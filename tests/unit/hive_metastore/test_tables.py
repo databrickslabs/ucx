@@ -136,7 +136,7 @@ def test_tables_returning_error_when_show_tables(caplog):
     tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()
     assert len(results) == 0
-    assert "Schema hive_metastore.database no longer existed" in caplog.text
+    assert "Schema hive_metastore.database no longer exists" in caplog.text
 
 
 @pytest.mark.parametrize(
