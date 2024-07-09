@@ -313,19 +313,19 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
         # Add more test cases here
     ],
 )
-def test_notebook_linter(lang, source, expected):
+def test_notebook_linter(lang, source, expected, mock_path_lookup):
     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
     # Hence SQL statement advice offsets can be wrong because of comments and statements
     # over multiple lines.
-    linter = NotebookLinter.from_source(index, source, lang)
+    linter = NotebookLinter.from_source(index, mock_path_lookup, source, lang)
     assert linter is not None
     gathered = list(linter.lint())
     assert gathered == expected
 
 
-def test_notebook_linter_name():
+def test_notebook_linter_name(mock_path_lookup):
     source = """-- Databricks notebook source"""
-    linter = NotebookLinter.from_source(index, source, Language.SQL)
+    linter = NotebookLinter.from_source(index, mock_path_lookup, source, Language.SQL)
     assert linter.name() == "notebook-linter"
 
 
@@ -544,8 +544,8 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
         ),
     ],
 )
-def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
-    linter = NotebookLinter.from_source(extended_test_index, source, lang)
+def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected, mock_path_lookup):
+    linter = NotebookLinter.from_source(extended_test_index, mock_path_lookup, source, lang)
     assert linter is not None
     advices = list(linter.lint())
     assert advices == expected
@@ -554,7 +554,7 @@ def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected)
 def test_computes_values_across_cells(extended_test_index, mock_path_lookup):
     path = mock_path_lookup.resolve(Path("values_across_cells.py"))
     source = path.read_text()
-    linter = NotebookLinter.from_source(extended_test_index, source, Language.PYTHON)
+    linter = NotebookLinter.from_source(extended_test_index, mock_path_lookup, source, Language.PYTHON)
     advices = list(linter.lint())
     expected = [
         Advice(
@@ -563,6 +563,24 @@ def test_computes_values_across_cells(extended_test_index, mock_path_lookup):
             start_line=5,
             start_col=0,
             end_line=5,
+            end_col=19,
+        )
+    ]
+    assert advices == expected
+
+
+def test_computes_values_across_notebooks_using_run(extended_test_index, mock_path_lookup):
+    path = mock_path_lookup.resolve(Path("values_across_notebooks.py"))
+    source = path.read_text()
+    linter = NotebookLinter.from_source(extended_test_index, mock_path_lookup, source, Language.PYTHON)
+    advices = list(linter.lint())
+    expected = [
+        Advice(
+            code='table-migrate',
+            message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
+            start_line=8,
+            start_col=0,
+            end_line=8,
             end_col=19,
         )
     ]

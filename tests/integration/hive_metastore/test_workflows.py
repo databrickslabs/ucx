@@ -15,8 +15,15 @@ from databricks.sdk.retries import retried
     ],
     indirect=("prepare_tables_for_migration",),
 )
-def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, prepare_tables_for_migration, workflow):
+def test_table_migration_job_refreshes_migration_status(
+    ws,
+    installation_ctx,
+    prepare_tables_for_migration,
+    workflow,
+    modified_or_skip,
+):
     """The migration status should be refreshed after the migration job."""
+    modified_or_skip("hive_metastore")
     tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={

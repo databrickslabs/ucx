@@ -246,7 +246,7 @@ class CommonUtils:
         return self._ws
 
 
-class TestRuntimeContext(CommonUtils, RuntimeContext):
+class MockRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
         make_table_fixture,
@@ -411,6 +411,11 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
     @cached_property
     def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
+        for udf_info in self._udfs:
+            if udf_info.catalog_name != "hive_metastore":
+                continue
+            assert udf_info.schema_name is not None
+            created_databases.add(udf_info.schema_name)
         for schema_info in self._schemas:
             if schema_info.catalog_name != "hive_metastore":
                 continue
@@ -472,12 +477,12 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> TestRuntimeContext:
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> MockRuntimeContext:
+    ctx = MockRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
         make_schema_fixture,
@@ -509,7 +514,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         )
 
 
-class LocalAzureCliTest(TestWorkspaceContext):
+class MockLocalAzureCli(MockWorkspaceContext):
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -525,11 +530,11 @@ class LocalAzureCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAzureCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
-class LocalAwsCliTest(TestWorkspaceContext):
+class MockLocalAwsCli(MockWorkspaceContext):
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
@@ -545,11 +550,11 @@ class LocalAwsCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAwsCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAwsCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
-class TestInstallationContext(TestRuntimeContext):
+class MockInstallationContext(MockRuntimeContext):
     __test__ = False
 
     def __init__(  # pylint: disable=too-many-arguments
@@ -578,7 +583,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_G{self._make_random(4)}"
+            workspace_group_name = f"ucx-{self._make_random(4)}-{get_purge_suffix()}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
@@ -741,9 +746,17 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_random,
     make_acc_group,
     make_user,
-) -> Generator[TestInstallationContext, None, None]:
-    ctx = TestInstallationContext(
-        make_table, make_schema, make_udf, make_group, env_or_skip, make_random, make_acc_group, make_user, ws
+) -> Generator[MockInstallationContext, None, None]:
+    ctx = MockInstallationContext(
+        make_table,
+        make_schema,
+        make_udf,
+        make_group,
+        env_or_skip,
+        make_random,
+        make_acc_group,
+        make_user,
+        ws,
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()

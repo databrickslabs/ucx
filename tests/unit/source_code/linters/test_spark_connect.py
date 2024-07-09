@@ -1,12 +1,12 @@
 from itertools import chain
 
-from databricks.labs.ucx.source_code.base import Failure
+from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
 
 def test_jvm_access_match_shared():
-    linter = SparkConnectLinter(is_serverless=False)
+    linter = SparkConnectLinter(CurrentSessionState())
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -26,7 +26,7 @@ spark._jspark._jvm.com.my.custom.Name()
 
 
 def test_jvm_access_match_serverless():
-    linter = SparkConnectLinter(is_serverless=True)
+    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -47,7 +47,7 @@ spark._jspark._jvm.com.my.custom.Name()
 
 
 def test_rdd_context_match_shared():
-    linter = SparkConnectLinter(is_serverless=False)
+    linter = SparkConnectLinter(CurrentSessionState())
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -91,7 +91,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
 
 
 def test_rdd_context_match_serverless():
-    linter = SparkConnectLinter(is_serverless=True)
+    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -133,7 +133,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
 
 
 def test_rdd_map_partitions():
-    linter = SparkConnectLinter(is_serverless=False)
+    linter = SparkConnectLinter(CurrentSessionState())
     code = """
 df = spark.createDataFrame([])
 df.rdd.mapPartitions(myUdf)
@@ -153,7 +153,7 @@ df.rdd.mapPartitions(myUdf)
 
 
 def test_conf_shared():
-    linter = SparkConnectLinter(is_serverless=False)
+    linter = SparkConnectLinter(CurrentSessionState())
     code = """df.sparkContext.getConf().get('spark.my.conf')"""
     assert [
         Failure(
@@ -168,7 +168,7 @@ def test_conf_shared():
 
 
 def test_conf_serverless():
-    linter = SparkConnectLinter(is_serverless=True)
+    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
     code = """sc._conf().get('spark.my.conf')"""
     expected = [
         Failure(
@@ -185,7 +185,7 @@ def test_conf_serverless():
 
 
 def test_logging_shared():
-    logging_matcher = LoggingMatcher(is_serverless=False)
+    logging_matcher = LoggingMatcher(CurrentSessionState())
     code = """
 sc.setLogLevel("INFO")
 setLogLevel("WARN")
@@ -226,7 +226,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 
 
 def test_logging_serverless():
-    logging_matcher = LoggingMatcher(is_serverless=True)
+    logging_matcher = LoggingMatcher(CurrentSessionState(is_serverless=True))
     code = """
 sc.setLogLevel("INFO")
 log4jLogger = sc._jvm.org.apache.log4j
@@ -255,7 +255,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
 
 def test_valid_code():
-    linter = SparkConnectLinter()
+    linter = SparkConnectLinter(CurrentSessionState())
     code = """
 df = spark.range(10)
 df.collect()
