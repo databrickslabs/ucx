@@ -543,7 +543,7 @@ for name, resource_type, levels, id_retriever in _redash_permissions_mapping():
 @pytest.fixture
 def make_secret_scope(ws, make_random):
     def create(**kwargs):
-        name = f"sdk-{make_random(4)}"
+        name = f"sdk-{make_random(4)}-{get_purge_suffix()}"
         ws.secrets.create_scope(name, **kwargs)
         return name
 
@@ -586,7 +586,7 @@ def make_notebook(ws, make_random):
 def make_directory(ws, make_random):
     def create(*, path: str | None = None):
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}-{get_purge_suffix()}"
         ws.workspace.mkdirs(path)
         return path
 
@@ -612,7 +612,7 @@ def make_user(ws, make_random):
 
     @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(**kwargs):
-        user = ws.users.create(user_name=f"sdk-{make_random(8)}@example.com".lower(), **kwargs)
+        user = ws.users.create(user_name=f"sdk-{make_random(4)}-{get_purge_suffix()}@example.com".lower(), **kwargs)
         return user
 
     yield from factory("workspace user", create, lambda item: ws.users.delete(item.id))
@@ -633,7 +633,7 @@ def _make_group(name, cfg, interface, make_random):
         wait_for_provisioning: bool = False,
         **kwargs,
     ):
-        kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
+        kwargs["display_name"] = f"sdk-{make_random(4)}-{get_purge_suffix()}" if display_name is None else display_name
         if members is not None:
             kwargs["members"] = _scim_values(members)
         if roles is not None:
@@ -1392,3 +1392,8 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
 def get_test_purge_time() -> str:
     return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
+
+def get_purge_suffix() -> str:
+    """HEX-encoded purge time suffix for test objects."""
+    return f'ra{int(get_test_purge_time()):x}'

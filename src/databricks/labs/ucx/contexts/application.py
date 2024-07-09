@@ -50,7 +50,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -355,7 +355,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self):
-        return PythonLibraryResolver(self.whitelist)
+        return PythonLibraryResolver(self.allow_list)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
@@ -384,12 +384,12 @@ class GlobalContext(abc.ABC):
         return FolderLoader(self.file_loader)
 
     @cached_property
-    def whitelist(self):
-        return Whitelist()
+    def allow_list(self):
+        return KnownList()
 
     @cached_property
     def file_resolver(self):
-        return ImportFileResolver(self.file_loader, self.whitelist)
+        return ImportFileResolver(self.file_loader, self.allow_list)
 
     @cached_property
     def dependency_resolver(self):

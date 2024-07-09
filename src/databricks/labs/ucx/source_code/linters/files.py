@@ -9,7 +9,7 @@ from typing import TextIO
 from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
@@ -246,9 +246,9 @@ class FolderLoader(FileLoader):
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, whitelist: Whitelist):
+    def __init__(self, file_loader: FileLoader, allow_list: KnownList):
         super().__init__()
-        self._whitelist = whitelist
+        self._allow_list = allow_list
         self._file_loader = file_loader
 
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
@@ -259,7 +259,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        maybe = self._resolve_whitelist(name)
+        maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
         maybe = self._resolve_import(path_lookup, name)
@@ -267,8 +267,8 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             return maybe
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
-    def _resolve_whitelist(self, name: str) -> MaybeDependency | None:
-        compatibility = self._whitelist.module_compatibility(name)
+    def _resolve_allow_list(self, name: str) -> MaybeDependency | None:
+        compatibility = self._allow_list.module_compatibility(name)
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
             return None
