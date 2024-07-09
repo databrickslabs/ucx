@@ -15,6 +15,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, 
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -67,19 +68,19 @@ class Functional:
     _location = Path(__file__).parent / 'samples/functional'
 
     @classmethod
-    def all(cls) -> list['Functional']:
-        return [Functional(_) for _ in cls._location.glob('**/*.py')]
+    def all(cls) -> list[Functional]:
+        return [Functional(path) for path in cls._location.glob('**/*.py')]
 
     @classmethod
-    def test_id(cls, sample: 'Functional') -> str:
+    def test_id(cls, sample: Functional) -> str:
         return sample.path.relative_to(cls._location).as_posix()
 
     def __init__(self, path: Path) -> None:
         self.path = path
 
-    def verify(self) -> None:
+    def verify(self, path_lookup: PathLookup) -> None:
         expected_problems = list(self._expected_problems())
-        actual_advices = list(self._lint())
+        actual_advices = list(self._lint(path_lookup))
         # Convert the actual problems to the same type as our expected problems for easier comparison.
         actual_problems = [Expectation.from_advice(advice) for advice in actual_advices]
 
@@ -99,7 +100,7 @@ class Functional:
         assert no_errors, "\n".join(errors)
         # TODO: output annotated file with comments for quick fixing
 
-    def _lint(self) -> Iterable[Advice]:
+    def _lint(self, path_lookup: PathLookup) -> Iterable[Advice]:
         migration_index = MigrationIndex(
             [
                 MigrationStatus('old', 'things', dst_catalog='brand', dst_schema='new', dst_table='stuff'),
@@ -110,7 +111,7 @@ class Functional:
         print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
-        linter = FileLinter(ctx, self.path)
+        linter = FileLinter(ctx, path_lookup, self.path)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
@@ -164,5 +165,5 @@ class Functional:
 
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
-def test_functional(sample: Functional) -> None:
-    sample.verify()
+def test_functional(sample: Functional, mock_path_lookup) -> None:
+    sample.verify(mock_path_lookup)
