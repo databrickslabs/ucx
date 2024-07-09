@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.install import deploy_schema
 
-from ..conftest import TestRuntimeContext
+from ..conftest import MockRuntimeContext
 from ..retries import retried
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def _deployed_schema(runtime_ctx) -> None:
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
 def test_all_grant_types(
-    runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
+    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
 ):
     """Test that all types of grants are properly handled by the view when reporting the object type and identifier."""
 
@@ -73,7 +73,7 @@ def test_all_grant_types(
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
 def test_grant_findings(
-    runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
+    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
 ) -> None:
     """Test that findings are reported for a grant."""
 

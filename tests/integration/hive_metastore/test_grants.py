@@ -6,8 +6,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
-
-from ..conftest import TestRuntimeContext
+from ..conftest import MockRuntimeContext
 from ..retries import retried
 
 logger = logging.getLogger(__name__)
@@ -87,7 +86,7 @@ def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_other_objects(
-    runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, make_group
+    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, make_group
 ) -> None:
     group_a = make_group()
     group_b = make_group()

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 import tokenize
 from collections.abc import Iterable, Generator
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,6 +15,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, 
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -60,22 +63,24 @@ class Functional:
     _re = re.compile(
         r"# ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
     )
+    _re_session_state = re.compile(r'# ucx\[session-state] (?P<session_state_json>\{.*})')
+
     _location = Path(__file__).parent / 'samples/functional'
 
     @classmethod
-    def all(cls) -> list['Functional']:
-        return [Functional(_) for _ in cls._location.glob('**/*.py')]
+    def all(cls) -> list[Functional]:
+        return [Functional(path) for path in cls._location.glob('**/*.py')]
 
     @classmethod
-    def test_id(cls, sample: 'Functional') -> str:
+    def test_id(cls, sample: Functional) -> str:
         return sample.path.relative_to(cls._location).as_posix()
 
     def __init__(self, path: Path) -> None:
         self.path = path
 
-    def verify(self) -> None:
+    def verify(self, path_lookup: PathLookup) -> None:
         expected_problems = list(self._expected_problems())
-        actual_advices = list(self._lint())
+        actual_advices = list(self._lint(path_lookup))
         # Convert the actual problems to the same type as our expected problems for easier comparison.
         actual_problems = [Expectation.from_advice(advice) for advice in actual_advices]
 
@@ -95,46 +100,61 @@ class Functional:
         assert no_errors, "\n".join(errors)
         # TODO: output annotated file with comments for quick fixing
 
-    def _lint(self) -> Iterable[Advice]:
+    def _lint(self, path_lookup: PathLookup) -> Iterable[Advice]:
         migration_index = MigrationIndex(
             [
                 MigrationStatus('old', 'things', dst_catalog='brand', dst_schema='new', dst_table='stuff'),
                 MigrationStatus('other', 'matters', dst_catalog='some', dst_schema='certain', dst_table='issues'),
             ]
         )
-        session_state = CurrentSessionState()
+        session_state = self._test_session_state()
+        print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
-        linter = FileLinter(ctx, self.path)
+        linter = FileLinter(ctx, path_lookup, self.path)
         return linter.lint()
 
-    def _expected_problems(self) -> Generator[Expectation, None, None]:
+    def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
         with self.path.open('rb') as f:
             for comment in self._comments(f):
                 if not comment.text.startswith('# ucx['):
                     continue
-                match = self._re.match(comment.text)
+                match = regex.match(comment.text)
                 if not match:
                     continue
                 groups = match.groupdict()
-                reported_start_line = groups['start_line']
-                if '+' in reported_start_line:
-                    start_line = int(reported_start_line[1:]) + comment.start_line
-                else:
-                    start_line = int(reported_start_line)
-                reported_end_line = groups['end_line']
-                if '+' in reported_end_line:
-                    end_line = int(reported_end_line[1:]) + comment.start_line
-                else:
-                    end_line = int(reported_end_line)
-                yield Expectation(
-                    code=groups['code'],
-                    message=groups['message'],
-                    start_line=start_line,
-                    start_col=int(groups['start_col']),
-                    end_line=end_line,
-                    end_col=int(groups['end_col']),
-                )
+                yield comment, groups
+
+    def _expected_problems(self) -> Generator[Expectation, None, None]:
+        for comment, groups in self._regex_match(self._re):
+            reported_start_line = groups['start_line']
+            if '+' in reported_start_line:
+                start_line = int(reported_start_line[1:]) + comment.start_line
+            else:
+                start_line = int(reported_start_line)
+            reported_end_line = groups['end_line']
+            if '+' in reported_end_line:
+                end_line = int(reported_end_line[1:]) + comment.start_line
+            else:
+                end_line = int(reported_end_line)
+            yield Expectation(
+                code=groups['code'],
+                message=groups['message'],
+                start_line=start_line,
+                start_col=int(groups['start_col']),
+                end_line=end_line,
+                end_col=int(groups['end_col']),
+            )
+
+    def _test_session_state(self) -> CurrentSessionState:
+        matches = list(self._regex_match(self._re_session_state))
+        if len(matches) > 1:
+            raise ValueError("A test should have no more than one session state definition")
+        if len(matches) == 0:
+            return CurrentSessionState()
+        groups = matches[0][1]
+        json_str = groups['session_state_json']
+        return CurrentSessionState.from_json(json.loads(json_str))
 
     @staticmethod
     def _comments(f) -> Generator[Comment, None, None]:
@@ -145,5 +165,5 @@ class Functional:
 
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
-def test_functional(sample: Functional) -> None:
-    sample.verify()
+def test_functional(sample: Functional, mock_path_lookup) -> None:
+    sample.verify(mock_path_lookup)

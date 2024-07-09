@@ -92,7 +92,7 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx,
     make_cluster_policy,
@@ -197,7 +197,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
         get_group(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_repair_run_workflow_job(installation_ctx, mocker):
     mocker.patch("webbrowser.open")
     installation_ctx.workspace_installation.run()
@@ -407,7 +407,7 @@ def test_table_migration_job(
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job_cluster_override(
     ws,

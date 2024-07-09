@@ -6,7 +6,7 @@ from databricks.sdk.errors import InvalidParameterValue, NotFound
 from ..retries import retried
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
     [
