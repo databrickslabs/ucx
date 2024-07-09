@@ -3,7 +3,7 @@ name: nightly
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 5 * * *'
 
 permissions:
   id-token: write
@@ -38,7 +38,7 @@ jobs:
         uses: databrickslabs/sandbox/acceptance@acceptance/v0.2.2
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
-          timeout: 45m
+          timeout: 55m
           create_issues: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
