@@ -14,7 +14,6 @@ from astroid import (  # type: ignore
     Const,
     Import,
     ImportFrom,
-    InferenceError,
     Module,
     Name,
     NodeNG,

@@ -155,5 +155,7 @@ df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
     tree = Tree.normalize_and_parse(source)
-    save_call = tree.locate(Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)])[0]
+    save_call = tree.locate(
+        Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)]
+    )[0]
     assert Tree(save_call).is_from_module("spark")

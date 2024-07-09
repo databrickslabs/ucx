@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Name, NodeNG  # type: ignore
+from astroid import Attribute, Call, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
