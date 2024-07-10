@@ -1,11 +1,7 @@
-from datetime import timedelta
-
 import pytest
-from databricks.sdk.errors import InvalidParameterValue, NotFound
-from databricks.sdk.retries import retried
+from databricks.sdk.errors import NotFound
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
     [
@@ -63,7 +59,6 @@ def test_table_migration_job_refreshes_migration_status(
     assert len(asserts) == 0, assert_message
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_tables_for_migration):
     tables, dst_schema = prepare_tables_for_migration
@@ -84,7 +79,6 @@ def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_ta
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables_for_migration):
     tables, dst_schema = prepare_tables_for_migration
