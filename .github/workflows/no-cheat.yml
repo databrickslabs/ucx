@@ -20,11 +20,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify no lint is disabled in the new code
+      - name: Verify no additional disabled lint in the new code
         run: |
+          OLD_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^-')
+          OLD_CHEATS=$(echo "${OLD_CODE}" | grep -c '# pylint: disable'
           NEW_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
-          CHEAT=$(echo "${NEW_CODE}" | grep '# pylint: disable' | grep -v "CHEAT" | wc -c)
-          if [ "${CHEAT}" -ne 0 ]; then
-            echo "Do not cheat the linter: ${CHEAT}"
+          NEW_CHEATS=$(echo "${NEW_CODE}" | grep -c '# pylint: disable'
+          CHEATS=$((NEW_CHEATS-OLD_CHEATS))
+          if [ "${CHEATS}" -ne 0 ]; then
+            echo "Do not cheat the linter: ${CHEATS} new '# pylint: disable ...'"
             exit 1
           fi
