@@ -3141,6 +3141,83 @@
     "dockerpycreds.utils": [],
     "dockerpycreds.version": []
   },
+  "duckdb": {
+    "adbc_driver_duckdb": [],
+    "adbc_driver_duckdb.dbapi": [],
+    "duckdb": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'conn.table(table_name, **kwargs)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'conn.sql(query, **kwargs)' because its value cannot be computed"
+      }
+    ],
+    "duckdb.bytes_io_wrapper": [],
+    "duckdb.experimental": [],
+    "duckdb.experimental.spark": [],
+    "duckdb.experimental.spark._globals": [],
+    "duckdb.experimental.spark._typing": [],
+    "duckdb.experimental.spark.conf": [],
+    "duckdb.experimental.spark.context": [],
+    "duckdb.experimental.spark.errors": [],
+    "duckdb.experimental.spark.errors.error_classes": [],
+    "duckdb.experimental.spark.errors.exceptions": [],
+    "duckdb.experimental.spark.errors.exceptions.base": [],
+    "duckdb.experimental.spark.errors.utils": [],
+    "duckdb.experimental.spark.exception": [],
+    "duckdb.experimental.spark.sql": [],
+    "duckdb.experimental.spark.sql._typing": [],
+    "duckdb.experimental.spark.sql.catalog": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._session.conn.sql(query)' because its value cannot be computed"
+      }
+    ],
+    "duckdb.experimental.spark.sql.column": [],
+    "duckdb.experimental.spark.sql.conf": [],
+    "duckdb.experimental.spark.sql.dataframe": [],
+    "duckdb.experimental.spark.sql.functions": [],
+    "duckdb.experimental.spark.sql.group": [],
+    "duckdb.experimental.spark.sql.readwriter": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.session.conn.sql(f'select * from {path}')' because its value cannot be computed"
+      }
+    ],
+    "duckdb.experimental.spark.sql.session": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.conn.table(tableName)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(f'select * from \"{unique_name}\"')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(query, params=parameters)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(sqlQuery)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "duckdb.experimental.spark.sql.streaming": [],
+    "duckdb.experimental.spark.sql.type_utils": [],
+    "duckdb.experimental.spark.sql.types": [],
+    "duckdb.experimental.spark.sql.udf": [],
+    "duckdb.filesystem": [],
+    "duckdb.functional": [],
+    "duckdb.typing": [],
+    "duckdb.udf": [],
+    "duckdb.value.constant": []
+  },
   "docstring-to-markdown": {
     "docstring_to_markdown": [],
     "docstring_to_markdown._utils": [],
@@ -3224,7 +3301,7 @@
   "emmv": {
     "emmv": []
   },
- "einops": {
+  "einops": {
     "einops": [],
     "einops._backends": [],
     "einops._torch_specific": [],
@@ -6763,7 +6840,7 @@
     "livereload.server": [],
     "livereload.watcher": []
   },
- "lxml": {
+  "lxml": {
     "lxml": []
   },
   "mako": {
