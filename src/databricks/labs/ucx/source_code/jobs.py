@@ -287,17 +287,22 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
+        include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
+        self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         tasks = []
         all_jobs = list(self._ws.jobs.list())
         logger.info(f"Preparing {len(all_jobs)} linting jobs...")
         for job in all_jobs:
+            if self._include_job_ids and job.job_id not in self._include_job_ids:
+                logger.info(f"Skipping job {job.job_id}...")
+                continue
             tasks.append(functools.partial(self.lint_job, job.job_id))
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_problems, errors = Threads.gather('linting workflows', tasks)
