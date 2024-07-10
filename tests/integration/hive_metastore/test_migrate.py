@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
@@ -126,7 +126,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     assert target_tables[0]["tableName"] == table_name
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, PermissionDenied], timeout=timedelta(minutes=2))
 def test_migrate_external_table(
     ws,
     sql_backend,
