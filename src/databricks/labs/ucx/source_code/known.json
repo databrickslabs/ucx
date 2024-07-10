@@ -1014,6 +1014,17 @@
     "bleach.parse_shim": [],
     "bleach.sanitizer": []
   },
+  "blessed": {
+    "blessed": [],
+    "blessed._capabilities": [],
+    "blessed.color": [],
+    "blessed.colorspace": [],
+    "blessed.formatters": [],
+    "blessed.keyboard": [],
+    "blessed.sequences": [],
+    "blessed.terminal": [],
+    "blessed.win_terminal": []
+  },
   "blinker": {
     "blinker": [],
     "blinker._utilities": [],
@@ -3129,6 +3140,10 @@
   },
   "dill": {
     "dill": []
+  },
+  "distro": {
+    "distro": [],
+    "distro.distro": []
   },
   "docker": {
     "docker": []
