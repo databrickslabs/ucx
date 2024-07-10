@@ -3130,6 +3130,10 @@
   "dill": {
     "dill": []
   },
+  "distro": {
+    "distro": [],
+    "distro.distro": []
+  },
   "docker": {
     "docker": []
   },
