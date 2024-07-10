@@ -1863,10 +1863,6 @@
         "message": "Deprecated file system path: dbfs:/mnt/resources.training.databricks.com/distributions/"
       }
     ],
-    "dbacademy.dbbuild.test": [],
-    "dbacademy.dbbuild.test.results_evaluator": [],
-    "dbacademy.dbbuild.test.test_instance": [],
-    "dbacademy.dbbuild.test.test_suite": [],
     "dbacademy.dbgems": [
       {
         "code": "jvm-access-in-shared-clusters",
