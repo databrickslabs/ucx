@@ -8441,6 +8441,9 @@
   "pexpect": {
     "pexpect": []
   },
+  "pickleshare": {
+    "pickleshare": []
+  },
   "pillow": {
     "PIL": []
   },
