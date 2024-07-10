@@ -55,9 +55,9 @@ def test_list_and_analyze_should_separate_folders_and_other_objects():
     client.workspace.list.return_value = [file, directory, notebook]
 
     listing_instance = listing.WorkspaceListing(client, 1)
-    directories, others = listing_instance._list_and_analyze(rootobj)  # pylint: disable=protected-access
+    directories, others2 = listing_instance._list_and_analyze(rootobj)  # pylint: disable=protected-access
 
-    assert compare(others, [file, notebook])
+    assert compare(others2, [file, notebook])
     assert compare(directories, [directory])
 
 
