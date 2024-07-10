@@ -19,7 +19,5 @@ for i in range(10):
     spark.catalog.recoverPartitions(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: This is a false positive; any method named 'recoverPartitions' is triggering the warning.
-    # ucx[table-migrate:+1:4:+1:50] Table old.things is migrated to brand.new.stuff in Unity Catalog
     something_else.recoverPartitions("old.things")
     a_function("old.things")
