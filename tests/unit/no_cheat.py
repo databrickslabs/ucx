@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 DISABLE_TAG = '# pylint: disable='
 
@@ -30,4 +31,7 @@ def no_cheat(diff_text: str) -> str:
 
 if __name__ == "__main__":
     diff_data = sys.argv[1]
+    path = Path(diff_data)
+    if path.exists():
+        diff_data = path.read_text()
     print(no_cheat(diff_data))
