@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
@@ -221,7 +221,7 @@ def test_migrate_external_table_hiveserde_in_place(
         assert row["region"] == "us"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, PermissionDenied], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_ctas(
     ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
 ):
