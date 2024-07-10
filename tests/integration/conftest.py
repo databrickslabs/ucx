@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():  # pylint: disable=function-redefined
+def debug_env_name():  # pylint: disable=some-code
     return "ucws"
 
 
