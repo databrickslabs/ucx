@@ -33,11 +33,6 @@ class DashboardFromFiles:
 
         self._dashboards = Dashboards(self._ws)
 
-    def dashboard_link(self, dashboard_ref: str):
-        dashboard_id = self._state.dashboards[dashboard_ref]
-        dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
-        return dashboard_url
-
     def create_dashboards(self) -> None:
         try:
             self._ws.workspace.mkdirs(self._remote_folder)
