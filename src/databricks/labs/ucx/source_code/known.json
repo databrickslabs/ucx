@@ -4456,6 +4456,19 @@
   "gunicorn": {
     "gunicorn": []
   },
+  "h11": {
+    "h11": [],
+    "h11._abnf": [],
+    "h11._connection": [],
+    "h11._events": [],
+    "h11._headers": [],
+    "h11._readers": [],
+    "h11._receivebuffer": [],
+    "h11._state": [],
+    "h11._util": [],
+    "h11._version": [],
+    "h11._writers": []
+  },
   "h3": {
     ".........setup": [],
     "h3": [],
