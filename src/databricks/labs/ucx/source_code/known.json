@@ -3224,7 +3224,7 @@
   "emmv": {
     "emmv": []
   },
- "einops": {
+  "einops": {
     "einops": [],
     "einops._backends": [],
     "einops._torch_specific": [],
@@ -5165,7 +5165,7 @@
   },
   "jsonschema-specifications": {
     "jsonschema_specifications": [],
-    "jsonschema_specifications._core": [],
+    "jsonschema_specifications._core": []
   },
   "jupyter_client": {
     "jupyter_client": []
@@ -6781,7 +6781,7 @@
     "livereload.server": [],
     "livereload.watcher": []
   },
- "lxml": {
+  "lxml": {
     "lxml": []
   },
   "mako": {
