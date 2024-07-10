@@ -23,8 +23,10 @@ jobs:
       - name: Verify no additional disabled lint in the new code
         run: |
           DIFFS=$(git diff origin/main..$(git branch --show-current))
+          echo $DIFFS
           RESULTS=$(python tests/unit/no_cheat.py ${DIFFS})
-          if [ "${#RESULTS}" -gt 0 ]; then
+          echo ${RESULTS}
+          if [ ${#RESULTS} -gt 0 ]; then
             echo ${RESULTS}
             exit 1
           fi
