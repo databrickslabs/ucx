@@ -76,6 +76,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._spark_conf: dict[str, str] | None = {}
         self._spark_version: str | None = None
         self._data_security_mode = None
+        self._is_serverless = False
 
     @property
     def named_parameters(self) -> dict[str, str]:
@@ -268,6 +269,8 @@ class WorkflowTaskContainer(SourceContainer):
                 if job_cluster.job_cluster_key != self._task.job_cluster_key:
                     continue
                 return self._new_job_cluster_metadata(job_cluster.new_cluster)
+        self._data_security_mode = compute.DataSecurityMode.USER_ISOLATION
+        self._is_serverless = True
         return []
 
     def _new_job_cluster_metadata(self, new_cluster):
@@ -284,17 +287,22 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
+        include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
+        self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         tasks = []
         all_jobs = list(self._ws.jobs.list())
         logger.info(f"Preparing {len(all_jobs)} linting jobs...")
         for job in all_jobs:
+            if self._include_job_ids and job.job_id not in self._include_job_ids:
+                logger.info(f"Skipping job {job.job_id}...")
+                continue
             tasks.append(functools.partial(self.lint_job, job.job_id))
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_problems, errors = Threads.gather('linting workflows', tasks)
@@ -357,6 +365,7 @@ class WorkflowLinter:
             data_security_mode=container.data_security_mode,
             named_parameters=container.named_parameters,
             spark_conf=container.spark_conf,
+            dbr_version=container.runtime_version,
         )
         graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
@@ -377,11 +386,11 @@ class WorkflowLinter:
                 yield from self._lint_file(container, ctx)
 
     def _lint_file(self, file: LocalFile, ctx: LinterContext):
-        linter = FileLinter(ctx, file.path)
+        linter = FileLinter(ctx, self._path_lookup, file.path)
         for advice in linter.lint():
             yield file.path, advice
 
     def _lint_notebook(self, notebook: Notebook, ctx: LinterContext):
-        linter = NotebookLinter(ctx, notebook)
+        linter = NotebookLinter(ctx, self._path_lookup, notebook)
         for advice in linter.lint():
             yield notebook.path, advice

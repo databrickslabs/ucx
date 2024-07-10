@@ -618,6 +618,9 @@ in the Migration dashboard.
 The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
 workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
 
+Once the workflow completes, the output will be stored in `$inventory_database.workflow_problems` table, and displayed
+in the Migration dashboard.
+
 ![code compatibility problems](docs/code_compatibility_problems.png)
 
 [[back to top](#databricks-labs-ucx)]
