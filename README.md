@@ -86,8 +86,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Multiple Profiles in Databricks CLI](#multiple-profiles-in-databricks-cli)
     * [Authentication Issues](#authentication-issues)
     * [Workspace has an external Hive Metastore (HMS)](#workspace-has-an-external-hive-metastore-hms)
-* [Verify the Installation](#verify-the-installation)
-* [Contact Us](#contact-us)
+    * [Verify the Installation](#verify-the-installation)
 * [Star History](#star-history)
 * [Project Support](#project-support)
 <!-- TOC -->
@@ -1313,6 +1312,8 @@ By default, it will revert all the clusters present in the backup folder
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Network Connectivity Issues
 
 **From local machine to the Databricks Account and Workspace:** UCX
@@ -1351,6 +1352,8 @@ enabled clusters. If you have different proxy settings for each, then
 please update the necessary proxies (eg. with init scripts) for each
 cluster type.
 
+[[back to top](#databricks-labs-ucx)]
+
 ### Insufficient Privileges
 
 **User is not a Databricks workspace administrator:** User running the
@@ -1360,12 +1363,14 @@ deploy the UCX tool into the workspace, create jobs, and dashboards.
 **Solution:** Identify a workspace admin from your team and ask them to
 install UCX with their authentication, or request a workspace
 administrator to grant you temporary administrator privileges to run the
-installation.
+installation. More details on the issues that you can run into if
+you are not an admin (and some possible solutions) can be found
+[here](docs/troubleshooting.md#resolving-common-errors-on-ucx-install).
 
 **User is not a Cloud IAM Administrator:** Cloud CLI needs to be
 installed in the local machine for certain cloud related activities,
 like creating an [<u>uber
-principal</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-uber-principal-command).
+principal</u>](#create-uber-principal-command).
 For this, the user needs Cloud IAM Administrator privileges.
 
 **Solution:** Work with a cloud administrator in your organization to
@@ -1375,18 +1380,20 @@ Admin privileges required for commands:
 
 | **CLI command** | **Admin privileges** |
 |----|----|
-| [<u>install</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#install-ucx) | Workspace Admin |
-| [<u>account install</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account) | Account Admin |
-| [<u>create-account-groups</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-account-groups-command) | Account Admin |
-| [<u>validate-groups-membership</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#validate-groups-membership-command) | Account Admin |
-| [<u>create-uber-principal</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-uber-principal-command) | Cloud Admin |
-| [<u>principal-prefix-access</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#principal-prefix-access-command) | Cloud Admin |
-| [<u>create-missing-principals</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-missing-pricipals-command-aws-only) | Cloud Admin |
-| [<u>migrate-credentials</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#migrate-credentials-command) | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
-| [<u>migrate-location</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#migrate-locations-command) | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
-| [<u>create-catalogs-schemas</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-catalogs-schemas-command) | Metastore Admin / CREATE CATALOG privilege |
-| [<u>sync-workspace-info</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#sync-workspace-info-command) | Account Admin |
-| [<u>manual-workspace-info</u>](https://github.com/databrickslabs/ucx?tab=readme-ov-file#manual-workspace-info-command) | Workspace Admin |
+| [<u>install</u>](#install-ucx) | Workspace Admin |
+| [<u>account install</u>](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account) | Account Admin |
+| [<u>create-account-groups</u>](#create-account-groups-command) | Account Admin |
+| [<u>validate-groups-membership</u>](#validate-groups-membership-command) | Account Admin |
+| [<u>create-uber-principal</u>](#create-uber-principal-command) | Cloud Admin |
+| [<u>principal-prefix-access</u>](#principal-prefix-access-command) | Cloud Admin |
+| [<u>create-missing-principals</u>](#create-missing-pricipals-command-aws-only) | Cloud Admin |
+| [<u>migrate-credentials</u>](#migrate-credentials-command) | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
+| [<u>migrate-location</u>](#migrate-locations-command) | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
+| [<u>create-catalogs-schemas</u>](#create-catalogs-schemas-command) | Metastore Admin / CREATE CATALOG privilege |
+| [<u>sync-workspace-info</u>](#sync-workspace-info-command) | Account Admin |
+| [<u>manual-workspace-info</u>](#manual-workspace-info-command) | Workspace Admin |
+
+[[back to top](#databricks-labs-ucx)]
 
 ### Version Issues
 
@@ -1415,6 +1422,33 @@ specific version of UCX, you can do it using the command
 “databricks labs install ucx@\<version\>”, for example,
 “databricks labs install ucx@v0.21.0”.
 
+[[back to top](#databricks-labs-ucx)]
+
+### Authentication Issues
+
+**Workspace Level:** If you are facing authentication issues while
+setting up Databricks CLI, please refer to the
+[Cryptic errors on authentication](docs/troubleshooting.md#cryptic-errors-on-authentication)
+section to resolve the common errors related to authentication,
+profiles, and tokens.
+
+**Account Level:** Not only workspace, but account level authentication
+is also needed for installing UCX. If you do not have an account
+configured in .databrickscfg, you will get an error message
+“.databrickscfg does not contain account profiles; please create one
+first”.
+
+**Solution:** To authenticate with a Databricks account, consider using
+one of the following authentication types: [<u>OAuth machine-to-machine
+(M2M)
+authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#m2m-auth),
+[<u>OAuth user-to-machine (U2M)
+authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#u2m-auth),
+[<u>Basic authentication
+(legacy)</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#basic-auth).
+
+[[back to top](#databricks-labs-ucx)]
+
 ### Multiple Profiles in Databricks CLI
 
 **Workspace Level:** More than one workspace profile can be configured
@@ -1437,22 +1471,7 @@ profile: “*databricks labs install ucx -p prod*”.
 **Solution:** The installation command “*databricks labs install ucx*”
 will provide an option to select one account profile.
 
-### Authentication Issues
-
-**Account Level:** Not only workspace, but account level authentication
-is also needed for installing UCX. If you do not have an account
-configured in .databrickscfg, you will get an error message
-“.databrickscfg does not contain account profiles; please create one
-first”.
-
-**Solution:** To authenticate with a Databricks account, consider using
-one of the following authentication types: [<u>OAuth machine-to-machine
-(M2M)
-authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#m2m-auth),
-[<u>OAuth user-to-machine (U2M)
-authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#u2m-auth),
-[<u>Basic authentication
-(legacy)</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#basic-auth).
+[[back to top](#databricks-labs-ucx)]
 
 ### Workspace has an external Hive Metastore (HMS)
 
@@ -1465,7 +1484,7 @@ will not be able to assess the tables on HMS.
 required Spark config for connecting to the external HMS, or manually
 edit the cluster post-installation to have the correct configurations.
 Detailed steps can be found
-[<u>here</u>](https://github.com/databrickslabs/ucx/blob/main/docs/external_hms_glue.md).
+[<u>here</u>](docs/external_hms_glue.md).
 
 **External HMS connectivity from UCX SQL warehouse:** UCX requires a SQL
 warehouse to create tables, run queries, create and refresh dashboards.
@@ -1482,7 +1501,9 @@ admin settings do not have the configurations already set. For example,
 add *spark.hadoop.javax.jdo.option.ConnectionURL \<connectionstring\>*
 under Data Access Configuration of SQL Warehouse Admin Settings.
 
-# Verify the Installation
+[[back to top](#databricks-labs-ucx)]
+
+### Verify the Installation
 
 Once the UCX command “*databricks labs install ucx*” has completed
 successfully, the installation can be verified with the following steps:
@@ -1497,15 +1518,7 @@ successfully, the installation can be verified with the following steps:
     external HMS, verify from the results that the assessment has
     analyzed the external HMS tables.
 
-# Contact Us
-
-For any concerns/issues:
-
-- File an [<u>issue</u>](https://github.com/databrickslabs/ucx/issues)
-
-- Reach out to Databricks support
-
-- Contact your Databricks SA/DSA
+[[back to top](#databricks-labs-ucx)]
 
 # Star History
 
