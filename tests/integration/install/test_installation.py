@@ -1,8 +1,6 @@
 import dataclasses
 import json
 import logging
-import os.path
-import sys
 from dataclasses import replace
 from datetime import timedelta
 
@@ -91,11 +89,9 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
-    installation_ctx,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
+    installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group, acc_group = installation_ctx.make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
@@ -196,7 +192,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
         get_group(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_repair_run_workflow_job(installation_ctx, mocker):
     mocker.patch("webbrowser.open")
     installation_ctx.workspace_installation.run()
@@ -362,15 +358,7 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job(
-    ws,
-    installation_ctx,
-    env_or_skip,
-    prepare_tables_for_migration,
-):
-    # skip this test if not in nightly test job or debug mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        env_or_skip("TEST_NIGHTLY")
+def test_table_migration_job(ws, installation_ctx, env_or_skip, prepare_tables_for_migration):
 
     ctx = installation_ctx.replace(
         config_transform=lambda wc: replace(wc, override_clusters=None),
@@ -406,14 +394,10 @@ def test_table_migration_job(
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job_cluster_override(
-    ws,
-    installation_ctx,
-    prepare_tables_for_migration,
-    env_or_skip,
-):
+def test_table_migration_job_cluster_override(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
+
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={

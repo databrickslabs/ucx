@@ -17,13 +17,11 @@ for i in range(10):
     df.write.insertInto(overwrite=None, tableName="old.things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:4:+1:29] Can't migrate 'df.write.insertInto(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:29] Can't migrate 'df.write.insertInto(name)' because its table name argument cannot be computed
     df.write.insertInto(name)
-    # ucx[table-migrate:+1:4:+1:39] Can't migrate 'df.write.insertInto(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:39] Can't migrate 'df.write.insertInto(f'boop{stuff}')' because its table name argument cannot be computed
     df.write.insertInto(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: This is a false positive; any method named 'insertInto' is triggering the warning.
-    # ucx[table-migrate:+1:4:+1:43] Table old.things is migrated to brand.new.stuff in Unity Catalog
     something_else.insertInto("old.things")
     a_function("old.things")

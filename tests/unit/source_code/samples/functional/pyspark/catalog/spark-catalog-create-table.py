@@ -27,15 +27,13 @@ for i in range(10):
     do_stuff_with(df)
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:9:+1:40] Can't migrate 'spark.catalog.createTable(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:9:+1:40] Can't migrate 'spark.catalog.createTable(name)' because its table name argument cannot be computed
     df = spark.catalog.createTable(name)
     do_stuff_with(df)
-    # ucx[table-migrate:+1:9:+1:50] Can't migrate 'spark.catalog.createTable(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:9:+1:50] Can't migrate 'spark.catalog.createTable(f'boop{stuff}')' because its table name argument cannot be computed
     df = spark.catalog.createTable(f"boop{stuff}")
     do_stuff_with(df)
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: This is a false positive; any method named 'createTable' is triggering the warning.
-    # ucx[table-migrate:+1:4:+1:44] Table old.things is migrated to brand.new.stuff in Unity Catalog
     something_else.createTable("old.things")
     a_function("old.things")

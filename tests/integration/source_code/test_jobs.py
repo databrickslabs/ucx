@@ -6,6 +6,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -14,23 +15,22 @@ from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.known import UNKNOWN, Whitelist
+from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
-from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)
-    make_job(notebook_path=notebook)
-
-    ctx = installation_ctx
+    job = make_job(notebook_path=notebook)
+    ctx = installation_ctx.replace(config_transform=lambda wc: replace(wc, include_job_ids=[job.job_id]))
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
     ctx.deployed_workflows.validate_step("experimental-workflow-linter")
@@ -47,7 +47,8 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
     # but it's executed on the caller side and is easier to debug.
     # ensure we have at least 1 job that fails
     notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
-    make_job(notebook_path=notebook_path)
+    job = make_job(notebook_path=notebook_path)
+    simple_ctx.config.include_job_ids = [job.job_id]
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
     cursor = simple_ctx.sql_backend.fetch(
@@ -119,7 +120,7 @@ def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, 
         "second_notebook:3 [dbfs-usage] Deprecated file system path: /mnt/something",
     }
 
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
     entrypoint.mkdir()
 
     main_notebook = entrypoint / 'main'
@@ -154,7 +155,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_notebook,
     make_random,
 ):
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
@@ -260,11 +261,11 @@ def test_workflow_linter_lints_job_with_missing_library(
     make_directory,
 ):
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
-    whitelist = create_autospec(Whitelist)  # databricks is in default list
-    whitelist.module_compatibility.return_value = UNKNOWN
+    allow_list = create_autospec(KnownList)  # databricks is in default list
+    allow_list.module_compatibility.return_value = UNKNOWN
 
     simple_ctx = simple_ctx.replace(
-        whitelist=whitelist,
+        allow_list=allow_list,
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
@@ -274,7 +275,7 @@ def test_workflow_linter_lints_job_with_missing_library(
     problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) > 0
-    whitelist.module_compatibility.assert_called_once_with("databricks.labs.ucx")
+    allow_list.module_compatibility.assert_called_once_with("databricks.labs.ucx")
 
 
 def test_workflow_linter_lints_job_with_wheel_dependency(
@@ -288,7 +289,7 @@ def test_workflow_linter_lints_job_with_wheel_dependency(
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist(),  # databricks is in default list
+        allow_list=KnownList(),  # databricks is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
@@ -305,7 +306,13 @@ def test_workflow_linter_lints_job_with_wheel_dependency(
 
 
 def test_job_spark_python_task_linter_happy_path(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+    simple_ctx,
+    ws,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
 ):
     entrypoint = make_directory()
 
@@ -348,12 +355,12 @@ def test_job_spark_python_task_linter_unhappy_path(
 
 
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random):
-    whitelist = create_autospec(Whitelist)  # databricks is in default list
-    whitelist.module_compatibility.return_value = UNKNOWN
-    whitelist.distribution_compatibility.return_value = UNKNOWN
+    allow_list = create_autospec(KnownList)  # databricks is in default list
+    allow_list.module_compatibility.return_value = UNKNOWN
+    allow_list.distribution_compatibility.return_value = UNKNOWN
 
     simple_ctx = simple_ctx.replace(
-        whitelist=whitelist,
+        allow_list=allow_list,
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
@@ -379,11 +386,18 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
 
     assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
     assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
-    whitelist.distribution_compatibility.assert_called_once()
+    allow_list.distribution_compatibility.assert_called_once()
 
 
 def test_job_dlt_task_linter_unhappy_path(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory, make_pipeline
+    simple_ctx,
+    ws,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
+    make_pipeline,
 ):
     entrypoint = make_directory()
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
@@ -402,7 +416,14 @@ def test_job_dlt_task_linter_unhappy_path(
 
 
 def test_job_dlt_task_linter_happy_path(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory, make_pipeline
+    simple_ctx,
+    ws,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
+    make_pipeline,
 ):
     entrypoint = make_directory()
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")

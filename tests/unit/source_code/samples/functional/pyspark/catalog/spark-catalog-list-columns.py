@@ -23,13 +23,11 @@ for i in range(10):
     columns = spark.catalog.listColumns(dbName="old", name="things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:14:+1:45] Can't migrate 'spark.catalog.listColumns(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:14:+1:45] Can't migrate 'spark.catalog.listColumns(name)' because its table name argument cannot be computed
     columns = spark.catalog.listColumns(name)
-    # ucx[table-migrate:+1:14:+1:55] Can't migrate 'spark.catalog.listColumns(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:14:+1:55] Can't migrate 'spark.catalog.listColumns(f'boop{stuff}')' because its table name argument cannot be computed
     columns = spark.catalog.listColumns(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: This is a false positive; any method named 'listColumns' is triggering the warning.
-    # ucx[table-migrate:+1:4:+1:44] Table old.things is migrated to brand.new.stuff in Unity Catalog
     something_else.listColumns("old.things")
     a_function("old.things")

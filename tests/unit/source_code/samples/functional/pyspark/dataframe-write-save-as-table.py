@@ -17,14 +17,11 @@ for i in range(10):
     df.write.saveAsTable(format="xyz", name="old.things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:4:+1:46] Can't migrate 'df.write.format('delta').saveAsTable(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:46] Can't migrate 'df.write.format('delta').saveAsTable(name)' because its table name argument cannot be computed
     df.write.format("delta").saveAsTable(name)
-    # ucx[table-migrate:+1:4:+1:56] Can't migrate 'df.write.format('delta').saveAsTable(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:56] Can't migrate 'df.write.format('delta').saveAsTable(f'boop{stuff}')' because its table name argument cannot be computed
     df.write.format("delta").saveAsTable(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: This are false positives; any method named 'saveAsTable' is triggering the warnings.
-    # ucx[table-migrate:+2:4:+2:44] Table old.things is migrated to brand.new.stuff in Unity Catalog
-    # ucx[table-migrate:+1:4:+1:44] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     something_else.saveAsTable("old.things")
     a_function("old.things")

@@ -6,7 +6,7 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
@@ -132,8 +132,8 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    library_resolver = PythonLibraryResolver(Whitelist())
-    import_resolver = ImportFileResolver(FileLoader(), Whitelist())
+    library_resolver = PythonLibraryResolver(KnownList())
+    import_resolver = ImportFileResolver(FileLoader(), KnownList())
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
 
 
@@ -280,4 +280,4 @@ dbutils.notebook.run(f"Hey {name2}")
     linter = DbutilsLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert len(advices) == 1
-    assert advices[0].code == "dbutils-notebook-run-dynamic"
+    assert advices[0].code == "notebook-run-cannot-compute-value"

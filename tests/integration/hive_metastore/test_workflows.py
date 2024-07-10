@@ -5,7 +5,7 @@ from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
     [
@@ -15,7 +15,12 @@ from databricks.sdk.retries import retried
     ],
     indirect=("prepare_tables_for_migration",),
 )
-def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, prepare_tables_for_migration, workflow):
+def test_table_migration_job_refreshes_migration_status(
+    ws,
+    installation_ctx,
+    prepare_tables_for_migration,
+    workflow,
+):
     """The migration status should be refreshed after the migration job."""
     tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
@@ -56,3 +61,45 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
         "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
     )
     assert len(asserts) == 0, assert_message
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
+def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_tables_for_migration):
+    tables, dst_schema = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-external-hiveserde-tables-in-place-experimental")
+    # assert the tables are migrated
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
+def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables_for_migration):
+    tables, dst_schema = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
+    # assert the tables are migrated
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"

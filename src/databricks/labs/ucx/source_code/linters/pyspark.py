@@ -2,19 +2,19 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Const, InferenceError, NodeNG, AstroidSyntaxError  # type: ignore
+from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
     Deprecation,
     Fixer,
-    Linter,
-    Failure,
     CurrentSessionState,
+    PythonLinter,
 )
+from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -28,7 +28,12 @@ class Matcher(ABC):
     session_state: CurrentSessionState | None = None
 
     def matches(self, node: NodeNG):
-        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
+        return (
+            isinstance(node, Call)
+            and self._get_table_arg(node) is not None
+            and isinstance(node.func, Attribute)
+            and Tree(node.func.expr).is_from_module("spark")
+        )
 
     @abstractmethod
     def lint(
@@ -78,11 +83,11 @@ class QueryMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         if table_arg:
             try:
-                for inferred in Tree(table_arg).infer_values(self.session_state):
+                for inferred in InferredValue.infer_from_node(table_arg, self.session_state):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
-                    code='table-migrate',
+                    code='table-migrate-cannot-compute-value',
                     message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
                     node=node,
                 )
@@ -94,7 +99,7 @@ class QueryMatcher(Matcher):
                 yield advice.replace_from_node(call_node)
         else:
             yield Advisory.from_node(
-                code='table-migrate',
+                code='table-migrate-cannot-compute-value',
                 message=f"Can't migrate table_name argument in '{call_node.as_string()}' because its value cannot be computed",
                 node=call_node,
             )
@@ -114,10 +119,10 @@ class TableNameMatcher(Matcher):
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         table_name = table_arg.as_string().strip("'").strip('"')
-        for inferred in Tree(table_arg).infer_values(session_state):
+        for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
                 yield Advisory.from_node(
-                    code='table-migrate',
+                    code='table-migrate-cannot-compute-value',
                     message=f"Can't migrate '{node.as_string()}' because its table name argument cannot be computed",
                     node=node,
                 )
@@ -315,7 +320,7 @@ class SparkMatchers:
         return self._matchers
 
 
-class SparkSql(Linter, Fixer):
+class SparkSql(PythonLinter, Fixer):
 
     _spark_matchers = SparkMatchers()
 
@@ -328,12 +333,7 @@ class SparkSql(Linter, Fixer):
         # this is the same fixer, just in a different language context
         return self._from_table.name()
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            tree = Tree.normalize_and_parse(code)
-        except AstroidSyntaxError as e:
-            yield Failure('syntax-error', str(e), 0, 0, 0, 0)
-            return
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:

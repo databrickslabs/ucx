@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from tests.unit import (
     locate_site_packages,
@@ -125,8 +125,8 @@ def test_dependency_resolver_terminates_at_known_libraries(empty_index, mock_not
     site_packages_path = locate_site_packages()
     lookup.append_path(site_packages_path)
     file_loader = FileLoader()
-    import_resolver = ImportFileResolver(file_loader, Whitelist())
-    library_resolver = PythonLibraryResolver(Whitelist())
+    import_resolver = ImportFileResolver(file_loader, KnownList())
+    library_resolver = PythonLibraryResolver(KnownList())
     resolver = DependencyResolver(library_resolver, mock_notebook_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(Path("import-site-package.py"), CurrentSessionState())
     assert not maybe.failed
@@ -157,9 +157,9 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_file(mock_path_
             return None
 
     file_loader = FailingFileLoader()
-    whitelist = Whitelist()
-    import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PythonLibraryResolver(whitelist)
+    allow_list = KnownList()
+    import_resolver = ImportFileResolver(file_loader, allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list)
     resolver = DependencyResolver(pip_resolver, mock_notebook_resolver, import_resolver, mock_path_lookup)
     maybe = resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py"), CurrentSessionState())
     assert list(maybe.problems) == [
@@ -177,7 +177,7 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
 
     notebook_loader = FailingNotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(KnownList())
     resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = resolver.build_notebook_dependency_graph(Path("root5.py"), CurrentSessionState())
     assert list(maybe.problems) == [
@@ -186,7 +186,7 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
 
 
 def test_dependency_resolver_raises_problem_with_missing_file_loader(mock_notebook_resolver, mock_path_lookup):
-    library_resolver = PythonLibraryResolver(Whitelist())
+    library_resolver = PythonLibraryResolver(KnownList())
     import_resolver = create_autospec(BaseImportResolver)
     import_resolver.resolve_import.return_value = None
     resolver = DependencyResolver(library_resolver, mock_notebook_resolver, import_resolver, mock_path_lookup)
@@ -202,7 +202,7 @@ def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(simple_de
     )
     assert list(maybe.problems) == [
         DependencyProblem(
-            code='sys-path-cannot-compute',
+            code='sys-path-cannot-compute-value',
             message="Can't update sys.path from f'{name_2}' because the expression cannot be computed",
             source_path=Path('sys-path-with-fstring.py'),
             start_line=4,
@@ -211,7 +211,7 @@ def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(simple_de
             end_col=27,
         ),
         DependencyProblem(
-            code='sys-path-cannot-compute',
+            code='sys-path-cannot-compute-value',
             message="Can't update sys.path from name because the expression cannot be computed",
             source_path=Path('sys-path-with-fstring.py'),
             start_line=7,

@@ -6,10 +6,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from astroid import NodeNG  # type: ignore
+from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
 
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -113,11 +114,11 @@ class Advisory(Advice):
     """A warning that does not prevent the code from running."""
 
 
-class Failure(Advisory):
+class Failure(Advice):
     """An error that prevents the code from running."""
 
 
-class Deprecation(Advisory):
+class Deprecation(Advice):
     """An advisory that suggests to replace the code with a newer version."""
 
 
@@ -128,6 +129,16 @@ class Convention(Advice):
 class Linter:
     @abstractmethod
     def lint(self, code: str) -> Iterable[Advice]: ...
+
+
+class PythonLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        tree = Tree.normalize_and_parse(code)
+        yield from self.lint_tree(tree)
+
+    @abstractmethod
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
 class Fixer:
@@ -161,6 +172,20 @@ class CurrentSessionState:
     spark_conf: dict[str, str] | None = None
     named_parameters: dict[str, str] | None = None
     data_security_mode: compute.DataSecurityMode | None = None
+    is_serverless: bool = False
+    dbr_version: tuple[int, int] | None = None
+
+    @classmethod
+    def from_json(cls, json: dict) -> CurrentSessionState:
+        return cls(
+            schema=json.get('schema', DEFAULT_SCHEMA),
+            catalog=json.get('catalog', DEFAULT_CATALOG),
+            spark_conf=json.get('spark_conf', None),
+            named_parameters=json.get('named_parameters', None),
+            data_security_mode=json.get('data_security_mode', None),
+            is_serverless=json.get('is_serverless', False),
+            dbr_version=tuple(json['dbr_version']) if 'dbr_version' in json else None,
+        )
 
 
 class SequentialLinter(Linter):
@@ -170,3 +195,33 @@ class SequentialLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)
+
+
+class PythonSequentialLinter(Linter):
+
+    def __init__(self, linters: list[PythonLinter]):
+        self._linters = linters
+        self._tree: Tree | None = None
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        try:
+            tree = Tree.normalize_and_parse(code)
+            if self._tree is None:
+                self._tree = tree
+            else:
+                tree = self._tree.append_statements(tree)
+            for linter in self._linters:
+                yield from linter.lint_tree(tree)
+        except AstroidSyntaxError as e:
+            yield Failure('syntax-error', str(e), 0, 0, 0, 0)
+
+    def process_child_cell(self, code: str):
+        try:
+            tree = Tree.normalize_and_parse(code)
+            if self._tree is None:
+                self._tree = tree
+            else:
+                self._tree.append_statements(tree)
+        except AstroidSyntaxError as e:
+            # error already reported when linting enclosing notebook
+            logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)

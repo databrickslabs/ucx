@@ -3,15 +3,22 @@ from __future__ import annotations
 from abc import ABC
 import logging
 import re
-from collections.abc import Iterable, Iterator, Generator
-from typing import Any, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar, cast
 
-from astroid import Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
-from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
-from astroid.typing import InferenceErrorInfo  # type: ignore
-from astroid.exceptions import InferenceError  # type: ignore
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from astroid import (  # type: ignore
+    Assign,
+    AssignName,
+    Attribute,
+    Call,
+    Const,
+    Import,
+    ImportFrom,
+    Module,
+    Name,
+    NodeNG,
+    parse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +174,16 @@ class Tree:
         return cls._get_attribute_value(node)
 
     @classmethod
+    def get_function_name(cls, node: Call) -> str | None:
+        if not isinstance(node, Call):
+            return None
+        if isinstance(node.func, Attribute):
+            return node.func.attrname
+        if isinstance(node.func, Name):
+            return node.func.name
+        return None
+
+    @classmethod
     def get_full_function_name(cls, node: Call) -> str | None:
         if not isinstance(node, Call):
             return None
@@ -192,191 +209,41 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def infer_values(self, state: CurrentSessionState | None = None) -> Iterable[InferredValue]:
-        self._contextualize(state)
-        for inferred_atoms in self._infer_values():
-            yield InferredValue(inferred_atoms)
+    def append_statements(self, tree: Tree) -> Tree:
+        if not isinstance(tree.node, Module):
+            raise NotImplementedError(f"Can't append statements from {type(tree.node).__name__}")
+        tree_module: Module = cast(Module, tree.node)
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for stmt in tree_module.body:
+            stmt.parent = self_module
+            self_module.body.append(stmt)
+        for name, value in tree_module.globals.items():
+            self_module.globals[name] = value
+        # the following may seem strange but it's actually ok to use the original module as tree root
+        return tree
 
-    def _contextualize(self, state: CurrentSessionState | None):
-        if state is None or state.named_parameters is None or len(state.named_parameters) == 0:
-            return
-        self._contextualize_dbutils_widgets_get(state)
-        self._contextualize_dbutils_widgets_get_all(state)
-
-    def _contextualize_dbutils_widgets_get(self, state: CurrentSessionState):
-        calls = Tree(self.root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
-        for call in calls:
-            call.func = _DbUtilsWidgetsGetCall(state, call)
-
-    def _contextualize_dbutils_widgets_get_all(self, state: CurrentSessionState):
-        calls = Tree(self.root).locate(Call, [("getAll", Attribute), ("widgets", Attribute), ("dbutils", Name)])
-        for call in calls:
-            call.func = _DbUtilsWidgetsGetAllCall(state, call)
-
-    def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
-        # deal with node types that don't implement 'inferred()'
-        if self._node is Uninferable or isinstance(self._node, Const):
-            yield [self._node]
-        elif isinstance(self._node, JoinedStr):
-            yield from self._infer_values_from_joined_string()
-        elif isinstance(self._node, FormattedValue):
-            yield from _LocalTree(self._node.value).do_infer_values()
-        else:
-            yield from self._infer_internal()
-
-    def _infer_internal(self):
-        try:
-            for inferred in self._node.inferred():
-                # work around infinite recursion of empty lists
-                if inferred == self._node:
+    def is_from_module(self, module_name: str):
+        # if his is the call's root node, check it against the required module
+        if isinstance(self._node, Name):
+            if self._node.name == module_name:
+                return True
+            root = self.root
+            if not isinstance(root, Module):
+                return False
+            for value in root.globals.get(self._node.name, []):
+                if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
                     continue
-                yield from _LocalTree(inferred).do_infer_values()
-        except InferenceError as e:
-            logger.debug(f"When inferring {self._node}", exc_info=e)
-            yield [Uninferable]
-
-    def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
-        assert isinstance(self._node, JoinedStr)
-        yield from self._infer_values_from_joined_values(self._node.values)
-
-    @classmethod
-    def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
-        if len(nodes) == 1:
-            yield from _LocalTree(nodes[0]).do_infer_values()
-            return
-        for firsts in _LocalTree(nodes[0]).do_infer_values():
-            for remains in cls._infer_values_from_joined_values(nodes[1:]):
-                yield list(firsts) + list(remains)
-
-
-class _LocalTree(Tree):
-    """class that avoids pylint W0212 protected-access warning"""
-
-    def do_infer_values(self):
-        return self._infer_values()
-
-
-class _DbUtilsWidgetsGetCall(NodeNG):
-
-    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
-        super().__init__(
-            lineno=node.lineno,
-            col_offset=node.col_offset,
-            end_lineno=node.end_lineno,
-            end_col_offset=node.end_col_offset,
-            parent=node.parent,
-        )
-        self._session_state = session_state
-
-    @decorators.raise_if_nothing_inferred
-    def _infer(
-        self, context: InferenceContext | None = None, **kwargs: Any
-    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
-        yield self
-        return InferenceErrorInfo(node=self, context=context)
-
-    def infer_call_result(self, context: InferenceContext | None = None, **_):  # caller needs unused kwargs
-        call_context = getattr(context, "callcontext", None)
-        if not isinstance(call_context, CallContext):
-            yield Uninferable
-            return
-        arg = call_context.args[0]
-        for inferred in Tree(arg).infer_values(self._session_state):
-            if not inferred.is_inferred():
-                yield Uninferable
-                continue
-            name = inferred.as_string()
-            named_parameters = self._session_state.named_parameters
-            if not named_parameters or name not in named_parameters:
-                yield Uninferable
-                continue
-            value = named_parameters[name]
-            yield Const(
-                value,
-                lineno=self.lineno,
-                col_offset=self.col_offset,
-                end_lineno=self.end_lineno,
-                end_col_offset=self.end_col_offset,
-                parent=self,
-            )
-
-
-class _DbUtilsWidgetsGetAllCall(NodeNG):
-
-    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
-        super().__init__(
-            lineno=node.lineno,
-            col_offset=node.col_offset,
-            end_lineno=node.end_lineno,
-            end_col_offset=node.end_col_offset,
-            parent=node.parent,
-        )
-        self._session_state = session_state
-
-    @decorators.raise_if_nothing_inferred
-    def _infer(
-        self, context: InferenceContext | None = None, **kwargs: Any
-    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
-        yield self
-        return InferenceErrorInfo(node=self, context=context)
-
-    def infer_call_result(self, **_):  # caller needs unused kwargs
-        named_parameters = self._session_state.named_parameters
-        if not named_parameters:
-            yield Uninferable
-            return
-        items = self._populate_items(named_parameters)
-        result = Dict(
-            lineno=self.lineno,
-            col_offset=self.col_offset,
-            end_lineno=self.end_lineno,
-            end_col_offset=self.end_col_offset,
-            parent=self,
-        )
-        result.postinit(items)
-        yield result
-
-    def _populate_items(self, values: dict[str, str]):
-        items: list[tuple[InferenceResult, InferenceResult]] = []
-        for key, value in values.items():
-            item_key = Const(
-                key,
-                lineno=self.lineno,
-                col_offset=self.col_offset,
-                end_lineno=self.end_lineno,
-                end_col_offset=self.end_col_offset,
-                parent=self,
-            )
-            item_value = Const(
-                value,
-                lineno=self.lineno,
-                col_offset=self.col_offset,
-                end_lineno=self.end_lineno,
-                end_col_offset=self.end_col_offset,
-                parent=self,
-            )
-            items.append((item_key, item_value))
-        return items
-
-
-class InferredValue:
-    """Represents 1 or more nodes that together represent the value.
-    The list of nodes typically holds one Const element, but for f-strings it
-    can hold multiple ones, including Uninferable nodes."""
-
-    def __init__(self, atoms: Iterable[NodeNG]):
-        self._atoms = list(atoms)
-
-    @property
-    def nodes(self):
-        return self._atoms
-
-    def is_inferred(self):
-        return all(atom is not Uninferable for atom in self._atoms)
-
-    def as_string(self):
-        strings = [str(const.value) for const in filter(lambda atom: isinstance(atom, Const), self._atoms)]
-        return "".join(strings)
+                if Tree(value.parent.value).is_from_module(module_name):
+                    return True
+            return False
+        # walk up intermediate calls such as spark.range(...)
+        if isinstance(self._node, Call):
+            return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
+        if isinstance(self._node, Attribute):
+            return Tree(self._node.expr).is_from_module(module_name)
+        return False
 
 
 class TreeVisitor:
@@ -437,6 +304,8 @@ class MatchingVisitor(TreeVisitor):
     def _matches(self, node: NodeNG, depth: int):
         if depth >= len(self._match_nodes):
             return False
+        if isinstance(node, Call):
+            return self._matches(node.func, depth)
         name, match_node = self._match_nodes[depth]
         if not isinstance(node, match_node):
             return False
