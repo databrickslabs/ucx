@@ -4,7 +4,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Advisory
 from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
 index = MigrationIndex([])
@@ -591,7 +591,7 @@ def test_computes_values_across_notebooks_using_run_cell(extended_test_index, mo
     assert advices == expected
 
 
-def test_computes_values_across_notebooks_using_dbutils_notebook_run(extended_test_index, mock_path_lookup):
+def test_ignores_values_across_notebooks_using_dbutils_notebook_run(extended_test_index, mock_path_lookup):
     path = mock_path_lookup.resolve(Path("values_across_notebooks_dbutils_notebook_run.py"))
     source = path.read_text()
     linter = NotebookLinter.from_source(
@@ -599,6 +599,14 @@ def test_computes_values_across_notebooks_using_dbutils_notebook_run(extended_te
     )
     advices = list(linter.lint())
     expected = [
+        Advisory(
+            code='table-migrate-cannot-compute-value',
+            message="Can't migrate 'spark.table(f'{a}')' because its table name argument cannot be computed",
+            start_line=3,
+            start_col=0,
+            end_line=3,
+            end_col=19,
+        ),
         Advice(
             code='table-migrate',
             message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
@@ -606,7 +614,7 @@ def test_computes_values_across_notebooks_using_dbutils_notebook_run(extended_te
             start_col=0,
             end_line=3,
             end_col=19,
-        )
+        ),
     ]
     assert advices == expected
 

@@ -26,9 +26,7 @@ from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGra
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
-    DbutilsLinter,
     UnresolvedPath,
-    NotebookRunCall,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.notebooks.cells import (
@@ -129,10 +127,7 @@ class NotebookLinter:
         return cls(ctx, path_lookup, session_state, notebook)
 
     def __init__(
-        self, context: LinterContext,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        notebook: Notebook
+        self, context: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, notebook: Notebook
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -181,7 +176,6 @@ class NotebookLinter:
         assert isinstance(tree.node, Module)
         # look for child notebooks (and sys.path changes that might affect their loading)
         base_nodes: list[NodeBase] = []
-        base_nodes.extend(DbutilsLinter.list_dbutils_notebook_run_calls(tree))
         base_nodes.extend(self._list_run_magic_lines(tree))
         base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
         if len(base_nodes) == 0:
@@ -234,25 +228,6 @@ class NotebookLinter:
                 )
                 return
             yield from self._load_tree_from_notebook(notebook, False)
-            return
-        if isinstance(base_node, NotebookRunCall):
-            has_unresolved, paths = base_node.get_notebook_paths(self._session_state)
-            if has_unresolved:
-                yield Advisory.from_node(
-                    'dependency-cannot-compute-value',
-                    f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
-                    base_node.node,
-                )
-            for path in paths:
-                notebook = self._load_source_from_path(Path(path))
-                if notebook is None:
-                    yield Advisory.from_node(
-                        'dependency-not-found',
-                        f"Can't locate dependency: {path}",
-                        base_node.node,
-                    )
-                    continue
-                yield from self._load_tree_from_notebook(notebook, False)
             return
 
     def _mutate_path_lookup(self, change: SysPathChange):
