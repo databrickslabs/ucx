@@ -12,6 +12,7 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.dashboards import DashboardMetadata
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
@@ -41,7 +42,6 @@ from databricks.sdk.service.workspace import ObjectInfo
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import AccountInstaller, WorkspaceInstallation, WorkspaceInstaller, extract_major_minor
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
@@ -617,8 +617,14 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
 
 
 def test_query_metadata(ws):
-    local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
-    DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
+    queries_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
+    for dashboard_path in queries_path.iterdir():
+        try:
+            DashboardMetadata.from_path(dashboard_path).validate()
+        except ValueError as e:
+            assert False, f"Invalid dashboard in {dashboard_path}: {e}"
+        else:
+            assert True, f"Valid dashboard in {dashboard_path}"
 
 
 def test_remove_database(ws):
