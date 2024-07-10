@@ -402,6 +402,7 @@ class GlobalContext(abc.ABC):
             self.dependency_resolver,
             self.path_lookup,
             MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.config.include_job_ids,
         )
 
     @cached_property

@@ -926,3 +926,42 @@ def modified_or_skip(package: str):
         return wrapper
 
     return decorator
+
+
+def pytest_ignore_collect(path):
+    if not os.path.isdir(path):
+        logger.debug(f"pytest_ignore_collect: not a dir: {path}")
+        return False
+    if is_in_debug():
+        logger.debug(f"pytest_ignore_collect: in debug: {path}")
+        return False  # not skipping, as we're debugging
+    if 'TEST_NIGHTLY' in os.environ:
+        logger.debug(f"pytest_ignore_collect: nightly: {path}")
+        return False  # or during nightly runs
+
+    checkout_root = ProductInfo.from_class(WorkspaceConfig).checkout_root()
+
+    def _run(command: str) -> str:
+        with subprocess.Popen(
+            command.split(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=checkout_root,
+        ) as process:
+            output, error = process.communicate()
+            if process.returncode != 0:
+                raise ValueError(f"Command failed: {command}\n{error.decode('utf-8')}")
+            return output.decode("utf-8").strip()
+
+    try:  # pylint: disable=too-many-try-statements
+        target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
+        current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
+        changed_files = _run(f"git diff {target_branch}..{current_branch} --name-only")
+        if path.basename in changed_files:
+            logger.debug(f"pytest_ignore_collect: in changed files: {path} - {changed_files}")
+            return False
+        logger.debug(f"pytest_ignore_collect: skip: {path}")
+        return True
+    except ValueError as err:
+        logger.debug(f"pytest_ignore_collect: error: {err}")
+        return False

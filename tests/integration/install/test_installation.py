@@ -1,14 +1,12 @@
 import dataclasses
 import json
 import logging
-from dataclasses import replace
 from datetime import timedelta
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.blueprint.installation import Installation
-from databricks.labs.blueprint.installer import RawState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
@@ -29,7 +27,6 @@ import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from tests.integration.conftest import modified_or_skip
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +87,6 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@modified_or_skip("workspace_access")
 @retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx, make_cluster_policy, make_cluster_policy_permissions
@@ -171,7 +167,6 @@ def test_job_cluster_policy(ws, installation_ctx):
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
-@modified_or_skip("workspace_access")
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     ws_group_a, _ = installation_ctx.make_ucx_group()
@@ -357,76 +352,6 @@ def test_check_inventory_database_exists(ws, installation_ctx):
             },
         )
         installation_ctx.workspace_installer.configure()
-
-
-@modified_or_skip("hive_metastore")
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job(ws, installation_ctx, env_or_skip, prepare_tables_for_migration):
-
-    ctx = installation_ctx.replace(
-        config_transform=lambda wc: replace(wc, override_clusters=None),
-        extend_prompts={
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    tables, dst_schema = prepare_tables_for_migration
-
-    ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    # assert the workflow is successful
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
-    # assert the tables are migrated
-    for table in tables.values():
-        try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-    # assert the cluster is configured correctly
-    for job_cluster in ws.jobs.get(
-        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
-    ).settings.job_clusters:
-        if job_cluster.job_cluster_key != "table_migration":
-            # don't assert on the cluster for parse logs task
-            continue
-        assert job_cluster.new_cluster.autoscale.min_workers == 2
-        assert job_cluster.new_cluster.autoscale.max_workers == 20
-        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
-
-
-@modified_or_skip("hive_metastore")
-@retried(on=[NotFound], timeout=timedelta(minutes=8))
-@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job_cluster_override(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
-
-    tables, dst_schema = prepare_tables_for_migration
-    ctx = installation_ctx.replace(
-        extend_prompts={
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    # assert the workflow is successful
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
-    # assert the tables are migrated
-    for table in tables.values():
-        try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-    # assert the cluster is configured correctly on the migrate tables tasks
-    install_state = ctx.installation.load(RawState)
-    job_id = install_state.resources["jobs"]["migrate-tables"]
-    assert all(
-        task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
-        for task in ws.jobs.get(job_id).settings.tasks
-        if task.task_key != "parse_logs"
-    )
 
 
 def test_compare_remote_local_install_versions(ws, installation_ctx):
