@@ -21456,10 +21456,6 @@
     "pulp.solverdir.cbc.win.32": [],
     "pulp.solverdir.cbc.win.64": [],
     "pulp.sparse": [],
-    "pulp.tests.bin_packing_problem": [],
-    "pulp.tests.test_examples": [],
-    "pulp.tests.test_gurobipy_env": [],
-    "pulp.tests.test_pulp": [],
     "pulp.utilities": []
   },
   "pure-eval": {
