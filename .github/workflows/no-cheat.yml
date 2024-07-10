@@ -22,12 +22,12 @@ jobs:
 
       - name: Verify no additional disabled lint in the new code
         run: |
-          OLD_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^-')
-          OLD_CHEATS=$(echo "${OLD_CODE}" | grep -c '# pylint: disable'
-          NEW_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
-          NEW_CHEATS=$(echo "${NEW_CODE}" | grep -c '# pylint: disable'
-          CHEATS=$((NEW_CHEATS-OLD_CHEATS))
-          if [ "${CHEATS}" -ne 0 ]; then
-            echo "Do not cheat the linter: ${CHEATS} new '# pylint: disable ...'"
+          MAIN_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^-')
+          MAIN_CHEATS=$(echo "${MAIN_CODE}" | grep -c '# pylint: disable')
+          BRANCH_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
+          BRANCH_CHEATS=$(echo "${BRANCH_CODE}" | grep -c '# pylint: disable')
+          NEW_CHEATS=$((BRANCH_CHEATS-MAIN_CHEATS))
+          if [ "${NEW_CHEATS}" -gt 0 ]; then
+            echo "Do not cheat the linter: ${NEW_CHEATS} new '# pylint: disable ...'"
             exit 1
           fi
