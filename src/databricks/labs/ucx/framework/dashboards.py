@@ -69,20 +69,3 @@ class DashboardFromFiles:
                 assert dashboard.dashboard_id is not None
                 self._ws.lakeview.publish(dashboard.dashboard_id)
                 self._state.dashboards[dashboard_ref] = dashboard.dashboard_id
-
-    def validate(self):
-        step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
-        for step_folder in step_folders:
-            logger.info(f"Reading step folder {step_folder}...")
-            dashboard_folders = [p for p in step_folder.iterdir() if p.is_dir()]
-            # Create separate dashboards per step, represented as second-level folders
-            for dashboard_folder in dashboard_folders:
-                self._validate_folder(dashboard_folder)
-
-    def _validate_folder(self, folder: Path):
-        try:
-            dashboard = self._dashboards.create_dashboard(folder)
-        except ValueError as e:
-            raise AssertionError(f"Creating dashboard in {folder}") from e
-        if len(dashboard.datasets) != len(list(folder.glob("*.sql"))):
-            raise AssertionError(f"Dashboard in {folder} contains invalid query.")
