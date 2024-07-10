@@ -16,7 +16,7 @@ def no_cheat(diff_text: str) -> str:
             continue
         codes = line[idx + len(DISABLE_TAG) :].split(',')
         for code in codes:
-            code = code.strip()
+            code = code.strip().strip('\n').strip('"').strip("'")
             if line.startswith("-"):
                 removed[code] = removed.get(code, 0) + 1
                 continue
