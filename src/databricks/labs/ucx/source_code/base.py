@@ -219,7 +219,7 @@ class PythonSequentialLinter(Linter):
         self.append_tree(tree)
         return tree
 
-    def append_tree(self, tree):
+    def append_tree(self, tree: Tree):
         if self._tree is None:
             self._tree = Tree(Module("root"))
         self._tree.append_tree(tree)

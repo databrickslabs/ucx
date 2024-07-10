@@ -162,7 +162,9 @@ site_packages = locate_site_packages()
 
 
 @pytest.mark.skip("Manual testing for troubleshooting")
-@pytest.mark.parametrize("path", [(Path(site_packages, "mypy", "build.py"))])
+@pytest.mark.parametrize(
+    "path", [Path("/Users/eric.vergnaud/development/ucx/.venv/lib/python3.10/site-packages/spacy/pipe_analysis.py")]
+)
 def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
@@ -181,4 +183,6 @@ def test_known_issues(path: Path, migration_index):
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linter.lint(MockPrompts({}), path)
+    advices = linter.lint(MockPrompts({}), path)
+    for advice in advices:
+        print(repr(advice))

@@ -129,7 +129,10 @@ class NotebookLinter:
         return cls(ctx, path_lookup, session_state, notebook)
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, notebook: Notebook
+        self, context: LinterContext,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        notebook: Notebook
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
