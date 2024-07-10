@@ -50,7 +50,11 @@ class NoFormatPythonMatcher:
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
-        # Check 3: check presence of the format specifier:
+        # Check 3: ensure this is a spark call
+        if not Tree(node.func.expr).is_from_module("spark"):
+            return None
+
+        # Check 4: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   >>> df.saveToTable("c.db.table", format="csv")
         format_arg = Tree.get_arg(node, self.format_arg_index, self.format_arg_name)
