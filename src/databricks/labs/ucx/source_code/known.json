@@ -26274,6 +26274,25 @@
   "tomlkit": {
     "tomlkit": []
   },
+  "toolz": {
+    "tlz": [],
+    "tlz._build_tlz": [],
+    "toolz": [],
+    "toolz._signatures": [],
+    "toolz._version": [],
+    "toolz.compatibility": [],
+    "toolz.curried": [],
+    "toolz.curried.exceptions": [],
+    "toolz.curried.operator": [],
+    "toolz.dicttoolz": [],
+    "toolz.functoolz": [],
+    "toolz.itertoolz": [],
+    "toolz.recipes": [],
+    "toolz.sandbox": [],
+    "toolz.sandbox.core": [],
+    "toolz.sandbox.parallel": [],
+    "toolz.utils": []
+  },
   "torch": {
     "functorch": [],
     "torch": []
