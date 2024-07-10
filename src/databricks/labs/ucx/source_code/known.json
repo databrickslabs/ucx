@@ -8441,6 +8441,15 @@
   "pexpect": {
     "pexpect": []
   },
+  "phonetics": {
+    "phonetics": [],
+    "phonetics.metaphone": [],
+    "phonetics.nysiis": [],
+    "phonetics.soundex": [],
+    "phonetics.tests": [],
+    "phonetics.tests.test_metaphone": [],
+    "phonetics.utils": []
+  },
   "pillow": {
     "PIL": []
   },
