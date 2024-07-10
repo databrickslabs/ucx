@@ -127,7 +127,10 @@ class NotebookLinter:
         return cls(ctx, path_lookup, session_state, notebook)
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, notebook: Notebook
+        self, context: LinterContext,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        notebook: Notebook
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -178,10 +181,6 @@ class NotebookLinter:
         base_nodes: list[NodeBase] = []
         base_nodes.extend(DbutilsLinter.list_dbutils_notebook_run_calls(tree))
         base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
-        _ = """ run_magics = self._list_run_magics(tree)
-        # magic_commands, _ = MagicCommand.extract_from_tree(tree, self._report_problem)
-        base_nodes.extend(magic_commands)
-        """
         if len(base_nodes) == 0:
             self._python_linter.append_tree(tree)
             return
