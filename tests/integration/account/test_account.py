@@ -25,7 +25,13 @@ def clean_account_level_groups(acc: AccountClient):
 
 
 def test_create_account_level_groups(
-    make_ucx_group, make_group, make_user, acc, ws, make_random, clean_account_level_groups
+    make_ucx_group,
+    make_group,
+    make_user,
+    acc,
+    ws,
+    make_random,
+    clean_account_level_groups,
 ):
     suffix = get_purge_suffix()
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")

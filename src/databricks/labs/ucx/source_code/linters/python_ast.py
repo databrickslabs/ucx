@@ -8,6 +8,7 @@ from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
     Assign,
+    AssignName,
     Attribute,
     Call,
     Const,
@@ -223,6 +224,27 @@ class Tree:
         # the following may seem strange but it's actually ok to use the original module as tree root
         return tree
 
+    def is_from_module(self, module_name: str):
+        # if his is the call's root node, check it against the required module
+        if isinstance(self._node, Name):
+            if self._node.name == module_name:
+                return True
+            root = self.root
+            if not isinstance(root, Module):
+                return False
+            for value in root.globals.get(self._node.name, []):
+                if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
+                    continue
+                if Tree(value.parent.value).is_from_module(module_name):
+                    return True
+            return False
+        # walk up intermediate calls such as spark.range(...)
+        if isinstance(self._node, Call):
+            return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
+        if isinstance(self._node, Attribute):
+            return Tree(self._node.expr).is_from_module(module_name)
+        return False
+
 
 class TreeVisitor:
 
@@ -282,6 +304,8 @@ class MatchingVisitor(TreeVisitor):
     def _matches(self, node: NodeNG, depth: int):
         if depth >= len(self._match_nodes):
             return False
+        if isinstance(node, Call):
+            return self._matches(node.func, depth)
         name, match_node = self._match_nodes[depth]
         if not isinstance(node, match_node):
             return False

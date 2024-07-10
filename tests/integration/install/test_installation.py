@@ -91,12 +91,8 @@ def new_installation(ws, env_or_skip, make_random):
 
 @retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
-    installation_ctx,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
-    modified_or_skip,
+    installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
-    modified_or_skip("workspace_access")
     ws_group, acc_group = installation_ctx.make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
     cluster_policy = make_cluster_policy()
@@ -174,8 +170,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_remove_backup_groups_job(ws, installation_ctx, modified_or_skip):
-    modified_or_skip("workspace_access")
+def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
@@ -363,14 +358,7 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job(
-    ws,
-    installation_ctx,
-    env_or_skip,
-    prepare_tables_for_migration,
-    modified_or_skip,
-):
-    modified_or_skip("hive_metastore")
+def test_table_migration_job(ws, installation_ctx, env_or_skip, prepare_tables_for_migration):
 
     ctx = installation_ctx.replace(
         config_transform=lambda wc: replace(wc, override_clusters=None),
@@ -408,14 +396,8 @@ def test_table_migration_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
-def test_table_migration_job_cluster_override(
-    ws,
-    installation_ctx,
-    prepare_tables_for_migration,
-    env_or_skip,
-    modified_or_skip,
-):
-    modified_or_skip("hive_metastore")
+def test_table_migration_job_cluster_override(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
+
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
