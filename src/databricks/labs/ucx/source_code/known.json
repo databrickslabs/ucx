@@ -4773,6 +4773,31 @@
   "html5lib": {
     "html5lib": []
   },
+ "httpx": {
+    "httpx": [],
+    "httpx._api": [],
+    "httpx._auth": [],
+    "httpx._client": [],
+    "httpx._compat": [],
+    "httpx._config": [],
+    "httpx._content": [],
+    "httpx._decoders": [],
+    "httpx._exceptions": [],
+    "httpx._main": [],
+    "httpx._models": [],
+    "httpx._multipart": [],
+    "httpx._status_codes": [],
+    "httpx._transports": [],
+    "httpx._transports.asgi": [],
+    "httpx._transports.base": [],
+    "httpx._transports.default": [],
+    "httpx._transports.mock": [],
+    "httpx._transports.wsgi": [],
+    "httpx._types": [],
+    "httpx._urlparse": [],
+    "httpx._urls": [],
+    "httpx._utils": []
+  },
   "huggingface-hub": {
     "huggingface_hub": []
   },
