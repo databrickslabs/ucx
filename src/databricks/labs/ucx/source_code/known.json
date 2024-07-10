@@ -25407,6 +25407,30 @@
     "starlette.types": [],
     "starlette.websockets": []
   },
+  "statsforecast": {
+    "action_files": [],
+    "action_files.imports_with_code": [],
+    "action_files.utils": [],
+    "statsforecast": [],
+    "statsforecast._modidx": [],
+    "statsforecast.adapters": [],
+    "statsforecast.adapters.prophet": [],
+    "statsforecast.arima": [],
+    "statsforecast.ces": [],
+    "statsforecast.core": [],
+    "statsforecast.distributed": [],
+    "statsforecast.distributed.fugue": [],
+    "statsforecast.distributed.multiprocess": [],
+    "statsforecast.ets": [],
+    "statsforecast.feature_engineering": [],
+    "statsforecast.garch": [],
+    "statsforecast.mfles": [],
+    "statsforecast.models": [],
+    "statsforecast.mstl": [],
+    "statsforecast.tbats": [],
+    "statsforecast.theta": [],
+    "statsforecast.utils": []
+  },
   "sympy": {
     "isympy": [],
     "sympy": []
