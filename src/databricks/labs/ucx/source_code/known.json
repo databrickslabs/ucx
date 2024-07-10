@@ -3960,6 +3960,13 @@
   "fastcluster": {
     "fastcluster": []
   },
+  "fastprogress": {
+    "fastprogress": [],
+    "fastprogress._nbdev": [],
+    "fastprogress.core": [],
+    "fastprogress.fastprogress": [],
+    "fastprogress.version": []
+  },
   "fasttext": {
     "fasttext.FastText": [],
     "fasttext": [],
