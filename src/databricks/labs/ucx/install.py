@@ -619,8 +619,9 @@ class AccountInstaller(AccountContext):
         """
         if self.account_client.config.is_account_client:
             return self.account_client
-        w = WorkspaceClient(product="ucx", product_version=__version__)
-        host = w.config.environment.deployment_url("accounts")
+        # w = WorkspaceClient(product="ucx", product_version=__version__)
+        # host = w.config.environment.deployment_url("accounts")
+        host = 'https://accounts.azuredatabricks.net/'
         account_id = self.prompts.question("Please provide the Databricks account id")
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
