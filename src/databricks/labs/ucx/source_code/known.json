@@ -1943,6 +1943,37 @@
       }
     ]
   },
+  "dbignite": {
+    "dbignite": [],
+    "dbignite.fhir_mapping_model": [],
+    "dbignite.fhir_resource": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbignite.hosp_feeds": [],
+    "dbignite.hosp_feeds.adt": [],
+    "dbignite.omop": [],
+    "dbignite.omop.data_model": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbignite.omop.schemas": [],
+    "dbignite.omop.utils": [],
+    "dbignite.readers": [],
+    "dbignite.version": []
+  },
   "dbldatagen": {
     "dbldatagen": [],
     "dbldatagen._version": [],
