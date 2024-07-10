@@ -5149,6 +5149,24 @@
     "johnsnowlabs.visual": [],
     "johnsnowlabs.viz": []
   },
+  "jsonschema": {
+    "jsonschema": [],
+    "jsonschema._format": [],
+    "jsonschema._keywords": [],
+    "jsonschema._legacy_keywords": [],
+    "jsonschema._types": [],
+    "jsonschema._typing": [],
+    "jsonschema._utils": [],
+    "jsonschema.cli": [],
+    "jsonschema.exceptions": [],
+    "jsonschema.protocols": [],
+    "jsonschema.tests": [],
+    "jsonschema.validators": []
+  },
+  "jsonschema-specifications": {
+    "jsonschema_specifications": [],
+    "jsonschema_specifications._core": [],
+  },
   "jupyter_client": {
     "jupyter_client": []
   },
