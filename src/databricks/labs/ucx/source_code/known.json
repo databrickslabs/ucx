@@ -23040,6 +23040,15 @@
     "querystring_parser.builder": [],
     "querystring_parser.parser": []
   },
+  "referencing": {
+    "referencing": [],
+    "referencing._attrs": [],
+    "referencing._core": [],
+    "referencing.exceptions": [],
+    "referencing.jsonschema": [],
+    "referencing.retrieval": [],
+    "referencing.typing": []
+  },
   "regex": {
     "regex": [],
     "regex._regex_core": [],
