@@ -28,7 +28,12 @@ class Matcher(ABC):
     session_state: CurrentSessionState | None = None
 
     def matches(self, node: NodeNG):
-        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
+        return (
+            isinstance(node, Call)
+            and self._get_table_arg(node) is not None
+            and isinstance(node.func, Attribute)
+            and Tree(node.func.expr).is_from_module("spark")
+        )
 
     @abstractmethod
     def lint(
