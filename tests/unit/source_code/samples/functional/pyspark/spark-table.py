@@ -31,9 +31,6 @@ for i in range(10):
     df = spark.table(f"boop{stuff}")
     do_stuff_with(df)
 
-    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-    # FIXME: These are false positives; any method named 'table' is triggering the warnings.
-    # ucx[table-migrate:+2:4:+2:38] Table old.things is migrated to brand.new.stuff in Unity Catalog
-    # ucx[table-migrate:+1:4:+1:38] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnings.
     something_else.table("old.things")
     a_function("old.things")
