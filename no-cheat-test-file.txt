@@ -1,1 +1,3 @@
 some other code # pylint: disable=some-stuff
+more code # pylint: disable=some-stuff
+more code # pylint: disable=other-stuff
