@@ -4,6 +4,8 @@ import pytest
 
 # pylint: disable-next=import-private-name
 from _pytest.outcomes import Failed, Skipped
+from databricks.sdk.errors import InvalidParameterValue
+from databricks.sdk.service import iam
 from databricks.sdk.service.workspace import AclPermission
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
@@ -159,3 +161,24 @@ def test_remove_after_property_schema(ws, make_schema, sql_backend):
     for row in sql_response:
         if row.database_description_item == "Properties":
             assert "RemoveAfter" in row[1]
+
+
+def test_lakeview_dashboard_permissions(make_lakeview_dashboard, make_lakeview_dashboard_permissions, make_group):
+    permissions = [
+        iam.PermissionLevel.CAN_EDIT,
+        iam.PermissionLevel.CAN_RUN,
+        iam.PermissionLevel.CAN_MANAGE,
+        iam.PermissionLevel.CAN_READ,
+    ]
+    dashboard = make_lakeview_dashboard()
+    group = make_group()
+    for permission in permissions:
+        try:
+            make_lakeview_dashboard_permissions(
+                object_id=dashboard.dashboard_id,
+                permission_level=permission,
+                group_name=group.display_name,
+            )
+        except InvalidParameterValue as e:
+            assert False, f"Could not create {permission} permission for lakeview dashboard: {e}"
+    assert True, "Could create all fixtures"
