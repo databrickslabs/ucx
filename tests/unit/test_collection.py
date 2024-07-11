@@ -137,7 +137,7 @@ def test_join_collection_join_collection_not_account_admin_no_workspace_id():
     account_client.get_workspace_client.return_value = ws
     account_client.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test"), Workspace(workspace_id=456, deployment_name="test2"),Workspace(workspace_id=789, deployment_name="test3")]
 
-    account_client.workspaces.list.side_effect = PermissionDenied('access denied')
+    #account_client.workspaces.list.side_effect = PermissionDenied('access denied')
     account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
