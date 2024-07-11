@@ -25,6 +25,9 @@ jobs:
           git fetch origin $GITHUB_BASE_REF:$GITHUB_BASE_REF
           git diff $GITHUB_BASE_REF...$(git branch --show-current) >> diff_data.txt
           python tests/unit/no_cheat.py diff_data.txt >> cheats.txt
+          echo "Displaying cheats.txt"
+          cat cheats.txt
+          echo "Done displaying cheats.txt"
           COUNT=$(cat cheats.txt | wc -c)
           if [ ${COUNT} -gt 0 ]; then
             cat cheats.txt
