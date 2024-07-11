@@ -80,6 +80,7 @@ def run_workflow(mocker, mock_installation):
 
 @pytest.fixture
 def acc_client():
+    # add a comment such that the below line moves
     acc = create_autospec(AccountClient)  # pylint: disable=mock-no-usage
     acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
     return acc
