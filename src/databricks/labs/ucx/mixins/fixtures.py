@@ -32,6 +32,7 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
+from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedModelInput,
@@ -1402,6 +1403,62 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
             logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
+
+
+@pytest.fixture
+def make_lakeview_dashboard(ws, make_random, env_or_skip):
+    """Create a lakeview dashboard."""
+    serialized_dashboard = {
+        "datasets": [{"name": "count", "displayName": "count", "query": "SELECT 42 AS count"}],
+        "pages": [
+            {
+                "name": "count",
+                "displayName": "Counter",
+                "layout": [
+                    {
+                        "widget": {
+                            "name": "count",
+                            "queries": [
+                                {
+                                    "name": "main_query",
+                                    "query": {
+                                        "datasetName": "count",
+                                        "fields": [{"name": "count", "expression": "`count`"}],
+                                        "disaggregated": True,
+                                    },
+                                }
+                            ],
+                            "spec": {
+                                "version": 2,
+                                "widgetType": "counter",
+                                "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
+                            },
+                        },
+                        "position": {"x": 0, "y": 0, "width": 1, "height": 3},
+                    }
+                ],
+            }
+        ],
+    }
+
+    def create(display_name: str = "") -> SDKDashboard:
+        if len(display_name) == 0:
+            display_name = f"created_by_ucx_{make_random()}"
+        else:
+            display_name = f"{display_name} ({make_random()})"
+        warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+        dashboard = ws.lakeview.create(
+            display_name,
+            serialized_dashboard=json.dumps(serialized_dashboard),
+            warehouse_id=warehouse_id,
+        )
+        ws.lakeview.publish(dashboard.dashboard_id)
+        return dashboard
+
+    def delete(dashboard: SDKDashboard) -> None:
+        ws.lakeview.trash(dashboard.dashboard_id)
+
+    yield from factory("dashboard", create, delete)
 
 
 def get_test_purge_time() -> str:
