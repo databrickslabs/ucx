@@ -477,14 +477,12 @@ class WorkspaceInstallation(InstallationMixin):
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
-        install_tasks = [self._create_database]
-        install_tasks.extend(self._get_create_dashboard_tasks())
-        Threads.strict("installing components", install_tasks)
+        self._create_database()  # Need the database before creating the dashboards
+        self._create_dashboards()
         readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
-
         if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
@@ -505,15 +503,15 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
-    def _get_create_dashboard_tasks(self) -> Iterable[Callable]:
-        """Get the callables to create the lakeview dashboards from the SQL queries in the queries subfolders"""
+    def _create_dashboards(self) -> None:
+        """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
         logger.info("Creating dashboards...")
         dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
         try:
             self._ws.workspace.mkdirs(dashboard_folder_remote)
         except ResourceAlreadyExists:
             pass
-        queries_folder = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
+        queries_folder, tasks = find_project_root(__file__) / "src/databricks/labs/ucx/queries", []
         for step_folder in queries_folder.iterdir():
             if not step_folder.is_dir():
                 continue
@@ -526,7 +524,8 @@ class WorkspaceInstallation(InstallationMixin):
                     dashboard_folder,
                     parent_path=dashboard_folder_remote,
                 )
-                yield task
+                tasks.append(task)
+        Threads.strict("create dashboards", tasks)
 
     def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
