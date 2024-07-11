@@ -1265,7 +1265,7 @@
         "code": "dbfs-usage",
         "message": "Deprecated file system path: dbfs:/"
       },
-     {
+      {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
       }
@@ -1910,6 +1910,14 @@
     "dockerpycreds.store": [],
     "dockerpycreds.utils": [],
     "dockerpycreds.version": []
+  },
+  "docstring-to-markdown": {
+    "docstring_to_markdown": [],
+    "docstring_to_markdown._utils": [],
+    "docstring_to_markdown.cpython": [],
+    "docstring_to_markdown.google": [],
+    "docstring_to_markdown.plain": [],
+    "docstring_to_markdown.rst": []
   },
   "entrypoints": {
     "entrypoints": []
@@ -20586,6 +20594,53 @@
   "python-dateutil": {
     "dateutil": []
   },
+  "python-lsp-jsonrpc": {
+    "pylsp_jsonrpc": [],
+    "pylsp_jsonrpc._version": [],
+    "pylsp_jsonrpc.dispatchers": [],
+    "pylsp_jsonrpc.endpoint": [],
+    "pylsp_jsonrpc.exceptions": [],
+    "pylsp_jsonrpc.streams": []
+  },
+  "python-lsp-server": {
+    "pylsp": [],
+    "pylsp._utils": [],
+    "pylsp._version": [],
+    "pylsp.config": [],
+    "pylsp.config.config": [],
+    "pylsp.config.flake8_conf": [],
+    "pylsp.config.pycodestyle_conf": [],
+    "pylsp.config.source": [],
+    "pylsp.hookspecs": [],
+    "pylsp.lsp": [],
+    "pylsp.plugins": [],
+    "pylsp.plugins._resolvers": [],
+    "pylsp.plugins._rope_task_handle": [],
+    "pylsp.plugins.autopep8_format": [],
+    "pylsp.plugins.definition": [],
+    "pylsp.plugins.flake8_lint": [],
+    "pylsp.plugins.folding": [],
+    "pylsp.plugins.highlight": [],
+    "pylsp.plugins.hover": [],
+    "pylsp.plugins.jedi_completion": [],
+    "pylsp.plugins.jedi_rename": [],
+    "pylsp.plugins.mccabe_lint": [],
+    "pylsp.plugins.preload_imports": [],
+    "pylsp.plugins.pycodestyle_lint": [],
+    "pylsp.plugins.pydocstyle_lint": [],
+    "pylsp.plugins.pyflakes_lint": [],
+    "pylsp.plugins.pylint_lint": [],
+    "pylsp.plugins.references": [],
+    "pylsp.plugins.rope_autoimport": [],
+    "pylsp.plugins.rope_completion": [],
+    "pylsp.plugins.signature": [],
+    "pylsp.plugins.symbols": [],
+    "pylsp.plugins.yapf_format": [],
+    "pylsp.python_lsp": [],
+    "pylsp.text_edit": [],
+    "pylsp.uris": [],
+    "pylsp.workspace": []
+  },
   "pytz": {
     "pytz": []
   },
@@ -22904,6 +22959,7 @@
   "tzdata": {
     "tzdata": []
   },
+  "ujson": {},
   "umap": {
     "umap": [],
     "umap.get": []
@@ -23706,4 +23762,3 @@
     "zipp.glob": []
   }
 }
-

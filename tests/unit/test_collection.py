@@ -36,7 +36,9 @@ def test_join_collection_prompt_no_join():
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection([123], )
+    account_installer.join_collection(
+        [123],
+    )
     account_client.workspaces.list.assert_not_called()
 
 
@@ -135,9 +137,14 @@ def test_join_collection_join_collection_not_account_admin_no_workspace_id():
     ws = mock_workspace_client()
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
-    account_client.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test"), Workspace(workspace_id=456, deployment_name="test2"),Workspace(workspace_id=789, deployment_name="test3")]
-
-    #account_client.workspaces.list.side_effect = PermissionDenied('access denied')
+    account_client.workspaces.list.side_effect = [
+        [
+            Workspace(workspace_id=123, deployment_name="test"),
+            Workspace(workspace_id=456, deployment_name="test2"),
+            Workspace(workspace_id=789, deployment_name="test3"),
+        ],
+        PermissionDenied('access denied'),
+    ]
     account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
@@ -162,7 +169,14 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_coll
     ws.current_user.me = lambda: iam.User(user_name="me@example.com")
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
-    account_client.workspaces.list.side_effect = PermissionDenied('access denied')
+    account_client.workspaces.list.side_effect = [
+        [
+            Workspace(workspace_id=123, deployment_name="test"),
+            Workspace(workspace_id=456, deployment_name="test2"),
+            Workspace(workspace_id=789, deployment_name="test3"),
+        ],
+        PermissionDenied('access denied'),
+    ]
     account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
@@ -190,7 +204,14 @@ def test_join_collection_not_account_admin_workspace_id_not_installed_workspace_
         iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="notadmin")]),
     ]
     account_client.get_workspace_client.return_value = ws
-    account_client.workspaces.list.side_effect = PermissionDenied('access denied')
+    account_client.workspaces.list.side_effect = [
+        [
+            Workspace(workspace_id=123, deployment_name="test"),
+            Workspace(workspace_id=456, deployment_name="test2"),
+            Workspace(workspace_id=789, deployment_name="test3"),
+        ],
+        PermissionDenied('access denied'),
+    ]
     account_installer = AccountInstaller(account_client)
     account_workspace = create_autospec(AccountWorkspaces)
     workspace_access = {123: True, 456: False, 789: True}
@@ -216,6 +237,11 @@ def test_join_collection_join_existing_collection():
     ws = mock_workspace_client()
 
     account_client = create_autospec(AccountClient)
+    account_client.workspaces.list.return_value = [
+        Workspace(workspace_id=123, deployment_name="test"),
+        Workspace(workspace_id=456, deployment_name="test2"),
+        Workspace(workspace_id=789, deployment_name="test3"),
+    ]
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
     account_workspace = create_autospec(AccountWorkspaces)
