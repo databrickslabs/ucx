@@ -20,11 +20,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify no lint is disabled in the new code
+      - name: Verify no additional disabled lint in the new code
         run: |
-          NEW_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
-          CHEAT=$(echo "${NEW_CODE}" | grep '# pylint: disable' | grep -v "CHEAT" | wc -c)
-          if [ "${CHEAT}" -ne 0 ]; then
-            echo "Do not cheat the linter: ${CHEAT}"
+          git fetch origin $GITHUB_BASE_REF:$GITHUB_BASE_REF
+          git diff $GITHUB_BASE_REF...$(git branch --show-current) >> diff_data.txt
+          python tests/unit/no_cheat.py diff_data.txt >> cheats.txt
+          COUNT=$(cat cheats.txt | wc -c)
+          if [ ${COUNT} -gt 1 ]; then
+            cat cheats.txt
             exit 1
           fi
