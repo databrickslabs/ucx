@@ -1,15 +1,9 @@
 import dataclasses
-from datetime import timedelta
 
-from databricks.sdk.errors import (
-    InvalidParameterValue,
-    NotFound,
-)
-from databricks.sdk.retries import retried
+from databricks.labs.lsql.backends import CommandExecutionBackend
 from databricks.sdk.service.iam import PermissionLevel
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job_ext_hms(
     ws,
     installation_ctx,
@@ -17,8 +11,10 @@ def test_running_real_assessment_job_ext_hms(
     make_cluster_policy,
     make_cluster_policy_permissions,
 ):
+    cluster_id = env_or_skip('TEST_EXT_HMS_CLUSTER_ID')
     ext_hms_ctx = installation_ctx.replace(
         skip_dashboards=True,
+        sql_backend=CommandExecutionBackend(ws, cluster_id),
         config_transform=lambda wc: dataclasses.replace(
             wc,
             override_clusters=None,
