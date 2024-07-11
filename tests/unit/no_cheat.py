@@ -33,5 +33,5 @@ if __name__ == "__main__":
     diff_data = sys.argv[1]
     path = Path(diff_data)
     if path.exists():
-        diff_data = path.read_text()
+        diff_data = path.read_text("utf-8")
     print(no_cheat(diff_data))
