@@ -169,6 +169,7 @@ def test_lakeview_dashboard_permissions(
     make_lakeview_dashboard_permissions,  # pylint: invalid-name
     make_group,
 ):
+    # Only the last permission in the list is visible in the Databricks UI
     permissions = [
         iam.PermissionLevel.CAN_EDIT,
         iam.PermissionLevel.CAN_RUN,
