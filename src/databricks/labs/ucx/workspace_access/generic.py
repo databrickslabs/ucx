@@ -59,7 +59,7 @@ class Listing:
             for item in self._func():
                 yield GenericPermissionsInfo(getattr(item, self._id_attribute), self._object_type)
         except NotFound as e:
-            logger.error(f"Listing {self._object_type} failed: {e}")
+            logger.warning(f"Listing {self._object_type} failed: {e}")
         since = datetime.datetime.now() - started
         logger.info(f"Listed {self._object_type} in {since}")
 
