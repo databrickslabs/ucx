@@ -1,6 +1,6 @@
 # Databricks notebook source
 
-%run "./values_across_notebooks_child.py"
+%run ./values_across_notebooks_child.py
 
 # COMMAND ----------
 

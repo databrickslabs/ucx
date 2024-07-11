@@ -534,13 +534,11 @@ class RunCommand(MagicCommand):
 
     @property
     def notebook_path(self) -> Path | None:
-        for quote in ('"', "'"):
-            start = self._code.find(quote)
-            if start >= 0:
-                end = self._code.find(quote, start + 1)
-                if end >= 0:
-                    return Path(self._code[start + 1 : end])
-        return None
+        start = self._code.find(' ')
+        if start < 0:
+            return None
+        path = self._code[start + 1 :].strip().strip('"').strip("'")
+        return Path(path)
 
 
 class PipCommand(MagicCommand):
