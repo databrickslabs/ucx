@@ -5,7 +5,6 @@ import os
 import re
 import time
 import webbrowser
-from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
