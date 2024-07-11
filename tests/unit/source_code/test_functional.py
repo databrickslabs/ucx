@@ -172,7 +172,9 @@ def test_functional(sample: Functional, mock_path_lookup) -> None:
 
 @pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup):
-    path = Path("/Users/eric.vergnaud/development/ucx/tests/unit/source_code/samples/functional/values_across_notebooks_magic_line.py")
+    path = Path(
+        "/Users/eric.vergnaud/development/ucx/tests/unit/source_code/samples/functional/values_across_notebooks_magic_line.py"
+    )
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)
     sample.verify(path_lookup)

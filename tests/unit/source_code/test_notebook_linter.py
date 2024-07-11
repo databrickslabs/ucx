@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
 index = MigrationIndex([])
@@ -549,4 +547,3 @@ def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected,
     assert linter is not None
     advices = list(linter.lint())
     assert advices == expected
-
