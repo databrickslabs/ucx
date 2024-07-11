@@ -852,7 +852,7 @@ if __name__ == "__main__":
 
         try:
             account_installer.join_collection(
-                workspace_installer.workspace_client.get_workspace_id(),
+                [workspace_installer.workspace_client.get_workspace_id()],
             )
         except Unauthenticated:
             logger.warning(
