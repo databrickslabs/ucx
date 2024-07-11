@@ -7,6 +7,7 @@ import time
 import webbrowser
 from datetime import timedelta
 from functools import cached_property
+from pathlib import Path
 from typing import Any
 
 import databricks.sdk.errors
@@ -22,6 +23,7 @@ from databricks.labs.blueprint.wheels import (
     find_project_root,
 )
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.core import with_user_agent_extra
@@ -31,6 +33,7 @@ from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
     PermissionDenied,
+    ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
 )
@@ -51,7 +54,6 @@ from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
@@ -513,18 +515,44 @@ class WorkspaceInstallation(InstallationMixin):
             raise err
 
     def _create_dashboards(self):
+        """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
+        dashboard_folder_local = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         logger.info("Creating dashboards...")
-        local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
-        dash = DashboardFromFiles(
-            self._ws,
-            state=self._install_state,
-            local_folder=local_query_files,
-            remote_folder=f"{self._installation.install_folder()}/dashboards",
-            name_prefix=self._name("UCX "),
-            warehouse_id=self._warehouse_id,
-            query_transformer=self._config.transform_inventory_database,
+        for step_folder in dashboard_folder_local.iterdir():
+            if not step_folder.is_dir():
+                continue
+            logger.debug(f"Reading step folder {step_folder}...")
+            for dashboard_folder in step_folder.iterdir():
+                if not dashboard_folder.is_dir():
+                    continue
+                logger.info(f"Creating dashboard in {dashboard_folder}...")
+                self._create_dashboard(dashboard_folder)
+
+    def _create_dashboard(self, folder: Path) -> None:
+        """Create a lakeview dashboard from the SQL queries in the folder"""
+        dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
+        try:
+            self._ws.workspace.mkdirs(dashboard_folder_remote)
+        except ResourceAlreadyExists:
+            pass
+        dashboard_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
+        dashboard_metadata = DashboardMetadata.from_path(folder).replace_database(
+            database=self._config.inventory_database, database_to_replace="inventory"
         )
-        dash.create_dashboards()
+        dashboard_metadata.display_name = dashboard_name
+        dashboards = Dashboards(self._ws)
+        lakeview_dashboard = dashboards.create_dashboard(dashboard_metadata)
+        dashboard_ref = f"{folder.parent.stem}_{folder.stem}".lower()
+        dashboard_id = self._install_state.dashboards.get(dashboard_ref)
+        dashboard = dashboards.deploy_dashboard(
+            lakeview_dashboard,
+            dashboard_id=dashboard_id,
+            parent_path=dashboard_folder_remote,
+            warehouse_id=self._warehouse_id,
+        )
+        assert dashboard.dashboard_id is not None
+        self._ws.lakeview.publish(dashboard.dashboard_id)
+        self._install_state.dashboards[dashboard_ref] = dashboard.dashboard_id
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
