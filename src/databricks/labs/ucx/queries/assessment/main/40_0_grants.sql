@@ -1,4 +1,4 @@
--- --title 'Incompatible Object Privileges'
+-- --title 'Incompatible Object Privileges' --width 6
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     action_type,

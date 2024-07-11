@@ -47,7 +47,7 @@ WITH table_stats AS (
   FROM inventory.grant_detail
   GROUP BY `database`
 )
--- --title 'Database Summary' --filter database
+-- --title 'Database Summary' --filter database --width 6
 SELECT
   database,
   upgrade,

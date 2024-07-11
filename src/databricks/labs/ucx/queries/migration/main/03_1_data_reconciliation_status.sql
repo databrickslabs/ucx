@@ -1,4 +1,4 @@
--- --title 'Migration status'
+-- --title 'Migration status' --width 6
 SELECT
   concat_ws('.', tables.`catalog`, tables.`database`, tables.name) AS table_name,
   tables.object_type,

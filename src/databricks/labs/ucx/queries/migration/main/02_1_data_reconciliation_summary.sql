@@ -1,4 +1,4 @@
--- --title 'Data Reconciliation Results'
+-- --title 'Data Reconciliation Results' --width 6
 SELECT
   COUNT(
     CASE

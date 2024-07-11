@@ -1,5 +1,6 @@
 /*
 --title 'Workflow migration problems'
+--width 6
 --overrides '{"spec":
     {"encodings": {"columns": [
         {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "/#workspace/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},

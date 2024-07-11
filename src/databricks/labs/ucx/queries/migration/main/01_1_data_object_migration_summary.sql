@@ -1,4 +1,4 @@
--- --title 'Data Migration Progress'
+-- --title 'Data Migration Progress' --width 6
 SELECT
   COUNT(
     CASE

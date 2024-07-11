@@ -1,4 +1,4 @@
--- --title 'Incompatible Jobs'
+-- --title 'Incompatible Jobs' --width 6
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     job_id,

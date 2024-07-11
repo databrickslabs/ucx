@@ -41,7 +41,7 @@ pattern_matcher(
         LEFT OUTER JOIN misc_patterns dbr_type
             ON a.dbr_type = dbr_type.dbr_type and a.dbr_type in ('cpu','gpu')
 )
--- --title 'Findings by Cluster'
+-- --title 'Findings by Cluster' --width 6
 SELECT
     collect_list(distinct issue) `Distinct Findings`,
     count(1) `Commands`,

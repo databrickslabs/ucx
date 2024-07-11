@@ -1,4 +1,4 @@
--- --title 'Warning messages'
+-- --title 'Warning messages' --width 6
 SELECT
   from_unixtime(timestamp) AS timestamp,
   job_id,

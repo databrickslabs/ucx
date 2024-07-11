@@ -1,4 +1,4 @@
--- --title 'Azure Service Principals'
+-- --title 'Azure Service Principals' --width 6
 select
   application_id,
   if(secret_scope = '', "NA", secret_scope) secret_scope,

@@ -1,4 +1,4 @@
--- --title 'Table Types' --filter name
+-- --title 'Table Types' --filter name --width 6
 SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        object_type AS type,
        table_format AS format,
