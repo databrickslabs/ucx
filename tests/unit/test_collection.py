@@ -36,7 +36,7 @@ def test_join_collection_prompt_no_join():
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection(123, 789)
+    account_installer.join_collection([123], )
     account_client.workspaces.list.assert_not_called()
 
 
@@ -57,7 +57,7 @@ def test_join_collection_no_sync_called():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     with pytest.raises(ValueError):
-        account_installer.join_collection(123)
+        account_installer.join_collection([123])
 
 
 def test_join_collection_join_collection_no_installation_id():
@@ -99,7 +99,7 @@ def test_join_collection_join_collection_no_installation_id():
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection(456)
+    account_installer.join_collection([456])
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 1
 
@@ -125,7 +125,7 @@ def test_join_collection_join_collection_account_admin():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     account_installer.join_collection(
-        123,
+        [123],
     )
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 3
@@ -135,6 +135,8 @@ def test_join_collection_join_collection_not_account_admin_no_workspace_id():
     ws = mock_workspace_client()
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
+    account_client.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test"), Workspace(workspace_id=456, deployment_name="test2"),Workspace(workspace_id=789, deployment_name="test3")]
+
     account_client.workspaces.list.side_effect = PermissionDenied('access denied')
     account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
@@ -150,7 +152,7 @@ def test_join_collection_join_collection_not_account_admin_no_workspace_id():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     account_installer.join_collection(
-        123,
+        [123],
     )
     ws.current_user.assert_not_called()
 
@@ -174,7 +176,7 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_coll
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection(123)
+    account_installer.join_collection([123])
     ws.workspace.upload.assert_not_called()
 
 
@@ -206,7 +208,7 @@ def test_join_collection_not_account_admin_workspace_id_not_installed_workspace_
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection(789)
+    account_installer.join_collection([789])
     ws.workspace.upload.assert_not_called()
 
 
@@ -222,7 +224,7 @@ def test_join_collection_join_existing_collection():
     account_installer.replace(
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection(123, 789)
+    account_installer.join_collection([123], 789)
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 3
 
@@ -254,7 +256,7 @@ def test_join_collection_join_existing_collection_sync_not_upto_date():
     )
 
     with pytest.raises(KeyError):
-        account_installer.join_collection(789, 123)
+        account_installer.join_collection([789], 123)
 
 
 def test_get_workspaces_context_not_collection_admin(caplog):
