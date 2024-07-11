@@ -864,5 +864,5 @@ if __name__ == "__main__":
                 "User is not authenticated, "
                 "you need account admin and workspace admin on "
                 "respective workspaces to enable collection joining. Please run join-collection command "
-                "with account admin credentials"
+                "with account admin credentials."
             )
