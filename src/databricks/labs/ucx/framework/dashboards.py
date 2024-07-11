@@ -4,7 +4,7 @@ from pathlib import Path
 
 import sqlglot
 from databricks.labs.blueprint.installer import InstallState
-from databricks.labs.lsql.dashboards import Dashboards
+from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceAlreadyExists
 
@@ -46,9 +46,8 @@ class DashboardFromFiles:
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
                 logger.info(f"Creating dashboard in {dashboard_folder}...")
-                lakeview_dashboard = self._dashboards.create_dashboard(
-                    dashboard_folder, query_transformer=self._query_transformer
-                )
+                dashboard_metadata = DashboardMetadata.from_path(dashboard_folder)
+                lakeview_dashboard = self._dashboards.create_dashboard(dashboard_metadata)
                 main_name = step_folder.stem.title()
                 sub_name = dashboard_folder.stem.title()
                 dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
