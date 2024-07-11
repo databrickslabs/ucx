@@ -221,7 +221,7 @@ def test_ensure_assessment_run(ws):
 
 def test_ensure_assessment_run_collection(ws):
     acc_client = create_autospec(AccountClient)
-    ensure_assessment_run(ws, 123, acc_client)
+    ensure_assessment_run(ws, True, acc_client)
 
     acc_client.workspaces.get.assert_called_once()
 

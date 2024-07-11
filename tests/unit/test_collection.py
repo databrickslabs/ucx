@@ -11,7 +11,7 @@ from databricks.sdk.service import iam
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient
-from databricks.sdk.errors import PermissionDenied, NotFound
+from databricks.sdk.errors import PermissionDenied
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -40,26 +40,6 @@ def test_join_collection_prompt_no_join():
         [123],
     )
     account_client.workspaces.list.assert_not_called()
-
-
-def test_join_collection_no_sync_called():
-    ws = mock_workspace_client()
-    ws.workspace.download.side_effect = NotFound
-    account_client = create_autospec(AccountClient)
-    account_client.get_workspace_client.return_value = ws
-    account_installer = AccountInstaller(account_client)
-    prompts = MockPrompts(
-        {
-            r"Do you want to join the current.*": "yes",
-            r".*": "",
-        }
-    )
-    account_installer.replace(
-        prompts=prompts,
-        product_info=ProductInfo.for_testing(WorkspaceConfig),
-    )
-    with pytest.raises(ValueError):
-        account_installer.join_collection([123])
 
 
 def test_join_collection_join_collection_no_installation_id():

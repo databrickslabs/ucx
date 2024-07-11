@@ -675,7 +675,7 @@ class AccountInstaller(AccountContext):
             msg = "Current workspace is not known, Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise KeyError(msg) from None
 
-    def get_workspace_info(self):
+    def _get_workspace_info(self):
         account_client = self._get_safe_account_client()
         workspaces = account_client.workspaces.list()
         ids_to_workspace = {}
@@ -718,7 +718,7 @@ class AccountInstaller(AccountContext):
             return None
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        ids_to_workspace = self.get_workspace_info()
+        ids_to_workspace = self._get_workspace_info()
         if target_workspace_id is None:
             # If joining a collection as part of the installation then collection_workspace_id would be empty
             try:

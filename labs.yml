@@ -60,8 +60,8 @@ commands:
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
     flags:
-      - name: collection-workspace-id
-        description: id of the collection workspace, the cmd will run for all workspaces in this collection.
+      - name: run-as-collection
+        description: boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts
