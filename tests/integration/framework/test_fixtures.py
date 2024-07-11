@@ -166,7 +166,7 @@ def test_remove_after_property_schema(ws, make_schema, sql_backend):
 def test_creating_lakeview_dashboard_permissions(
     make_lakeview_dashboard,
     # The `_permissions` fixtures are generated following a pattern resulting in an argument with too many characters
-    make_lakeview_dashboard_permissions,  # pylint: invalid-name
+    make_lakeview_dashboard_permissions,  # pylint: disable=invalid-name
     make_group,
 ):
     # Only the last permission in the list is visible in the Databricks UI
