@@ -23,7 +23,7 @@ jobs:
       - name: Verify no additional disabled lint in the new code
         run: |
           echo "Using base ref: ${GITHUB_BASE_REF}"
-          echo "Using head ref: ${$GITHUB_HEAD_REF}"
+          echo "Using head ref: ${GITHUB_HEAD_REF}"
           git fetch origin/$GITHUB_BASE_REF
           git fetch origin/$GITHUB_HEAD_REF
           git diff $GITHUB_BASE_REF...$GITHUB_HEAD_REF >> diff_data.txt
