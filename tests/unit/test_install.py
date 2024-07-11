@@ -616,15 +616,20 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     wheels.upload_to_dbfs.assert_not_called()
 
 
-def test_query_metadata(ws):
+def test_validate_dashboards(ws):
     queries_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
-    for dashboard_path in queries_path.iterdir():
-        try:
-            DashboardMetadata.from_path(dashboard_path).validate()
-        except ValueError as e:
-            assert False, f"Invalid dashboard in {dashboard_path}: {e}"
-        else:
-            assert True, f"Valid dashboard in {dashboard_path}"
+    for step_folder in queries_path.iterdir():
+        if not step_folder.is_dir():
+            continue
+        for dashboard_folder in step_folder.iterdir():
+            if not dashboard_folder.is_dir():
+                continue
+            try:
+                DashboardMetadata.from_path(dashboard_folder).validate()
+            except ValueError as e:
+                assert False, f"Invalid dashboard in {dashboard_folder}: {e}"
+            else:
+                assert True, f"Valid dashboard in {dashboard_folder}"
 
 
 def test_remove_database(ws):
