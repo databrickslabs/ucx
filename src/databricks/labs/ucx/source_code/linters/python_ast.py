@@ -12,6 +12,7 @@ from astroid import (  # type: ignore
     Attribute,
     Call,
     Const,
+    Expr,
     Import,
     ImportFrom,
     Module,
@@ -223,7 +224,11 @@ class Tree:
             raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for name, value in globs.items():
-            self_module.globals[name] = value
+            statements: list[Expr] = self_module.globals.get(name, None)
+            if statements is None:
+                self_module.globals[name] = list(value)  # clone the source list to avoid side-effects
+                continue
+            statements.extend(value)
 
     def append_nodes(self, nodes: list[NodeNG]):
         if not isinstance(self.node, Module):
@@ -234,7 +239,7 @@ class Tree:
             self_module.body.append(node)
 
     def is_from_module(self, module_name: str):
-        # if his is the call's root node, check it against the required module
+        # if this is the call's root node, check it against the required module
         if isinstance(self._node, Name):
             if self._node.name == module_name:
                 return True
