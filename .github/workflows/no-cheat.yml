@@ -22,7 +22,7 @@ jobs:
 
       - name: Verify no additional disabled lint in the new code
         run: |
-          git diff origin/main..$(git branch --show-current) >> diff_data.txt
+          git diff origin/main...$(git branch --show-current) >> diff_data.txt
           python tests/unit/no_cheat.py diff_data.txt >> cheats.txt
           COUNT=$(cat cheats.txt | wc -c)
           if [ ${COUNT} -gt 0 ]; then
