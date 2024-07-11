@@ -5,6 +5,7 @@ import os
 import re
 import time
 import webbrowser
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
@@ -416,7 +417,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
 
 class WorkspaceInstallation(InstallationMixin):
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         config: WorkspaceConfig,
         installation: Installation,
@@ -426,7 +427,6 @@ class WorkspaceInstallation(InstallationMixin):
         workflows_installer: WorkflowsDeployment,
         prompts: Prompts,
         product_info: ProductInfo,
-        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -438,7 +438,6 @@ class WorkspaceInstallation(InstallationMixin):
         self._product_info = product_info
         environ = dict(os.environ.items())
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
-        self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
     @classmethod
@@ -454,14 +453,7 @@ class WorkspaceInstallation(InstallationMixin):
         timeout = timedelta(minutes=2)
         tasks = Workflows.all().tasks()
         workflows_installer = WorkflowsDeployment(
-            config,
-            installation,
-            install_state,
-            ws,
-            wheels,
-            product_info,
-            timeout,
-            tasks,
+            config, installation, install_state, ws, wheels, product_info, timeout, tasks
         )
 
         return cls(
@@ -486,8 +478,7 @@ class WorkspaceInstallation(InstallationMixin):
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         install_tasks = [self._create_database]
-        if not self._skip_dashboards:
-            install_tasks.append(self._create_dashboards)
+        install_tasks.extend(self._get_create_dashboard_tasks())
         Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
@@ -514,10 +505,15 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
-    def _create_dashboards(self):
-        """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
-        queries_folder = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
+    def _get_create_dashboard_tasks(self) -> Iterable[Callable]:
+        """Get the callables to create the lakeview dashboards from the SQL queries in the queries subfolders"""
         logger.info("Creating dashboards...")
+        dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
+        try:
+            self._ws.workspace.mkdirs(dashboard_folder_remote)
+        except ResourceAlreadyExists:
+            pass
+        queries_folder = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         for step_folder in queries_folder.iterdir():
             if not step_folder.is_dir():
                 continue
@@ -525,16 +521,16 @@ class WorkspaceInstallation(InstallationMixin):
             for dashboard_folder in step_folder.iterdir():
                 if not dashboard_folder.is_dir():
                     continue
-                logger.info(f"Creating dashboard in {dashboard_folder}...")
-                self._create_dashboard(dashboard_folder)
+                task = functools.partial(
+                    self._create_dashboard,
+                    dashboard_folder,
+                    parent_path=dashboard_folder_remote,
+                )
+                yield task
 
-    def _create_dashboard(self, folder: Path) -> None:
+    def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
-        folder_remote = f"{self._installation.install_folder()}/dashboards"
-        try:
-            self._ws.workspace.mkdirs(folder_remote)
-        except ResourceAlreadyExists:
-            pass
+        logger.info(f"Creating dashboard in {folder}...")
         metadata = DashboardMetadata.from_path(folder).replace_database(
             database=self._config.inventory_database, database_to_replace="inventory"
         )
@@ -543,7 +539,7 @@ class WorkspaceInstallation(InstallationMixin):
         dashboard = Dashboards(self._ws).deploy_dashboard(
             metadata.as_lakeview(),
             dashboard_id=self._install_state.dashboards.get(reference),
-            parent_path=folder_remote,
+            parent_path=parent_path,
             warehouse_id=self._warehouse_id,
         )
         assert dashboard.dashboard_id is not None

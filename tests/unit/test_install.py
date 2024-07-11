@@ -723,14 +723,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         [],
     )
     workspace_installation = WorkspaceInstallation(
-        config,
-        mock_installation_with_jobs,
-        install_state,
-        sql_backend,
-        ws,
-        workflows_installer,
-        prompts,
-        PRODUCT_INFO,
+        config, mock_installation_with_jobs, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     with caplog.at_level('ERROR'):

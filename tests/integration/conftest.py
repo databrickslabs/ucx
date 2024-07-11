@@ -680,10 +680,6 @@ class MockInstallationContext(MockRuntimeContext):
         return Workflows.all().tasks()
 
     @cached_property
-    def skip_dashboards(self):
-        return True
-
-    @cached_property
     def workflows_deployment(self):
         return WorkflowsDeployment(
             self.config,
@@ -694,7 +690,6 @@ class MockInstallationContext(MockRuntimeContext):
             self.product_info,
             timedelta(minutes=3),
             self.tasks,
-            skip_dashboards=self.skip_dashboards,
         )
 
     @cached_property
@@ -708,7 +703,6 @@ class MockInstallationContext(MockRuntimeContext):
             self.workflows_deployment,
             self.prompts,
             self.product_info,
-            skip_dashboards=self.skip_dashboards,
         )
 
     @cached_property

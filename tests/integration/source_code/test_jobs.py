@@ -37,7 +37,7 @@ def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_
     cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
     result = next(cursor)
     if result['count'] == 0:
-        ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
+        installation_ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
         assert False, "No workflow problems found"
 
 

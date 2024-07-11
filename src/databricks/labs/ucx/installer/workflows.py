@@ -380,7 +380,7 @@ class DeployedWorkflows:
 
 
 class WorkflowsDeployment(InstallationMixin):
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         config: WorkspaceConfig,
         installation: Installation,
@@ -390,7 +390,6 @@ class WorkflowsDeployment(InstallationMixin):
         product_info: ProductInfo,
         verify_timeout: timedelta,
         tasks: list[Task],
-        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -401,7 +400,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
-        self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
     def create_jobs(self):
@@ -465,8 +463,7 @@ class WorkflowsDeployment(InstallationMixin):
                 continue
             job_id = self._install_state.jobs[step_name]
             dashboard_link = ""
-            if not self._skip_dashboards:
-                dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
+            dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")
             markdown.append(f"## {job_link}\n\n")
