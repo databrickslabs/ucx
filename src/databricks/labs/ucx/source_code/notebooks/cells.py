@@ -10,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
+from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
@@ -403,7 +404,8 @@ class GraphBuilder:
         problems: list[DependencyProblem] = []
         try:
             tree = Tree.normalize_and_parse(python_code)
-        except Exception as e:  # pylint: disable=broad-except
+        except AstroidSyntaxError as e:
+            logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
@@ -485,11 +487,11 @@ class MagicCommand(NodeBase):
             nodes = tree.locate(Call, [("magic_command", Name)])
             for command in cls._make_commands_for_magic_command_call_nodes(nodes):
                 commands.append(command)
-            return commands, problems
         except Exception as e:  # pylint: disable=broad-except
+            logger.debug(f"Internal error while checking magic commands in tree: {tree.root}", exc_info=True)
             problem = problem_factory('internal-error', f"While checking magic commands: {e}", tree.root)
             problems.append(problem)
-            return [], problems
+        return commands, problems
 
     @classmethod
     def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]):
@@ -527,8 +529,11 @@ class PipMagic:
             return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
         return graph.register_library(*argv[2:])  # Skipping %pip install
 
-    @staticmethod
-    def _split(code) -> list[str]:
+    # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
+    _splitter = re.compile(r"(?<!\\)\n")
+
+    @classmethod
+    def _split(cls, code: str) -> list[str]:
         """Split pip cell code into multiple arguments
 
         Note:
@@ -537,7 +542,7 @@ class PipMagic:
         Sources:
             https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
         """
-        match = re.search(r"(?<!\\)\n", code)
+        match = cls._splitter.search(code)
         if match:
             code = code[: match.start()]  # Remove code after non-escaped newline
         code = code.replace("\\\n", " ")
