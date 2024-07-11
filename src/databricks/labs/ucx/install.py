@@ -535,11 +535,10 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws.workspace.mkdirs(folder_remote)
         except ResourceAlreadyExists:
             pass
-        display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         metadata = DashboardMetadata.from_path(folder).replace_database(
             database=self._config.inventory_database, database_to_replace="inventory"
         )
-        metadata.display_name = display_name
+        metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         dashboards = Dashboards(self._ws)
         lakeview_dashboard = dashboards.create_dashboard(metadata)
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
