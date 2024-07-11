@@ -24330,6 +24330,12 @@
     "sktime.utils.validation.series": [],
     "sktime.utils.warnings": []
   },
+  "slicer": {
+    "slicer": [],
+    "slicer.slicer": [],
+    "slicer.slicer_internal": [],
+    "slicer.utils_testing": []
+  },
   "smmap": {
     "smmap": []
   },
