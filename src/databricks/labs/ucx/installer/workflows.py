@@ -16,6 +16,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
+from databricks.labs.lsql.dashboards import Dashboards
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     Aborted,
@@ -492,7 +493,7 @@ class WorkflowsDeployment(InstallationMixin):
             if len(dashboard_link) == 0:
                 dashboard_link += "Go to the one of the following dashboards after running the job:\n"
             first, second = dash.replace("_", " ").title().split()
-            dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{self._install_state.dashboards[dash]}"
+            dashboard_url = Dashboards(self._ws).get_url(self._install_state.dashboards[dash])
             dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
         return dashboard_link
 
