@@ -1,4 +1,4 @@
--- --title 'Data migration efforts' --height 7
+-- --title 'Data migration efforts' --height 7 --width 6
 SELECT
     object_type,
     table_format,
