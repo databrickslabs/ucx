@@ -163,7 +163,7 @@ def test_remove_after_property_schema(ws, make_schema, sql_backend):
             assert "RemoveAfter" in row[1]
 
 
-def test_lakeview_dashboard_permissions(
+def test_creating_lakeview_dashboard_permissions(
     make_lakeview_dashboard,
     # The `_permissions` fixtures are generated following a pattern resulting in an argument with too many characters
     make_lakeview_dashboard_permissions,  # pylint: invalid-name
