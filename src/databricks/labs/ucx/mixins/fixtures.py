@@ -252,7 +252,10 @@ def _permissions_mapping():
         (
             "lakeview_dashboard",
             "dashboards",
-            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_VIEW],
+            # The `CAN_READ` permission is consistent with the documentation (see below),
+            # but not with the databricks UI as it shows `CAN_VIEW` instead.
+            # https://docs.databricks.com/en/dashboards/tutorials/manage-permissions.html#get-workspace-object-permission-levels
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ],
             _simple,
         ),
         (
