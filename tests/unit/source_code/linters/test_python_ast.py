@@ -159,3 +159,21 @@ df.write.format("delta").saveAsTable("old.things")
         Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)]
     )[0]
     assert Tree(save_call).is_from_module("spark")
+
+
+def test_supports_recursive_refs_when_checking_module():
+    source_1 = """
+    df = spark.read.csv("hi")
+    """
+    source_2 = """
+    df = df.withColumn(stuff)
+    """
+    source_3 = """
+    df = df.withColumn(stuff2)
+    """
+    main_tree = Tree.normalize_and_parse(source_1)
+    main_tree.append_statements(Tree.normalize_and_parse(source_2))
+    tree = Tree.normalize_and_parse(source_3)
+    main_tree.append_statements(tree)
+    assign = tree.locate(Assign, [])[0]
+    assert Tree(assign.value).is_from_module("spark")
