@@ -7,7 +7,7 @@ from astroid import Attribute, Call, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
-    Linter,
+    PythonLinter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -50,7 +50,11 @@ class NoFormatPythonMatcher:
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
-        # Check 3: check presence of the format specifier:
+        # Check 3: ensure this is a spark call
+        if not Tree(node.func.expr).is_from_module("spark"):
+            return None
+
+        # Check 4: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   >>> df.saveToTable("c.db.table", format="csv")
         format_arg = Tree.get_arg(node, self.format_arg_index, self.format_arg_name)
@@ -92,7 +96,7 @@ class NoFormatPythonLinter:
                 )
 
 
-class DBRv8d0Linter(Linter):
+class DBRv8d0Linter(PythonLinter):
     """Performs Python linting for backwards incompatible changes in DBR version 8.0.
     Specifically, it yields advice for table-creation with implicit format.
     """
@@ -111,9 +115,8 @@ class DBRv8d0Linter(Linter):
             ]
         )
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         if self._skip_dbr:
             return
-        tree = Tree.normalize_and_parse(code)
         for node in tree.walk():
             yield from self._linter.lint(node)

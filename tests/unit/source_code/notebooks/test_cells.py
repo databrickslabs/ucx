@@ -10,12 +10,17 @@ from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, D
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell, PipMagic, MagicCommand
+from databricks.labs.ucx.source_code.notebooks.cells import (
+    GraphBuilder,
+    PythonCell,
+)
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 
 
 def test_basic_cell_extraction() -> None:
@@ -119,7 +124,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(KnownList())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
@@ -137,10 +142,10 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    whitelist = Whitelist()
+    allow_list = KnownList()
     file_loader = FileLoader()
-    pip_resolver = PythonLibraryResolver(whitelist)
-    import_resolver = ImportFileResolver(file_loader, whitelist)
+    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
@@ -165,6 +170,58 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
 
     assert len(problems) == 0
     graph.register_library.assert_called_once_with("databricks")
+
+
+def test_graph_builder_parse_error(
+    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup
+) -> None:
+    """Check that internal parsing errors are caught and logged."""
+    # Fixture.
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    graph.new_graph_builder_context()
+    builder = GraphBuilder(graph.new_graph_builder_context())
+
+    # Run the test.
+    problems = builder.build_graph_from_python_source("this is not valid python")
+
+    # Check results.
+    assert [
+        problem
+        for problem in problems
+        if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code")
+    ]
+
+
+def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):
+    code = """
+a = 'something'
+%pip install databricks
+b = 'else'
+"""
+    cell = PythonCell(code, original_offset=1)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    problems = cell.build_dependency_graph(graph)
+    assert not problems
+
+
+@pytest.mark.xfail(reason="Line-magic as an expression is not supported ", strict=True)
+def test_python_cell_with_expression_magic(
+    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup
+) -> None:
+    """Line magic (%) can be used in places where expressions are expected; check that this is handled."""
+    # Fixture
+    code = "current_directory = %pwd"
+    cell = PythonCell(code, original_offset=1)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+
+    # Run the test
+    problems = cell.build_dependency_graph(graph)
+
+    # Verify there were no problems.
+    assert not problems
 
 
 @pytest.mark.parametrize(
@@ -193,6 +250,12 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     ],
 )
 def test_pip_magic_split(code, split):
+    # Avoid direct protected access to the _split method.
+    class _PipMagicFriend(PipMagic):
+        @classmethod
+        def split(cls, code: str) -> list[str]:
+            return cls._split(code)
+
     assert PipMagic._split(code) == split  # pylint: disable=protected-access
 
 

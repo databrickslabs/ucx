@@ -10,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
+from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
@@ -168,22 +169,14 @@ class RunCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
-        lines = self._original_code.split('\n')
-        for idx, line in enumerate(lines):
-            start = line.index(command)
-            if start >= 0:
-                path = line[start + len(command) :]
-                path = path.strip().strip("'").strip('"')
-                if len(path) == 0:
-                    continue
-                notebook_path = Path(path)
-                start_line = self._original_offset + idx
-                problems = parent.register_notebook(notebook_path)
-                return [
-                    problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
-                    for problem in problems
-                ]
+        path, idx, line = self._read_notebook_path()
+        if path is not None:
+            start_line = self._original_offset + idx
+            problems = parent.register_notebook(path)
+            return [
+                problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
+                for problem in problems
+            ]
         start_line = self._original_offset
         problem = DependencyProblem(
             'invalid-run-cell',
@@ -194,6 +187,23 @@ class RunCell(Cell):
             end_col=len(self._original_code),
         )
         return [problem]
+
+    def maybe_notebook_path(self) -> Path | None:
+        path, _, _ = self._read_notebook_path()
+        return path
+
+    def _read_notebook_path(self):
+        command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
+        lines = self._original_code.split('\n')
+        for idx, line in enumerate(lines):
+            start = line.find(command)
+            if start >= 0:
+                path = line[start + len(command) :]
+                path = path.strip().strip("'").strip('"')
+                if len(path) == 0:
+                    continue
+                return Path(path), idx, line
+        return None, 0, ""
 
     def migrate_notebook_path(self):
         pass
@@ -394,7 +404,8 @@ class GraphBuilder:
         problems: list[DependencyProblem] = []
         try:
             tree = Tree.normalize_and_parse(python_code)
-        except Exception as e:  # pylint: disable=broad-except
+        except AstroidSyntaxError as e:
+            logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
@@ -476,11 +487,11 @@ class MagicCommand(NodeBase):
             nodes = tree.locate(Call, [("magic_command", Name)])
             for command in cls._make_commands_for_magic_command_call_nodes(nodes):
                 commands.append(command)
-            return commands, problems
         except Exception as e:  # pylint: disable=broad-except
+            logger.debug(f"Internal error while checking magic commands in tree: {tree.root}", exc_info=True)
             problem = problem_factory('internal-error', f"While checking magic commands: {e}", tree.root)
             problems.append(problem)
-            return [], problems
+        return commands, problems
 
     @classmethod
     def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]):
@@ -518,8 +529,11 @@ class PipMagic:
             return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
         return graph.register_library(*argv[2:])  # Skipping %pip install
 
-    @staticmethod
-    def _split(code) -> list[str]:
+    # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
+    _splitter = re.compile(r"(?<!\\)\n")
+
+    @classmethod
+    def _split(cls, code: str) -> list[str]:
         """Split pip cell code into multiple arguments
 
         Note:
@@ -528,7 +542,7 @@ class PipMagic:
         Sources:
             https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
         """
-        match = re.search(r"(?<!\\)\n", code)
+        match = cls._splitter.search(code)
         if match:
             code = code[: match.start()]  # Remove code after non-escaped newline
         code = code.replace("\\\n", " ")
