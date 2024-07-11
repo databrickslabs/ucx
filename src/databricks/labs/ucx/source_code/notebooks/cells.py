@@ -230,7 +230,8 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        return PipCommand(self.original_code).build_dependency_graph(graph)
+        node = MagicNode(0, 1, None, end_lineno=0, end_col_offset=len(self.original_code))
+        return PipCommand(node, self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):
@@ -504,9 +505,9 @@ class MagicLine(NodeBase):
 
     def as_magic(self) -> MagicCommand | None:
         if self._command.startswith("%pip") or self._command.startswith("!pip"):
-            return PipCommand(self._command)
+            return PipCommand(self.node, self._command)
         if self._command.startswith("%run"):
-            return RunCommand(self._command)
+            return RunCommand(self.node, self._command)
         return None
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
@@ -519,9 +520,14 @@ class MagicLine(NodeBase):
         return [problem]
 
 
+class MagicNode(NodeNG):
+    pass
+
+
 class MagicCommand(ABC):
 
-    def __init__(self, code: str):
+    def __init__(self, node: NodeNG, code: str):
+        self._node = node
         self._code = code
 
     @abstractmethod
@@ -531,8 +537,12 @@ class MagicCommand(ABC):
 class RunCommand(MagicCommand):
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        # TODO
-        return []
+        path = self.notebook_path
+        if path is not None:
+            problems = graph.register_notebook(path)
+            return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
+        problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
+        return [problem]
 
     @property
     def notebook_path(self) -> Path | None:
@@ -548,12 +558,21 @@ class PipCommand(MagicCommand):
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         argv = self._split(self._code)
         if len(argv) == 1:
-            return [DependencyProblem("library-install-failed", "Missing command after 'pip'")]
+            return [DependencyProblem.from_node("library-install-failed", "Missing command after 'pip'", self._node)]
         if argv[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported 'pip' command: {argv[1]}")]
+            return [
+                DependencyProblem.from_node(
+                    "library-install-failed", f"Unsupported 'pip' command: {argv[1]}", self._node
+                )
+            ]
         if len(argv) == 2:
-            return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
-        return graph.register_library(*argv[2:])  # Skipping %pip install
+            return [
+                DependencyProblem.from_node(
+                    "library-install-failed", "Missing arguments after 'pip install'", self._node
+                )
+            ]
+        problems = graph.register_library(*argv[2:])  # Skipping %pip install
+        return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
 
     # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
     _splitter = re.compile(r"(?<!\\)\n")
