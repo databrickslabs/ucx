@@ -630,9 +630,9 @@ def test_computes_values_across_notebooks_using_magic_line(extended_test_index, 
         Advice(
             code='table-migrate',
             message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
-            start_line=3,
+            start_line=6,
             start_col=0,
-            end_line=3,
+            end_line=6,
             end_col=19,
         )
     ]
