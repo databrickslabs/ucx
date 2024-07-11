@@ -12,6 +12,7 @@ from astroid import (  # type: ignore
     Attribute,
     Call,
     Const,
+    Expr,
     Import,
     ImportFrom,
     Module,
@@ -220,12 +221,16 @@ class Tree:
             stmt.parent = self_module
             self_module.body.append(stmt)
         for name, value in tree_module.globals.items():
-            self_module.globals[name] = value
+            statements: list[Expr] = self_module.globals.get(name, None)
+            if statements is None:
+                self_module.globals[name] = list(value)  # clone the source list to avoid side-effects
+                continue
+            statements.extend(value)
         # the following may seem strange but it's actually ok to use the original module as tree root
         return tree
 
     def is_from_module(self, module_name: str):
-        # if his is the call's root node, check it against the required module
+        # if this is the call's root node, check it against the required module
         if isinstance(self._node, Name):
             if self._node.name == module_name:
                 return True
