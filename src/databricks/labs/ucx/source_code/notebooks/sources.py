@@ -192,13 +192,15 @@ class NotebookLinter:
         self._python_linter.append_nodes(nodes)
 
     @staticmethod
-    def _list_run_magic_lines(tree: Tree) -> list[MagicLine]:
+    def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
 
         def _ignore_problem(_code: str, _message: str, _node: NodeNG) -> None:
             return None
 
         commands, _ = MagicLine.extract_from_tree(tree, _ignore_problem)
-        return list(filter(lambda cmd: isinstance(cmd.as_magic(), RunCommand), commands))
+        for command in commands:
+            if isinstance(command.as_magic(), RunCommand):
+                yield command
 
     def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]):
         for base_node in base_nodes:
