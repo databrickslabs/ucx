@@ -539,11 +539,9 @@ class WorkspaceInstallation(InstallationMixin):
             database=self._config.inventory_database, database_to_replace="inventory"
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
-        dashboards = Dashboards(self._ws)
-        lakeview_dashboard = dashboards.create_dashboard(metadata)
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard = dashboards.deploy_dashboard(
-            lakeview_dashboard,
+        dashboard = Dashboards(self._ws).deploy_dashboard(
+            metadata.as_lakeview(),
             dashboard_id=self._install_state.dashboards.get(reference),
             parent_path=folder_remote,
             warehouse_id=self._warehouse_id,
