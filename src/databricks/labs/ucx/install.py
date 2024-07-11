@@ -516,9 +516,9 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _create_dashboards(self):
         """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
-        dashboard_folder_local = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
+        queries_folder = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         logger.info("Creating dashboards...")
-        for step_folder in dashboard_folder_local.iterdir():
+        for step_folder in queries_folder.iterdir():
             if not step_folder.is_dir():
                 continue
             logger.debug(f"Reading step folder {step_folder}...")
@@ -530,29 +530,28 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _create_dashboard(self, folder: Path) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
-        dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
+        folder_remote = f"{self._installation.install_folder()}/dashboards"
         try:
-            self._ws.workspace.mkdirs(dashboard_folder_remote)
+            self._ws.workspace.mkdirs(folder_remote)
         except ResourceAlreadyExists:
             pass
-        dashboard_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
-        dashboard_metadata = DashboardMetadata.from_path(folder).replace_database(
+        display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
+        metadata = DashboardMetadata.from_path(folder).replace_database(
             database=self._config.inventory_database, database_to_replace="inventory"
         )
-        dashboard_metadata.display_name = dashboard_name
+        metadata.display_name = display_name
         dashboards = Dashboards(self._ws)
-        lakeview_dashboard = dashboards.create_dashboard(dashboard_metadata)
-        dashboard_ref = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard_id = self._install_state.dashboards.get(dashboard_ref)
+        lakeview_dashboard = dashboards.create_dashboard(metadata)
+        reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard = dashboards.deploy_dashboard(
             lakeview_dashboard,
-            dashboard_id=dashboard_id,
-            parent_path=dashboard_folder_remote,
+            dashboard_id=self._install_state.dashboards.get(reference),
+            parent_path=folder_remote,
             warehouse_id=self._warehouse_id,
         )
         assert dashboard.dashboard_id is not None
         self._ws.lakeview.publish(dashboard.dashboard_id)
-        self._install_state.dashboards[dashboard_ref] = dashboard.dashboard_id
+        self._install_state.dashboards[reference] = dashboard.dashboard_id
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
