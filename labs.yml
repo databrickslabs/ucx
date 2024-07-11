@@ -240,7 +240,7 @@ commands:
     is_account_level: true
     description: workspace_id to join a collection.
     flags:
-      - name: workspace-id
-        description: workspace_id which should join a collection.
+      - name: workspace-ids
+        description: workspace_ids which should join a collection. provide a comma separated list of workspace ids.
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list

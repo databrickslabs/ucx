@@ -157,13 +157,16 @@ def ensure_assessment_run(
             a = AccountClient(product='ucx', product_version=__version__)
         account_installer = AccountInstaller(a)
         workspaces_context = account_installer.get_workspaces_context(collection_workspace_id)
+        # if running the cmd as a collection, dont wait for each assessment job to finish as that will take long time
+        skip_job_status = True
     else:
+        skip_job_status = False
         workspaces_context = [WorkspaceContext(w)]
     for ctx in workspaces_context:
         logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
         deployed_workflows = ctx.deployed_workflows
         if not deployed_workflows.validate_step("assessment"):
-            deployed_workflows.run_workflow("assessment")
+            deployed_workflows.run_workflow("assessment", skip_job_status)
 
 
 @ucx.command
@@ -484,10 +487,11 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 
 
 @ucx.command(is_account=True)
-def join_collection(a: AccountClient, workspace_id: int, target_workspace_id: int):
+def join_collection(a: AccountClient, workspace_ids: str, target_workspace_id: int):
     """joins the workspace to an existing collection"""
     account_installer = AccountInstaller(a)
-    account_installer.join_collection(workspace_id, target_workspace_id)
+    w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
+    account_installer.join_collection(w_ids, target_workspace_id)
 
 
 @ucx.command

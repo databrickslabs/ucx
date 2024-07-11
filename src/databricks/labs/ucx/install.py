@@ -619,9 +619,8 @@ class AccountInstaller(AccountContext):
         """
         if self.account_client.config.is_account_client:
             return self.account_client
-        # w = WorkspaceClient(product="ucx", product_version=__version__)
-        # host = w.config.environment.deployment_url("accounts")
-        host = 'https://accounts.azuredatabricks.net/'
+        w = WorkspaceClient(product="ucx", product_version=__version__)
+        host = w.config.environment.deployment_url("accounts")
         account_id = self.prompts.question("Please provide the Databricks account id")
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
@@ -676,17 +675,12 @@ class AccountInstaller(AccountContext):
             msg = "Current workspace is not known, Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise KeyError(msg) from None
 
-    def get_workspace_info(self, current_workspace_id: int):
+    def get_workspace_info(self):
         account_client = self._get_safe_account_client()
         workspaces = account_client.workspaces.list()
         ids_to_workspace = {}
         for workspace in workspaces:
             ids_to_workspace[workspace.workspace_id] = workspace
-        # current_workspace_client = account_client.get_workspace_client(workspace)
-        # current_workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-        # installation = Installation.current(current_workspace_client, self.product_info.product_name())
-        # workspace_info = WorkspaceInfo(installation, current_workspace_client)
-        # return workspace_info.load_workspace_info()
         return ids_to_workspace
 
     def get_workspaces_context(self, collection_workspace_id: int) -> list[WorkspaceContext]:
@@ -713,7 +707,7 @@ class AccountInstaller(AccountContext):
 
     def join_collection(
         self,
-        current_workspace_id: int,
+        workspace_ids: list[int],
         target_workspace_id: int | None = None,
     ):
         if self.is_account_install:
@@ -724,7 +718,7 @@ class AccountInstaller(AccountContext):
             return None
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        ids_to_workspace = self.get_workspace_info(current_workspace_id)
+        ids_to_workspace = self.get_workspace_info()
         if target_workspace_id is None:
             # If joining a collection as part of the installation then collection_workspace_id would be empty
             try:
@@ -766,7 +760,7 @@ class AccountInstaller(AccountContext):
         if collection_workspace is not None:
             self._sync_collection(
                 collection_workspace,
-                current_workspace_id,
+                workspace_ids,
                 ids_to_workspace,
             )
         return None
@@ -774,7 +768,7 @@ class AccountInstaller(AccountContext):
     def _sync_collection(
         self,
         collection_workspace: Workspace,
-        current_workspace_id: int,
+        workspace_ids: list[int],
         ids_to_workspace: dict[int, Workspace],
     ) -> list[Workspace] | None:
         # gets the list of existing collection of workspace from the config
@@ -788,7 +782,8 @@ class AccountInstaller(AccountContext):
                 f"Workspace {collection_workspace.deployment_name} does not belong to any existing "
                 f"collection, creating a new collection"
             )
-        installed_workspace_ids.append(current_workspace_id)
+        for workspace_id in workspace_ids:
+            installed_workspace_ids.append(workspace_id)
         installed_workspaces = []
         ctx = AccountContext(self._get_safe_account_client())
         for workspace_id in installed_workspace_ids:
