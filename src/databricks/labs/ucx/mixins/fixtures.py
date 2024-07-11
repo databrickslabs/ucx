@@ -252,7 +252,7 @@ def _permissions_mapping():
         (
             "lakeview_dashboard",
             "dashboards",
-            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ],
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_VIEW],
             _simple,
         ),
         (
