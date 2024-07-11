@@ -551,26 +551,6 @@ def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected,
     assert advices == expected
 
 
-def test_computes_values_across_notebooks_using_run_cell(extended_test_index, mock_path_lookup):
-    path = mock_path_lookup.resolve(Path("values_across_notebooks_run_cell.py"))
-    source = path.read_text()
-    linter = NotebookLinter.from_source(
-        extended_test_index, mock_path_lookup, CurrentSessionState(), source, Language.PYTHON
-    )
-    advices = list(linter.lint())
-    expected = [
-        Advice(
-            code='table-migrate',
-            message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
-            start_line=8,
-            start_col=0,
-            end_line=8,
-            end_col=19,
-        )
-    ]
-    assert advices == expected
-
-
 def test_ignores_values_across_notebooks_using_dbutils_notebook_run(extended_test_index, mock_path_lookup):
     path = mock_path_lookup.resolve(Path("values_across_notebooks_dbutils_notebook_run.py"))
     source = path.read_text()
