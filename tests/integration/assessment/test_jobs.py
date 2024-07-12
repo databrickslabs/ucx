@@ -2,7 +2,7 @@ import json
 import time
 from datetime import timedelta
 
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.jobs import NotebookTask, RunTask
 from databricks.sdk.service.workspace import ImportFormat
@@ -28,7 +28,7 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert int(results[0].job_id) == new_job.job_id
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_job_run_crawler(ws, env_or_skip, inventory_schema, sql_backend):
     cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     dummy_notebook = """# Databricks notebook source
