@@ -8683,6 +8683,13 @@
   "pexpect": {
     "pexpect": []
   },
+  "phonetics": {
+    "phonetics": [],
+    "phonetics.metaphone": [],
+    "phonetics.nysiis": [],
+    "phonetics.soundex": [],
+    "phonetics.utils": []
+  },
   "pickleshare": {
     "pickleshare": []
   },
