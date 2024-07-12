@@ -26146,12 +26146,7 @@
     "statsmodels.base": [],
     "statsmodels.base._constraints": [],
     "statsmodels.base._parameter_inference": [],
-    "statsmodels.base._penalized": [
-      {
-        "code": "legacy-context-in-shared-clusters",
-        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
-      }
-    ],
+    "statsmodels.base._penalized": [],
     "statsmodels.base._penalties": [],
     "statsmodels.base._prediction_inference": [],
     "statsmodels.base._screening": [],
@@ -26558,12 +26553,7 @@
     "statsmodels.tsa._bds": [],
     "statsmodels.tsa.adfvalues": [],
     "statsmodels.tsa.api": [],
-    "statsmodels.tsa.ar_model": [
-      {
-        "code": "legacy-context-in-shared-clusters",
-        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
-      }
-    ],
+    "statsmodels.tsa.ar_model": [],
     "statsmodels.tsa.ardl": [],
     "statsmodels.tsa.ardl._pss_critical_values": [],
     "statsmodels.tsa.ardl._pss_critical_values.pss-process": [],
