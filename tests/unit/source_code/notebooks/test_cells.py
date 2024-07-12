@@ -9,11 +9,14 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell, PipMagic, MagicCommand
 from databricks.labs.ucx.source_code.notebooks.cells import (
+    CellLanguage,
+    PipCell,
     GraphBuilder,
     PythonCell,
+    PipCommand,
 )
+from databricks.labs.ucx.source_code.notebooks.cells import MagicLine
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
@@ -251,12 +254,12 @@ def test_python_cell_with_expression_magic(
 )
 def test_pip_magic_split(code, split):
     # Avoid direct protected access to the _split method.
-    class _PipMagicFriend(PipMagic):
+    class _PipMagicFriend(PipCommand):
         @classmethod
         def split(cls, code: str) -> list[str]:
             return cls._split(code)
 
-    assert PipMagic._split(code) == split  # pylint: disable=protected-access
+    assert _PipMagicFriend._split(code) == split  # pylint: disable=protected-access
 
 
 def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
@@ -264,7 +267,7 @@ def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_
 %unsupported stuff '"%#@!
 """
     tree = Tree.normalize_and_parse(source)
-    commands, _ = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+    commands, _ = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     problems = commands[0].build_dependency_graph(graph)

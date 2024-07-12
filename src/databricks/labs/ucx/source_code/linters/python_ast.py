@@ -210,24 +210,33 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def append_statements(self, tree: Tree) -> Tree:
+    def append_tree(self, tree: Tree) -> Tree:
         if not isinstance(tree.node, Module):
-            raise NotImplementedError(f"Can't append statements from {type(tree.node).__name__}")
+            raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
+        self.append_nodes(tree_module.body)
+        self.append_globals(tree_module.globals)
+        # the following may seem strange but it's actually ok to use the original module as tree root
+        return tree
+
+    def append_globals(self, globs: dict):
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+            raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
-        for stmt in tree_module.body:
-            stmt.parent = self_module
-            self_module.body.append(stmt)
-        for name, value in tree_module.globals.items():
+        for name, value in globs.items():
             statements: list[Expr] = self_module.globals.get(name, None)
             if statements is None:
                 self_module.globals[name] = list(value)  # clone the source list to avoid side-effects
                 continue
             statements.extend(value)
-        # the following may seem strange but it's actually ok to use the original module as tree root
-        return tree
+
+    def append_nodes(self, nodes: list[NodeNG]):
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for node in nodes:
+            node.parent = self_module
+            self_module.body.append(node)
 
     def is_from_module(self, module_name: str):
         # if this is the call's root node, check it against the required module

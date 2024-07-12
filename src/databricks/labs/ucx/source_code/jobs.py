@@ -381,16 +381,16 @@ class WorkflowLinter:
             if not container:
                 continue
             if isinstance(container, Notebook):
-                yield from self._lint_notebook(container, ctx)
+                yield from self._lint_notebook(container, ctx, session_state)
             if isinstance(container, LocalFile):
-                yield from self._lint_file(container, ctx)
+                yield from self._lint_file(container, ctx, session_state)
 
-    def _lint_file(self, file: LocalFile, ctx: LinterContext):
-        linter = FileLinter(ctx, self._path_lookup, file.path)
+    def _lint_file(self, file: LocalFile, ctx: LinterContext, session_state: CurrentSessionState):
+        linter = FileLinter(ctx, self._path_lookup, session_state, file.path)
         for advice in linter.lint():
             yield file.path, advice
 
-    def _lint_notebook(self, notebook: Notebook, ctx: LinterContext):
-        linter = NotebookLinter(ctx, self._path_lookup, notebook)
+    def _lint_notebook(self, notebook: Notebook, ctx: LinterContext, session_state: CurrentSessionState):
+        linter = NotebookLinter(ctx, self._path_lookup, session_state, notebook)
         for advice in linter.lint():
             yield notebook.path, advice

@@ -40,6 +40,12 @@ def test_dependency_resolver_visits_local_notebook_dependencies(simple_dependenc
     assert maybe.graph.all_relative_names() == {"root4.py", "leaf3.py"}
 
 
+def test_dependency_resolver_visits_local_notebook_dependencies_in_magic_run(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root1.magic.py"), CurrentSessionState())
+    assert not maybe.failed
+    assert maybe.graph.all_relative_names() == {"root1.magic.py", "leaf1.py"}
+
+
 def test_dependency_resolver_visits_workspace_file_dependencies(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path('./root8.py'), CurrentSessionState())
     assert not maybe.failed

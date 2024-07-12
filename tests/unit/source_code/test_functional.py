@@ -111,7 +111,7 @@ class Functional:
         print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
-        linter = FileLinter(ctx, path_lookup, self.path)
+        linter = FileLinter(ctx, path_lookup, session_state, self.path)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
@@ -166,4 +166,13 @@ class Functional:
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
 def test_functional(sample: Functional, mock_path_lookup) -> None:
-    sample.verify(mock_path_lookup)
+    path_lookup = mock_path_lookup.change_directory(sample.path.parent)
+    sample.verify(path_lookup)
+
+
+@pytest.mark.skip(reason="Used for troubleshooting failing tests")
+def test_one_functional(mock_path_lookup):
+    path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_magic_line.py"))
+    path_lookup = mock_path_lookup.change_directory(path.parent)
+    sample = Functional(path)
+    sample.verify(path_lookup)
