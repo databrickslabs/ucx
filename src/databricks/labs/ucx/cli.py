@@ -154,7 +154,7 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
         if not a:
             a = AccountClient(product='ucx', product_version=__version__)
         account_installer = AccountInstaller(a)
-        workspaces_context = account_installer.get_workspaces_context(w.get_workspace_id())
+        workspaces_context = account_installer.get_workspace_contexts(w.get_workspace_id())
         # if running the cmd as a collection, dont wait for each assessment job to finish as that will take long time
         skip_job_status = True
     else:
