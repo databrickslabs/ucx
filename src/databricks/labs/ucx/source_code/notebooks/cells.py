@@ -8,6 +8,7 @@ from ast import parse as parse_python
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
+from typing import TypeVar
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
@@ -229,7 +230,8 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        return PipMagic(self.original_code).build_dependency_graph(graph)
+        node = MagicNode(0, 1, None, end_lineno=0, end_col_offset=len(self.original_code))
+        return PipCommand(node, self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):
@@ -414,10 +416,10 @@ class GraphBuilder:
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(import_problems)
-        magic_commands, command_problems = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
         nodes = syspath_changes + run_calls + import_sources + magic_commands
-        # need to execute things in intertwined sequence so concat and sort
+        # need to execute things in intertwined sequence so concat and sort them
         for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
                 # Astroid line numbers are 1-based.
@@ -437,7 +439,7 @@ class GraphBuilder:
             yield from self._register_notebook(base_node)
         elif isinstance(base_node, ImportSource):
             yield from self._register_import(base_node)
-        elif isinstance(base_node, MagicCommand):
+        elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
         else:
             logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
@@ -466,23 +468,20 @@ class GraphBuilder:
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
-        path = Path(change.path)
-        if not path.is_absolute():
-            path = self._context.path_lookup.cwd / path
-        if change.is_append:
-            self._context.path_lookup.append_path(path)
-            return
-        self._context.path_lookup.prepend_path(path)
+        change.apply_to(self._context.path_lookup)
 
 
-class MagicCommand(NodeBase):
+T = TypeVar("T")
+
+
+class MagicLine(NodeBase):
 
     @classmethod
     def extract_from_tree(
-        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], DependencyProblem]
-    ) -> tuple[list[MagicCommand], list[DependencyProblem]]:
-        problems: list[DependencyProblem] = []
-        commands: list[MagicCommand] = []
+        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], T]
+    ) -> tuple[list[MagicLine], list[T]]:
+        problems: list[T] = []
+        commands: list[MagicLine] = []
         try:
             nodes = tree.locate(Call, [("magic_command", Name)])
             for command in cls._make_commands_for_magic_command_call_nodes(nodes):
@@ -498,36 +497,82 @@ class MagicCommand(NodeBase):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
-                yield MagicCommand(node, arg.value)
+                yield MagicLine(node, arg.value)
 
     def __init__(self, node: NodeNG, command: bytes):
         super().__init__(node)
         self._command = command.decode()
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+    def as_magic(self) -> MagicCommand | None:
         if self._command.startswith("%pip") or self._command.startswith("!pip"):
-            cmd = PipMagic(self._command)
-            return cmd.build_dependency_graph(graph)
+            return PipCommand(self.node, self._command)
+        if self._command.startswith("%run"):
+            return RunCommand(self.node, self._command)
+        return None
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        magic = self.as_magic()
+        if magic is not None:
+            return magic.build_dependency_graph(graph)
         problem = DependencyProblem.from_node(
             code='unsupported-magic-line', message=f"magic line '{self._command}' is not supported yet", node=self.node
         )
         return [problem]
 
 
-class PipMagic:
+class MagicNode(NodeNG):
+    pass
 
-    def __init__(self, code: str):
+
+class MagicCommand(ABC):
+
+    def __init__(self, node: NodeNG, code: str):
+        self._node = node
         self._code = code
+
+    @abstractmethod
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]: ...
+
+
+class RunCommand(MagicCommand):
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        path = self.notebook_path
+        if path is not None:
+            problems = graph.register_notebook(path)
+            return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
+        problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
+        return [problem]
+
+    @property
+    def notebook_path(self) -> Path | None:
+        start = self._code.find(' ')
+        if start < 0:
+            return None
+        path = self._code[start + 1 :].strip().strip('"').strip("'")
+        return Path(path)
+
+
+class PipCommand(MagicCommand):
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         argv = self._split(self._code)
         if len(argv) == 1:
-            return [DependencyProblem("library-install-failed", "Missing command after 'pip'")]
+            return [DependencyProblem.from_node("library-install-failed", "Missing command after 'pip'", self._node)]
         if argv[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported 'pip' command: {argv[1]}")]
+            return [
+                DependencyProblem.from_node(
+                    "library-install-failed", f"Unsupported 'pip' command: {argv[1]}", self._node
+                )
+            ]
         if len(argv) == 2:
-            return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
-        return graph.register_library(*argv[2:])  # Skipping %pip install
+            return [
+                DependencyProblem.from_node(
+                    "library-install-failed", "Missing arguments after 'pip install'", self._node
+                )
+            ]
+        problems = graph.register_library(*argv[2:])  # Skipping %pip install
+        return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
 
     # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
     _splitter = re.compile(r"(?<!\\)\n")

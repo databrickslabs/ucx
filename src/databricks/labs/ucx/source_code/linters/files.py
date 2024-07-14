@@ -139,7 +139,7 @@ class LocalCodeLinter:
         if path.is_dir():
             return []
         ctx = self._new_linter_context()
-        linter = FileLinter(ctx, self._path_lookup, path)
+        linter = FileLinter(ctx, self._path_lookup, self._session_state, path)
         return [advice.for_path(path) for advice in linter.lint()]
 
 

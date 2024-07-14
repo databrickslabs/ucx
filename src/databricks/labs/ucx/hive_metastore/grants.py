@@ -187,6 +187,9 @@ class Grant:
         return make_query(object_type, object_key)
 
 
+CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this cluster"
+
+
 class GrantsCrawler(CrawlerBase[Grant]):
     def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
         assert tc._backend == udf._backend
@@ -198,7 +201,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
         self._include_databases = include_databases
 
     def snapshot(self) -> Iterable[Grant]:
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
+        try:
+            return self._snapshot(partial(self._try_load), partial(self._crawl))
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
+            log_fn(f"Couldn't fetch grants snapshot: {e}")
+            return []
 
     def _try_load(self):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
@@ -354,11 +362,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 grants.append(grant)
             return grants
         except NotFound:
-            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            # This makes the integration test more robust as many test schemas are being created and deleted quickly.
             logger.warning(f"Schema {catalog}.{database} no longer existed")
             return []
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
+            log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
+            log_fn(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []
 
 

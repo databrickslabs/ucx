@@ -141,7 +141,7 @@ def test_appends_statements():
     tree_1 = Tree.normalize_and_parse(source_1)
     source_2 = 'b = f"Hello {a}!"'
     tree_2 = Tree.normalize_and_parse(source_2)
-    tree_3 = tree_1.append_statements(tree_2)
+    tree_3 = tree_1.append_tree(tree_2)
     nodes = tree_3.locate(Assign, [])
     tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
     values = list(InferredValue.infer_from_node(tree.node))
@@ -172,8 +172,8 @@ def test_supports_recursive_refs_when_checking_module():
     df = df.withColumn(stuff2)
     """
     main_tree = Tree.normalize_and_parse(source_1)
-    main_tree.append_statements(Tree.normalize_and_parse(source_2))
+    main_tree.append_tree(Tree.normalize_and_parse(source_2))
     tree = Tree.normalize_and_parse(source_3)
-    main_tree.append_statements(tree)
+    main_tree.append_tree(tree)
     assign = tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
