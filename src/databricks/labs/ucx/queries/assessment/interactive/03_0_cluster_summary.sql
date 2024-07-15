@@ -1,6 +1,3 @@
--- viz type=table, name=Findings by Cluster, columns=distinct_findings,Commands,Users,First_command,Last_command,workspace_id,cluster_id,cluster_name,dbr_version,creator
--- widget title=Findings by Cluster, row=3, col=0, size_x=6, size_y=12
---
 WITH
 iteractive_cluster_commands (
     SELECT
@@ -20,19 +17,19 @@ iteractive_cluster_commands (
         c.creator,
         a.event_date
     FROM system.access.audit a
-        LEFT OUTER JOIN $inventory.clusters AS c ON a.request_params.clusterId = c.cluster_id
+        LEFT OUTER JOIN inventory.clusters AS c ON a.request_params.clusterId = c.cluster_id
         AND a.action_name = 'runCommand'
     WHERE a.event_date >= DATE_SUB(CURRENT_DATE(), 90)
 ),
 misc_patterns(
-    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM $inventory.misc_patterns
+    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM inventory.misc_patterns
 ),
 pattern_matcher(
     SELECT
         explode(array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null))) issue,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns p
+        LEFT OUTER JOIN inventory.code_patterns p
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
         LEFT OUTER JOIN misc_patterns lp
@@ -44,6 +41,7 @@ pattern_matcher(
         LEFT OUTER JOIN misc_patterns dbr_type
             ON a.dbr_type = dbr_type.dbr_type and a.dbr_type in ('cpu','gpu')
 )
+-- --title 'Findings by Cluster' --width 6
 SELECT
     collect_list(distinct issue) `Distinct Findings`,
     count(1) `Commands`,

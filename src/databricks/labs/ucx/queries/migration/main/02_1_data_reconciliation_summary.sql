@@ -1,5 +1,4 @@
--- viz type=counter, name=Data Reconciliation Results, counter_label=Table migration success rate, value_column=success_rate
--- widget row=2, col=4, size_x=2, size_y=4
+-- --title 'Data Reconciliation Results' --width 6
 SELECT
   COUNT(
     CASE
@@ -9,6 +8,6 @@ SELECT
     END
   ) AS success,
   count(*) AS total,
-  concat(round(success / total * 100, 2), '%') AS success_rate
+  concat(round(try_divide(success, total) * 100, 2), '%') AS success_rate
 FROM
-    $inventory.reconciliation_results
+    inventory.reconciliation_results

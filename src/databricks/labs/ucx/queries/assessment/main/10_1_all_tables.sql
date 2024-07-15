@@ -1,5 +1,4 @@
--- viz type=table, name=Table Types, search_by=name, columns=name,type,format,storage,is_delta,location
--- widget title=Table Types, row=13, col=0, size_x=8, size_y=8
+-- --title 'Table Types' --filter name --width 6
 SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        object_type AS type,
        table_format AS format,
@@ -25,7 +24,7 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
             WHEN size_in_bytes < 100000000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024/1024,2) AS string),"GB")
             ELSE CONCAT(CAST(round(size_in_bytes/1024/1024/1024/1024,2) AS string),"TB")
        END AS table_size
-FROM $inventory.tables left outer join $inventory.table_size on
-$inventory.tables.catalog = $inventory.table_size.catalog and
-$inventory.tables.database = $inventory.table_size.database and
-$inventory.tables.name = $inventory.table_size.name
+FROM inventory.tables AS tables left outer join inventory.table_size AS table_size on
+tables.catalog = table_size.catalog and
+tables.database = table_size.database and
+tables.name = table_size.name

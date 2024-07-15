@@ -32,6 +32,7 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
+from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedModelInput,
@@ -247,6 +248,15 @@ def _permissions_mapping():
             "warehouse",
             "sql/warehouses",
             [PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
+            _simple,
+        ),
+        (
+            "lakeview_dashboard",
+            "dashboards",
+            # The `CAN_READ` permission is consistent with the documentation (see below),
+            # but not with the databricks UI as it shows `CAN_VIEW` instead.
+            # https://docs.databricks.com/en/dashboards/tutorials/manage-permissions.html#get-workspace-object-permission-levels
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ],
             _simple,
         ),
         (
@@ -1344,6 +1354,11 @@ def make_storage_dir(ws, env_or_skip):
 
 @pytest.fixture
 def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_query):
+    """Create a legacy dashboard.
+
+    This fixture is used to test migrating legacy dashboards to Lakeview.
+    """
+
     def create() -> Dashboard:
         query = make_query()
         viz = ws.query_visualizations.create(
@@ -1388,6 +1403,62 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
             logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
+
+
+@pytest.fixture
+def make_lakeview_dashboard(ws, make_random, env_or_skip):
+    """Create a lakeview dashboard."""
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+    serialized_dashboard = {
+        "datasets": [{"name": "count", "displayName": "count", "query": "SELECT 42 AS count"}],
+        "pages": [
+            {
+                "name": "count",
+                "displayName": "Counter",
+                "layout": [
+                    {
+                        "widget": {
+                            "name": "count",
+                            "queries": [
+                                {
+                                    "name": "main_query",
+                                    "query": {
+                                        "datasetName": "count",
+                                        "fields": [{"name": "count", "expression": "`count`"}],
+                                        "disaggregated": True,
+                                    },
+                                }
+                            ],
+                            "spec": {
+                                "version": 2,
+                                "widgetType": "counter",
+                                "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
+                            },
+                        },
+                        "position": {"x": 0, "y": 0, "width": 1, "height": 3},
+                    }
+                ],
+            }
+        ],
+    }
+
+    def create(display_name: str = "") -> SDKDashboard:
+        if len(display_name) == 0:
+            display_name = f"created_by_ucx_{make_random()}"
+        else:
+            display_name = f"{display_name} ({make_random()})"
+        dashboard = ws.lakeview.create(
+            display_name,
+            serialized_dashboard=json.dumps(serialized_dashboard),
+            warehouse_id=warehouse_id,
+        )
+        ws.lakeview.publish(dashboard.dashboard_id)
+        return dashboard
+
+    def delete(dashboard: SDKDashboard) -> None:
+        ws.lakeview.trash(dashboard.dashboard_id)
+
+    yield from factory("dashboard", create, delete)
 
 
 def get_test_purge_time() -> str:

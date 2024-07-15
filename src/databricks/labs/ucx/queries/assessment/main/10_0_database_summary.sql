@@ -1,5 +1,3 @@
--- viz type=table, name=Database Summary, search_by=database, columns=database,upgrade,tables,views,dbfs_root,delta_tables,total_grants,granted_principals,database_grants,table_grants,service_principal_grants,user_grants,group_grants
--- widget title=Database Summary, row=12, col=0, size_x=8, size_y=8
 WITH table_stats AS (
   SELECT
     `database`,
@@ -19,7 +17,7 @@ WITH table_stats AS (
         ELSE 0
     END AS is_unsupported,
     IF(table_format = "DELTA", 1, 0) AS is_delta
-   FROM $inventory.tables
+   FROM inventory.tables
 ), database_stats AS (
   SELECT `database`,
     CASE
@@ -46,8 +44,23 @@ WITH table_stats AS (
     SUM(IF(principal_type == 'service-principal', 1, 0)) AS service_principal_grants,
     SUM(IF(principal_type == 'user', 1, 0)) AS user_grants,
     SUM(IF(principal_type == 'group', 1, 0)) AS group_grants
-  FROM $inventory.grant_detail
+  FROM inventory.grant_detail
   GROUP BY `database`
 )
-SELECT * FROM database_stats FULL JOIN grant_stats USING (`database`)
+-- --title 'Database Summary' --filter database --width 6
+SELECT
+  database,
+  upgrade,
+  tables,
+  views,
+  dbfs_root,
+  delta_tables,
+  total_grants,
+  granted_principals,
+  database_grants,
+  table_grants,
+  service_principal_grants,
+  user_grants,
+  group_grants
+FROM database_stats FULL JOIN grant_stats USING (`database`)
 ORDER BY tables DESC

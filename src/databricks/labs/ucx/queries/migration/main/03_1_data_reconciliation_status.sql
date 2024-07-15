@@ -1,5 +1,4 @@
--- viz type=table, name=Migration status, search_by=table_name,upgraded_status, columns=table_name,object_type,table_format,location,upgraded_status,upgraded_to_table_name,schema_matches,column_comparison,data_matches,source_row_count,target_row_count,source_missing_count,target_missing_count,reconciliation_error,view_text,storage_properties,is_partitioned
--- widget title=Migration status, row=3, col=0, size_x=8, size_y=16
+-- --title 'Migration status' --width 6
 SELECT
   concat_ws('.', tables.`catalog`, tables.`database`, tables.name) AS table_name,
   tables.object_type,
@@ -22,10 +21,10 @@ SELECT
   tables.storage_properties,
   tables.is_partitioned
 FROM
-    $inventory.tables AS tables
+    inventory.tables AS tables
   LEFT JOIN
-    $inventory.migration_status AS migration_status
+    inventory.migration_status AS migration_status
   ON tables.`database` = migration_status.src_schema AND tables.name = migration_status.src_table
   LEFT JOIN
-    $inventory.reconciliation_results AS reconciliation_results
+    inventory.reconciliation_results AS reconciliation_results
   ON tables.`database` = reconciliation_results.src_schema AND tables.name = reconciliation_results.src_table

@@ -1,8 +1,5 @@
--- viz type=table, name=Compute Access Mode Limitation Summary, columns=issue,link,distinct_workspaces,distinct_notebooks,distinct_clusters,distinct_users
--- widget title=Compute Access Mode Limitation Summary, row=1, col=0, size_x=6, size_y=12
 -- Scan notebook command history for potential paper cut issues
 -- https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations
---
 WITH
 iteractive_cluster_commands (
     SELECT
@@ -18,20 +15,20 @@ iteractive_cluster_commands (
         a.request_params.commandText,
         md5(a.request_params.commandText) commandHash
     FROM system.access.audit a
-        LEFT OUTER JOIN $inventory.clusters AS c
+        LEFT OUTER JOIN inventory.clusters AS c
             ON a.request_params.clusterId = c.cluster_id
         AND a.action_name = 'runCommand'
     WHERE a.event_date >= DATE_SUB(CURRENT_DATE(), 90)
 ),
 misc_patterns(
-    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM $inventory.misc_patterns
+    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM inventory.misc_patterns
 ),
 pattern_matcher(
     SELECT
         array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null)) issues,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns p
+        LEFT OUTER JOIN inventory.code_patterns p
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
         LEFT OUTER JOIN misc_patterns lp
@@ -47,6 +44,7 @@ exp (
     select distinct explode(issues) issue, workspace_id, notebook_id, cluster_id, email
     FROM pattern_matcher
 )
+-- --title 'Compute Access Mode Limitation Summary' --width 6
 SELECT
     issue `Finding`,
     -- concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link,

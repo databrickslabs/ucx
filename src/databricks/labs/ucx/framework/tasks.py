@@ -20,7 +20,6 @@ class Task:
     depends_on: list[str] | None = None
     job_cluster: str = "main"
     notebook: str | None = None
-    dashboard: str | None = None
     cloud: str | None = None
 
     def is_testing(self):
@@ -87,7 +86,6 @@ def job_task(
     depends_on=None,
     job_cluster=Task.job_cluster,
     notebook: str | None = None,
-    dashboard: str | None = None,
     cloud: str | None = None,
 ) -> Callable[[Callable], Callable]:
     def register(func):
@@ -112,7 +110,6 @@ def job_task(
             depends_on=deps,
             job_cluster=job_cluster,
             notebook=notebook,
-            dashboard=dashboard,
             cloud=cloud,
         )
         return func
