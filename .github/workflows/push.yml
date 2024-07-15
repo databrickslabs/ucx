@@ -65,6 +65,18 @@ jobs:
       - name: Reformat code
         run: make fmt
 
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Install LSQL
+        run: databricks labs install lsql
+        env:  # this is a temporary hack
+          DATABRICKS_HOST: any
+          DATABRICKS_TOKEN: any
+
+      - name: Reformat SQL queries
+        run: databricks labs lsql fmt
+
       - name: Fail on differences
         run: |
           # Exit with status code 1 if there are differences (i.e. unformatted files)
