@@ -5,6 +5,7 @@ import os
 import re
 import time
 import webbrowser
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
@@ -478,8 +479,9 @@ class WorkspaceInstallation(InstallationMixin):
 
     def run(self):
         logger.info(f"Installing UCX v{self._product_info.version()}")
-        self._create_database()  # Need the database before creating the dashboards
-        self._create_dashboards()
+        install_tasks = [self._create_database()]  # Need the database before creating the dashboards
+        install_tasks.extend(self._create_dashboards())
+        Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
@@ -504,7 +506,7 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
-    def _create_dashboards(self) -> None:
+    def _create_dashboards(self) -> Iterable[Callable[[], None]]:
         """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
         logger.info("Creating dashboards...")
         dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
@@ -512,7 +514,7 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws.workspace.mkdirs(dashboard_folder_remote)
         except ResourceAlreadyExists:
             pass
-        queries_folder, tasks = find_project_root(__file__) / "src/databricks/labs/ucx/queries", []
+        queries_folder = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         for step_folder in queries_folder.iterdir():
             if not step_folder.is_dir():
                 continue
@@ -525,8 +527,7 @@ class WorkspaceInstallation(InstallationMixin):
                     dashboard_folder,
                     parent_path=dashboard_folder_remote,
                 )
-                tasks.append(task)
-        Threads.strict("create dashboards", tasks)
+                yield task
 
     # TODO: Confirm the assumption below is correct
     # An InternalError may occur when the dashboard is being published and the database does not exists
