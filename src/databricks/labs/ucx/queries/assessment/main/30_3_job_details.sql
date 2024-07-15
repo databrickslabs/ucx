@@ -1,10 +1,12 @@
--- --title 'Job Details' --filter job_name --width 6
+/* --title 'Job Details' --filter job_name --width 6 */
 SELECT
-    job_id,
-    job_name,
-    success,
-    failures,
-    creator
+  job_id,
+  job_name,
+  success,
+  failures,
+  creator
 FROM inventory.jobs
-WHERE job_name not like '[UCX]%'
-ORDER BY job_id DESC
+WHERE
+  NOT job_name LIKE '[UCX]%'
+ORDER BY
+  job_id DESC

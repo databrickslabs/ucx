@@ -1,13 +1,28 @@
-select concat(catalog, ".", database,".", name) as table_name, object_type, table_format, case
-when object_type == "MANAGED" and table_format == "DELTA" then 0.5 -- CTAS or recreate as external table, then SYNC
-when object_type == "MANAGED" and table_format != "DELTA" then 2 -- Can vary depending of format
-when object_type == "EXTERNAL" and table_format == "DELTA" and startswith(location, "dbfs:/") then 0.5 -- Must CTAS the target table
-when object_type == "EXTERNAL" and table_format == "DELTA" and startswith(location, "wasbs:/") then 1 -- Must Offload data to abfss
-when object_type == "EXTERNAL" and table_format == "DELTA" and startswith(location, "adl:/") then 1 -- Must Offload data to abfss
-when object_type == "EXTERNAL" and table_format == "DELTA" then 0.1 -- In place SYNC, mostly quick
-when object_type == "EXTERNAL" and table_format in ("SQLSERVER", "MYSQL", "SNOWFLAKE") then 2 -- Must uses Lakehouse Federation
-when object_type == "EXTERNAL" and table_format != "DELTA" then 1 -- Can vary depending of format
-when object_type == "VIEW" then 2 -- Can vary depending of view complexity and number of tables used in the view
-else NULL
-end as estimated_hours from $inventory.tables
-where not startswith(name, "__apply_changes")
+SELECT
+  CONCAT(catalog, `.`, database, `.`, name) AS table_name,
+  object_type,
+  table_format,
+  CASE
+    WHEN object_type = `MANAGED` AND table_format = `DELTA`
+    THEN 0.5 /* CTAS or recreate as external table, then SYNC */
+    WHEN object_type = `MANAGED` AND table_format <> `DELTA`
+    THEN 2 /* Can vary depending of format */
+    WHEN object_type = `EXTERNAL` AND table_format = `DELTA` AND STARTSWITH(location, `dbfs:/`)
+    THEN 0.5 /* Must CTAS the target table */
+    WHEN object_type = `EXTERNAL` AND table_format = `DELTA` AND STARTSWITH(location, `wasbs:/`)
+    THEN 1 /* Must Offload data to abfss */
+    WHEN object_type = `EXTERNAL` AND table_format = `DELTA` AND STARTSWITH(location, `adl:/`)
+    THEN 1 /* Must Offload data to abfss */
+    WHEN object_type = `EXTERNAL` AND table_format = `DELTA`
+    THEN 0.1 /* In place SYNC, mostly quick */
+    WHEN object_type = `EXTERNAL` AND table_format IN (`SQLSERVER`, `MYSQL`, `SNOWFLAKE`)
+    THEN 2 /* Must uses Lakehouse Federation */
+    WHEN object_type = `EXTERNAL` AND table_format <> `DELTA`
+    THEN 1 /* Can vary depending of format */
+    WHEN object_type = `VIEW`
+    THEN 2 /* Can vary depending of view complexity and number of tables used in the view */
+    ELSE NULL
+  END AS estimated_hours
+FROM $inventory.tables
+WHERE
+  NOT STARTSWITH(name, `__apply_changes`)
