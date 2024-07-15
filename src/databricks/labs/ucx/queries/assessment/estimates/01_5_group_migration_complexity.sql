@@ -4,11 +4,11 @@ SELECT
     WHEN total_groups = 0
     THEN NULL
     WHEN total_groups BETWEEN 1 AND 50
-    THEN `S`
+    THEN 'S'
     WHEN total_groups BETWEEN 51 AND 200
-    THEN `M`
+    THEN 'M'
     WHEN total_groups > 201
-    THEN `L`
+    THEN 'L'
     ELSE NULL
   END AS group_migration_complexity
 FROM (

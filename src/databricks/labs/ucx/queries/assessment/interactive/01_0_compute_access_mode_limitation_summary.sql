@@ -46,7 +46,7 @@ exp (
 )
 -- --title 'Compute Access Mode Limitation Summary' --width 6
 SELECT
-    issue `Finding`,
+    issue 'Finding',
     -- concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link,
     count(distinct workspace_id) `# workspaces`,
     count(distinct notebook_id)  `# notebooks`,

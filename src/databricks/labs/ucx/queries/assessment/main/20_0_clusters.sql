@@ -6,6 +6,6 @@ SELECT
   creator
 FROM inventory.clusters
 WHERE
-  NOT STARTSWITH(cluster_name, `job-`)
+  NOT STARTSWITH(cluster_name, 'job-')
 ORDER BY
   cluster_id DESC

@@ -11,4 +11,4 @@ FROM (
   FROM inventory.objects
 )
 WHERE
-  finding = `no data security mode specified` AND object_type = `submit_runs`
+  finding = 'no data security mode specified' AND object_type = 'submit_runs'

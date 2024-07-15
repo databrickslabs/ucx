@@ -43,7 +43,7 @@ pattern_matcher(
 )
 -- --title 'Findings by Cluster' --width 6
 SELECT
-    collect_list(distinct issue) `Distinct Findings`,
+    collect_list(distinct issue) 'Distinct Findings`,
     count(1) `Commands`,
     count(distinct email) `Users`,
     cast(min(event_date) as STRING) `First command`,
