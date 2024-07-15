@@ -30,6 +30,7 @@ from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
+    InternalError,
     InvalidParameterValue,
     NotFound,
     PermissionDenied,
@@ -37,6 +38,7 @@ from databricks.sdk.errors import (
     ResourceDoesNotExist,
     Unauthenticated,
 )
+from databricks.sdk.retries import retried
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -526,6 +528,9 @@ class WorkspaceInstallation(InstallationMixin):
                 tasks.append(task)
         Threads.strict("create dashboards", tasks)
 
+    # TODO: Confirm the assumption below is correct
+    # An InternalError may occur when the dashboard is being published and the database does not exists
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
