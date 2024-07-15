@@ -2,7 +2,7 @@ WITH raw AS (
   SELECT
     *,
     IF(STARTSWITH(action_type, 'DENIED_'), ARRAY('Explicitly DENYing privileges is not supported in UC.'), ARRAY()) AS failures
-  FROM $$inventory.grants
+  FROM $inventory.grants
   WHERE
     database IS NULL OR database <> SPLIT('$inventory', '[.]')[1]
 )
