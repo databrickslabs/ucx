@@ -106,6 +106,7 @@ verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples
                "mypy --exclude 'tests/unit/source_code/samples/*' --exclude dist .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
+cmds         = "python tests/integration/cmds.py"
 
 [tool.pytest.ini_options]
 # TODO: remove `-p no:warnings`
