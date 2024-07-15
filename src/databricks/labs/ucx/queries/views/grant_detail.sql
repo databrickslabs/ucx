@@ -4,7 +4,7 @@ WITH raw AS (
     IF(STARTSWITH(action_type, 'DENIED_'), ARRAY('Explicitly DENYing privileges is not supported in UC.'), ARRAY()) AS failures
   FROM $inventory.grants
   WHERE
-    database IS NULL OR database <> SPLIT(`$inventory`, CONCAT('\\Q', '[.]'))[1]
+    database IS NULL OR database <> SPLIT('$inventory', CONCAT('\\Q', '[.]'))[1]
 )
 SELECT
   CASE
