@@ -1,5 +1,5 @@
--- --title 'Tables to migrate' --height 10 --width 3
-select
+/* --title 'Tables to migrate' --height 10 --width 3 */
+SELECT
   catalog,
   database,
   name,
@@ -9,4 +9,4 @@ select
   view_text,
   upgraded_to,
   storage_properties
-from inventory.tables;
+FROM inventory.tables

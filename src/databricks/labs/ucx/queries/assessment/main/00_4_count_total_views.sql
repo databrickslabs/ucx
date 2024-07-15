@@ -1,3 +1,6 @@
--- --title 'Total Views'
-SELECT count(*) AS count_total_views
-FROM inventory.tables where object_type = 'VIEW'
+/* --title 'Total Views' */
+SELECT
+  COUNT(*) AS count_total_views
+FROM inventory.tables
+WHERE
+  object_type = 'VIEW'

@@ -1,4 +1,4 @@
--- --title 'UDF Summary' --filter name --width 6
+/* --title 'UDF Summary' --filter name --width 6 */
 SELECT
   catalog,
   database,
