@@ -1,5 +1,4 @@
-/* --title 'Compute Access Mode Limitation Summary' --width 6 */
-/* Scan notebook command history for potential paper cut issues */ /* https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations */
+/* --title 'Compute Access Mode Limitation Summary' --width 6 */ /* Scan notebook command history for potential paper cut issues */ /* https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations */
 WITH iteractive_cluster_commands AS (
   SELECT
     a.event_id,
@@ -17,7 +16,7 @@ WITH iteractive_cluster_commands AS (
   LEFT OUTER JOIN inventory.clusters AS c
     ON a.request_params.clusterid = c.cluster_id AND a.action_name = 'runCommand'
   WHERE
-    a.event_date >= DATE_ADD(CURRENT_DATE, 90 * -1)
+    a.event_date >= DATEADD(DAY, 90 * -1, CURRENT_DATE)
 ), misc_patterns AS (
   SELECT
     commandlanguage,

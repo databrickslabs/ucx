@@ -20,7 +20,7 @@ WITH iteractive_cluster_commands AS (
   LEFT OUTER JOIN inventory.clusters AS c
     ON a.request_params.clusterid = c.cluster_id AND a.action_name = 'runCommand'
   WHERE
-    a.event_date >= DATE_ADD(CURRENT_DATE, 90 * -1)
+    a.event_date >= DATEADD(DAY, 90 * -1, CURRENT_DATE)
 ), misc_patterns AS (
   SELECT
     commandlanguage,
@@ -62,7 +62,7 @@ SELECT
 FROM pattern_matcher
 GROUP BY ALL
 HAVING
-  MAX(event_date) >= DATE_ADD(CURRENT_DATE, 15 * -1) /* active in last N days */
+  MAX(event_date) >= DATEADD(DAY, 15 * -1, CURRENT_DATE) /* active in last N days */
 ORDER BY
   `Last command` DESC,
   `First command` ASC,
