@@ -3213,12 +3213,7 @@
     "duckdb.experimental.spark.sql.functions": [],
     "duckdb.experimental.spark.sql.group": [],
     "duckdb.experimental.spark.sql.readwriter": [],
-    "duckdb.experimental.spark.sql.session": [
-      {
-        "code": "table-migrate",
-        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
-      }
-    ],
+    "duckdb.experimental.spark.sql.session": [],
     "duckdb.experimental.spark.sql.streaming": [],
     "duckdb.experimental.spark.sql.type_utils": [],
     "duckdb.experimental.spark.sql.types": [],
