@@ -70,6 +70,9 @@ jobs:
 
       - name: Install LSQL
         run: databricks labs install lsql
+        env:  # this is a temporary hack
+          DATABRICKS_HOST: any
+          DATABRICKS_TOKEN: any
 
       - name: Reformat SQL queries
         run: databricks labs lsql fmt
