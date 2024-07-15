@@ -2,31 +2,31 @@ SELECT
   'jobs' AS object_type,
   job_id AS object_id,
   failures
-FROM ${inventory}.jobs
+FROM $inventory.jobs
 UNION ALL
 SELECT
   'clusters' AS object_type,
   cluster_id AS object_id,
   failures
-FROM ${inventory}.clusters
+FROM $inventory.clusters
 UNION ALL
 SELECT
   'global init scripts' AS object_type,
   script_id AS object_id,
   failures
-FROM ${inventory}.global_init_scripts
+FROM $inventory.global_init_scripts
 UNION ALL
 SELECT
   'submit_runs' AS object_type,
   hashed_id AS object_id,
   failures
-FROM ${inventory}.submit_runs
+FROM $inventory.submit_runs
 UNION ALL
 SELECT
   'pipelines' AS object_type,
   pipeline_id AS object_id,
   failures
-FROM ${inventory}.pipelines
+FROM $inventory.pipelines
 UNION ALL
 SELECT
   object_type,
@@ -58,8 +58,8 @@ FROM (
         f -> NOT f IS NULL
       )
     ) AS failures
-  FROM ${inventory}.tables AS t
-  FULL JOIN ${inventory}.table_failures AS tf
+  FROM $inventory.tables AS t
+  FULL JOIN $inventory.table_failures AS tf
     USING (catalog, database, name)
 )
 UNION ALL
@@ -67,7 +67,7 @@ SELECT
   'databases' AS object_type,
   CONCAT(catalog, '.', database) AS object_id,
   TO_JSON(ARRAY(error)) AS failures
-FROM ${inventory}.table_failures
+FROM $inventory.table_failures
 WHERE
   name IS NULL
 UNION ALL
@@ -75,4 +75,4 @@ SELECT
   'permissions' AS object_type,
   object_id,
   failures
-FROM ${inventory}.grant_detail
+FROM $inventory.grant_detail

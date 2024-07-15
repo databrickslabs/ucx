@@ -23,6 +23,6 @@ SELECT
     THEN 2 /* Can vary depending of view complexity and number of tables used in the view */
     ELSE NULL
   END AS estimated_hours
-FROM ${inventory}.tables
+FROM $inventory.tables
 WHERE
   NOT STARTSWITH(name, '__apply_changes')
