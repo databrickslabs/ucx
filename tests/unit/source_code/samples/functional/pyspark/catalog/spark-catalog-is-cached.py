@@ -3,7 +3,7 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrate:+1:24:+1:60] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc:+1:24:+1:60] Table old.things is migrated to brand.new.stuff in Unity Catalog
     cached_previously = spark.catalog.isCached("old.things")
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
@@ -13,9 +13,9 @@ for i in range(10):
     cached_previously = spark.catalog.isCached("old.things", "extra-argument")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate-cannot-compute-value:+1:24:+1:52] Can't migrate 'spark.catalog.isCached(name)' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:24:+1:52] Can't migrate 'spark.catalog.isCached(name)' because its table name argument cannot be computed
     cached_previously = spark.catalog.isCached(name)
-    # ucx[table-migrate-cannot-compute-value:+1:24:+1:62] Can't migrate 'spark.catalog.isCached(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:24:+1:62] Can't migrate 'spark.catalog.isCached(f'boop{stuff}')' because its table name argument cannot be computed
     cached_previously = spark.catalog.isCached(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.

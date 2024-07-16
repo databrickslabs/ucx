@@ -3,7 +3,7 @@ df = spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrate:+1:4:+1:37] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc:+1:4:+1:37] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df.write.insertInto("old.things")
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
@@ -13,13 +13,13 @@ for i in range(10):
     df.write.insertInto("old.things", None, "extra-argument")
 
     ## Check a call with an out-of-position named argument referencing a table known to be migrated.
-    # ucx[table-migrate:+1:4:+1:63] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc:+1:4:+1:63] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df.write.insertInto(overwrite=None, tableName="old.things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate-cannot-compute-value:+1:4:+1:29] Can't migrate 'df.write.insertInto(name)' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:4:+1:29] Can't migrate 'df.write.insertInto(name)' because its table name argument cannot be computed
     df.write.insertInto(name)
-    # ucx[table-migrate-cannot-compute-value:+1:4:+1:39] Can't migrate 'df.write.insertInto(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:4:+1:39] Can't migrate 'df.write.insertInto(f'boop{stuff}')' because its table name argument cannot be computed
     df.write.insertInto(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.

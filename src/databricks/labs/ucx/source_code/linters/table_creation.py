@@ -87,7 +87,7 @@ class NoFormatPythonLinter:
             span = matcher.get_advice_span(node)
             if span is not None:
                 yield Advice(
-                    code="table-migrate",
+                    code="default-format-changed-in-dbr8",
                     message="The default format changed in Databricks Runtime 8.0, from Parquet to Delta",
                     start_line=span.start.line,
                     start_col=span.start.character,

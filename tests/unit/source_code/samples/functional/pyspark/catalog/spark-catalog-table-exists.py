@@ -3,11 +3,11 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrate:+1:7:+1:46] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc:+1:7:+1:46] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("old.things"):
         pass
     # TODO: Fix missing migration warning:
-    # #ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # #ucx[table-migrated-to-uc:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("things", "old"):
         pass
 
@@ -21,15 +21,15 @@ for i in range(10):
 
     ## Check a call with an out-of-position named argument referencing a table known to be migrated.
     # TODO: Fix missing migration warning
-    # # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # # ucx[table-migrated-to-uc:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists(dbName="old", name="things"):
         pass
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate-cannot-compute-value:+1:7:+1:38] Can't migrate 'spark.catalog.tableExists(name)' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:7:+1:38] Can't migrate 'spark.catalog.tableExists(name)' because its table name argument cannot be computed
     if spark.catalog.tableExists(name):
         pass
-    # ucx[table-migrate-cannot-compute-value:+1:7:+1:48] Can't migrate 'spark.catalog.tableExists(f'boot{stuff}')' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+1:7:+1:48] Can't migrate 'spark.catalog.tableExists(f'boot{stuff}')' because its table name argument cannot be computed
     if spark.catalog.tableExists(f"boot{stuff}"):
         pass
 

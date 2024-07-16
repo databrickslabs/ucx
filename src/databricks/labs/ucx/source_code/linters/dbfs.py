@@ -5,9 +5,10 @@ from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, Failure, PythonLinter
+from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, PythonLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.queries import FromTable
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,9 @@ class DetectDbfsVisitor(TreeVisitor):
         value = inferred.as_string()
         if any(value.startswith(prefix) for prefix in self._fs_prefixes):
             advisory = Deprecation.from_node(
-                code='dbfs-usage', message=f"Deprecated file system path: {value}", node=source_node
+                code='dbfs-usage',
+                message=f"Deprecated file system path: {value}",
+                node=source_node,
             )
             self._advices.append(advisory)
 
@@ -103,15 +106,7 @@ class FromDbfsFolder(Linter):
                 yield from self._lint_query(query)
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield Failure(
-                code='dbfs-query-unsupported-sql',
-                message=f"SQL query is not supported yet: {code}",
-                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                start_line=0,
-                start_col=0,
-                end_line=0,
-                end_col=1024,
-            )
+            yield FromTable.sql_parse_failure(code)
 
     def _lint_query(self, query: Expression):
         for table in query.find_all(Table):
@@ -125,7 +120,7 @@ class FromDbfsFolder(Linter):
         """
         if any(table.name.startswith(prefix) for prefix in self._dbfs_prefixes):
             yield Deprecation(
-                code='dbfs-query',
+                code='dbfs-read-from-sql-query',
                 message=f"The use of DBFS is deprecated: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,

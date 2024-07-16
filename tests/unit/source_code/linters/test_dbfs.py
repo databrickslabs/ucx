@@ -94,7 +94,7 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
-            code='dbfs-query',
+            code='dbfs-read-from-sql-query',
             message=f'The use of DBFS is deprecated: {table}',
             start_line=0,
             start_col=0,
@@ -115,7 +115,7 @@ def test_dbfs_queries_failure(query: str):
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
-            code='dbfs-query-unsupported-sql',
+            code='sql-parse-error',
             message=f'SQL query is not supported yet: {query}',
             start_line=0,
             start_col=0,

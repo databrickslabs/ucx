@@ -87,7 +87,7 @@ class QueryMatcher(Matcher):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
-                    code='table-migrate-cannot-compute-value',
+                    code='cannot-autofix-table-reference',
                     message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
                     node=node,
                 )
@@ -99,7 +99,7 @@ class QueryMatcher(Matcher):
                 yield advice.replace_from_node(call_node)
         else:
             yield Advisory.from_node(
-                code='table-migrate-cannot-compute-value',
+                code='cannot-autofix-table-reference',
                 message=f"Can't migrate table_name argument in '{call_node.as_string()}' because its value cannot be computed",
                 node=call_node,
             )
@@ -122,7 +122,7 @@ class TableNameMatcher(Matcher):
         for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
                 yield Advisory.from_node(
-                    code='table-migrate-cannot-compute-value',
+                    code='cannot-autofix-table-reference',
                     message=f"Can't migrate '{node.as_string()}' because its table name argument cannot be computed",
                     node=node,
                 )
@@ -131,7 +131,7 @@ class TableNameMatcher(Matcher):
             if dst is None:
                 continue
             yield Deprecation.from_node(
-                code='table-migrate',
+                code='table-migrated-to-uc',
                 message=f"Table {table_name} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
@@ -164,7 +164,7 @@ class ReturnValueMatcher(Matcher):
     ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
-            code='table-migrate',
+            code='changed-result-format-in-uc',
             message=f"Call to '{node.func.attrname}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
             node=node,
         )
@@ -211,7 +211,7 @@ class DirectFilesystemAccessMatcher(Matcher):
             return
         if table_arg.value.startswith("/") and self._check_call_context(node):
             yield Deprecation.from_node(
-                code='direct-filesystem-access',
+                code='implicit-dbfs-usage',
                 message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
                 node=node,
             )
