@@ -1,4 +1,3 @@
-import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
@@ -83,16 +82,15 @@ def test_migrator_supported_language_no_fixer():
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
 
 
-def test_migrator_supported_language_with_fixer():
+def test_migrator_supported_language_with_fixer(tmpdir):
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
     migrator = LocalFileMigrator(lambda: languages)
-    with tempfile.NamedTemporaryFile(mode="w+t", suffix=".py") as file:
-        file.writelines(["import tempfile"])
-        path = Path(file.name)
-        migrator.apply(path)
-        assert file.readline() == "Hi there!"
+    path = Path(tmpdir, 'any.py')
+    path.write_text("import tempfile", encoding='utf-8')
+    migrator.apply(path)
+    assert path.read_text("utf-8") == "Hi there!"
 
 
 def test_migrator_walks_directory():
