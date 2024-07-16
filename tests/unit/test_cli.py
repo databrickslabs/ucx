@@ -605,5 +605,5 @@ def test_join_collection():
     a.get_workspace_client.return_value = w
     a.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test")]
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
-    join_collection(a, "123", 123)
+    join_collection(a, "123")
     w.workspace.download.assert_not_called()
