@@ -771,6 +771,8 @@ class AccountInstaller(AccountContext):
             workspace_collection_ids = installer.config.installed_workspace_ids
             if workspace_collection_ids is not None:
                 installed_workspace_ids.extend(workspace_collection_ids)
+            else:
+                installed_workspace_ids.append(workspace_id)
         installed_workspace_ids = list(set(installed_workspace_ids))
         for workspace_id in installed_workspace_ids:
             installed_workspace = ids_to_workspace[workspace_id]
