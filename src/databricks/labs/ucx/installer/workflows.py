@@ -229,8 +229,13 @@ class DeployedWorkflows:
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
         log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
+        try:
+            log_path_objects = self._ws.workspace.list(log_path)
+        except ResourceDoesNotExist:
+            logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
+            return []
         run_folders = []
-        for run_folder in self._ws.workspace.list(log_path):
+        for run_folder in log_path_objects:
             if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
                 continue
             if f'run-{run_id}-' not in run_folder.path:
