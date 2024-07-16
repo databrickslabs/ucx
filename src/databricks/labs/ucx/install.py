@@ -753,7 +753,9 @@ class AccountInstaller(AccountContext):
         except PermissionDenied:
             # if the user is not account admin, allow user to enter the workspace_id to join as collection.
             # if no workspace_id is entered, then exit
-            logger.warning("User doesnt have account admin permission, cant list workspaces")
+            logger.error("User doesnt have account admin permission, cant list workspaces")
+            return None
+
 
         if not AccountInstaller._validate_collection(workspace_ids, ids_to_workspace):
             return None
