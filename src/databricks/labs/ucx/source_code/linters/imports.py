@@ -129,13 +129,11 @@ class DbutilsLinter(PythonLinter):
         call = NotebookRunCall(cast(Call, node))
         has_unresolved, _ = call.get_notebook_paths(session_state)
         if has_unresolved:
-            yield from [
-                Advisory.from_node(
-                    'notebook-run-cannot-compute-value',
-                    "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
-                    node=node,
-                )
-            ]
+            yield Advisory.from_node(
+                code='notebook-run-cannot-compute-value',
+                message="Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
+                node=node,
+            )
 
     @staticmethod
     def get_dbutils_notebook_run_path_arg(node: Call):

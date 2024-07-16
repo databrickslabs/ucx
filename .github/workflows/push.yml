@@ -20,6 +20,10 @@ env:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pyVersion: [ '3.10', '3.11', '3.12' ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +35,7 @@ jobs:
         with:
           cache: 'pip'
           cache-dependency-path: '**/pyproject.toml'
-          python-version: '3.10'
+          python-version: ${{ matrix.pyVersion }}
 
       - name: Install hatch
         run: pip install hatch==$HATCH_VERSION
@@ -64,6 +68,18 @@ jobs:
 
       - name: Reformat code
         run: make fmt
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Install LSQL
+        run: databricks labs install lsql
+        env:  # this is a temporary hack
+          DATABRICKS_HOST: any
+          DATABRICKS_TOKEN: any
+
+      - name: Reformat SQL queries
+        run: databricks labs lsql fmt
 
       - name: Fail on differences
         run: |

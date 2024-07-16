@@ -1,6 +1,9 @@
--- widget title=Assessment overview, row=40, col=2, size_x=8, size_y=3
+---
+height: 4
+---
 
-## Other
+# Other
+Global Init Scripts
 - Object permissions
 - Delta Live Tables
 - Global Init Scripts

@@ -1,4 +1,6 @@
--- widget title=Table migration status, row=1, col=0, size_x=4, size_y=8
+---
+height: 6
+---
 
 ## Table migration status
 

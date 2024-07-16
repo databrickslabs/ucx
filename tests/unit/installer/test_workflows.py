@@ -4,12 +4,25 @@ from unittest.mock import create_autospec
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.iam import ComplexValue, User
-from databricks.sdk.service.jobs import CreateResponse
+from databricks.sdk.service.jobs import BaseRun, CreateResponse
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import Task
-from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
+
+
+def test_deployed_workflows_handles_log_folder_does_not_exists(mock_installation):
+    ws = create_autospec(WorkspaceClient)
+    ws.jobs.list_runs.return_value = [BaseRun(run_id=456)]
+    ws.workspace.list.side_effect = ResourceDoesNotExist("logs")
+    install_state = InstallState.from_installation(mock_installation)
+    deployed_workflows = DeployedWorkflows(ws, install_state, timedelta(minutes=2))
+
+    deployed_workflows.relay_logs("test")
+
+    ws.jobs.list_runs.assert_called_once_with(job_id="123", limit=1)
 
 
 def side_effect_remove_after_in_tags_settings(**settings) -> CreateResponse:

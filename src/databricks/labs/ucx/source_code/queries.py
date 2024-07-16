@@ -51,15 +51,19 @@ class FromTable(Linter, Fixer):
                 yield from self._lint_statement(statement)
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield Failure(
-                code='sql-query-unsupported-sql',
-                message=f"SQL query is not supported yet: {code}",
-                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                start_line=0,
-                start_col=0,
-                end_line=0,
-                end_col=1024,
-            )
+            yield self.sql_parse_failure(code)
+
+    @staticmethod
+    def sql_parse_failure(code: str):
+        return Failure(
+            code='sql-parse-error',
+            message=f"SQL query is not supported yet: {code}",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=0,
+            start_col=0,
+            end_line=0,
+            end_col=1024,
+        )
 
     def _lint_statement(self, statement: Expression):
         for table in statement.find_all(Table):
@@ -86,7 +90,7 @@ class FromTable(Linter, Fixer):
             if not dst:
                 continue
             yield Deprecation(
-                code='table-migrate',
+                code='table-migrated-to-uc',
                 message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,

@@ -16,6 +16,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
+from databricks.labs.lsql.dashboards import Dashboards
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     Aborted,
@@ -218,7 +219,7 @@ class DeployedWorkflows:
         self._relay_logs(workflow, latest_run.run_id)
 
     def _relay_logs(self, workflow, run_id):
-        for record in self._fetch_logs(workflow, run_id):
+        for record in self._fetch_last_run_attempt_logs(workflow, run_id):
             task_logger = logging.getLogger(record.component)
             MaxedStreamHandler.install_handler(task_logger)
             task_logger.setLevel(logger.getEffectiveLevel())
@@ -226,15 +227,9 @@ class DeployedWorkflows:
             task_logger.log(log_level, record.message)
         MaxedStreamHandler.uninstall_handlers()
 
-    def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
-        log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
-        run_folders = []
-        for run_folder in self._ws.workspace.list(log_path):
-            if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
-                continue
-            if f'run-{run_id}-' not in run_folder.path:
-                continue
-            run_folders.append(run_folder.path)
+    def _fetch_last_run_attempt_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
+        """Fetch the logs for the last run attempt."""
+        run_folders = self._get_log_run_folders(workflow, run_id)
         if not run_folders:
             return
         # sort folders based on the last repair attempt
@@ -249,6 +244,27 @@ class DeployedWorkflows:
                 text_io = StringIO(raw_file.read().decode())
             for record in parse_logs(text_io):
                 yield replace(record, component=f'{record.component}:{task_name}')
+
+    def _get_log_run_folders(self, workflow: str, run_id: str) -> list[str]:
+        """Get the log run folders.
+
+        The log run folders are located in the installation folder under the logs directory. Each workflow has a log run
+        folder for each run id. Multiple runs occur for repair runs.
+        """
+        log_path = f"{self._install_state.install_folder()}/logs/{workflow}"
+        try:
+            log_path_objects = self._ws.workspace.list(log_path)
+        except ResourceDoesNotExist:
+            logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
+            return []
+        run_folders = []
+        for run_folder in log_path_objects:
+            if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
+                continue
+            if f"run-{run_id}-" not in run_folder.path:
+                continue
+            run_folders.append(run_folder.path)
+        return run_folders
 
     @staticmethod
     def _readable_timedelta(epoch):
@@ -379,7 +395,7 @@ class DeployedWorkflows:
 
 
 class WorkflowsDeployment(InstallationMixin):
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         config: WorkspaceConfig,
         installation: Installation,
@@ -389,7 +405,6 @@ class WorkflowsDeployment(InstallationMixin):
         product_info: ProductInfo,
         verify_timeout: timedelta,
         tasks: list[Task],
-        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -400,7 +415,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
-        self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
     def create_jobs(self):
@@ -464,8 +478,7 @@ class WorkflowsDeployment(InstallationMixin):
                 continue
             job_id = self._install_state.jobs[step_name]
             dashboard_link = ""
-            if not self._skip_dashboards:
-                dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
+            dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")
             markdown.append(f"## {job_link}\n\n")
@@ -492,7 +505,7 @@ class WorkflowsDeployment(InstallationMixin):
             if len(dashboard_link) == 0:
                 dashboard_link += "Go to the one of the following dashboards after running the job:\n"
             first, second = dash.replace("_", " ").title().split()
-            dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
+            dashboard_url = Dashboards(self._ws).get_url(self._install_state.dashboards[dash])
             dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
         return dashboard_link
 
@@ -598,8 +611,6 @@ class WorkflowsDeployment(InstallationMixin):
         for task in self._tasks:
             if task.workflow != step_name:
                 continue
-            if self._skip_dashboards and task.dashboard:
-                continue
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
         job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheels))
@@ -624,26 +635,9 @@ class WorkflowsDeployment(InstallationMixin):
             job_cluster_key=task.job_cluster,
             depends_on=[jobs.TaskDependency(task_key=d) for d in task.dependencies()],
         )
-        if task.dashboard:
-            # dashboards are created in parallel to wheel uploads, so we'll just retry
-            retry_on_attribute_error = retried(on=[KeyError], timeout=self._verify_timeout)
-            retried_job_dashboard_task = retry_on_attribute_error(self._job_dashboard_task)
-            return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
         return self._job_wheel_task(jobs_task, task.workflow, remote_wheels)
-
-    def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
-        assert task.dashboard is not None
-        dashboard_id = self._install_state.dashboards[task.dashboard]
-        return replace(
-            jobs_task,
-            job_cluster_key=None,
-            sql_task=jobs.SqlTask(
-                warehouse_id=self._warehouse_id,
-                dashboard=jobs.SqlTaskDashboard(dashboard_id=dashboard_id),
-            ),
-        )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.notebook is not None
