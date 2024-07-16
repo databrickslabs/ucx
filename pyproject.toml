@@ -88,8 +88,6 @@ dependencies = [
     "types-requests~=2.31.0",
 ]
 
-python="3.10"
-
 # store virtual env as the child of this folder. Helps VSCode (and PyCharm) to run better
 path = ".venv"
 
