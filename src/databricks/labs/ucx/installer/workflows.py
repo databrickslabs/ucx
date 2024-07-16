@@ -233,7 +233,7 @@ class DeployedWorkflows:
             log_path_objects = self._ws.workspace.list(log_path)
         except ResourceDoesNotExist:
             logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
-            return []
+            return
         run_folders = []
         for run_folder in log_path_objects:
             if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
