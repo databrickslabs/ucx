@@ -692,17 +692,17 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
-    def get_workspace_contexts(self, collection_workspace_id: int) -> list[WorkspaceContext]:
+    def get_workspace_contexts(self, other_workspace_id: int) -> list[WorkspaceContext]:
         workspace_contexts = []
         account_client = self._get_safe_account_client()
         acct_ctx = AccountContext(account_client)
-        collection_workspace = account_client.workspaces.get(collection_workspace_id)
+        collection_workspace = account_client.workspaces.get(other_workspace_id)
         if not acct_ctx.account_workspaces.can_administer(collection_workspace):
-            logger.error(f"User is not workspace admin of collection workspace {collection_workspace_id}")
+            logger.error(f"User is not workspace admin of collection workspace {other_workspace_id}")
             return []
         installer = self._get_installer(collection_workspace)
         if installer.config.installed_workspace_ids is None:
-            logger.error(f"No collection info found in the workspace {collection_workspace_id}")
+            logger.error(f"No collection info found in the workspace {other_workspace_id}")
             return []
         for workspace_id in installer.config.installed_workspace_ids:
             workspace = account_client.workspaces.get(workspace_id)
