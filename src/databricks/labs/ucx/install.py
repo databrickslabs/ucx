@@ -716,6 +716,8 @@ class AccountInstaller(AccountContext):
 
     @staticmethod
     def _validate_collection(workspace_ids: list[int], ids_to_workspace: dict[int, Workspace]) -> bool:
+        # validate if the passed list of workspace ids, the user has workspace admin access on
+        # if not, then cant join a collection
         for workspace_id in workspace_ids:
             try:
                 ids_to_workspace[workspace_id]
@@ -730,6 +732,7 @@ class AccountInstaller(AccountContext):
     def join_collection(self, workspace_ids: list[int], join_on_install: bool = False):
         ids_to_workspace: dict[int, Workspace] = {}
         if join_on_install:
+            # if run as part of ucx installation prompt user if the installation needs to join a collection
             prompt_message = "Do you want to join the current installation to an existing collection?"
             if not self.prompts.confirm(prompt_message):
                 return None
@@ -737,11 +740,13 @@ class AccountInstaller(AccountContext):
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
         try:
-            # if user is account admin list and show available workspaces to select from
+            # if user is account admin list all the available workspace the user has admin access on.
+            # This code is run if joining collection after installation or through cli
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
             for workspace in accessible_workspaces:
                 ids_to_workspace[workspace.workspace_id] = workspace
             if join_on_install:
+                # if run as part of ucx installation allow user to select from the list to join
                 target_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
                 assert target_workspace is not None and target_workspace.workspace_id is not None
                 workspace_ids.append(target_workspace.workspace_id)
@@ -756,6 +761,8 @@ class AccountInstaller(AccountContext):
         return None
 
     def _sync_collection(self, workspace_ids: list[int], ids_to_workspace: dict[int, Workspace]):
+        # for all the workspace_ids syncs the config.installed_workspace_ids property in all the
+        # collection workspaces
         installed_workspace_ids = []
         for workspace_id in workspace_ids:
             workspace = ids_to_workspace[workspace_id]
@@ -763,6 +770,7 @@ class AccountInstaller(AccountContext):
             workspace_collection_ids = installer.config.installed_workspace_ids
             if workspace_collection_ids is not None:
                 installed_workspace_ids.extend(workspace_collection_ids)
+        installed_workspace_ids = list(set(installed_workspace_ids))
         for workspace_id in installed_workspace_ids:
             installed_workspace = ids_to_workspace[workspace_id]
             installer = self._get_installer(installed_workspace)

@@ -37,7 +37,7 @@ def test_join_collection_prompt_no_join():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     account_installer.join_collection(
-        [123],
+        [123], True
     )
     account_client.workspaces.list.assert_not_called()
 
@@ -81,7 +81,7 @@ def test_join_collection_join_collection_no_installation_id():
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.join_collection([456])
+    account_installer.join_collection([456], True)
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 1
 
