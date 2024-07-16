@@ -219,7 +219,7 @@ class DeployedWorkflows:
         self._relay_logs(workflow, latest_run.run_id)
 
     def _relay_logs(self, workflow, run_id):
-        for record in self._fetch_logs(workflow, run_id):
+        for record in self._fetch_last_run_attempt_logs(workflow, run_id):
             task_logger = logging.getLogger(record.component)
             MaxedStreamHandler.install_handler(task_logger)
             task_logger.setLevel(logger.getEffectiveLevel())
@@ -227,20 +227,9 @@ class DeployedWorkflows:
             task_logger.log(log_level, record.message)
         MaxedStreamHandler.uninstall_handlers()
 
-    def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
-        log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
-        try:
-            log_path_objects = self._ws.workspace.list(log_path)
-        except ResourceDoesNotExist:
-            logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
-            return
-        run_folders = []
-        for run_folder in log_path_objects:
-            if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
-                continue
-            if f'run-{run_id}-' not in run_folder.path:
-                continue
-            run_folders.append(run_folder.path)
+    def _fetch_last_run_attempt_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
+        """Fetch the logs for the last run attempt."""
+        run_folders = self._get_log_run_folders(workflow, run_id)
         if not run_folders:
             return
         # sort folders based on the last repair attempt
@@ -255,6 +244,27 @@ class DeployedWorkflows:
                 text_io = StringIO(raw_file.read().decode())
             for record in parse_logs(text_io):
                 yield replace(record, component=f'{record.component}:{task_name}')
+
+    def _get_log_run_folders(self, workflow: str, run_id: str) -> list[str]:
+        """Get the log run folders.
+
+        The log run folders are located in the installation folder under the logs directory. Each workflow has a log run
+        folder for each run id. Multiple runs occur for repair runs.
+        """
+        log_path = f"{self._install_state.install_folder()}/logs/{workflow}"
+        try:
+            log_path_objects = self._ws.workspace.list(log_path)
+        except ResourceDoesNotExist:
+            logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
+            return []
+        run_folders = []
+        for run_folder in log_path_objects:
+            if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
+                continue
+            if f"run-{run_id}-" not in run_folder.path:
+                continue
+            run_folders.append(run_folder.path)
+        return run_folders
 
     @staticmethod
     def _readable_timedelta(epoch):
