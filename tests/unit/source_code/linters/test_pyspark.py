@@ -62,7 +62,7 @@ for i in range(10):
             end_col=34,
         ),
         Deprecation(
-            code='table-migrate',
+            code='table-migrated-to-uc',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
             start_col=13,
@@ -93,7 +93,7 @@ for i in range(10):
             end_col=34,
         ),
         Deprecation(
-            code='table-migrate',
+            code='table-migrated-to-uc',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
             start_col=13,
@@ -345,7 +345,7 @@ for i in range(10):
             """spark.read.load("/bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
+                    code='implicit-dbfs-usage',
                     message="The use of default dbfs: references is deprecated: /bucket/path",
                     start_line=0,
                     start_col=0,

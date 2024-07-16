@@ -3,15 +3,15 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrate:+3:9:+3:34] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc:+3:9:+3:34] Table old.things is migrated to brand.new.stuff in Unity Catalog
     # TODO: Fix false positive:
-    # ucx[table-migrate:+1:9:+1:34] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    # ucx[default-format-changed-in-dbr8:+1:9:+1:34] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table("old.things")
     do_stuff_with(df)
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     # TODO: Fix false positive:
-    # ucx[table-migrate:+1:9:+1:51] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    # ucx[default-format-changed-in-dbr8:+1:9:+1:51] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table("table.we.know.nothing.about")
     do_stuff_with(df)
 
@@ -20,14 +20,14 @@ for i in range(10):
     do_stuff_with(df)
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate-cannot-compute-value:+3:9:+3:26] Can't migrate 'spark.table(name)' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+3:9:+3:26] Can't migrate 'spark.table(name)' because its table name argument cannot be computed
     # TODO: Fix false positive:
-    # ucx[table-migrate:+1:9:+1:26] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    # ucx[default-format-changed-in-dbr8:+1:9:+1:26] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table(name)
     do_stuff_with(df)
-    # ucx[table-migrate-cannot-compute-value:+3:9:+3:36] Can't migrate 'spark.table(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[cannot-autofix-table-reference:+3:9:+3:36] Can't migrate 'spark.table(f'boop{stuff}')' because its table name argument cannot be computed
     # TODO: Fix false positive:
-    # ucx[table-migrate:+1:9:+1:36] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    # ucx[default-format-changed-in-dbr8:+1:9:+1:36] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table(f"boop{stuff}")
     do_stuff_with(df)
 

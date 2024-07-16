@@ -37,6 +37,7 @@ class Advice:
 
     def replace(
         self,
+        *,
         code: str | None = None,
         message: str | None = None,
         start_line: int | None = None,
@@ -69,7 +70,7 @@ class Advice:
         return LocatedAdvice(self, path)
 
     @classmethod
-    def from_node(cls, code: str, message: str, node: NodeNG) -> Advice:
+    def from_node(cls, *, code: str, message: str, node: NodeNG) -> Advice:
         # Astroid lines are 1-based.
         return cls(
             code=code,

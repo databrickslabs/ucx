@@ -46,7 +46,7 @@ for i in range(10):
 def get_advice(assign: bool, method_name: str, args_len: int) -> Advice:
     """Repeated boilerplate Advice constructing"""
     return Advice(
-        code="table-migrate",
+        code="default-format-changed-in-dbr8",
         message="The default format changed in Databricks Runtime 8.0, from Parquet to Delta",
         start_line=3,
         start_col=(9 if assign else 4),

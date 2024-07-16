@@ -224,9 +224,9 @@ class NotebookLinter:
             notebook = self._load_source_from_path(magic.notebook_path)
             if notebook is None:
                 yield Advisory.from_node(
-                    'dependency-not-found',
-                    f"Can't locate dependency: {magic.notebook_path}",
-                    base_node.node,
+                    code='dependency-not-found',
+                    message=f"Can't locate dependency: {magic.notebook_path}",
+                    node=base_node.node,
                 )
                 return
             yield from self._load_tree_from_notebook(notebook, False)
@@ -235,9 +235,9 @@ class NotebookLinter:
     def _mutate_path_lookup(self, change: SysPathChange):
         if isinstance(change, UnresolvedPath):
             yield Advisory.from_node(
-                'sys-path-cannot-compute-value',
-                f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
-                change.node,
+                code='sys-path-cannot-compute-value',
+                message=f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
+                node=change.node,
             )
             return
         change.apply_to(self._path_lookup)
