@@ -742,10 +742,7 @@ class AccountInstaller(AccountContext):
             for workspace in accessible_workspaces:
                 ids_to_workspace[workspace.workspace_id] = workspace
             if join_on_install:
-                target_workspace = self._get_collection_workspace(
-                    accessible_workspaces,
-                    account_client,
-                )
+                target_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
                 assert target_workspace is not None and target_workspace.workspace_id is not None
                 workspace_ids.append(target_workspace.workspace_id)
         except PermissionDenied:
@@ -772,19 +769,14 @@ class AccountInstaller(AccountContext):
             installer.replace_config(installed_workspace_ids=installed_workspace_ids)
 
     def _get_collection_workspace(
-        self,
-        accessible_workspaces: list[Workspace],
-        account_client: AccountClient,
+        self, accessible_workspaces: list[Workspace], account_client: AccountClient
     ) -> Workspace | None:
         # iterate through each workspace and select workspace which has existing ucx installation
         # allow user to select from the eligible workspace to join as collection
         installed_workspaces = []
         for workspace in accessible_workspaces:
             workspace_client = account_client.get_workspace_client(workspace)
-            workspace_installation = Installation.existing(
-                workspace_client,
-                self.product_info.product_name(),
-            )
+            workspace_installation = Installation.existing(workspace_client, self.product_info.product_name())
             if len(workspace_installation) > 0:
                 installed_workspaces.append(workspace)
 
