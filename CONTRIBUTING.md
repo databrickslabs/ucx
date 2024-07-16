@@ -257,6 +257,11 @@ To begin, run `make dev` to create the default environment and install developme
 make dev
 ```
 
+To use different python version, specify it in `HATCH_PYTHON` variable:
+```shell
+HATCH_PYTHON=python3.10 make clean dev test
+```
+
 Configure your IDE to use `.venv/bin/python` from the virtual environment when developing the project:
 ![IDE Setup](docs/hatch-intellij.gif)
 
