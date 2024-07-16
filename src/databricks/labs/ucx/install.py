@@ -756,7 +756,6 @@ class AccountInstaller(AccountContext):
             logger.error("User doesnt have account admin permission, cant list workspaces")
             return None
 
-
         if not AccountInstaller._validate_collection(workspace_ids, ids_to_workspace):
             return None
         self._sync_collection(workspace_ids, ids_to_workspace)
