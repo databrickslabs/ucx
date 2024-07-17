@@ -159,7 +159,7 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
 def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_other_requirements(
     mock_path_lookup, graph, caplog
 ):
-    expected_message = "References to other requirements file is not supported: -r other-requirements.txt"
+    expected_message = "Reference to other requirements file is not supported: -r other-requirements.txt"
 
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"-r other-requirements.txt")
@@ -176,13 +176,13 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
 
 
-def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constrains(
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constraints(
     mock_path_lookup, graph, caplog
 ):
-    expected_message = "References to constrains file is not supported: -c constrains.txt"
+    expected_message = "Reference to constraints file is not supported: -c constraints.txt"
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.return_value = io.BytesIO(b"-c constrains.txt")
+    ws.workspace.download.return_value = io.BytesIO(b"-c constraints.txt")
 
     libraries = [compute.Library(requirements="requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
