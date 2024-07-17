@@ -176,7 +176,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
 
 
-def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constrains(
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constraints(
     mock_path_lookup, graph, caplog
 ):
     expected_message = "Reference to constraints file is not supported: -c constraints.txt"
