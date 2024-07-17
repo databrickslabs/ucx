@@ -153,7 +153,9 @@ class TestWorkflowTaskContainerDependencyGraphForLibraries:
         _ = workflow_task_container.build_dependency_graph(dep_graph)
 
         dep_graph.register_library.assert_called_once()
-        registered_libraries = [library for args in dep_graph.register_library.call_args_list for library in args[0]]
+        registered_libraries = tuple(
+            library for args in dep_graph.register_library.call_args_list for library in args[0]
+        )
         registered_names = tuple(Path(library).name for library in registered_libraries)
         assert registered_names == (expected_name,)
 
@@ -204,9 +206,10 @@ class TestWorkflowTaskContainerDependencyGraphForLibraries:
         workflow_task_container = WorkflowTaskContainer(ws, task, Job())
         _ = workflow_task_container.build_dependency_graph(dep_graph)
 
-        registered_libraries = [library for args in dep_graph.register_library.call_args_list for library in args[0]]
-        registered_names = tuple(Path(library).name for library in registered_libraries)
-        assert registered_names == expected_dependencies
+        registered_libraries = tuple(
+            library for args in dep_graph.register_library.call_args_list for library in args[0]
+        )
+        assert registered_libraries == expected_dependencies
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
