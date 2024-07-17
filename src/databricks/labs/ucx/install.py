@@ -719,9 +719,7 @@ class AccountInstaller(AccountContext):
         # validate if the passed list of workspace ids, the user has workspace admin access on
         # if not, then cant join a collection
         for workspace_id in workspace_ids:
-            try:
-                ids_to_workspace[workspace_id]
-            except KeyError:
+            if workspace_id not in ids_to_workspace:
                 logger.error(
                     f"User doesnt have admin access on the workspace {workspace_id} in the collection, "
                     f"cant join collection."
