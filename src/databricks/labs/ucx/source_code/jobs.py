@@ -125,12 +125,14 @@ class WorkflowTaskContainer(SourceContainer):
                 yield from problems
         if library.egg:
             logger.info(f"Registering library from {library.egg}")
+            # TODO: Support DBFS here.
             with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
                 with tempfile.TemporaryDirectory() as directory:
                     local_file = Path(directory) / Path(library.egg).name
                     local_file.write_bytes(remote_file.read())
                     yield from graph.register_library(local_file.as_posix())
         if library.whl:
+            # TODO: Support DBFS here.
             with self._ws.workspace.download(library.whl, format=ExportFormat.AUTO) as remote_file:
                 with tempfile.TemporaryDirectory() as directory:
                     local_file = Path(directory) / Path(library.whl).name
@@ -138,6 +140,7 @@ class WorkflowTaskContainer(SourceContainer):
                     yield from graph.register_library(local_file.as_posix())
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
+            # TODO: Support DBFS here.
             with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
                 contents = remote_file.read().decode()
                 for requirement in contents.splitlines():
@@ -159,6 +162,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
+        # TODO: Support DBFS here.
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
@@ -168,6 +172,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._parameters = self._task.spark_python_task.parameters
         notebook_path = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
+        # TODO: Support DBFS here.
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
@@ -233,6 +238,7 @@ class WorkflowTaskContainer(SourceContainer):
                 return
             if library.notebook.path:
                 notebook_path = library.notebook.path
+                # TODO: Support DBFS here.
                 path = WorkspacePath(self._ws, notebook_path)
                 yield from graph.register_notebook(path)
             if library.jar:
