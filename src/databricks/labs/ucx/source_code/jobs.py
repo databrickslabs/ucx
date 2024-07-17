@@ -101,6 +101,7 @@ class WorkflowTaskContainer(SourceContainer):
         return list(self._register_task_dependencies(parent))
 
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+        yield from self._register_cluster_info()
         yield from self._register_libraries(graph)
         yield from self._register_existing_cluster_id(graph)
         yield from self._register_notebook(graph)
@@ -110,7 +111,6 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
         yield from self._register_spark_submit_task(graph)
-        yield from self._register_cluster_info()
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
@@ -125,8 +125,9 @@ class WorkflowTaskContainer(SourceContainer):
                 yield from problems
         if library.egg:
             if self.runtime_version > (14, 0):
-                yield DependencyProblem('not-yet-implemented', 'Installing eggs is no longer supported '
-                                                               'on Databricks 14.0 or higher')
+                yield DependencyProblem(
+                    'not-yet-implemented', 'Installing eggs is no longer supported ' 'on Databricks 14.0 or higher'
+                )
             logger.info(f"Registering library from {library.egg}")
             with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
                 with tempfile.TemporaryDirectory() as directory:
