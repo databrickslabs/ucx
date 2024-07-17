@@ -1,7 +1,8 @@
 import io
 import logging
+import textwrap
 from pathlib import Path
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, mock_open
 
 import pytest
 from databricks.sdk.service.jobs import Job
@@ -103,21 +104,109 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_path_lookup, graph):
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.return_value = io.BytesIO(b"test")
+class TestWorkflowTaskContainerDependencyGraphForLibraries:
+    """Tests that verify the dependency graphs for local task libraries are all registered with the graph."""
 
-    libraries = [compute.Library(whl="test.whl")]
-    task = jobs.Task(task_key="test", libraries=libraries)
+    @classmethod
+    def test_builds_dependency_graph_for_workspace_wheel(cls) -> None:
+        """Verify that wheel libraries in the workspace are registered with the graph."""
+        ws = create_autospec(WorkspaceClient)
+        ws.workspace.download.return_value = io.BytesIO(b"test")
+        library = compute.Library(whl="/path/to/some/some_library-py3-none-any.whl")
 
-    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
-    problems = workflow_task_container.build_dependency_graph(graph)
+        cls._verify_library_path_registered(ws, library, "some_library-py3-none-any.whl")
 
-    assert len(problems) == 1
-    assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("'pip install")
-    assert mock_path_lookup.resolve(Path("test")) is None
-    ws.assert_not_called()
+    @classmethod
+    def test_builds_dependency_graph_for_dbfs_wheel(cls) -> None:
+        """Verify that wheel libraries from DBFS are registered with the graph."""
+        ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+        ws.dbfs.open = mock_open(read_data=b"unimportant")
+        library = compute.Library(whl="dbfs:/path/to/some_library-py3-none-any.whl")
+
+        cls._verify_library_path_registered(ws, library, "some_library-py3-none-any.whl")
+
+    @classmethod
+    def test_builds_dependency_graph_for_workspace_egg(cls) -> None:
+        """Verify that egg libraries in the workspace are registered against the graph."""
+        ws = create_autospec(WorkspaceClient)
+        ws.workspace.download.return_value = io.BytesIO(b"test")
+        library = compute.Library(egg="/path/to/some/some_library-py3.10.egg")
+
+        cls._verify_library_path_registered(ws, library, "some_library-py3.10.egg")
+
+    @classmethod
+    def test_builds_dependency_graph_for_dbfs_egg(cls) -> None:
+        """Verify that egg libraries from DBFS are registered with the graph."""
+        ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+        ws.dbfs.open = mock_open(read_data=b"unimportant")
+        library = compute.Library(whl="dbfs:/path/to/some_library-py3.10.egg")
+
+        cls._verify_library_path_registered(ws, library, "some_library-py3.10.egg")
+
+    @classmethod
+    def _verify_library_path_registered(cls, ws: WorkspaceClient, library: compute.Library, expected_name: str) -> None:
+        dep_graph = create_autospec(DependencyGraph)
+
+        task = jobs.Task(task_key="test", libraries=[library])
+
+        workflow_task_container = WorkflowTaskContainer(ws, task, Job())
+        _ = workflow_task_container.build_dependency_graph(dep_graph)
+
+        dep_graph.register_library.assert_called_once()
+        registered_libraries = [library for args in dep_graph.register_library.call_args_list for library in args[0]]
+        registered_names = tuple(Path(library).name for library in registered_libraries)
+        assert registered_names == (expected_name,)
+
+    @classmethod
+    def test_builds_dependency_graph_for_workspace_requirements(cls) -> None:
+        """Verify that dependencies from workspace-hosted requirements files are registered with the graph."""
+        ws = create_autospec(WorkspaceClient)
+        ws.workspace.download.return_value = io.BytesIO(
+            textwrap.dedent(
+                """\
+                some_library==0.10.0
+                databricks-cli==0.17.5
+            """
+            ).encode("utf-8")
+        )
+        library = compute.Library(requirements="/path/to/requirements.txt")
+
+        cls._verify_libraries_registered(
+            ws, library, expected_dependencies=("some_library==0.10.0", "databricks-cli==0.17.5")
+        )
+
+    @classmethod
+    def test_builds_dependency_graph_for_dbfs_requirements(cls) -> None:
+        """Verify that dependencies from DBFS-hosted requirements files are registered with the graph."""
+        ws = create_autospec(WorkspaceClient)
+        ws.dbfs.open.return_value = io.BytesIO(
+            textwrap.dedent(
+                """\
+                some_library==0.10.0
+                databricks-cli==0.17.5
+                """
+            ).encode("utf-8")
+        )
+        library = compute.Library(requirements="dbfs:/path/to/requirements.txt")
+
+        cls._verify_libraries_registered(
+            ws, library, expected_dependencies=("some_library==0.10.0", "databricks-cli==0.17.5")
+        )
+
+    @classmethod
+    def _verify_libraries_registered(
+        cls, ws: WorkspaceClient, library: compute.Library, expected_dependencies: tuple[str, ...]
+    ) -> None:
+        dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
+
+        task = jobs.Task(task_key="test", libraries=[library])
+
+        workflow_task_container = WorkflowTaskContainer(ws, task, Job())
+        _ = workflow_task_container.build_dependency_graph(dep_graph)
+
+        registered_libraries = [library for args in dep_graph.register_library.call_args_list for library in args[0]]
+        registered_names = tuple(Path(library).name for library in registered_libraries)
+        assert registered_names == expected_dependencies
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
