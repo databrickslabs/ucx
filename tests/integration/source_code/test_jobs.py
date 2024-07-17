@@ -443,13 +443,7 @@ def test_job_dlt_task_linter_happy_path(
 
 
 def test_job_dependency_problem_egg_dbr14plus(
-    make_cluster,
-    make_job,
-    make_directory,
-    make_notebook,
-    make_random,
-    simple_ctx,
-    ws
+    make_cluster, make_job, make_directory, make_notebook, make_random, simple_ctx, ws
 ):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     task_spark_conf = None
@@ -475,3 +469,5 @@ def test_job_dependency_problem_egg_dbr14plus(
     j = make_job(tasks=[task])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems
+                if problem.message == "Installing eggs is no longer supported on Databricks 14.0 or higher"]) == 1
