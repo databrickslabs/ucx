@@ -6,6 +6,7 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
+from databricks.sdk.service.provisioning import Workspace
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -217,6 +218,11 @@ def test_ensure_assessment_run(ws):
     ensure_assessment_run(ws)
 
     ws.jobs.list_runs.assert_called_once()
+
+
+def test_ensure_assessment_run_collection(ws, acc_client):
+    ensure_assessment_run(ws, True, acc_client)
+    acc_client.workspaces.get.assert_called_once()
 
 
 def test_repair_run(ws):
@@ -610,6 +616,7 @@ def test_join_collection():
     a = create_autospec(AccountClient)
     w = create_autospec(WorkspaceClient)
     a.get_workspace_client.return_value = w
+    a.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test")]
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
-    join_collection(a, w, 123)
-    w.workspace.download.assert_called()
+    join_collection(a, "123")
+    w.workspace.download.assert_not_called()
