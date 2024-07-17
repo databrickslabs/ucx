@@ -469,5 +469,13 @@ def test_job_dependency_problem_egg_dbr14plus(
     j = make_job(tasks=[task])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
-    assert len([problem for problem in problems
-                if problem.message == "Installing eggs is no longer supported on Databricks 14.0 or higher"]) == 1
+    assert (
+        len(
+            [
+                problem
+                for problem in problems
+                if problem.message == "Installing eggs is no longer supported on Databricks 14.0 or higher"
+            ]
+        )
+        == 1
+    )

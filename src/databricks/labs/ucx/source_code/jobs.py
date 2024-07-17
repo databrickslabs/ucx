@@ -124,16 +124,7 @@ class WorkflowTaskContainer(SourceContainer):
             if problems:
                 yield from problems
         if library.egg:
-            if self.runtime_version > (14, 0):
-                yield DependencyProblem(
-                    'not-supported', 'Installing eggs is no longer supported on Databricks 14.0 or higher'
-                )
-            logger.info(f"Registering library from {library.egg}")
-            with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
-                with tempfile.TemporaryDirectory() as directory:
-                    local_file = Path(directory) / Path(library.egg).name
-                    local_file.write_bytes(remote_file.read())
-                    yield from graph.register_library(local_file.as_posix())
+            yield from self._register_egg(graph, library)
         if library.whl:
             with self._ws.workspace.download(library.whl, format=ExportFormat.AUTO) as remote_file:
                 with tempfile.TemporaryDirectory() as directory:
@@ -156,6 +147,19 @@ class WorkflowTaskContainer(SourceContainer):
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+
+    def _register_egg(self, graph, library):
+        if self.runtime_version > (14, 0):
+            yield DependencyProblem(
+                code='not-supported',
+                message='Installing eggs is no longer supported on Databricks 14.0 or higher',
+            )
+        logger.info(f"Registering library from {library.egg}")
+        with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
+            with tempfile.TemporaryDirectory() as directory:
+                local_file = Path(directory) / Path(library.egg).name
+                local_file.write_bytes(remote_file.read())
+                yield from graph.register_library(local_file.as_posix())
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
