@@ -13,6 +13,7 @@ from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from databricks.sdk.errors.platform import BadRequest
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -430,6 +431,18 @@ def test_create_catalogs_schemas(ws):
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     create_catalogs_schemas(ws, prompts)
     ws.catalogs.list.assert_called_once()
+
+
+def test_create_catalogs_schemas_handles_existing(ws, caplog):
+    prompts = MockPrompts({'.*': 's3://test'})
+    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
+    ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
+    ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
+    create_catalogs_schemas(ws, prompts)
+    ws.catalogs.list.assert_called_once()
+
+    assert "Catalog test already exists. Skipping." in caplog.messages
+    assert "Schema test in catalog test already exists. Skipping." in caplog.messages
 
 
 def test_cluster_remap(ws, caplog):

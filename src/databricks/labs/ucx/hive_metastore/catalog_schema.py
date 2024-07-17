@@ -10,6 +10,7 @@ from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import SchemaInfo
+from databricks.sdk.errors.platform import BadRequest
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
@@ -29,10 +30,22 @@ class CatalogSchema:
     def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
-            self._create_catalog_validate(candidate_catalog, prompts)
+            try:
+                self._create_catalog_validate(candidate_catalog, prompts)
+            except BadRequest as e:
+                if "already exists" in str(e):
+                    logger.warning(f"Catalog {candidate_catalog} already exists. Skipping.")
+                    continue
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
-                self._create_schema(candidate_catalog, candidate_schema)
+                try:
+                    self._create_schema(candidate_catalog, candidate_schema)
+                except BadRequest as e:
+                    if "already exists" in str(e):
+                        logger.warning(
+                            f"Schema {candidate_schema} in catalog {candidate_catalog} " f"already exists. Skipping."
+                        )
+                        continue
         self._update_principal_acl()
 
     def _update_principal_acl(self):
