@@ -1,19 +1,21 @@
 import functools
 import itertools
 import logging
+import shutil
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
+from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -118,6 +120,26 @@ class WorkflowTaskContainer(SourceContainer):
         for library in self._task.libraries:
             yield from self._register_library(graph, library)
 
+    def _as_path(self, path: str) -> Path:
+        parsed_path = parse.urlparse(path)
+        match parsed_path.scheme:
+            case "":
+                return WorkspacePath(self._ws, path)
+            case "dbfs":
+                return DBFSPath(self._ws, parsed_path.path)
+            case other:
+                msg = f"Unsupported schema: {other} (only DBFS or Workspace paths are allowed)"
+                raise ValueError(msg)
+
+    @classmethod
+    @contextmanager
+    def _temporary_copy(cls, path: Path) -> Generator[Path, None, None]:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary_path = Path(directory) / path.name
+            with path.open("rb") as src, temporary_path.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+            yield temporary_path
+
     def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
             problems = graph.register_library(library.pypi.package)
@@ -126,18 +148,14 @@ class WorkflowTaskContainer(SourceContainer):
         if library.egg:
             yield from self._register_egg(graph, library)
         if library.whl:
-            # TODO: Support DBFS here.
-            with self._ws.workspace.download(library.whl, format=ExportFormat.AUTO) as remote_file:
-                with tempfile.TemporaryDirectory() as directory:
-                    local_file = Path(directory) / Path(library.whl).name
-                    local_file.write_bytes(remote_file.read())
-                    yield from graph.register_library(local_file.as_posix())
+            wheel_path = self._as_path(library.whl)
+            with self._temporary_copy(wheel_path) as local_file:
+                yield from graph.register_library(local_file.as_posix())
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
-            # TODO: Support DBFS here.
-            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
-                contents = remote_file.read().decode()
-                for requirement in contents.splitlines():
+            requirements_path = self._as_path(library.requirements)
+            with requirements_path.open() as requirements:
+                for requirement in requirements:
                     clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
                     if clean_requirement.startswith("-r"):
                         logger.warning(f"References to other requirements file is not supported: {requirement}")
@@ -157,12 +175,9 @@ class WorkflowTaskContainer(SourceContainer):
                 message='Installing eggs is no longer supported on Databricks 14.0 or higher',
             )
         logger.info(f"Registering library from {library.egg}")
-        # TODO: Support DBFS here.
-        with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
-            with tempfile.TemporaryDirectory() as directory:
-                local_file = Path(directory) / Path(library.egg).name
-                local_file.write_bytes(remote_file.read())
-                yield from graph.register_library(local_file.as_posix())
+        egg_path = self._as_path(library.egg)
+        with self._temporary_copy(egg_path) as local_file:
+            yield from graph.register_library(local_file.as_posix())
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
@@ -180,8 +195,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._parameters = self._task.spark_python_task.parameters
         notebook_path = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
-        # TODO: Support DBFS here.
-        path = WorkspacePath(self._ws, notebook_path)
+        path = self._as_path(notebook_path)
         return graph.register_notebook(path)
 
     @staticmethod
