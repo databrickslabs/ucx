@@ -5,9 +5,10 @@ from pathlib import Path
 from unittest.mock import create_autospec, mock_open
 
 import pytest
-from databricks.sdk.service.jobs import Job
+from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
@@ -210,6 +211,32 @@ class TestWorkflowTaskContainerDependencyGraphForLibraries:
             library for args in dep_graph.register_library.call_args_list for library in args[0]
         )
         assert registered_libraries == expected_dependencies
+
+
+@pytest.mark.parametrize(
+    "python_file,expected_cls,expected_path",
+    (
+        ("/path/to/file.py", WorkspacePath, "/path/to/file.py"),
+        ("dbfs:/path/to/another/file.py", DBFSPath, "/path/to/another/file.py"),
+    ),
+)
+def test_workflow_task_container_builds_dependency_graph_spark_python_task(
+    python_file: str, expected_cls, expected_path: str
+) -> None:
+    """Verify that spark python tasks from the workspace are registered with the graph."""
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
+
+    task = jobs.Task(task_key="test", spark_python_task=SparkPythonTask(python_file=python_file))
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
+
+    expected_path_instance = expected_cls(ws, expected_path)
+
+    registered_notebooks = tuple(
+        notebook for args in dep_graph.register_notebook.call_args_list for notebook in args[0]
+    )
+    assert registered_notebooks == (expected_path_instance,)
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
