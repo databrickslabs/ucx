@@ -138,10 +138,10 @@ class WorkflowTaskContainer(SourceContainer):
                 for requirement in contents.splitlines():
                     clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
                     if clean_requirement.startswith("-r"):
-                        logger.warning(f"References to other requirements file is not supported: {requirement}")
+                        logger.warning(f"References to other requirements files are not supported: {requirement}")
                         continue
                     if clean_requirement.startswith("-c"):
-                        logger.warning(f"References to constrains file is not supported: {requirement}")
+                        logger.warning(f"References to constraints files are not supported: {requirement}")
                         continue
                     yield from graph.register_library(clean_requirement)
         if library.jar:
