@@ -156,6 +156,7 @@ class WorkflowTaskContainer(SourceContainer):
             requirements_path = self._as_path(library.requirements)
             with requirements_path.open() as requirements:
                 for requirement in requirements:
+                    requirement = requirement.rstrip()
                     clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
                     if clean_requirement.startswith("-r"):
                         logger.warning(f"References to other requirements file is not supported: {requirement}")
