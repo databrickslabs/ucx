@@ -170,7 +170,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
-        # TODO: Support DBFS here.
+        # Notebooks can't be on DBFS.
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
@@ -246,7 +246,7 @@ class WorkflowTaskContainer(SourceContainer):
                 return
             if library.notebook.path:
                 notebook_path = library.notebook.path
-                # TODO: Support DBFS here.
+                # Notebooks can't be on DBFS.
                 path = WorkspacePath(self._ws, notebook_path)
                 yield from graph.register_notebook(path)
             if library.jar:
