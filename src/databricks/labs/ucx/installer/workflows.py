@@ -117,14 +117,14 @@ class DeployedWorkflows:
         self._install_state = install_state
         self._verify_timeout = verify_timeout
 
-    def run_workflow(self, step: str):
+    def run_workflow(self, step: str, skip_job_wait: bool = False):
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
-        if job_initial_run.run_id:
+        if job_initial_run.run_id and not skip_job_wait:
             try:
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
             except OperationFailed as err:

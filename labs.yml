@@ -59,6 +59,9 @@ commands:
 
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
+    flags:
+      - name: run-as-collection
+        description: boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts
@@ -237,7 +240,7 @@ commands:
     is_account_level: true
     description: workspace_id to join a collection.
     flags:
-      - name: workspace-id
-        description: workspace_id which should join a collection.
-      - name: target_workspace-id
+      - name: workspace-ids
+        description: workspace_ids which should join a collection. provide a comma separated list of workspace ids.
+      - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
