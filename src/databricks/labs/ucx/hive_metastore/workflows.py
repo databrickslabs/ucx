@@ -15,10 +15,7 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_SYNC,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
@@ -28,10 +25,7 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.DBFS_ROOT_DELTA,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
@@ -41,10 +35,7 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.DBFS_ROOT_NON_DELTA,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(
@@ -62,10 +53,7 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
@@ -84,10 +72,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         the Hive Metastore to the Unity Catalog."""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
             mounts_crawler=ctx.mounts_crawler,
             hiveserde_in_place_migrate=True,
         )
@@ -102,10 +87,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
@@ -123,10 +105,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates non-SYNC supported and non HiveSerde external tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_NO_SYNC,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -135,10 +114,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates HiveSerde tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -152,10 +128,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """
         ctx.tables_migrator.migrate_tables(
             what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
+            acl_strategy=None,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
