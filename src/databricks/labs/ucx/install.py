@@ -293,10 +293,9 @@ class WorkspaceInstaller(WorkspaceContext):
         try:
             config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
-            if self._confirm_force_install():
-                return self._configure_new_installation(default_config)
-            self._apply_upgrades()
-            return config
+            if not self._confirm_force_install():
+                self._apply_upgrades()
+                return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
