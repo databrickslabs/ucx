@@ -2,7 +2,7 @@ import io
 import logging
 import textwrap
 from pathlib import Path
-from unittest.mock import create_autospec, mock_open
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.service.jobs import Job, SparkPythonTask
@@ -105,112 +105,100 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     ws.assert_not_called()
 
 
-class TestWorkflowTaskContainerDependencyGraphForLibraries:
-    """Tests that verify the dependency graphs for local task libraries are all registered with the graph."""
+@pytest.fixture(scope="function")
+def ws_pkg(request: pytest.FixtureRequest) -> WorkspaceClient:
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    data = io.BytesIO(b"unimportant")
+    match request.param:
+        case "wspath":
+            ws.workspace.download.return_value = data
+        case "dbfs":
+            ws.dbfs.open.return_value = data
+    return ws
 
-    @classmethod
-    def test_builds_dependency_graph_for_workspace_wheel(cls) -> None:
-        """Verify that wheel libraries in the workspace are registered with the graph."""
-        ws = create_autospec(WorkspaceClient)
-        ws.workspace.download.return_value = io.BytesIO(b"test")
-        library = compute.Library(whl="/path/to/some/some_library-py3-none-any.whl")
 
-        cls._verify_library_path_registered(ws, library, "some_library-py3-none-any.whl")
+@pytest.mark.parametrize(
+    "ws_pkg, library, registered",
+    (
+        (
+            "wspath",
+            compute.Library(whl="/path/to/some/some_library-py3-none-any.whl"),
+            "some_library-py3-none-any.whl",
+        ),
+        (
+            "wspath",
+            compute.Library(egg="/path/to/some/some_library-py3.10.egg"),
+            "some_library-py3.10.egg",
+        ),
+        (
+            "dbfs",
+            compute.Library(whl="dbfs:/path/to/some/some_library-py3-none-any.whl"),
+            "some_library-py3-none-any.whl",
+        ),
+        (
+            "dbfs",
+            compute.Library(egg="dbfs:/path/to/some/some_library-py3.10.egg"),
+            "some_library-py3.10.egg",
+        ),
+    ),
+    indirect=("ws_pkg",),
+)
+def test_builds_dependency_graph_for_local_package(
+    ws_pkg: WorkspaceClient, library: compute.Library, registered: str
+) -> None:
+    """Check that the (local) libraries for a task are registered with the dependency graph."""
+    dep_graph = create_autospec(DependencyGraph)
 
-    @classmethod
-    def test_builds_dependency_graph_for_dbfs_wheel(cls) -> None:
-        """Verify that wheel libraries from DBFS are registered with the graph."""
-        ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
-        ws.dbfs.open = mock_open(read_data=b"unimportant")
-        library = compute.Library(whl="dbfs:/path/to/some_library-py3-none-any.whl")
+    task = jobs.Task(task_key="test", libraries=[library])
 
-        cls._verify_library_path_registered(ws, library, "some_library-py3-none-any.whl")
+    workflow_task_container = WorkflowTaskContainer(ws_pkg, task, Job())
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
 
-    @classmethod
-    def test_builds_dependency_graph_for_workspace_egg(cls) -> None:
-        """Verify that egg libraries in the workspace are registered against the graph."""
-        ws = create_autospec(WorkspaceClient)
-        ws.workspace.download.return_value = io.BytesIO(b"test")
-        library = compute.Library(egg="/path/to/some/some_library-py3.10.egg")
+    dep_graph.register_library.assert_called_once()
+    registered_libraries = tuple(library for args in dep_graph.register_library.call_args_list for library in args[0])
+    registered_names = tuple(Path(library).name for library in registered_libraries)
+    assert registered_names == (registered,)
 
-        cls._verify_library_path_registered(ws, library, "some_library-py3.10.egg")
 
-    @classmethod
-    def test_builds_dependency_graph_for_dbfs_egg(cls) -> None:
-        """Verify that egg libraries from DBFS are registered with the graph."""
-        ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
-        ws.dbfs.open = mock_open(read_data=b"unimportant")
-        library = compute.Library(whl="dbfs:/path/to/some_library-py3.10.egg")
-
-        cls._verify_library_path_registered(ws, library, "some_library-py3.10.egg")
-
-    @classmethod
-    def _verify_library_path_registered(cls, ws: WorkspaceClient, library: compute.Library, expected_name: str) -> None:
-        dep_graph = create_autospec(DependencyGraph)
-
-        task = jobs.Task(task_key="test", libraries=[library])
-
-        workflow_task_container = WorkflowTaskContainer(ws, task, Job())
-        _ = workflow_task_container.build_dependency_graph(dep_graph)
-
-        dep_graph.register_library.assert_called_once()
-        registered_libraries = tuple(
-            library for args in dep_graph.register_library.call_args_list for library in args[0]
-        )
-        registered_names = tuple(Path(library).name for library in registered_libraries)
-        assert registered_names == (expected_name,)
-
-    @classmethod
-    def test_builds_dependency_graph_for_workspace_requirements(cls) -> None:
-        """Verify that dependencies from workspace-hosted requirements files are registered with the graph."""
-        ws = create_autospec(WorkspaceClient)
-        ws.workspace.download.return_value = io.BytesIO(
-            textwrap.dedent(
-                """\
-                some_library==0.10.0
-                databricks-cli==0.17.5
+@pytest.fixture(scope="function")
+def ws_requirements(request: pytest.FixtureRequest) -> WorkspaceClient:
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    data = io.BytesIO(
+        textwrap.dedent(
+            """\
+            some_library==0.10.0
+            databricks-cli==0.17.5
             """
-            ).encode("utf-8")
-        )
-        library = compute.Library(requirements="/path/to/requirements.txt")
+        ).encode("utf-8")
+    )
+    match request.param:
+        case "wspath":
+            ws.workspace.download.return_value = data
+        case "dbfs":
+            ws.dbfs.open.return_value = data
+    return ws
 
-        cls._verify_libraries_registered(
-            ws, library, expected_dependencies=("some_library==0.10.0", "databricks-cli==0.17.5")
-        )
 
-    @classmethod
-    def test_builds_dependency_graph_for_dbfs_requirements(cls) -> None:
-        """Verify that dependencies from DBFS-hosted requirements files are registered with the graph."""
-        ws = create_autospec(WorkspaceClient)
-        ws.dbfs.open.return_value = io.BytesIO(
-            textwrap.dedent(
-                """\
-                some_library==0.10.0
-                databricks-cli==0.17.5
-                """
-            ).encode("utf-8")
-        )
-        library = compute.Library(requirements="dbfs:/path/to/requirements.txt")
+@pytest.mark.parametrize(
+    "ws_requirements, path",
+    (
+        ("wspath", "/path/to/requirements.txt"),
+        ("dbfs", "dbfs:/path/to/requirements.txt"),
+    ),
+    indirect=("ws_requirements",),
+)
+def test_builds_dependency_graph_for_requirements(ws_requirements: WorkspaceClient, path: str) -> None:
+    """Check that the task dependencies listed in a requirements.txt are registered with the dependency graph."""
+    dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
 
-        cls._verify_libraries_registered(
-            ws, library, expected_dependencies=("some_library==0.10.0", "databricks-cli==0.17.5")
-        )
+    library = compute.Library(requirements=path)
+    task = jobs.Task(task_key="test", libraries=[library])
 
-    @classmethod
-    def _verify_libraries_registered(
-        cls, ws: WorkspaceClient, library: compute.Library, expected_dependencies: tuple[str, ...]
-    ) -> None:
-        dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
+    workflow_task_container = WorkflowTaskContainer(ws_requirements, task, Job())
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
 
-        task = jobs.Task(task_key="test", libraries=[library])
-
-        workflow_task_container = WorkflowTaskContainer(ws, task, Job())
-        _ = workflow_task_container.build_dependency_graph(dep_graph)
-
-        registered_libraries = tuple(
-            library for args in dep_graph.register_library.call_args_list for library in args[0]
-        )
-        assert registered_libraries == expected_dependencies
+    registered_libraries = tuple(library for args in dep_graph.register_library.call_args_list for library in args[0])
+    assert registered_libraries == ("some_library==0.10.0", "databricks-cli==0.17.5")
 
 
 @pytest.mark.parametrize(
