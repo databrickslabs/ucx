@@ -92,59 +92,6 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-class ApiClientNoInternet(ApiClient):
-    @staticmethod
-    def _is_retryable(err: BaseException) -> Optional[str]:
-        return None
-
-
-@pytest.fixture
-def config_without_internet_connection() -> Config:
-    @credentials_strategy("no_internet_connection", [])
-    def no_internet_connection(_: Any):
-        def raise_connection_error():
-            raise ConnectionError("No internet access")
-
-        return raise_connection_error
-
-    return Config(credentials_strategy=no_internet_connection, retry_timeout_seconds=1)
-
-
-@pytest.fixture
-def ws_without_internet_connection(
-    product_info,
-    debug_env,
-    config_without_internet_connection
-) -> WorkspaceClient:
-    # Use variables from Unified Auth
-    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
-    product_name, product_version = product_info
-    return WorkspaceClient(
-        host=debug_env["DATABRICKS_HOST"],
-        product=product_name,
-        product_version=product_version,
-        config=config_without_internet_connection,
-    )
-
-
-@pytest.mark.parametrize("with_default_config", [False, True])
-def test_workspace_installer_run(
-    caplog,
-    ws_without_internet_connection,
-    installation_ctx,
-    with_default_config,
-):
-    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
-    default_config = WorkspaceConfig("ucx") if with_default_config else None
-    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        ctx.workspace_installer.run(default_config=default_config)
-    assert "Cannot connect with" in caplog.text
-
-
-def test_workspace_installation_run(installation_ctx):
-    installation_ctx.workspace_installation.run()
-
-
 @retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx, make_cluster_policy, make_cluster_policy_permissions
@@ -467,3 +414,56 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
     installation_ctx.deployed_workflows.repair_run("failing")
     assert installation_ctx.deployed_workflows.validate_step("failing")
+
+
+class ApiClientNoInternet(ApiClient):
+    @staticmethod
+    def _is_retryable(err: BaseException) -> Optional[str]:
+        return None
+
+
+@pytest.fixture
+def config_without_internet_connection() -> Config:
+    @credentials_strategy("no_internet_connection", [])
+    def no_internet_connection(_: Any):
+        def raise_connection_error():
+            raise ConnectionError("No internet access")
+
+        return raise_connection_error
+
+    return Config(credentials_strategy=no_internet_connection, retry_timeout_seconds=1)
+
+
+@pytest.fixture
+def ws_without_internet_connection(
+    product_info,
+    debug_env,
+    config_without_internet_connection
+) -> WorkspaceClient:
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    product_name, product_version = product_info
+    return WorkspaceClient(
+        host=debug_env["DATABRICKS_HOST"],
+        product=product_name,
+        product_version=product_version,
+        config=config_without_internet_connection,
+    )
+
+
+@pytest.mark.parametrize("with_default_config", [False, True])
+def test_workspace_installer_run(
+    caplog,
+    ws_without_internet_connection,
+    installation_ctx,
+    with_default_config,
+):
+    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
+    default_config = WorkspaceConfig("ucx") if with_default_config else None
+    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        ctx.workspace_installer.run(default_config=default_config)
+    assert "Cannot connect with" in caplog.text
+
+
+def test_workspace_installation_run(installation_ctx):
+    installation_ctx.workspace_installation.run()
