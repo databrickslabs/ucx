@@ -459,5 +459,12 @@ def test_workspace_installer_run(
     assert "Cannot connect with" in caplog.text
 
 
-def test_workspace_installation_run(installation_ctx):
-    installation_ctx.workspace_installation.run()
+def test_workspace_installation_run(
+    caplog,
+    installation_ctx,
+    ws_without_internet_connection,
+):
+    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
+    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        ctx.workspace_installation.run()
+    assert "Cannot connect with" in caplog.text
