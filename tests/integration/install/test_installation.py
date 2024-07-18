@@ -104,21 +104,31 @@ def config_without_internet_connection() -> Config:
     def no_internet_connection(_: Any):
         def raise_connection_error():
             raise ConnectionError("No internet access")
+
         return raise_connection_error
+
     return Config(credentials_strategy=no_internet_connection, retry_timeout_seconds=1)
 
 
 @pytest.mark.parametrize("with_default_config", [False, True])
 @pytest.mark.parametrize("with_config", [False, True])
-def test_workspace_installer_run(ws, config_without_internet_connection, installation_ctx, default_workspace_config, with_default_config, with_config):
+def test_workspace_installer_run(
+    caplog,
+    ws,
+    config_without_internet_connection,
+    installation_ctx,
+    default_workspace_config,
+    with_default_config,
+    with_config,
+):
     default_config = default_workspace_config if with_default_config else None
     config = default_workspace_config if with_config else None
     ws._config = config_without_internet_connection
     ws._api_client = ApiClient(ws.config)
     ws._current_user = CurrentUserAPI(ws._api_client)
-    # TODO: Check caplog
-    with pytest.raises(TimeoutError):
+    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         installation_ctx.workspace_installer.run(default_config=default_config, config=config)
+    assert "Cannot connect with" in caplog.text
 
 
 def test_workspace_installation_run(installation_ctx):
