@@ -12,7 +12,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.core import ApiClient, Config
 from databricks.sdk.credentials_provider import credentials_strategy
@@ -110,21 +110,36 @@ def config_without_internet_connection() -> Config:
     return Config(credentials_strategy=no_internet_connection, retry_timeout_seconds=1)
 
 
+@pytest.fixture
+def ws_without_internet_connection(
+    product_info,
+    debug_env,
+    config_without_internet_connection
+) -> WorkspaceClient:
+    # Use variables from Unified Auth
+    # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
+    product_name, product_version = product_info
+    return WorkspaceClient(
+        host=debug_env["DATABRICKS_HOST"],
+        product=product_name,
+        product_version=product_version,
+        config=config_without_internet_connection,
+    )
+
+
 @pytest.mark.parametrize("with_default_config", [False, True])
 def test_workspace_installer_run(
     caplog,
-    ws,
+    ws_without_internet_connection,
     config_without_internet_connection,
     installation_ctx,
     default_workspace_config,
     with_default_config,
 ):
+    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
     default_config = default_workspace_config if with_default_config else None
-    ws._config = config_without_internet_connection
-    ws._api_client = ApiClient(ws.config)
-    ws._current_user = CurrentUserAPI(ws._api_client)
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        installation_ctx.workspace_installer.run(default_config=default_config)
+        ctx.workspace_installer.run(default_config=default_config)
     assert "Cannot connect with" in caplog.text
 
 
