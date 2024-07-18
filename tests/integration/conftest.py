@@ -755,7 +755,10 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         ws,
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
-    ctx.workspace_installation.uninstall()
+    try:
+        ctx.workspace_installation.uninstall()
+    except TimeoutError:
+        pass
 
 
 def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[str, TableInfo]:
