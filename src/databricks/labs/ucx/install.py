@@ -298,7 +298,14 @@ class WorkspaceInstaller(WorkspaceContext):
             # eventually raising a TimeoutError if tries take too long
             if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
                 logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
-        return self._configure_new_installation(default_config)
+                if default_config is None:
+                    raise err
+        try:
+            return self._configure_new_installation(default_config)
+        except TimeoutError as err:
+            if isinstance(err.__cause__, ConnectionError):
+                logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
+            raise err
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
         """
