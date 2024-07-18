@@ -46,6 +46,7 @@ from databricks.sdk.service.sql import (
     EndpointInfoWarehouseType,
     SpotInstancePolicy,
 )
+from requests.exceptions import ConnectionError
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
@@ -293,6 +294,8 @@ class WorkspaceInstaller(WorkspaceContext):
             logger.debug(f"Cannot find previous installation: {err}")
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
             logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
+        except ConnectionError as err:
+            logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
         return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
