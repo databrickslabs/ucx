@@ -294,8 +294,13 @@ class WorkspaceInstaller(WorkspaceContext):
             logger.debug(f"Cannot find previous installation: {err}")
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
             logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
-        except ConnectionError as err:
-            logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
+        except TimeoutError as err:
+            # API calls are wrapped with a retry mechanism for ConnectionError
+            # eventually raising a TimeoutError if tries take too long
+            if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
+                logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
+            else:
+                raise err
         return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
