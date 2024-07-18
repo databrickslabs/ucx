@@ -1,13 +1,17 @@
 import io
 import logging
+import shutil
 from dataclasses import replace
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from typing import Callable
 from unittest.mock import create_autospec
 
-from databricks.labs.blueprint.paths import WorkspacePath
+import pytest
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.blueprint.tui import Prompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
@@ -15,7 +19,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
+from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
@@ -198,6 +202,18 @@ def test_lint_local_code(simple_ctx):
     assert len(problems) > 0
 
 
+@pytest.fixture(params=(DBFSPath, WorkspacePath))
+def make_directory_path(ws: WorkspaceClient, make_random: Callable[[int], str], request: pytest.FixtureRequest):
+    cls = request.param
+
+    def create() -> DBFSPath | WorkspacePath:
+        path = cls(ws, f"~/sdk-{make_random(4)}-{get_purge_suffix()}").expanduser()
+        path.mkdir()
+        return path
+
+    yield from factory("directory", create, lambda p: p.rmdir(recursive=True))
+
+
 def test_workflow_linter_lints_job_with_requirements_dependency(
     simple_ctx,
     ws,
@@ -233,17 +249,21 @@ def test_workflow_linter_lints_job_with_egg_dependency(
     make_job,
     make_notebook,
     make_directory,
+    make_directory_path,
 ):
     expected_problem_message = "Could not locate import: thingy"
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
 
+    remote_egg_path = make_directory_path() / egg_file.name
+    with egg_file.open("rb") as src, remote_egg_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+    if isinstance(remote_egg_path, DBFSPath):
+        remote_egg_uri = f"dbfs:{remote_egg_path.as_posix()}"
+    else:
+        remote_egg_uri = remote_egg_path.as_posix()
+    library = compute.Library(egg=remote_egg_uri)
+
     entrypoint = make_directory()
-
-    remote_egg_file = f"{entrypoint}/{egg_file.name}"
-    with egg_file.open("rb") as f:
-        ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
-    library = compute.Library(egg=remote_egg_file)
-
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
