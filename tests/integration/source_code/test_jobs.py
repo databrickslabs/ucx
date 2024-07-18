@@ -1,13 +1,17 @@
 import io
 import logging
+import shutil
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
 
-from databricks.labs.blueprint.paths import WorkspacePath
+import pytest
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.blueprint.tui import Prompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
@@ -15,7 +19,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
+from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
@@ -198,56 +202,142 @@ def test_lint_local_code(simple_ctx):
     assert len(problems) > 0
 
 
-def test_workflow_linter_lints_job_with_requirements_dependency(
+@pytest.fixture
+def make_dbfs_directory(ws: WorkspaceClient, make_random: Callable[[int], str]):
+    def create() -> DBFSPath:
+        path = DBFSPath(ws, f"~/sdk-{make_random(4)}-{get_purge_suffix()}").expanduser()
+        path.mkdir()
+        return path
+
+    yield from factory("dbfs-directory", create, lambda p: p.rmdir(recursive=True))
+
+
+@pytest.fixture
+def make_workspace_directory(ws: WorkspaceClient, make_random: Callable[[int], str]):
+    def create() -> WorkspacePath:
+        path = WorkspacePath(ws, f"~/sdk-{make_random(4)}-{get_purge_suffix()}").expanduser()
+        path.mkdir()
+        return path
+
+    yield from factory("workspace-directory", create, lambda p: p.rmdir(recursive=True))
+
+
+def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     simple_ctx,
     ws,
     make_job,
     make_notebook,
     make_directory,
+    make_workspace_directory,
 ):
-    expected_problem_message = "Could not locate import: yaml"
+    # A requirement that can definitely not be found.
+    requirements = "a_package_that_does_not_exist\n"
 
-    simple_ctx = simple_ctx.replace(
-        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the yaml locally
-    )
+    # Notebook code: yaml is part of DBR, and shouldn't trigger an error but the other module will.
+    python_code = "import yaml\nimport module_that_does_not_exist\n"
+
+    remote_requirements_path = make_workspace_directory() / "requirements.txt"
+    remote_requirements_path.write_text(requirements)
+    library = compute.Library(requirements=remote_requirements_path.as_posix())
 
     entrypoint = make_directory()
-
-    requirements_file = f"{entrypoint}/requirements.txt"
-    ws.workspace.upload(requirements_file, io.BytesIO(b"pyyaml"), format=ImportFormat.AUTO)
-    library = compute.Library(requirements=requirements_file)
-
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import yaml")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    messages = tuple(problem.message for problem in problems)
+    expected_messages = (
+        "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
+        "Could not locate import: module_that_does_not_exist",
+    )
+    unexpected_messages = ("Could not locate import: yaml",)
+    assert len(problems) == 2
+    assert all(any(expected in message for message in messages) for expected in expected_messages)
+    assert all(not any(unexpected in message for message in messages) for unexpected in unexpected_messages)
 
-    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
 
-
-def test_workflow_linter_lints_job_with_egg_dependency(
+def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     simple_ctx,
     ws,
     make_job,
     make_notebook,
     make_directory,
+    make_dbfs_directory,
+):
+    # A requirement that can definitely not be found.
+    requirements = "a_package_that_does_not_exist\n"
+
+    # Notebook code: yaml is part of DBR, and shouldn't trigger an error but the other module will.
+    python_code = "import yaml\nimport module_that_does_not_exist\n"
+
+    remote_requirements_path = make_dbfs_directory() / "requirements.txt"
+    remote_requirements_path.write_text(requirements)
+    library = compute.Library(requirements=f"dbfs:{remote_requirements_path.as_posix()}")
+
+    entrypoint = make_directory()
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
+    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    messages = tuple(problem.message for problem in problems)
+    expected_messages = (
+        "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
+        "Could not locate import: module_that_does_not_exist",
+    )
+    unexpected_messages = ("Could not locate import: yaml",)
+    assert len(problems) == 2
+    assert all(any(expected in message for message in messages) for expected in expected_messages)
+    assert all(not any(unexpected in message for message in messages) for unexpected in unexpected_messages)
+
+
+def test_workflow_linter_lints_job_with_workspace_egg_dependency(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_directory,
+    make_workspace_directory,
 ):
     expected_problem_message = "Could not locate import: thingy"
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
 
+    remote_egg_path = make_workspace_directory() / egg_file.name
+    with egg_file.open("rb") as src, remote_egg_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+    library = compute.Library(egg=remote_egg_path.as_posix())
+
     entrypoint = make_directory()
-
-    remote_egg_file = f"{entrypoint}/{egg_file.name}"
-    with egg_file.open("rb") as f:
-        ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
-    library = compute.Library(egg=remote_egg_file)
-
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
-    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+    assert not [problem for problem in problems if problem.message == expected_problem_message]
+
+
+def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_directory,
+    make_dbfs_directory,
+):
+    expected_problem_message = "Could not locate import: thingy"
+    egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
+
+    remote_egg_path = make_dbfs_directory() / egg_file.name
+    with egg_file.open("rb") as src, remote_egg_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+    library = compute.Library(egg=f"dbfs:{remote_egg_path.as_posix()}")
+
+    entrypoint = make_directory()
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
+    job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+
+    assert not [problem for problem in problems if problem.message == expected_problem_message]
 
 
 def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, make_notebook, make_directory):

@@ -1,12 +1,14 @@
 import io
 import logging
+import textwrap
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.jobs import Job
+from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
@@ -103,21 +105,126 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_path_lookup, graph):
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.return_value = io.BytesIO(b"test")
+@pytest.fixture(scope="function")
+def ws_pkg(request: pytest.FixtureRequest) -> WorkspaceClient:
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    data = io.BytesIO(b"unimportant")
+    match request.param:
+        case "wspath":
+            ws.workspace.download.return_value = data
+        case "dbfs":
+            ws.dbfs.open.return_value = data
+    return ws
 
-    libraries = [compute.Library(whl="test.whl")]
-    task = jobs.Task(task_key="test", libraries=libraries)
 
+@pytest.mark.parametrize(
+    "ws_pkg, library, registered",
+    (
+        (
+            "wspath",
+            compute.Library(whl="/path/to/some/some_library-py3-none-any.whl"),
+            "some_library-py3-none-any.whl",
+        ),
+        (
+            "wspath",
+            compute.Library(egg="/path/to/some/some_library-py3.10.egg"),
+            "some_library-py3.10.egg",
+        ),
+        (
+            "dbfs",
+            compute.Library(whl="dbfs:/path/to/some/some_library-py3-none-any.whl"),
+            "some_library-py3-none-any.whl",
+        ),
+        (
+            "dbfs",
+            compute.Library(egg="dbfs:/path/to/some/some_library-py3.10.egg"),
+            "some_library-py3.10.egg",
+        ),
+    ),
+    indirect=("ws_pkg",),
+)
+def test_builds_dependency_graph_for_local_package(
+    ws_pkg: WorkspaceClient, library: compute.Library, registered: str
+) -> None:
+    """Check that the (local) libraries for a task are registered with the dependency graph."""
+    dep_graph = create_autospec(DependencyGraph)
+
+    task = jobs.Task(task_key="test", libraries=[library])
+
+    workflow_task_container = WorkflowTaskContainer(ws_pkg, task, Job())
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
+
+    dep_graph.register_library.assert_called_once()
+    registered_libraries = tuple(library for args in dep_graph.register_library.call_args_list for library in args[0])
+    registered_names = tuple(Path(library).name for library in registered_libraries)
+    assert registered_names == (registered,)
+
+
+@pytest.fixture(scope="function")
+def ws_requirements(request: pytest.FixtureRequest) -> WorkspaceClient:
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    data = io.BytesIO(
+        textwrap.dedent(
+            """\
+            some_library==0.10.0
+            databricks-cli==0.17.5
+            """
+        ).encode("utf-8")
+    )
+    match request.param:
+        case "wspath":
+            ws.workspace.download.return_value = data
+        case "dbfs":
+            ws.dbfs.open.return_value = data
+    return ws
+
+
+@pytest.mark.parametrize(
+    "ws_requirements, path",
+    (
+        ("wspath", "/path/to/requirements.txt"),
+        ("dbfs", "dbfs:/path/to/requirements.txt"),
+    ),
+    indirect=("ws_requirements",),
+)
+def test_builds_dependency_graph_for_requirements(ws_requirements: WorkspaceClient, path: str) -> None:
+    """Check that the task dependencies listed in a requirements.txt are registered with the dependency graph."""
+    dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
+
+    library = compute.Library(requirements=path)
+    task = jobs.Task(task_key="test", libraries=[library])
+
+    workflow_task_container = WorkflowTaskContainer(ws_requirements, task, Job())
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
+
+    registered_libraries = tuple(library for args in dep_graph.register_library.call_args_list for library in args[0])
+    assert registered_libraries == ("some_library==0.10.0", "databricks-cli==0.17.5")
+
+
+@pytest.mark.parametrize(
+    "python_file,expected_cls,expected_path",
+    (
+        ("/path/to/file.py", WorkspacePath, "/path/to/file.py"),
+        ("dbfs:/path/to/another/file.py", DBFSPath, "/path/to/another/file.py"),
+    ),
+)
+def test_workflow_task_container_builds_dependency_graph_spark_python_task(
+    python_file: str, expected_cls, expected_path: str
+) -> None:
+    """Verify that spark python tasks from the workspace are registered with the graph."""
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+    dep_graph = create_autospec(DependencyGraph)  # pylint: disable=mock-no-usage
+
+    task = jobs.Task(task_key="test", spark_python_task=SparkPythonTask(python_file=python_file))
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
-    problems = workflow_task_container.build_dependency_graph(graph)
+    _ = workflow_task_container.build_dependency_graph(dep_graph)
 
-    assert len(problems) == 1
-    assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("'pip install")
-    assert mock_path_lookup.resolve(Path("test")) is None
-    ws.assert_not_called()
+    expected_path_instance = expected_cls(ws, expected_path)
+
+    registered_notebooks = tuple(
+        notebook for args in dep_graph.register_notebook.call_args_list for notebook in args[0]
+    )
+    assert registered_notebooks == (expected_path_instance,)
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
