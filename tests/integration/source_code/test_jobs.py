@@ -62,7 +62,7 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
     assert result['count'] > 0
 
 
-def test_job_linter_no_problems(simple_ctx, ws, make_job):
+def test_job_linter_no_problems(simple_ctx, make_job):
     j = make_job()
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
@@ -71,7 +71,7 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
 
 
 def test_job_task_linter_library_not_installed_cluster(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
 ):
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
@@ -219,7 +219,6 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
     ws,
     make_job,
     make_notebook,
-    make_random,
     make_directory,
     make_directory_path,
 ):
@@ -275,14 +274,7 @@ def test_workflow_linter_lints_job_with_egg_dependency(
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
 
-def test_workflow_linter_lints_job_with_missing_library(
-    simple_ctx,
-    ws,
-    make_job,
-    make_notebook,
-    make_random,
-    make_directory,
-):
+def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, make_notebook, make_directory):
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
     allow_list = create_autospec(KnownList)  # databricks is in default list
     allow_list.module_compatibility.return_value = UNKNOWN
@@ -301,14 +293,7 @@ def test_workflow_linter_lints_job_with_missing_library(
     allow_list.module_compatibility.assert_called_once_with("databricks.labs.ucx")
 
 
-def test_workflow_linter_lints_job_with_wheel_dependency(
-    simple_ctx,
-    ws,
-    make_job,
-    make_notebook,
-    make_random,
-    make_directory,
-):
+def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, make_notebook, make_directory):
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
 
     simple_ctx = simple_ctx.replace(
@@ -330,7 +315,6 @@ def test_workflow_linter_lints_job_with_wheel_dependency(
 
 def test_job_spark_python_task_linter_happy_path(
     simple_ctx,
-    ws,
     make_job,
     make_random,
     make_cluster,
@@ -357,7 +341,7 @@ def test_job_spark_python_task_linter_happy_path(
 
 
 def test_job_spark_python_task_linter_unhappy_path(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
 ):
     entrypoint = make_directory()
 
@@ -414,10 +398,8 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
 
 def test_job_dlt_task_linter_unhappy_path(
     simple_ctx,
-    ws,
     make_job,
     make_random,
-    make_cluster,
     make_notebook,
     make_directory,
     make_pipeline,
@@ -440,10 +422,8 @@ def test_job_dlt_task_linter_unhappy_path(
 
 def test_job_dlt_task_linter_happy_path(
     simple_ctx,
-    ws,
     make_job,
     make_random,
-    make_cluster,
     make_notebook,
     make_directory,
     make_pipeline,
@@ -465,9 +445,7 @@ def test_job_dlt_task_linter_happy_path(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_dependency_problem_egg_dbr14plus(
-    make_cluster, make_job, make_directory, make_notebook, make_random, simple_ctx, ws
-):
+def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_notebook, make_random, simple_ctx, ws):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     task_spark_conf = None
     entrypoint = make_directory()
