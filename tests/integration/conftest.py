@@ -758,7 +758,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     try:
         ctx.workspace_installation.uninstall()
     except TimeoutError:
-        pass
+        pass  # Best effort uninstall, we do not want the teardown to raise an exception
 
 
 def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[str, TableInfo]:
