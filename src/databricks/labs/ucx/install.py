@@ -176,14 +176,7 @@ class WorkspaceInstaller(WorkspaceContext):
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
         if config is None:
-            try:
-                config = self.configure(default_config)
-            except TimeoutError as err:
-                # API calls are wrapped with a retry mechanism for ConnectionError
-                # eventually raising a TimeoutError if tries take too long
-                if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
-                    logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
-                raise err
+            config = self.configure(default_config)
         if self._is_testing():
             return config
         workflows_deployment = WorkflowsDeployment(
@@ -300,6 +293,11 @@ class WorkspaceInstaller(WorkspaceContext):
             logger.debug(f"Cannot find previous installation: {err}")
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
             logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
+        except TimeoutError as err:
+            # API calls are wrapped with a retry mechanism for ConnectionError
+            # eventually raising a TimeoutError if tries take too long
+            if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
+                logger.warning(f"Cannot connect with {self.workspace_client.config.host}: {err}")
         return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
