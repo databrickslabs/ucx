@@ -885,6 +885,8 @@ on each storage account. The command is used to identify Azure Service Principal
 `Storage Blob Data Reader`, `Storage Blob Data Owner` roles, or custom read/write roles on ADLS Gen2 locations that are being
 used in Databricks. This requires Azure CLI to be installed and configured via `az login`. It outputs azure_storage_account_info.csv
 which will be later used by migrate-credentials command to create UC storage credentials.
+Note: This cmd only lists azure storage account gen2, storage format wasb:// or adl:// are not supported in UC and those storage info
+will be skipped.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
