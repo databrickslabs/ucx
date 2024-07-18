@@ -14,7 +14,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.sdk.core import ApiClient, Config
+from databricks.sdk.core import Config
 from databricks.sdk.credentials_provider import credentials_strategy
 from databricks.sdk.errors import (
     AlreadyExists,
@@ -414,12 +414,6 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
     installation_ctx.deployed_workflows.repair_run("failing")
     assert installation_ctx.deployed_workflows.validate_step("failing")
-
-
-class ApiClientNoInternet(ApiClient):
-    @staticmethod
-    def _is_retryable(err: BaseException) -> Optional[str]:
-        return None
 
 
 @pytest.fixture
