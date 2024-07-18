@@ -221,7 +221,7 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
     make_notebook,
     make_random,
     make_directory,
-    tmp_path,
+    make_directory_path,
 ):
     expected_problem_message = "Could not locate import: yaml"
 
@@ -229,18 +229,21 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the yaml locally
     )
 
+    remote_requirements_path = make_directory_path() / "requirements.txt"
+    remote_requirements_path.write_text("pyyaml\n")
+    if isinstance(remote_requirements_path, DBFSPath):
+        requirements_uri = f"dbfs:{remote_requirements_path.as_posix()}"
+    else:
+        requirements_uri = remote_requirements_path.as_posix()
+    library = compute.Library(requirements=requirements_uri)
+
     entrypoint = make_directory()
-
-    requirements_file = f"{entrypoint}/requirements.txt"
-    ws.workspace.upload(requirements_file, io.BytesIO(b"pyyaml"), format=ImportFormat.AUTO)
-    library = compute.Library(requirements=requirements_file)
-
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import yaml")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import yaml\n")
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+    assert not [problem for problem in problems if problem.message == expected_problem_message]
 
 
 def test_workflow_linter_lints_job_with_egg_dependency(
