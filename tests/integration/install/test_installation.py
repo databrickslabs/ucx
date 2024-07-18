@@ -2,11 +2,10 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.ucx.__about__ import __version__
-from requests.exceptions import ConnectionError
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
@@ -22,7 +21,6 @@ from databricks.sdk.errors import (
     NotFound,
     ResourceConflict,
 )
-from databricks.sdk.service.iam import CurrentUserAPI
 
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
@@ -419,6 +417,7 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 @pytest.fixture
 def config_without_credentials() -> Config:
     """Mock no internet access with a config without credentials"""
+
     @credentials_strategy("no_credentials", [])
     def no_credentials(_: Any):
         def inner():
