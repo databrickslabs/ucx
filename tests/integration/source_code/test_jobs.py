@@ -249,7 +249,7 @@ def test_workflow_linter_lints_job_with_egg_dependency(
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
-    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+    assert not [problem for problem in problems if problem.message == expected_problem_message]
 
 
 def test_workflow_linter_lints_job_with_missing_library(
