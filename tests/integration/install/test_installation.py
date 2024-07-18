@@ -2,9 +2,11 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
+from typing import Any, Optional
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.ucx.__about__ import __version__
+from requests.exceptions import ConnectionError
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
@@ -12,12 +14,15 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.sdk.core import ApiClient, Config
+from databricks.sdk.credentials_provider import credentials_strategy
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
     ResourceConflict,
 )
+from databricks.sdk.service.iam import CurrentUserAPI
 
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
@@ -85,6 +90,39 @@ def new_installation(ws, env_or_skip, make_random):
 
     for pending in cleanup:
         pending.remove()
+
+
+class ApiClientNoInternet(ApiClient):
+    @staticmethod
+    def _is_retryable(err: BaseException) -> Optional[str]:
+        return None
+
+
+@pytest.fixture
+def config_without_internet_connection() -> Config:
+    @credentials_strategy("no_internet_connection", [])
+    def no_internet_connection(_: Any):
+        def raise_connection_error():
+            raise ConnectionError("No internet access")
+        return raise_connection_error
+    return Config(credentials_strategy=no_internet_connection, retry_timeout_seconds=1)
+
+
+@pytest.mark.parametrize("with_default_config", [False, True])
+@pytest.mark.parametrize("with_config", [False, True])
+def test_workspace_installer_run(ws, config_without_internet_connection, installation_ctx, default_workspace_config, with_default_config, with_config):
+    default_config = default_workspace_config if with_default_config else None
+    config = default_workspace_config if with_config else None
+    ws._config = config_without_internet_connection
+    ws._api_client = ApiClient(ws.config)
+    ws._current_user = CurrentUserAPI(ws._api_client)
+    # TODO: Check caplog
+    with pytest.raises(TimeoutError):
+        installation_ctx.workspace_installer.run(default_config=default_config, config=config)
+
+
+def test_workspace_installation_run(installation_ctx):
+    installation_ctx.workspace_installation.run()
 
 
 @retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
