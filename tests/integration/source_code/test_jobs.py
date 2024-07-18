@@ -1,11 +1,11 @@
 import io
 import logging
 import shutil
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
-from typing import Callable
 from unittest.mock import create_autospec
 
 import pytest
