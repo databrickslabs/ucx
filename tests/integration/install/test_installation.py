@@ -429,10 +429,10 @@ def config_without_credentials() -> Config:
 
 
 @pytest.fixture
-def ws_without_internet_connection(ws, config_without_credentials) -> WorkspaceClient:
+def ws_without_internet_connection(env_or_skip, config_without_credentials) -> WorkspaceClient:
     """A workspace client without internet connection."""
     # Product and product version is not required as the lack of internet connection prohibits installation
-    return WorkspaceClient(host=ws.config.host, config=config_without_credentials)
+    return WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config_without_credentials)
 
 
 @pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
