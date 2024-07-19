@@ -435,16 +435,15 @@ def ws_without_internet_connection(ws, config_without_credentials) -> WorkspaceC
     return WorkspaceClient(host=ws.config.host, config=config_without_credentials)
 
 
-@pytest.mark.parametrize("with_default_config", [False, True])
+@pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
 def test_workspace_installer_warns_warns_connection_error(
     caplog,
     ws_without_internet_connection,
     installation_ctx,
-    with_default_config,
+    default_config,
 ):
     """This test works both with and without internet access"""
     ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
-    default_config = WorkspaceConfig("ucx") if with_default_config else None
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         ctx.workspace_installer.run(default_config=default_config)
     assert "Cannot connect with" in caplog.text
