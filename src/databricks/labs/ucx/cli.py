@@ -339,6 +339,8 @@ def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceCont
     Please review the file and delete the Roles you do not want to be migrated.
     Pass aws_profile for aws.
     """
+    if len(w.storage_credentials.list()) > 200:
+        raise RuntimeWarning('migration will breach UC limits')
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
     if ctx.is_azure:

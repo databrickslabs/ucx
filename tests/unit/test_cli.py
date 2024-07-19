@@ -11,7 +11,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.catalog import ExternalLocationInfo
+from databricks.sdk.service.catalog import ExternalLocationInfo, StorageCredentialInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.sdk.errors.platform import BadRequest
@@ -362,6 +362,18 @@ def test_migrate_credentials_aws(ws):
     ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
+
+
+def test_migrate_credentials_limit(ws):
+    ws.storage_credentials.list.return_value = 200*[StorageCredentialInfo(id="1234")]
+    prompts = MockPrompts({'.*': 'yes'})
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    migrate_credentials(ws, prompts, ctx=ctx)
+    ws.storage_credentials.list.assert_called()
+
+    ws.storage_credentials.list.return_value = 201*[StorageCredentialInfo(id="1234")]
+    with pytest.raises(RuntimeWarning):
+        migrate_credentials(ws, prompts, ctx=ctx)
 
 
 def test_create_master_principal_not_azure(ws):

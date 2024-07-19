@@ -1,9 +1,13 @@
-/* --title 'Table counts by storage' --width 2 --height 4 */
+/* --title 'Table counts by type, location and format' --width 2 --height 4 */
 SELECT
-  storage,
+  object_type AS source_table_type,
+  table_format AS format,
+  location,
   COUNT(*) AS count
 FROM (
   SELECT
+    object_type,
+    table_format,
     CASE
       WHEN STARTSWITH(location, 'dbfs:/mnt')
       THEN 'DBFS MOUNT'
@@ -22,10 +26,11 @@ FROM (
       WHEN STARTSWITH(location, 'adl')
       THEN 'UNSUPPORTED'
       ELSE 'EXTERNAL'
-    END AS storage
+    END AS location
   FROM inventory.tables
+  WHERE
+    NOT object_type IN ('VIEW')
 )
-GROUP BY
-  storage
+GROUP BY ALL
 ORDER BY
-  storage
+  source_table_type
