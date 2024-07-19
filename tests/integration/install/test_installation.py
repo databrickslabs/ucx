@@ -1,7 +1,6 @@
 import dataclasses
 import json
 import logging
-from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
 
@@ -444,7 +443,7 @@ def installation_ctx_without_internet_connection(
     no_connection_ws,
     env_or_skip,
     make_random,
-) -> Iterator[MockInstallationContext]:
+) -> MockInstallationContext:
     # Fixtures that create remote resources are not required as the lack of internet connection prohibits creation
     ctx = MockInstallationContext(
         lambda *_: None,
@@ -457,8 +456,8 @@ def installation_ctx_without_internet_connection(
         lambda *_: None,
         no_connection_ws,
     )
-    yield ctx
     # Uninstall is not required as the lack of internet connection prohibits installation
+    return ctx
 
 
 @pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
