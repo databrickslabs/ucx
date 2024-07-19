@@ -46,7 +46,7 @@ from databricks.sdk.service.sql import (
     EndpointInfoWarehouseType,
     SpotInstancePolicy,
 )
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
@@ -298,14 +298,14 @@ class WorkspaceInstaller(WorkspaceContext):
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
             logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
         except TimeoutError as err:
-            # API calls are wrapped with a retry mechanism for ConnectionError
+            # API calls are wrapped with a retry mechanism for requests.exceptions.ConnectionError
             # eventually raising a TimeoutError if tries take too long
-            if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
+            if isinstance(err.__cause__, RequestsConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
                 logger.warning(connection_error_message, err)
         try:
             return self._configure_new_installation(default_config)
         except TimeoutError as err:
-            if isinstance(err.__cause__, ConnectionError):
+            if isinstance(err.__cause__, RequestsConnectionError):
                 logger.warning(connection_error_message, err)
             raise err
 
