@@ -2,7 +2,7 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -24,12 +24,15 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
+from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+
+from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
 
@@ -435,25 +438,42 @@ def ws_without_internet_connection(env_or_skip, config_without_credentials) -> W
     return WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config_without_credentials)
 
 
+@pytest.fixture
+def installation_ctx_without_internet_connection(
+    ws_without_internet_connection,
+    env_or_skip,
+    make_random,
+) -> Iterator[MockInstallationContext]:
+    # Fixtures that create remote resources are not required as the lack of internet connection prohibits creation
+    ctx = MockInstallationContext(
+        lambda *_: None,
+        lambda catalog_name: SchemaInfo(catalog_name="hive_metastore"),
+        lambda *_: None,
+        lambda *_: None,
+        env_or_skip,
+        make_random,
+        lambda *_: None,
+        lambda *_: None,
+        ws_without_internet_connection,
+    )
+    yield ctx
+    # Uninstall is not required as the lack of internet connection prohibits installation
+
+
 @pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
 def test_workspace_installer_warns_about_connection_error(
     caplog,
-    ws_without_internet_connection,
-    installation_ctx,
+    installation_ctx_without_internet_connection,
     default_config,
 ):
-    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
+    """This test runs both with and without internet connection"""
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        ctx.workspace_installer.run(default_config=default_config)
+        installation_ctx_without_internet_connection.workspace_installer.run(default_config=default_config)
     assert "Cannot connect with" in caplog.text
 
 
-def test_workspace_installation_warns_about_connection_error(
-    caplog,
-    installation_ctx,
-    ws_without_internet_connection,
-):
-    ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
+def test_workspace_installation_warns_about_connection_error(caplog, installation_ctx_without_internet_connection):
+    """This test runs both with and without internet connection"""
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        ctx.workspace_installation.run()
+        installation_ctx_without_internet_connection.workspace_installation.run()
     assert "Cannot connect with" in caplog.text
