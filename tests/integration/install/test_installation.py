@@ -418,41 +418,34 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
 
 @pytest.fixture
-def config_without_credentials() -> Config:
-    """Mock no internet access by raising a ConnectionError"""
+def no_connection_ctx(env_or_skip, make_random) -> MockInstallationContext:
+    """Create a context without internet connection.
+
+    Resources are not required as the lack of internet connection prohibits creation.
+    """
 
     @credentials_strategy("raise_connection_error", [])
     def raise_connection_error(_: Any):
+        """Mock no internet access by raising a ConnectionError"""
+
         def inner():
             raise RequestsConnectionError("no internet")
 
         return inner
 
-    return Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
-
-
-@pytest.fixture
-def no_connection_ws(env_or_skip, config_without_credentials) -> WorkspaceClient:
-    """A workspace client without internet connection."""
-    # Product and product version is not required as the lack of internet connection prohibits installation
-    return WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config_without_credentials)
-
-
-@pytest.fixture
-def no_connection_ctx(no_connection_ws, env_or_skip, make_random) -> MockInstallationContext:
-    # Fixtures that create remote resources are not required as the lack of internet connection prohibits creation
+    config = Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
+    ws = WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config)
     ctx = MockInstallationContext(
-        lambda *_: None,
+        lambda: None,
         lambda catalog_name: SchemaInfo(catalog_name="hive_metastore"),
-        lambda *_: None,
-        lambda *_: None,
+        lambda: None,
+        lambda: None,
         env_or_skip,
         make_random,
-        lambda *_: None,
-        lambda *_: None,
-        no_connection_ws,
+        lambda: None,
+        lambda: None,
+        ws,
     )
-    # Uninstall is not required as the lack of internet connection prohibits installation
     return ctx
 
 
