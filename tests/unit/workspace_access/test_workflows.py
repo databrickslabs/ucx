@@ -133,8 +133,8 @@ def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
     assert len(raised_exception.errs) == 2
     expected_exceptions = {"simulate group failure: immediately", "simulate group failure: midway"}
     assert {str(e) for e in raised_exception.errs} == expected_exceptions
-    assert "Migration of group permissions failed: temp_1" in caplog.text
-    assert "Migration of group permissions failed: temp_2" in caplog.text
+    assert "failed-group-migration: temp_1 -> account_group_1: simulate group failure: immediately" in caplog.text
+    assert "failed-group-migration: temp_2 -> account_group_2: simulate group failure: midway" in caplog.text
     assert "Migrated 50 permissions for 1/3 groups successfully." in caplog.messages
     assert "Migrating permissions failed for 2/3 groups." in caplog.messages
 

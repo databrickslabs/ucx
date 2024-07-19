@@ -119,9 +119,7 @@ class MigrationState:
                 total_permissions += group_permissions
                 success_groups += 1
             except IOError as e:
-                logger.exception(
-                    f"Migration of group permissions failed: {name_in_workspace} (workspace) -> {name_in_account} (account)"
-                )
+                logger.error(f"failed-group-migration: {name_in_workspace} -> {name_in_account}: {e}")
                 errors.append(e)
         logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} groups successfully.")
         if errors:
