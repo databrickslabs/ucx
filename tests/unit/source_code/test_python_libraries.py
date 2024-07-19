@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.known import KnownList
 
 def test_python_library_resolver_resolves_library(mock_path_lookup):
     def mock_pip_install(command):
-        assert command.startswith("pip install anything -t")
+        assert command.startswith("pip --disable-pip-version-check install anything -t")
         return 0, "", ""
 
     python_library_resolver = PythonLibraryResolver(KnownList(), mock_pip_install)
@@ -25,7 +25,7 @@ def test_python_library_resolver_failing(mock_path_lookup):
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("'pip install anything")
+    assert problems[0].message.startswith("'pip --disable-pip-version-check install anything")
     assert problems[0].message.endswith("nope'")
 
 
