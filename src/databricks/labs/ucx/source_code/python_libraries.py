@@ -71,7 +71,9 @@ class PythonLibraryResolver(LibraryResolver):
         return libs
 
     def _install_pip(self, *libraries: str) -> list[DependencyProblem]:
-        install_command = f"pip install {shlex.join(libraries)} -t {self._temporary_virtual_environment}"
+        install_command = (
+            f"pip --disable-pip-version-check install {shlex.join(libraries)} -t {self._temporary_virtual_environment}"
+        )
         return_code, stdout, stderr = self._runner(install_command)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:

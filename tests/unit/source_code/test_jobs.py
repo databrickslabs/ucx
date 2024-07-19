@@ -100,7 +100,7 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("'pip install unknown-library-name")
+    assert problems[0].message.startswith("'pip --disable-pip-version-check install unknown-library-name")
     assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
     ws.assert_not_called()
 
@@ -228,7 +228,7 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
-    expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip install unknown-library"
+    expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
     linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index)
@@ -258,7 +258,7 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("'pip install test")
+    assert problems[0].message.startswith("'pip --disable-pip-version-check install test")
     assert mock_path_lookup.resolve(Path("test")) is None
     ws.assert_not_called()
 
