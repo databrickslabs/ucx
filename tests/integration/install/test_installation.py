@@ -4,9 +4,10 @@ import logging
 from datetime import timedelta
 from typing import Any
 
+import pytest
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 import databricks
-import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
@@ -24,7 +25,6 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig

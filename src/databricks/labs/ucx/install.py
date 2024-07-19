@@ -11,6 +11,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+from requests.exceptions import ConnectionError as RequestsConnectionError
+
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
@@ -46,7 +48,6 @@ from databricks.sdk.service.sql import (
     EndpointInfoWarehouseType,
     SpotInstancePolicy,
 )
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
