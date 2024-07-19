@@ -33,7 +33,8 @@ def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)
-    job = make_job(notebook_path=notebook)
+    default_cluster_id, _, _ = installation_ctx.running_clusters
+    job = make_job(notebook_path=notebook, existing_cluster_id=default_cluster_id)
     ctx = installation_ctx.replace(config_transform=lambda wc: replace(wc, include_job_ids=[job.job_id]))
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
@@ -51,7 +52,8 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
     # but it's executed on the caller side and is easier to debug.
     # ensure we have at least 1 job that fails
     notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
-    job = make_job(notebook_path=notebook_path)
+    default_cluster_id, _, _ = simple_ctx.running_clusters
+    job = make_job(notebook_path=notebook_path, existing_cluster_id=default_cluster_id)
     simple_ctx.config.include_job_ids = [job.job_id]
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
@@ -63,7 +65,8 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
 
 
 def test_job_linter_no_problems(simple_ctx, make_job):
-    j = make_job()
+    default_cluster_id, _, _ = simple_ctx.running_clusters
+    j = make_job(existing_cluster_id=default_cluster_id)
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
@@ -71,9 +74,9 @@ def test_job_linter_no_problems(simple_ctx, make_job):
 
 
 def test_job_task_linter_library_not_installed_cluster(
-    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
+    simple_ctx, make_job, make_random, make_notebook, make_directory
 ):
-    created_cluster = make_cluster(single_node=True)
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
 
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import greenlet")
@@ -81,7 +84,7 @@ def test_job_task_linter_library_not_installed_cluster(
     task = jobs.Task(
         task_key=make_random(4),
         description=make_random(4),
-        existing_cluster_id=created_cluster.cluster_id,
+        existing_cluster_id=default_cluster_id,
         notebook_task=jobs.NotebookTask(
             notebook_path=str(notebook),
         ),
@@ -124,12 +127,13 @@ def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, 
         'some_file.py:0 [implicit-dbfs-usage] The use of default dbfs: references is deprecated: /mnt/foo/bar',
     }
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
     entrypoint.mkdir()
 
     main_notebook = entrypoint / 'main'
     make_notebook(path=main_notebook, content=b'%run ./second_notebook')
-    j = make_job(notebook_path=main_notebook)
+    j = make_job(notebook_path=main_notebook, existing_cluster_id=default_cluster_id)
 
     make_notebook(
         path=entrypoint / 'second_notebook',
@@ -159,6 +163,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_notebook,
     make_random,
 ):
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
     entrypoint.mkdir()
 
@@ -169,7 +174,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     notebook = entrypoint / "notebook.ipynb"
     make_notebook(path=notebook, content=b"import greenlet")
 
-    job_without_pytest_library = make_job(notebook_path=notebook)
+    job_without_pytest_library = make_job(notebook_path=notebook, existing_cluster_id=default_cluster_id)
     problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
@@ -240,9 +245,12 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     remote_requirements_path.write_text(requirements)
     library = compute.Library(requirements=remote_requirements_path.as_posix())
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
-    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
+    job_with_pytest_library = make_job(
+        notebook_path=notebook, libraries=[library], existing_cluster_id=default_cluster_id
+    )
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
     messages = tuple(problem.message for problem in problems)
@@ -274,9 +282,12 @@ def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     remote_requirements_path.write_text(requirements)
     library = compute.Library(requirements=f"dbfs:{remote_requirements_path.as_posix()}")
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
-    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
+    job_with_pytest_library = make_job(
+        notebook_path=notebook, libraries=[library], existing_cluster_id=default_cluster_id
+    )
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
     messages = tuple(problem.message for problem in problems)
@@ -306,9 +317,12 @@ def test_workflow_linter_lints_job_with_workspace_egg_dependency(
         shutil.copyfileobj(src, dst)
     library = compute.Library(egg=remote_egg_path.as_posix())
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
-    job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
+    job_with_egg_dependency = make_job(
+        notebook_path=notebook, libraries=[library], existing_cluster_id=default_cluster_id
+    )
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
@@ -331,9 +345,12 @@ def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
         shutil.copyfileobj(src, dst)
     library = compute.Library(egg=f"dbfs:{remote_egg_path.as_posix()}")
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
-    job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
+    job_with_egg_dependency = make_job(
+        notebook_path=notebook, libraries=[library], existing_cluster_id=default_cluster_id
+    )
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
@@ -350,8 +367,9 @@ def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, ma
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
-    job_without_ucx_library = make_job(notebook_path=notebook)
+    job_without_ucx_library = make_job(notebook_path=notebook, existing_cluster_id=default_cluster_id)
 
     problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
 
@@ -367,12 +385,13 @@ def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, m
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     simple_ctx.workspace_installation.run()  # Creates ucx wheel
     wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
     library = compute.Library(whl=wheels[0].path)
 
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
-    job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library])
+    job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library], existing_cluster_id=default_cluster_id)
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
@@ -383,21 +402,20 @@ def test_job_spark_python_task_linter_happy_path(
     simple_ctx,
     make_job,
     make_random,
-    make_cluster,
     make_notebook,
     make_directory,
 ):
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
 
-    new_cluster = make_cluster(single_node=True)
     task = jobs.Task(
         task_key=make_random(4),
         spark_python_task=jobs.SparkPythonTask(
             python_file=f"{entrypoint}/notebook.py",
         ),
-        existing_cluster_id=new_cluster.cluster_id,
+        existing_cluster_id=default_cluster_id,
         libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
     )
     j = make_job(tasks=[task])
@@ -406,20 +424,18 @@ def test_job_spark_python_task_linter_happy_path(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_spark_python_task_linter_unhappy_path(
-    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
-):
+def test_job_spark_python_task_linter_unhappy_path(simple_ctx, make_job, make_random, make_notebook, make_directory):
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
 
-    new_cluster = make_cluster(single_node=True)
     task = jobs.Task(
         task_key=make_random(4),
         spark_python_task=jobs.SparkPythonTask(
             python_file=f"{entrypoint}/notebook.py",
         ),
-        existing_cluster_id=new_cluster.cluster_id,
+        existing_cluster_id=default_cluster_id,
     )
     j = make_job(tasks=[task])
 
@@ -437,6 +453,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     simple_ctx.workspace_installation.run()  # Creates ucx wheel
     wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
     library = compute.Library(whl=wheels[0].path)
@@ -445,11 +462,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     task = jobs.Task(
         task_key=make_random(4),
         python_wheel_task=python_wheel_task,
-        new_cluster=compute.ClusterSpec(
-            num_workers=1,
-            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-            spark_version=ws.clusters.select_spark_version(latest=True),
-        ),
+        existing_cluster_id=default_cluster_id,
         timeout_seconds=0,
         libraries=[library],
     )
@@ -513,7 +526,7 @@ def test_job_dlt_task_linter_happy_path(
 
 def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_notebook, make_random, simple_ctx, ws):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
-    task_spark_conf = None
+    default_cluster_id, _, _ = simple_ctx.running_clusters
     entrypoint = make_directory()
     notebook_path = make_notebook()
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
@@ -523,12 +536,7 @@ def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_not
     task = jobs.Task(
         task_key=make_random(4),
         description=make_random(4),
-        new_cluster=compute.ClusterSpec(
-            num_workers=1,
-            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-            spark_version=ws.clusters.select_spark_version(latest=True),
-            spark_conf=task_spark_conf,
-        ),
+        existing_cluster_id=default_cluster_id,
         libraries=[library],
         notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
     )
