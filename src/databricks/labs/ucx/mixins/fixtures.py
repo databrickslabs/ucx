@@ -803,20 +803,26 @@ def make_job(ws, make_random, make_notebook):
         if not notebook_path:
             notebook_path = make_notebook()
         assert notebook_path is not None
+        if "existing_cluster_id" in kwargs:
+            task_kwargs = {"existing_cluster_id": kwargs.pop("existing_cluster_id")}
+        else:
+            task_kwargs = {
+                "new_cluster": compute.ClusterSpec(
+                    num_workers=1,
+                    node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                    spark_version=ws.clusters.select_spark_version(latest=True),
+                    spark_conf=task_spark_conf,
+                )
+            }
         if "tasks" not in kwargs:
             kwargs["tasks"] = [
                 jobs.Task(
                     task_key=make_random(4),
                     description=make_random(4),
-                    new_cluster=compute.ClusterSpec(
-                        num_workers=1,
-                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                        spark_version=ws.clusters.select_spark_version(latest=True),
-                        spark_conf=task_spark_conf,
-                    ),
                     notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
                     libraries=libraries,
                     timeout_seconds=0,
+                    **task_kwargs,
                 )
             ]
 
