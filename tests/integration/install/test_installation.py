@@ -436,7 +436,7 @@ def ws_without_internet_connection(ws, config_without_credentials) -> WorkspaceC
 
 
 @pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
-def test_workspace_installer_warns_warns_connection_error(
+def test_workspace_installer_warns_about_connection_error(
     caplog,
     ws_without_internet_connection,
     installation_ctx,
