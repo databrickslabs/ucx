@@ -283,6 +283,10 @@ class WorkspaceInstaller(WorkspaceContext):
         return False
 
     def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
+        connection_error_message = (
+            f"Cannot connect with {self.workspace_client.config.host} see "
+            "https://github.com/databrickslabs/ucx#network-connectivity-issues for help: %s"
+        )
         try:
             config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
@@ -297,14 +301,12 @@ class WorkspaceInstaller(WorkspaceContext):
             # API calls are wrapped with a retry mechanism for ConnectionError
             # eventually raising a TimeoutError if tries take too long
             if isinstance(err.__cause__, ConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
-                logger.warning(f"Cannot connect with {self.workspace_client.config.host} see https://github.com/databrickslabs/ucx#network-connectivity-issues for help: {err}")
-                if default_config is None:
-                    raise err
+                logger.warning(connection_error_message, err)
         try:
             return self._configure_new_installation(default_config)
         except TimeoutError as err:
             if isinstance(err.__cause__, ConnectionError):
-                logger.warning(f"Cannot connect with {self.workspace_client.config.host} see https://github.com/databrickslabs/ucx#network-connectivity-issues for help: {err}")
+                logger.warning(connection_error_message, err)
             raise err
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
