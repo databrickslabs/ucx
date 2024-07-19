@@ -442,7 +442,6 @@ def test_workspace_installer_warns_about_connection_error(
     installation_ctx,
     default_config,
 ):
-    """This test works both with and without internet access"""
     ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         ctx.workspace_installer.run(default_config=default_config)
@@ -454,7 +453,6 @@ def test_workspace_installation_warns_about_connection_error(
     installation_ctx,
     ws_without_internet_connection,
 ):
-    """This test works both with and without internet access"""
     ctx = installation_ctx.replace(workspace_client=ws_without_internet_connection)
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         ctx.workspace_installation.run()
