@@ -757,8 +757,9 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     try:
         ctx.workspace_installation.uninstall()
-    except TimeoutError:
-        pass  # Best effort uninstall, we do not want the teardown to raise an exception
+    except TimeoutError as e:
+        # Best effort uninstall, we do not want the teardown to raise an exception
+        logger.warning(f"Timeout when uninstalling workspace installation: {e}")
 
 
 def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[str, TableInfo]:
