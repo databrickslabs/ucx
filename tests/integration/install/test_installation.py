@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.ucx.__about__ import __version__
+from requests.exceptions import ConnectionError
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
@@ -416,16 +417,16 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
 @pytest.fixture
 def config_without_credentials() -> Config:
-    """Mock no internet access with a config without credentials"""
+    """Mock no internet access by raising a ConnectionError"""
 
-    @credentials_strategy("no_credentials", [])
-    def no_credentials(_: Any):
+    @credentials_strategy("raise_connection_error", [])
+    def raise_connection_error(_: Any):
         def inner():
-            return {}
+            raise ConnectionError("no internet")
 
         return inner
 
-    return Config(credentials_strategy=no_credentials, retry_timeout_seconds=1)
+    return Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
 
 
 @pytest.fixture
