@@ -1,8 +1,9 @@
 import dataclasses
 import json
 import logging
+from collections.abc import Iterator
 from datetime import timedelta
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -432,7 +433,7 @@ def config_without_credentials() -> Config:
 
 
 @pytest.fixture
-def ws_without_internet_connection(env_or_skip, config_without_credentials) -> WorkspaceClient:
+def no_connection_ws(env_or_skip, config_without_credentials) -> WorkspaceClient:
     """A workspace client without internet connection."""
     # Product and product version is not required as the lack of internet connection prohibits installation
     return WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config_without_credentials)
@@ -440,7 +441,7 @@ def ws_without_internet_connection(env_or_skip, config_without_credentials) -> W
 
 @pytest.fixture
 def installation_ctx_without_internet_connection(
-    ws_without_internet_connection,
+    no_connection_ws,
     env_or_skip,
     make_random,
 ) -> Iterator[MockInstallationContext]:
@@ -454,7 +455,7 @@ def installation_ctx_without_internet_connection(
         make_random,
         lambda *_: None,
         lambda *_: None,
-        ws_without_internet_connection,
+        no_connection_ws,
     )
     yield ctx
     # Uninstall is not required as the lack of internet connection prohibits installation
