@@ -122,7 +122,9 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     linter = LocalCodeLinter(
         file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
-    advices = linter.lint(prompts, None)
+    paths: set[Path] = set()
+    advices = linter.lint(prompts, paths, None)
+    assert len(paths) > 10
     assert not advices
 
 
@@ -181,6 +183,7 @@ def test_known_issues(path: Path, migration_index):
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    advices = linter.lint(MockPrompts({}), path)
+    linted: set[Path] = set()
+    advices = linter.lint(MockPrompts({}), linted, path)
     for advice in advices:
         print(repr(advice))
