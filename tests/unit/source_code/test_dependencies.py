@@ -34,6 +34,12 @@ def test_dependency_resolver_visits_workspace_notebook_dependencies(simple_depen
     assert maybe.graph.all_relative_names() == {"root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"}
 
 
+def test_dependency_resolver_locates_root_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root3.run.py"), CurrentSessionState())
+    assert not maybe.failed
+    assert maybe.graph.root_relative_names() == {"root3.run.py"}
+
+
 def test_dependency_resolver_visits_local_notebook_dependencies(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root4.py"), CurrentSessionState())
     assert not maybe.failed
@@ -52,7 +58,7 @@ def test_dependency_resolver_visits_workspace_file_dependencies(simple_dependenc
     assert maybe.graph.all_relative_names() == {'leaf1.py', 'leaf2.py', 'root8.py'}
 
 
-def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_dependency(simple_dependency_resolver):
+def test_dependency_resolver_raises_problem_with_unresolved_workspace_notebook_dependency(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_notebook_dependency_graph(
         Path("root1-no-leaf.run.py"), CurrentSessionState()
     )
@@ -69,7 +75,7 @@ def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_depe
     ]
 
 
-def test_dependency_resolver_raises_problem_with_unfound_local_notebook_dependency(simple_dependency_resolver):
+def test_dependency_resolver_raises_problem_with_unresolved_local_notebook_dependency(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root4-no-leaf.py"), CurrentSessionState())
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -142,14 +148,14 @@ def test_dependency_resolver_terminates_at_known_libraries(empty_index, mock_not
     assert maybe.failed
 
 
-def test_dependency_resolver_raises_problem_with_unfound_root_file(simple_dependency_resolver):
+def test_dependency_resolver_raises_problem_with_unresolved_root_file(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("non-existing.py"), CurrentSessionState())
     assert list(maybe.problems) == [
         DependencyProblem('file-not-found', 'File not found: non-existing.py', Path("non-existing.py"))
     ]
 
 
-def test_dependency_resolver_raises_problem_with_unfound_root_notebook(simple_dependency_resolver):
+def test_dependency_resolver_raises_problem_with_unresolved_root_notebook(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("unknown_notebook"), CurrentSessionState())
     assert list(maybe.problems) == [
         DependencyProblem('notebook-not-found', 'Notebook not found: unknown_notebook', Path("unknown_notebook"))
@@ -183,8 +189,10 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
 
     notebook_loader = FailingNotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(KnownList())
-    resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
+    known_list = KnownList()
+    pip_resolver = PythonLibraryResolver(known_list)
+    import_resolver = ImportFileResolver(FileLoader(), known_list)
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = resolver.build_notebook_dependency_graph(Path("root5.py"), CurrentSessionState())
     assert list(maybe.problems) == [
         DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py', Path('<MISSING_SOURCE_PATH>'))
