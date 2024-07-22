@@ -536,7 +536,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     # TODO: Confirm the assumption below is correct
     # An InternalError may occur when the dashboard is being published and the database does not exists
-    @retried(on=[InternalError], timeout=timedelta(minutes=2))
+    @retried(on=[InternalError], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
