@@ -2,10 +2,12 @@ import io
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 import yaml
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
@@ -14,6 +16,8 @@ from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.core import Config
+from databricks.sdk.credentials_provider import credentials_strategy
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     InvalidParameterValue,
@@ -1929,3 +1933,33 @@ def test_upload_dependencies(ws, mock_installation):
     workspace_installation.run()
     wheels.upload_wheel_dependencies.assert_called_once()
     wheels.upload_to_wsfs.assert_called_once()
+
+
+@pytest.fixture
+def no_connection_ws() -> WorkspaceClient:
+    """Configure a workspace like it does not have an internet connection."""
+
+    @credentials_strategy("raise_connection_error", [])
+    def raise_connection_error(_: Any):
+        """Mock no internet access by raising a ConnectionError"""
+
+        def inner():
+            raise RequestsConnectionError("no internet")
+
+        return inner
+
+    config = Config(
+        host="https://adb-123456789.12.azuredatabricks.net/",
+        credentials_strategy=raise_connection_error,
+        retry_timeout_seconds=1,
+    )
+    return WorkspaceClient(config=config)
+
+
+@pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
+def test_workspace_installer_warns_about_connection_error(caplog, no_connection_ws, default_config):
+    """This test runs both with and without internet connection"""
+    workspace_installer = WorkspaceInstaller(no_connection_ws)
+    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        workspace_installer.run(default_config=default_config)
+    assert "Cannot connect with" in caplog.text

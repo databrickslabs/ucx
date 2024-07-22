@@ -3,9 +3,9 @@ import json
 import logging
 from datetime import timedelta
 
-import pytest  # pylint: disable=wrong-import-order
-from databricks.labs.ucx.__about__ import __version__
+import pytest
 
+import databricks
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
@@ -18,15 +18,15 @@ from databricks.sdk.errors import (
     NotFound,
     ResourceConflict,
 )
-
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
 
-import databricks
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
     # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[KeyError], timeout=timedelta(minutes=4))
+    @retried(on=[KeyError], timeout=timedelta(minutes=6))
     def get_group(group_id: str):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")

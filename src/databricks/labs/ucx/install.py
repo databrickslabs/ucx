@@ -11,6 +11,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+from requests.exceptions import ConnectionError as RequestsConnectionError
+
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
@@ -174,35 +176,42 @@ class WorkspaceInstaller(WorkspaceContext):
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
-        if config is None:
-            config = self.configure(default_config)
-        if self._is_testing():
-            return config
-        workflows_deployment = WorkflowsDeployment(
-            config,
-            self.installation,
-            self.install_state,
-            self.workspace_client,
-            self.wheels,
-            self.product_info,
-            verify_timeout,
-            self._tasks,
-        )
-        workspace_installation = WorkspaceInstallation(
-            config,
-            self.installation,
-            self.install_state,
-            self.sql_backend,
-            self.workspace_client,
-            workflows_deployment,
-            self.prompts,
-            self.product_info,
-        )
         try:
+            if config is None:
+                config = self.configure(default_config)
+            if self._is_testing():
+                return config
+            workflows_deployment = WorkflowsDeployment(
+                config,
+                self.installation,
+                self.install_state,
+                self.workspace_client,
+                self.wheels,
+                self.product_info,
+                verify_timeout,
+                self._tasks,
+            )
+            workspace_installation = WorkspaceInstallation(
+                config,
+                self.installation,
+                self.install_state,
+                self.sql_backend,
+                self.workspace_client,
+                workflows_deployment,
+                self.prompts,
+                self.product_info,
+            )
             workspace_installation.run()
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
+            raise err
+        except TimeoutError as err:
+            if isinstance(err.__cause__, RequestsConnectionError):
+                logger.warning(
+                    f"Cannot connect with {self.workspace_client.config.host} see "
+                    f"https://github.com/databrickslabs/ucx#network-connectivity-issues for help: {err}"
+                )
             raise err
         return config
 
@@ -282,6 +291,11 @@ class WorkspaceInstaller(WorkspaceContext):
         return False
 
     def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
+        """Configure the workspaces
+
+        Notes:
+        1. Connection errors are not handled within this configure method.
+        """
         try:
             config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
