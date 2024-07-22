@@ -485,7 +485,7 @@ class WorkspaceInstallation(InstallationMixin):
         """
         logger.info(f"Installing UCX v{self._product_info.version()}")
         install_tasks = [self._create_database]  # Need the database before creating the dashboards
-        install_tasks.extend(self._create_dashboards)
+        install_tasks.extend(self._get_create_dashboard_tasks())
         Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
@@ -511,8 +511,8 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
-    def _create_dashboards(self) -> Iterable[Callable[[], None]]:
-        """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
+    def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
+        """Get the tasks to create Lakeview dashboards from the SQL queries in the queries subfolders"""
         logger.info("Creating dashboards...")
         dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
         try:
