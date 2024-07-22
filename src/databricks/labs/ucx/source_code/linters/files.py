@@ -139,15 +139,16 @@ class LocalCodeLinter:
         self, dependency: Dependency, graph: DependencyGraph, linted: set[Dependency]
     ) -> Iterable[LocatedAdvice]:
         if dependency in linted:
-            return []
+            yield from []
         linted.add(dependency)
         if dependency.path.is_dir():
-            return []
+            yield from []
         ctx = self._new_linter_context()
         linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path)
         for advice in linter.lint():
             yield advice.for_path(dependency.path)
         maybe_graph = graph.locate_dependency(dependency.path)
+        # problems have already been reported while building the graph
         if maybe_graph.graph:
             child_graph = maybe_graph.graph
             for child_dependency in child_graph.local_dependencies:
