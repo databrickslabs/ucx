@@ -132,15 +132,26 @@ class LocalCodeLinter:
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
-        for child_path in graph.all_paths:
-            yield from self._lint_one(child_path)
+        for dependency in graph.root_dependencies:
+            yield from self._lint_one(dependency, graph, set())
 
-    def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
-        if path.is_dir():
+    def _lint_one(
+        self, dependency: Dependency, graph: DependencyGraph, linted: set[Dependency]
+    ) -> Iterable[LocatedAdvice]:
+        if dependency in linted:
+            return []
+        linted.add(dependency)
+        if dependency.path.is_dir():
             return []
         ctx = self._new_linter_context()
-        linter = FileLinter(ctx, self._path_lookup, self._session_state, path)
-        return [advice.for_path(path) for advice in linter.lint()]
+        linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path)
+        for advice in linter.lint():
+            yield advice.for_path(dependency.path)
+        maybe_graph = graph.locate_dependency(dependency.path)
+        if maybe_graph.graph:
+            child_graph = maybe_graph.graph
+            for child_dependency in child_graph.local_dependencies:
+                yield from self._lint_one(child_dependency, child_graph, linted)
 
 
 class LocalFileMigrator:
