@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 import yaml
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
@@ -28,7 +29,6 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.compute import ClusterDetails, CreatePolicyResponse, DataSecurityMode, Policy, State
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
@@ -42,7 +42,6 @@ from databricks.sdk.service.sql import (
     Widget,
 )
 from databricks.sdk.service.workspace import ObjectInfo
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
@@ -1950,8 +1949,7 @@ def no_connection_ws() -> WorkspaceClient:
         return inner
 
     config = Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
-    ws = WorkspaceClient(config=config)
-    return ws
+    return WorkspaceClient(config=config)
 
 
 @pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
@@ -1992,3 +1990,4 @@ def test_workspace_installation_warns_about_connection_error(caplog, no_connecti
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         workspace_installation.run()
     assert "Cannot connect with" in caplog.text
+    wheels.assert_not_called()
