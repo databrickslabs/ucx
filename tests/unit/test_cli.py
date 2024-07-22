@@ -365,13 +365,13 @@ def test_migrate_credentials_aws(ws):
 
 
 def test_migrate_credentials_limit(ws):
-    ws.storage_credentials.list.return_value = 200*[StorageCredentialInfo(id="1234")]
+    ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
 
-    ws.storage_credentials.list.return_value = 201*[StorageCredentialInfo(id="1234")]
+    ws.storage_credentials.list.return_value = 201 * [StorageCredentialInfo(id="1234")]
     with pytest.raises(RuntimeWarning):
         migrate_credentials(ws, prompts, ctx=ctx)
 
