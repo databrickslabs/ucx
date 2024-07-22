@@ -176,35 +176,42 @@ class WorkspaceInstaller(WorkspaceContext):
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
-        if config is None:
-            config = self.configure(default_config)
-        if self._is_testing():
-            return config
-        workflows_deployment = WorkflowsDeployment(
-            config,
-            self.installation,
-            self.install_state,
-            self.workspace_client,
-            self.wheels,
-            self.product_info,
-            verify_timeout,
-            self._tasks,
-        )
-        workspace_installation = WorkspaceInstallation(
-            config,
-            self.installation,
-            self.install_state,
-            self.sql_backend,
-            self.workspace_client,
-            workflows_deployment,
-            self.prompts,
-            self.product_info,
-        )
         try:
+            if config is None:
+                config = self.configure(default_config)
+            if self._is_testing():
+                return config
+            workflows_deployment = WorkflowsDeployment(
+                config,
+                self.installation,
+                self.install_state,
+                self.workspace_client,
+                self.wheels,
+                self.product_info,
+                verify_timeout,
+                self._tasks,
+            )
+            workspace_installation = WorkspaceInstallation(
+                config,
+                self.installation,
+                self.install_state,
+                self.sql_backend,
+                self.workspace_client,
+                workflows_deployment,
+                self.prompts,
+                self.product_info,
+            )
             workspace_installation.run()
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
+            raise err
+        except TimeoutError as err:
+            if isinstance(err.__cause__, RequestsConnectionError):
+                logger.warning(
+                    f"Cannot connect with {self.workspace_client.config.host} see "
+                    f"https://github.com/databrickslabs/ucx#network-connectivity-issues for help: {err}"
+                )
             raise err
         return config
 
@@ -284,31 +291,18 @@ class WorkspaceInstaller(WorkspaceContext):
         return False
 
     def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
-        connection_error_message = (
-            f"Cannot connect with {self.workspace_client.config.host} see "
-            "https://github.com/databrickslabs/ucx#network-connectivity-issues for help: %s"
-        )
         try:
             config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
-            if not self._confirm_force_install():
-                self._apply_upgrades()
-                return config
+            if self._confirm_force_install():
+                return self._configure_new_installation(default_config)
+            self._apply_upgrades()
+            return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
         except (PermissionDenied, SerdeError, ValueError, AttributeError):
             logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
-        except TimeoutError as err:
-            # API calls are wrapped with a retry mechanism for requests.exceptions.ConnectionError
-            # eventually raising a TimeoutError if tries take too long
-            if isinstance(err.__cause__, RequestsConnectionError):  # raise TimeoutError(...) from ConnectionError(...)
-                logger.warning(connection_error_message, err)
-        try:
-            return self._configure_new_installation(default_config)
-        except TimeoutError as err:
-            if isinstance(err.__cause__, RequestsConnectionError):
-                logger.warning(connection_error_message, err)
-            raise err
+        return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
         """
