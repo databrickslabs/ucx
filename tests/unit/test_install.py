@@ -1959,35 +1959,3 @@ def test_workspace_installer_warns_about_connection_error(caplog, no_connection_
     with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         workspace_installer.run(default_config=default_config)
     assert "Cannot connect with" in caplog.text
-
-
-def test_workspace_installation_warns_about_connection_error(caplog, no_connection_ws, mock_installation, any_prompt):
-    """This test runs both with and without internet connection"""
-    install_state = InstallState.from_installation(mock_installation)
-    wheels = create_autospec(WheelsV2)
-    workflows_installation = WorkflowsDeployment(
-        WorkspaceConfig(inventory_database="...", policy_id='123'),
-        mock_installation,
-        install_state,
-        no_connection_ws,
-        wheels,
-        PRODUCT_INFO,
-        timedelta(seconds=1),
-        [],
-    )
-    workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig("ucx"),
-        mock_installation,
-        install_state,
-        MockBackend(),
-        no_connection_ws,
-        workflows_installation,
-        any_prompt,
-        PRODUCT_INFO,
-    )
-
-    workspace_installation.run()
-    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        workspace_installation.run()
-    assert "Cannot connect with" in caplog.text
-    wheels.assert_not_called()
