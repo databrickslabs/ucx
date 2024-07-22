@@ -198,7 +198,7 @@ def test_lint_local_code(simple_ctx):
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )
-    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    problems = linter.lint(Prompts(), set(), path_to_scan, StringIO())
     assert len(problems) > 0
 
 

@@ -111,6 +111,10 @@ class DependencyGraph:
         return self if self._parent is None else self._parent.root
 
     @property
+    def parent(self):
+        return self._parent
+
+    @property
     def all_dependencies(self) -> set[Dependency]:
         dependencies: set[Dependency] = set()
 
@@ -122,6 +126,28 @@ class DependencyGraph:
 
         self.visit(add_to_dependencies, set())
         return dependencies
+
+    @property
+    def root_dependencies(self) -> set[Dependency]:
+        roots: set[Dependency] = set()
+        children: set[Dependency] = set()
+
+        def add_to_dependencies(graph: DependencyGraph) -> bool:
+            dependency = graph.dependency
+            if dependency in children:
+                return False  # Nothing to do
+            if dependency in roots:
+                roots.remove(dependency)
+                children.add(dependency)
+                return False
+            if graph.parent is None:
+                roots.add(dependency)
+                return False
+            children.add(dependency)
+            return False
+
+        self.visit(add_to_dependencies, set())
+        return roots
 
     @property
     def local_dependencies(self) -> set[Dependency]:
@@ -136,17 +162,27 @@ class DependencyGraph:
 
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
-        all_names = set[str]()
-        dependencies = self.all_dependencies
-        for library_root in self._path_lookup.library_roots:
-            for dependency in dependencies:
+        return self._relative_names(self.all_dependencies)
+
+    def _relative_names(self, dependencies: set[Dependency]) -> set[str]:
+        """This method is intended to simplify testing"""
+        names = set[str]()
+        for dependency in dependencies:
+            for library_root in self._path_lookup.library_roots:
                 if not dependency.path.is_relative_to(library_root):
                     continue
                 relative_path = dependency.path.relative_to(library_root).as_posix()
                 if relative_path == ".":
                     continue
-                all_names.add(relative_path)
-        return all_names
+                names.add(relative_path)
+        return names
+
+    def root_paths(self) -> set[Path]:
+        return {d.path for d in self.root_dependencies}
+
+    def root_relative_names(self) -> set[str]:
+        """This method is intended to simplify testing"""
+        return self._relative_names(self.root_dependencies)
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
