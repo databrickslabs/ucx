@@ -139,10 +139,10 @@ class LocalCodeLinter:
         self, dependency: Dependency, graph: DependencyGraph, linted: set[Dependency]
     ) -> Iterable[LocatedAdvice]:
         if dependency in linted:
-            yield from []
+            return
         linted.add(dependency)
         if dependency.path.is_dir():
-            yield from []
+            return
         ctx = self._new_linter_context()
         linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path)
         for advice in linter.lint():
