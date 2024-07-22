@@ -128,7 +128,8 @@ class PythonLibraryResolver(LibraryResolver):
             from setuptools import setup  # type: ignore
         except (ImportError, AssertionError):
             try:
-                from distutils.core import setup  # pylint: disable=deprecated-module
+                # pylint: disable-next=deprecated-module
+                from distutils.core import setup  # type: ignore
             except ImportError:
                 logger.warning("Could not import setup.")
                 setup = None
