@@ -3,9 +3,9 @@ import json
 import logging
 from datetime import timedelta
 
-import pytest  # pylint: disable=wrong-import-order
-from databricks.labs.ucx.__about__ import __version__
+import pytest
 
+import databricks
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
@@ -18,15 +18,15 @@ from databricks.sdk.errors import (
     NotFound,
     ResourceConflict,
 )
-
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
 
-import databricks
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+
 
 logger = logging.getLogger(__name__)
 

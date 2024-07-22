@@ -1350,7 +1350,7 @@ from a VPC, or from a specific IP range.
 
 **Solution:** Please check that your laptop has network connectivity to
 the Databricks account and workspace. If not, you might need to be
-connected to a VPN to access your workspace.
+connected to a VPN or configure an HTTP proxy to access your workspace.
 
 **From local machine to GitHub:** UCX needs internet access to connect
 to [<u>github.com</u>](https://github.com) (to download the tool) from
