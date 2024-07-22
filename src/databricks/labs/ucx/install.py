@@ -291,6 +291,11 @@ class WorkspaceInstaller(WorkspaceContext):
         return False
 
     def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
+        """Configure the workspaces
+
+        Notes:
+        1. Connection errors are not handled within this configure method.
+        """
         try:
             config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
