@@ -1948,7 +1948,11 @@ def no_connection_ws() -> WorkspaceClient:
 
         return inner
 
-    config = Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
+    config = Config(
+        host="https://adb-123456789.12.azuredatabricks.net/",
+        credentials_strategy=raise_connection_error,
+        retry_timeout_seconds=1,
+    )
     return WorkspaceClient(config=config)
 
 
