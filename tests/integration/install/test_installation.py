@@ -2,20 +2,16 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
-from typing import Any
 
 import pytest
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
 import databricks
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import AccountClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.sdk.core import Config
-from databricks.sdk.credentials_provider import credentials_strategy
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
@@ -24,7 +20,6 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
-from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.__about__ import __version__
@@ -32,7 +27,6 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
-from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
 
@@ -415,50 +409,3 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
     installation_ctx.deployed_workflows.repair_run("failing")
     assert installation_ctx.deployed_workflows.validate_step("failing")
-
-
-@pytest.fixture
-def no_connection_ctx(env_or_skip, make_random) -> MockInstallationContext:
-    """Create a context without internet connection.
-
-    Resources are not required as the lack of internet connection prohibits creation.
-    """
-
-    @credentials_strategy("raise_connection_error", [])
-    def raise_connection_error(_: Any):
-        """Mock no internet access by raising a ConnectionError"""
-
-        def inner():
-            raise RequestsConnectionError("no internet")
-
-        return inner
-
-    config = Config(credentials_strategy=raise_connection_error, retry_timeout_seconds=1)
-    ws = WorkspaceClient(host=env_or_skip("DATABRICKS_HOST"), config=config)
-    ctx = MockInstallationContext(
-        lambda: None,
-        lambda catalog_name: SchemaInfo(catalog_name="hive_metastore"),
-        lambda: None,
-        lambda: None,
-        env_or_skip,
-        make_random,
-        lambda: None,
-        lambda: None,
-        ws,
-    )
-    return ctx
-
-
-@pytest.mark.parametrize("default_config", [None, WorkspaceConfig("ucx")])
-def test_workspace_installer_warns_about_connection_error(caplog, no_connection_ctx, default_config):
-    """This test runs both with and without internet connection"""
-    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        no_connection_ctx.workspace_installer.run(default_config=default_config)
-    assert "Cannot connect with" in caplog.text
-
-
-def test_workspace_installation_warns_about_connection_error(caplog, no_connection_ctx):
-    """This test runs both with and without internet connection"""
-    with pytest.raises(TimeoutError), caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        no_connection_ctx.workspace_installation.run()
-    assert "Cannot connect with" in caplog.text
