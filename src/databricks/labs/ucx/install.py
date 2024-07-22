@@ -476,7 +476,13 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self):
+    def run(self) -> bool:
+        """Run workflow installation.
+
+        Returns
+            bool :
+                True, installation finished. False installation did not finish.
+        """
         logger.info(f"Installing UCX v{self._product_info.version()}")
         install_tasks = [self._create_database]  # Need the database before creating the dashboards
         install_tasks.extend(self._create_dashboards())
