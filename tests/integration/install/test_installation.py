@@ -181,7 +181,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
     # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[KeyError], timeout=timedelta(minutes=4))
+    @retried(on=[KeyError], timeout=timedelta(minutes=6))
     def get_group(group_id: str):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
