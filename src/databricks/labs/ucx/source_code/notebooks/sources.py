@@ -367,12 +367,14 @@ class FileLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         path: Path,
+        parents: list[Path] | None = None,
         content: str | None = None,
     ):
         self._ctx: LinterContext = ctx
         self._path_lookup = path_lookup
         self._session_state = session_state
-        self._path: Path = path
+        self._path = path
+        self._parents = parents
         self._content = content
 
     @cached_property

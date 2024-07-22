@@ -68,15 +68,22 @@ class Functional:
     _location = Path(__file__).parent / 'samples/functional'
 
     @classmethod
+    def for_child(cls, child: str, parents: list[str]) -> Functional:
+        child_path = cls._location / child
+        parent_paths = [ cls._location / parent for parent in parents ]
+        return Functional(child_path, parent_paths)
+
+    @classmethod
     def all(cls) -> list[Functional]:
-        return [Functional(path) for path in cls._location.glob('**/*.py')]
+        return [Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")]
 
     @classmethod
     def test_id(cls, sample: Functional) -> str:
         return sample.path.relative_to(cls._location).as_posix()
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, parents: list[Path] | None = None) -> None:
         self.path = path
+        self.parents = parents
 
     def verify(self, path_lookup: PathLookup) -> None:
         expected_problems = list(self._expected_problems())
@@ -166,6 +173,15 @@ class Functional:
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
 def test_functional(sample: Functional, mock_path_lookup) -> None:
+    path_lookup = mock_path_lookup.change_directory(sample.path.parent)
+    sample.verify(path_lookup)
+
+
+@pytest.mark.parametrize(
+    "child, parents", [("_child_uses_value_from_parent.py", ["parent_runs_child_that_uses_value_from_parent.py"])]
+)
+def test_functional_with_parent(child: str, parents: list[str], mock_path_lookup) -> None:
+    sample = Functional.for_child(child, parents)
     path_lookup = mock_path_lookup.change_directory(sample.path.parent)
     sample.verify(path_lookup)
 
