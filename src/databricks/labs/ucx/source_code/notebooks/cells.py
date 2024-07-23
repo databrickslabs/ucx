@@ -173,7 +173,7 @@ class RunCell(Cell):
         path, idx, line = self._read_notebook_path()
         if path is not None:
             start_line = self._original_offset + idx
-            problems = parent.register_notebook(path)
+            problems = parent.register_notebook(path, True)
             return [
                 problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
                 for problem in problems
@@ -459,7 +459,8 @@ class GraphBuilder:
                 f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
             )
         for path in paths:
-            yield from self._context.parent.register_notebook(Path(path))
+            # notebooks ran via dbutils.notebook.run do not inherit or propagate context
+            yield from self._context.parent.register_notebook(Path(path), False)
 
     def _mutate_path_lookup(self, change: SysPathChange):
         if isinstance(change, UnresolvedPath):
@@ -539,7 +540,7 @@ class RunCommand(MagicCommand):
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         path = self.notebook_path
         if path is not None:
-            problems = graph.register_notebook(path)
+            problems = graph.register_notebook(path, True)
             return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
         problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
         return [problem]

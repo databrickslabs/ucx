@@ -47,8 +47,8 @@ class DependencyGraph:
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
 
-    def register_notebook(self, path: Path) -> list[DependencyProblem]:
-        maybe = self._resolver.resolve_notebook(self.path_lookup, path)
+    def register_notebook(self, path: Path, inherit_context: bool) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_notebook(self.path_lookup, path, inherit_context)
         if not maybe.dependency:
             return maybe.problems
         maybe_graph = self.register_dependency(maybe.dependency)
@@ -212,13 +212,18 @@ class GraphBuilderContext:
 
 class Dependency(abc.ABC):
 
-    def __init__(self, loader: DependencyLoader, path: Path):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context: bool = False):
         self._loader = loader
         self._path = path
+        self._inherits_context = inherits_context
 
     @property
     def path(self) -> Path:
         return self._path
+
+    @property
+    def inherits_context(self):
+        return self._inherits_context
 
     def __hash__(self):
         return hash(self.path)
@@ -267,8 +272,7 @@ class LibraryResolver(abc.ABC):
 class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        """locates a notebook"""
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency: ...
 
     @staticmethod
     def _fail(code: str, message: str) -> MaybeDependency:
@@ -315,8 +319,8 @@ class DependencyResolver:
         self._import_resolver = import_resolver
         self._path_lookup = path_lookup
 
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._notebook_resolver.resolve_notebook(path_lookup, path)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency:
+        return self._notebook_resolver.resolve_notebook(path_lookup, path, inherit_context)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
@@ -353,7 +357,7 @@ class DependencyResolver:
     def build_notebook_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
+        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path, False)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)

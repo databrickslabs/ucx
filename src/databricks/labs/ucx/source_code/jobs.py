@@ -188,7 +188,7 @@ class WorkflowTaskContainer(SourceContainer):
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         # Notebooks can't be on DBFS.
         path = WorkspacePath(self._ws, notebook_path)
-        return graph.register_notebook(path)
+        return graph.register_notebook(path, False)
 
     def _register_spark_python_task(self, graph: DependencyGraph):
         if not self._task.spark_python_task:
@@ -197,7 +197,7 @@ class WorkflowTaskContainer(SourceContainer):
         notebook_path = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = self._as_path(notebook_path)
-        return graph.register_notebook(path)
+        return graph.register_notebook(path, False)
 
     @staticmethod
     def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:
@@ -263,7 +263,7 @@ class WorkflowTaskContainer(SourceContainer):
                 notebook_path = library.notebook.path
                 # Notebooks can't be on DBFS.
                 path = WorkspacePath(self._ws, notebook_path)
-                yield from graph.register_notebook(path)
+                yield from graph.register_notebook(path, False)
             if library.jar:
                 yield from self._register_library(graph, compute.Library(jar=library.jar))
             if library.maven:
