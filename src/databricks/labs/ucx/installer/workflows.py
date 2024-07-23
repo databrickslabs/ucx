@@ -417,11 +417,11 @@ class WorkflowsDeployment(InstallationMixin):
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
-    def create_jobs(self):
+    def create_jobs(self) -> None:
         remote_wheels = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
-        wheel_runner = None
 
+        wheel_runner = ""
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheels)
         for workflow_name in desired_workflows:
@@ -446,7 +446,7 @@ class WorkflowsDeployment(InstallationMixin):
 
         self._install_state.save()
         self._create_debug(remote_wheels)
-        return self._create_readme()
+        self._create_readme()
 
     @property
     def _config_file(self):
@@ -464,7 +464,7 @@ class WorkflowsDeployment(InstallationMixin):
         timeout = TEST_NIGHTLY_CI_JOBS_PURGE_TIMEOUT if self._is_nightly() else TEST_JOBS_PURGE_TIMEOUT
         return (datetime.utcnow() + timeout).strftime("%Y%m%d%H")
 
-    def _create_readme(self) -> str:
+    def _create_readme(self) -> None:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
             "# UCX - The Unity Catalog Migration Assistant",
@@ -496,8 +496,6 @@ class WorkflowsDeployment(InstallationMixin):
         preamble = ["# Databricks notebook source", "# MAGIC %md"]
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
         self._installation.upload('README.py', intro.encode('utf8'))
-        readme_url = self._installation.workspace_link('README')
-        return readme_url
 
     def _create_dashboard_links(self, step_name, dashboard_link):
         dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
@@ -570,7 +568,7 @@ class WorkflowsDeployment(InstallationMixin):
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
             return wheel_paths
 
-    def _upload_wheel_runner(self, remote_wheels: list[str]):
+    def _upload_wheel_runner(self, remote_wheels: list[str]) -> str:
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         remote_wheels_str = " ".join(remote_wheels)
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
