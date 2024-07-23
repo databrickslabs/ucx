@@ -5,7 +5,7 @@ import re
 import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import Enum
 from pathlib import Path
 from typing import TypeVar
@@ -16,7 +16,12 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, GraphBuilderContext
+from databricks.labs.ucx.source_code.graph import (
+    DependencyGraph,
+    DependencyProblem,
+    GraphBuilderContext,
+    InheritedContext,
+)
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsLinter,
@@ -70,12 +75,10 @@ class Cell(ABC):
 
     @property
     @abstractmethod
-    def language(self) -> CellLanguage:
-        """returns the language of this cell"""
+    def language(self) -> CellLanguage: ...
 
     @abstractmethod
-    def is_runnable(self) -> bool:
-        """whether of not this cell can be run"""
+    def is_runnable(self) -> bool: ...
 
     def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
         """Check for any problems with dependencies of this cell.
@@ -87,6 +90,9 @@ class Cell(ABC):
 
     def __repr__(self):
         return f"{self.language.name}: {self._original_code[:20]}"
+
+    def build_inherited_context(self, _graph: DependencyGraph, _child_path: Path) -> tuple[InheritedContext, bool]:
+        return InheritedContext(None), False
 
 
 class PythonCell(Cell):
@@ -104,8 +110,8 @@ class PythonCell(Cell):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         context = parent.new_graph_builder_context()
-        builder = GraphBuilder(context)
-        python_dependency_problems = builder.build_graph_from_python_source(self._original_code)
+        builder = PythonGraphBuilder(context, self._original_code)
+        python_dependency_problems = builder.build_graph()
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
         return [
             problem.replace(
@@ -113,6 +119,11 @@ class PythonCell(Cell):
             )
             for problem in python_dependency_problems
         ]
+
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+        context = graph.new_graph_builder_context()
+        builder = PythonGraphBuilder(context, self._original_code)
+        return builder.build_inherited_context(child_path)
 
 
 class RCell(Cell):
@@ -392,12 +403,22 @@ class CellLanguage(Enum):
         return "\n".join(lines)
 
 
-class GraphBuilder:
+class GraphBuilder(ABC):
 
-    def __init__(self, context: GraphBuilderContext):
+    @abstractmethod
+    def build_graph(self) -> list[DependencyProblem]: ...
+
+    @abstractmethod
+    def build_inherited_context(self, child_path: Path) -> tuple[InheritedContext, bool]: ...
+
+
+class PythonGraphBuilder(GraphBuilder):
+
+    def __init__(self, context: GraphBuilderContext, python_code: str):
         self._context = context
+        self._python_code = python_code
 
-    def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
+    def build_graph(self) -> list[DependencyProblem]:
         """Check python code for dependency-related problems.
 
         Returns:
@@ -405,23 +426,14 @@ class GraphBuilder:
         """
         problems: list[DependencyProblem] = []
         try:
-            tree = Tree.normalize_and_parse(python_code)
+            nodes, parse_problems = self._parse_and_extract_nodes()
+            problems.extend(parse_problems)
         except AstroidSyntaxError as e:
-            logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
+            logger.debug(f"Could not parse Python code: {self._python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
-        syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-        import_sources: list[ImportSource]
-        import_problems: list[DependencyProblem]
-        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(import_problems)
-        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(command_problems)
-        nodes = syspath_changes + run_calls + import_sources + magic_commands
-        # need to execute things in intertwined sequence so concat and sort them
-        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            for problem in self._process_node(base_node):
+        for base_node in nodes:
+            for problem in self._build_graph_from_node(base_node):
                 # Astroid line numbers are 1-based.
                 problem = problem.replace(
                     start_line=base_node.node.lineno - 1,
@@ -432,7 +444,37 @@ class GraphBuilder:
                 problems.append(problem)
         return problems
 
-    def _process_node(self, base_node: NodeBase):
+    def build_inherited_context(self, child_path: Path) -> tuple[InheritedContext, bool]:
+        try:
+            nodes, _ = self._parse_and_extract_nodes()
+        except AstroidSyntaxError as e:
+            logger.debug(f"Could not parse Python code: {self._python_code}", exc_info=True)
+            return InheritedContext(None), False
+        context = InheritedContext(None)
+        for base_node in nodes:
+            for child_context, done in self._build_inherited_context_from_node(base_node):
+                context = context.append(child_context)
+                if done:
+                    return context, done
+        return context, False
+
+    def _parse_and_extract_nodes(self) -> tuple[Iterable[NodeBase], Iterable[DependencyProblem]]:
+        problems: list[DependencyProblem] = []
+        tree = Tree.normalize_and_parse(self._python_code)
+        syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources: list[ImportSource]
+        import_problems: list[DependencyProblem]
+        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(import_problems)
+        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(command_problems)
+        nodes = syspath_changes + run_calls + import_sources + magic_commands
+        # need to evaluate things in intertwined sequence so concat and sort them
+        nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
+        return nodes, problems
+
+    def _build_graph_from_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
         elif isinstance(base_node, NotebookRunCall):

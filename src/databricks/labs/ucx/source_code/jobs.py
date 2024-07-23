@@ -28,6 +28,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     SourceContainer,
     WrappingLoader,
+    InheritedContext,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
@@ -307,6 +308,9 @@ class WorkflowTaskContainer(SourceContainer):
         self._spark_version = new_cluster.spark_version
         self._data_security_mode = new_cluster.data_security_mode
         return []
+
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+        raise NotImplementedError("Should never get there!")
 
 
 class WorkflowLinter:

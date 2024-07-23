@@ -83,7 +83,11 @@ class Functional:
     def test_id(cls, sample: Functional) -> str:
         if sample.parent is None:
             return sample.path.relative_to(cls._location).as_posix()
-        return sample.path.relative_to(cls._location).as_posix() + "/" + sample.parent.relative_to(cls._location).as_posix()
+        return (
+            sample.path.relative_to(cls._location).as_posix()
+            + "/"
+            + sample.parent.relative_to(cls._location).as_posix()
+        )
 
     def __init__(self, path: Path, parent: Path | None = None) -> None:
         self.path = path
@@ -192,9 +196,11 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
 
 
 @pytest.mark.parametrize(
-    "child, parent", [
+    "child, parent",
+    [
         ("_child_that_uses_value_from_parent.py", "parent_that_runs_child_that_uses_value_from_parent.py"),
-        ("_child_that_uses_value_from_parent.py", "grand_parent_that_runs_parent_that_runs_child.py")]
+        ("_child_that_uses_value_from_parent.py", "grand_parent_that_runs_parent_that_runs_child.py"),
+    ],
 )
 def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simple_dependency_resolver) -> None:
     sample = Functional.for_child(child, parent)

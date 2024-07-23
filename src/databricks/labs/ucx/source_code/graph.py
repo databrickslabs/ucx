@@ -220,7 +220,7 @@ class DependencyGraph:
 
     def compute_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
         route = self._compute_route(root, leaf, set())
-        return InheritedContext.from_route(route, leaf)
+        return InheritedContext.from_route(self, self.path_lookup, route, leaf)
 
     def new_graph_builder_context(self):
         return GraphBuilderContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
@@ -267,14 +267,15 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        """builds a dependency graph from the contents of this container"""
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
+
+    @abc.abstractmethod
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]: ...
 
 
 class DependencyLoader(abc.ABC):
     @abc.abstractmethod
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        """loads a dependency"""
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None: ...
 
 
 class WrappingLoader(DependencyLoader):
@@ -482,8 +483,21 @@ class MaybeGraph:
 class InheritedContext:
 
     @classmethod
-    def from_route(cls, route: list[Dependency], leaf: Path) -> InheritedContext:
-        return InheritedContext(None)
+    def from_route(
+        cls, graph: DependencyGraph, path_lookup: PathLookup, route: list[Dependency], leaf: Path
+    ) -> InheritedContext:
+        context = InheritedContext(None)
+        for i, dependency in enumerate(route):
+            child = leaf if i >= len(route) + 1 else route[i + 1].path
+            container = dependency.load(path_lookup)
+            if container is None:
+                logger.warning(f"Could not load content of {dependency.path}")
+                return context
+            local, done = container.build_inherited_context(graph, child)
+            context = context.append(local)
+            if done:
+                return context
+        return context
 
     def __init__(self, tree: Tree | None):
         self._tree = tree
@@ -491,3 +505,6 @@ class InheritedContext:
     @property
     def tree(self):
         return self._tree
+
+    def append(self, context: InheritedContext) -> InheritedContext:
+        raise NotImplementedError()

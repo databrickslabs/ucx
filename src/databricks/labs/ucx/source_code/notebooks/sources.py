@@ -22,7 +22,12 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
 )
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem, InheritedContext
+from databricks.labs.ucx.source_code.graph import (
+    SourceContainer,
+    DependencyGraph,
+    DependencyProblem,
+    InheritedContext,
+)
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
@@ -101,6 +106,15 @@ class Notebook(SourceContainer):
             cell_problems = cell.build_dependency_graph(parent)
             problems.extend(cell_problems)
         return problems
+
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+        context = InheritedContext(None)
+        for cell in self._cells:
+            child, found = cell.build_inherited_context(graph, child_path)
+            context = context.append(child)
+            if found:
+                return context, found
+        return context, False
 
     def __repr__(self):
         return f"<Notebook {self._path}>"
