@@ -368,14 +368,23 @@ def test_migrate_credentials_limit(ws):
     ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
     azure_resource = create_autospec(AzureResource)
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    access_connector = AccessConnector(id=azure_resource, name="test", location="test", provisioning_state="test", identity_type="test", principal_id="test")
+    access_connector = AccessConnector(
+        id=azure_resource,
+        name="test",
+        location="test",
+        provisioning_state="test",
+        identity_type="test",
+        principal_id="test",
+    )
     mock_access_connectors = (access_connector, 'test_url')
     azure_resource_permissions.create_access_connectors_for_storage_accounts.return_value = [mock_access_connectors]
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(is_azure=True,
-                                       azure_cli_authenticated=True,
-                                       azure_subscription_id='test',
-                                       azure_resource_permissions=azure_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resource_permissions=azure_resource_permissions,
+    )
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
 
