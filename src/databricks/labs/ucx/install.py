@@ -498,10 +498,9 @@ class WorkspaceInstallation(InstallationMixin):
                 True, installation finished. False installation did not finish.
         """
         logger.info(f"Installing UCX v{self._product_info.version()}")
-        install_tasks = [self._create_database]  # Need the database before creating the dashboards
-        install_tasks.extend(self._get_create_dashboard_tasks())
+        install_tasks = [self._create_database_and_dashboards, self._workflows_installer.create_jobs]
         Threads.strict("installing components", install_tasks)
-        readme_url = self._workflows_installer.create_jobs()
+        readme_url = self._installation.workspace_link("README")
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
@@ -509,6 +508,10 @@ class WorkspaceInstallation(InstallationMixin):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
         return True
+
+    def _create_database_and_dashboards(self) -> None:
+        self._create_database()  # Need the database before creating the dashboards
+        Threads.strict("installing dashboards", list(self._get_create_dashboard_tasks()))
 
     def _create_database(self):
         try:
