@@ -366,7 +366,7 @@ def test_migrate_credentials_aws(ws):
 
 def test_migrate_credentials_limit(ws):
     ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
-    azure_resource = create_autospec(AzureResource)
+    azure_resource = AzureResource(resource_id="test/test")
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
     access_connector = AccessConnector(
         id=azure_resource,
