@@ -877,12 +877,18 @@ def make_pipeline(ws, make_random, make_notebook):
 
 
 @pytest.fixture
-def make_warehouse(ws, make_random):
+def make_warehouse(
+    ws: WorkspaceClient, make_random: Callable[[int], str]
+) -> Generator[Callable[..., Wait[GetWarehouseResponseExt]], None, None]:
+    # Use custom client that is aware of the 'disable_uc' property.
+    warehouses = WarehousesAPIExt(ws.api_client)
+
     def create(
         *,
         warehouse_name: str | None = None,
         warehouse_type: CreateWarehouseRequestWarehouseType | None = None,
         cluster_size: str | None = None,
+        disable_uc: bool | None = None,
         max_num_clusters: int = 1,
         enable_serverless_compute: bool = False,
         **kwargs,
@@ -895,9 +901,10 @@ def make_warehouse(ws, make_random):
             cluster_size = "2X-Small"
 
         remove_after_tags = EndpointTags(custom_tags=[EndpointTagPair(key="RemoveAfter", value=get_test_purge_time())])
-        return ws.warehouses.create(
+        return warehouses.create(
             name=warehouse_name,
             cluster_size=cluster_size,
+            disable_uc=disable_uc,
             warehouse_type=warehouse_type,
             max_num_clusters=max_num_clusters,
             enable_serverless_compute=enable_serverless_compute,
@@ -905,7 +912,7 @@ def make_warehouse(ws, make_random):
             **kwargs,
         )
 
-    yield from factory("warehouse", create, lambda item: ws.warehouses.delete(item.id))
+    yield from factory("warehouse", create, lambda item: warehouses.delete(item.id))
 
 
 def _is_in_debug() -> bool:
