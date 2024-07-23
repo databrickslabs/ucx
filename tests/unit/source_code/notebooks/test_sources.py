@@ -12,14 +12,16 @@ from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
 @pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
 def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup):
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), content)
+    linter = FileLinter(
+        LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, content
+    )
     advices = list(linter.lint())
     assert not advices
 
 
 @pytest.mark.parametrize("path", ["xyz.scala", "xyz.r", "xyz.sh"])
 def test_file_linter_lints_not_yet_supported_language(path, migration_index, mock_path_lookup):
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), "")
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, "")
     advices = list(linter.lint())
     assert [advice.code for advice in advices] == ["unsupported-language"]
 
@@ -32,7 +34,7 @@ class FriendFileLinter(FileLinter):
 
 def test_checks_encoding_of_pseudo_file(migration_index, mock_path_lookup):
     linter = FriendFileLinter(
-        LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path("whatever"), "a=b"
+        LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path("whatever"), None, "a=b"
     )
     assert linter.source_code() == "a=b"
 

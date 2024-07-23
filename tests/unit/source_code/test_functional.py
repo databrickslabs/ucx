@@ -70,7 +70,7 @@ class Functional:
     @classmethod
     def for_child(cls, child: str, parents: list[str]) -> Functional:
         child_path = cls._location / child
-        parent_paths = [ cls._location / parent for parent in parents ]
+        parent_paths = [cls._location / parent for parent in parents]
         return Functional(child_path, parent_paths)
 
     @classmethod
@@ -118,7 +118,7 @@ class Functional:
         print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
-        linter = FileLinter(ctx, path_lookup, session_state, self.path)
+        linter = FileLinter(ctx, path_lookup, session_state, self.path, self.parents)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
