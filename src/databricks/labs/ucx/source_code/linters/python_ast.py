@@ -259,6 +259,12 @@ class Tree:
             return Tree(self._node.expr).is_from_module(module_name)
         return False
 
+    def has_global(self, name: str) -> bool:
+        if not isinstance(self.node, Module):
+            return False
+        self_module: Module = cast(Module, self.node)
+        return self_module.globals.get(name, None) is not None
+
 
 class TreeVisitor:
 

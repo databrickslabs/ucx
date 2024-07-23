@@ -10,6 +10,7 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.Logger(__name__)
@@ -195,6 +196,31 @@ class DependencyGraph:
             if dependency.visit(visit_node, visited):
                 return True
         return False
+
+    def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
+        maybe = self.locate_dependency(root)
+        assert maybe.graph  # assume caller knows what they're doing
+        route: list[Dependency] = []
+
+        def compute_route(graph: DependencyGraph) -> bool:
+            route.append(graph.dependency)
+            for dependency in graph.local_dependencies:
+                if dependency.path == leaf:
+                    return True
+            for dependency in graph.local_dependencies:
+                sub_route = self._compute_route(dependency.path, leaf, visited)
+                if len(sub_route) > 0:
+                    route.extend(sub_route)
+                    return True
+            route.pop()
+            return False
+
+        maybe.graph.visit(compute_route, visited)
+        return route
+
+    def compute_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
+        route = self._compute_route(root, leaf, set())
+        return InheritedContext.from_route(route, leaf)
 
     def new_graph_builder_context(self):
         return GraphBuilderContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
@@ -451,3 +477,17 @@ class MaybeGraph:
     @property
     def failed(self):
         return len(self.problems) > 0
+
+
+class InheritedContext:
+
+    @classmethod
+    def from_route(cls, route: list[Dependency], leaf: Path) -> InheritedContext:
+        return InheritedContext(None)
+
+    def __init__(self, tree: Tree | None):
+        self._tree = tree
+
+    @property
+    def tree(self):
+        return self._tree

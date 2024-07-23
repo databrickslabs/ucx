@@ -22,7 +22,7 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
 )
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem, InheritedContext
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
@@ -367,14 +367,14 @@ class FileLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         path: Path,
-        parents: list[Path] | None = None,
+        inherited_context: InheritedContext | None = None,
         content: str | None = None,
     ):
         self._ctx: LinterContext = ctx
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._path = path
-        self._parents = parents
+        self._inherited_context = inherited_context
         self._content = content
 
     @cached_property
