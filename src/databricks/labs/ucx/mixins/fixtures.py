@@ -52,6 +52,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
+from databricks.labs.ucx.mixins.sql import GetWarehouseResponseExt, WarehousesAPIExt
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
