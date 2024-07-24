@@ -1482,7 +1482,7 @@ workspace.
 
 **Solution:** The Databricks CLI provides an option to select the
 [<u>profile</u>](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
-using "*--profile \<profile_name\>*" or "*-p \<profile_name\>*". You can
+using `--profile \<profile_name\>` or `-p \<profile_name\>`. You can
 test that the correct workspace is getting selected by running any
 Databricks CLI command. For example, you can run `databricks clusters
 list -p prod` and check that the Prod clusters are being returned. Once
