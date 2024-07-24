@@ -14,7 +14,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonGraphBuilder
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -46,20 +46,20 @@ class LocalFile(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
             context = parent.new_graph_builder_context()
-            builder = PythonGraphBuilder(context, self._original_code)
-            return builder.build_graph()
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            return analyzer.build_graph()
         # supported language that does not generate dependencies
         if self._language is CellLanguage.SQL:
             return []
         logger.warning(f"Unsupported language: {self._language.language}")
         return []
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         if self._language is CellLanguage.PYTHON:
             context = graph.new_graph_builder_context()
-            builder = PythonGraphBuilder(context, self._original_code)
-            return builder.build_inherited_context(child_path)
-        return InheritedContext(None), False
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            return analyzer.build_inherited_context(child_path)
+        return InheritedContext(None, False)
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"
@@ -88,7 +88,7 @@ class Folder(SourceContainer):
             dependency = Dependency(loader, child_path)
             yield from parent.register_dependency(dependency).problems
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         raise NotImplementedError("Should never get there!")
 
     def __repr__(self):
@@ -232,7 +232,7 @@ class StubContainer(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         return []
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         raise NotImplementedError("Should never get there!")
 
 

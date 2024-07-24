@@ -135,7 +135,7 @@ class Functional:
         container = root_dependency.load(path_lookup)
         assert container is not None
         container.build_dependency_graph(root_graph)
-        inference_context = root_graph.compute_inherited_context(self.parent, self.path)
+        inference_context = root_graph.build_inherited_context(self.parent, self.path)
         linter = FileLinter(ctx, path_lookup, session_state, self.path, inference_context)
         return linter.lint()
 

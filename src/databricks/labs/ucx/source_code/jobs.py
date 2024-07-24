@@ -309,7 +309,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._data_security_mode = new_cluster.data_security_mode
         return []
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         raise NotImplementedError("Should never get there!")
 
 

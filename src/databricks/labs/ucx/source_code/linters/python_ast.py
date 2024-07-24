@@ -4,7 +4,7 @@ from abc import ABC
 import logging
 import re
 from collections.abc import Iterable
-from typing import TypeVar, cast
+from typing import TypeVar, cast, Any
 
 from astroid import (  # type: ignore
     Assign,
@@ -211,6 +211,7 @@ class Tree:
         return None
 
     def append_tree(self, tree: Tree) -> Tree:
+        """ returns the appended tree, not the consolidated one! """
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
@@ -264,6 +265,28 @@ class Tree:
             return False
         self_module: Module = cast(Module, self.node)
         return self_module.globals.get(name, None) is not None
+
+    def nodes_between(self, first_line: int, last_line: int) -> list[NodeNG]:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't extract nodes from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        nodes: list[NodeNG] = []
+        for node in self_module.body:
+            if node.lineno < first_line:
+                continue
+            if node.lineno > last_line:
+                break
+            nodes.append(node)
+        return nodes
+
+    def globals_between(self, first_line: int, last_line: int) -> dict[str, Any]:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't extract globals from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        globs: dict[str, Any] = {}
+        for key, value in self_module.globals:
+            pass
+        return globs
 
 
 class TreeVisitor:

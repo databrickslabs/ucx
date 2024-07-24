@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     PipCell,
     PythonCell,
     PipCommand,
-    PythonGraphBuilder,
+    PythonCodeAnalyzer,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import MagicLine
 from databricks.labs.ucx.source_code.notebooks.loaders import (
@@ -183,10 +183,10 @@ def test_graph_builder_parse_error(
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     graph.new_graph_builder_context()
-    builder = PythonGraphBuilder(graph.new_graph_builder_context(), "this is not valid python")
+    analyzer = PythonCodeAnalyzer(graph.new_graph_builder_context(), "this is not valid python")
 
     # Run the test.
-    problems = builder.build_graph()
+    problems = analyzer.build_graph()
 
     # Check results.
     assert [

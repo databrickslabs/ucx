@@ -64,14 +64,15 @@ def test_graph_computes_route(mock_path_lookup, simple_dependency_resolver):
     assert [dep.path for dep in route] == [grand_parent, parent]
 
 
-def test_graph_computes_inherited_context(mock_path_lookup, simple_dependency_resolver):
+def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_resolver):
     parent = mock_path_lookup.cwd / "functional/grand_parent_that_runs_parent_that_runs_child.py"
     child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
     dependency = Dependency(FileLoader(), parent)
     root_graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
-    inference_context = root_graph.compute_inherited_context(parent, child)
+    inference_context = root_graph.build_inherited_context(parent, child)
+    assert inference_context.found is True
     assert inference_context.tree is not None
     assert inference_context.tree.has_global("some_table_name")
     assert not inference_context.tree.has_global("other_table_name")

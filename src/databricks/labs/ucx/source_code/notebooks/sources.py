@@ -107,14 +107,14 @@ class Notebook(SourceContainer):
             problems.extend(cell_problems)
         return problems
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> tuple[InheritedContext, bool]:
-        context = InheritedContext(None)
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        context = InheritedContext(None, False)
         for cell in self._cells:
-            child, found = cell.build_inherited_context(graph, child_path)
-            context = context.append(child)
-            if found:
-                return context, found
-        return context, False
+            child = cell.build_inherited_context(graph, child_path)
+            context = context.append(child, True)
+            if context.found:
+                return context
+        return context
 
     def __repr__(self):
         return f"<Notebook {self._path}>"
