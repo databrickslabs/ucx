@@ -4,7 +4,7 @@ from abc import ABC
 import logging
 import re
 from collections.abc import Iterable
-from typing import TypeVar, cast, Any
+from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
     Assign,
@@ -194,14 +194,29 @@ class Tree:
             nodes.append(node)
         return nodes
 
-    def globals_between(self, _first_line: int, _last_line: int) -> dict[str, Any]:
+    def globals_between(self, first_line: int, last_line: int) -> dict[str, list[NodeNG]]:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't extract globals from {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
-        globs: dict[str, Any] = {}
-        for _key, _value in self_module.globals:
-            pass
+        globs: dict[str, list[NodeNG]] = {}
+        for key, nodes in self_module.globals.items():
+            nodes_in_scope: list[NodeNG] = []
+            for node in nodes:
+                if node.lineno < first_line or node.lineno > last_line:
+                    continue
+                nodes_in_scope.append(node)
+            if len(nodes_in_scope) > 0:
+                globs[key] = nodes_in_scope
         return globs
+
+    def line_count(self):
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't count lines from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        nodes_count = len(self_module.body)
+        if nodes_count == 0:
+            return 0
+        return 1 + self_module.body[nodes_count - 1].lineno - self_module.body[0].lineno
 
 
 class TreeHelper(ABC):

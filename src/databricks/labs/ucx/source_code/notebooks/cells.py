@@ -458,6 +458,12 @@ class PythonCodeAnalyzer:
             context = context.append(child_context, True)
             if context.found:
                 return context
+        line_count = tree.line_count()
+        if last_line < line_count:
+            nodes = tree.nodes_between(last_line + 1, line_count)
+            context.tree.append_nodes(nodes)
+            globs = tree.globals_between(last_line + 1, line_count)
+            context.tree.append_globals(globs)
         return context
 
     def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:

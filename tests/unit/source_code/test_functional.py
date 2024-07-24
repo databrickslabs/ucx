@@ -16,6 +16,7 @@ from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -130,7 +131,9 @@ class Functional:
             linter = FileLinter(ctx, path_lookup, session_state, self.path)
             return linter.lint()
         # use dependency graph built from parent
-        root_dependency = Dependency(FileLoader(), self.parent)
+        is_notebook = self._is_notebook(ctx, path_lookup, session_state, self.parent)
+        loader = NotebookLoader() if is_notebook else FileLoader()
+        root_dependency = Dependency(loader, self.parent)
         root_graph = DependencyGraph(root_dependency, None, dependency_resolver, path_lookup, session_state)
         container = root_dependency.load(path_lookup)
         assert container is not None
@@ -138,6 +141,18 @@ class Functional:
         inference_context = root_graph.build_inherited_context(self.parent, self.path)
         linter = FileLinter(ctx, path_lookup, session_state, self.path, inference_context)
         return linter.lint()
+
+    def _is_notebook(
+        self, ctx: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, path: Path
+    ) -> bool:
+
+        class LocalFileLinter(FileLinter):
+
+            def is_notebook(self):
+                return self._is_notebook()
+
+        linter = LocalFileLinter(ctx, path_lookup, session_state, path)
+        return linter.is_notebook()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
         with self.path.open('rb') as f:

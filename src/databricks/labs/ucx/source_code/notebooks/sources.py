@@ -141,14 +141,22 @@ class NotebookLinter:
         return cls(ctx, path_lookup, session_state, notebook)
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, notebook: Notebook
+        self,
+        context: LinterContext,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        notebook: Notebook,
+        inherited_context: InheritedContext | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._notebook: Notebook = notebook
-        # reuse Python linter, which accumulates statements for improved inference
+        # reuse Python linter across related files and notebook cells
+        # this is required in order to accumulate statements for improved inference
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
+        if inherited_context is not None and inherited_context.tree is not None:
+            self._python_linter.append_tree(inherited_context.tree)
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
@@ -441,6 +449,8 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
+                if self._inherited_context is not None and isinstance(linter, PythonSequentialLinter):
+                    linter.append_tree(self._inherited_context.tree)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
@@ -448,5 +458,7 @@ class FileLinter:
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
-        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook)
+        notebook_linter = NotebookLinter(
+            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_context
+        )
         yield from notebook_linter.lint()
