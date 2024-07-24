@@ -66,18 +66,6 @@ class Rule:
     def as_hms_table_key(self):
         return f"hive_metastore.{self.src_schema}.{self.src_table}"
 
-@dataclass
-class TableNotMapped:
-    workspace_name: str
-    src_table: str
-
-    @classmethod
-    def initial(cls, workspace_name: str, table: str) -> "TableNotMapped":
-        return cls(
-            workspace_name=workspace_name,
-            src_table=table,
-        )
-
 
 @dataclass
 class TableToMigrate:
@@ -93,7 +81,6 @@ class TableToMigrate:
 
 class TableMapping:
     FILENAME = 'mapping.csv'
-    FILENAME_UNMAPPED = 'unmapped_tables.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
     def __init__(
@@ -116,21 +103,10 @@ class TableMapping:
         for table in tables_snapshot:
             yield Rule.initial(workspace_name, catalog_name, table, self._recon_tolerance_percent)
 
-    @staticmethod
-    def tables_not_mapped(tables_crawler: TablesCrawler, current_tables: list[Rule], workspace_name: str):
-        crawled_tables_keys = [crawled_table.key for crawled_table in tables_crawler.snapshot()]
-        hms_table_keys = [rule.as_hms_table_key for rule in current_tables]
-        for crawled_table_key in crawled_tables_keys:
-            if crawled_table_key not in hms_table_keys:
-                yield TableNotMapped.initial(workspace_name, crawled_table_key)
-
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
         current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        unmapped_tables = self.tables_not_mapped(tables, list(current_tables), workspace_name)
-        if len(unmapped_tables) != 0:
-            self._installation.save(list(unmapped_tables), filename=self.FILENAME_UNMAPPED)
         return self._installation.save(list(current_tables), filename=self.FILENAME)
 
     def load(self) -> list[Rule]:
