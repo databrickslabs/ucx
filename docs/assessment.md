@@ -853,7 +853,7 @@ The `.sequenceFile` pattern was found. Use "Assigned" access mode compute or mak
 ### AF313.18 - SparkContext ( `.setJobGroup` )
 
 The `.setJobGroup` pattern was found.
-`spark.addTag()` can attach a tag, and `getTags()` and `interruptTag(tag)` can be used to act upon the presence/absence of a tag. These APIs only work with Spark Connect (Shared Compute Mode) and will not work in “Assigned” access mode.
+`spark.addTag()` can attach a tag, and `getTags()` and `interruptTag(tag)` can be used to act upon the presence/absence of a tag. These APIs only work with Spark Connect (Shared Compute Mode) and will not work in "Assigned" access mode.
 
 [[back to top](#migration-assessment-report)]
 
