@@ -1529,7 +1529,7 @@ under Data Access Configuration of SQL Warehouse Admin Settings.
 
 ### Verify the Installation
 
-Once the UCX command "*databricks labs install ucx*" has completed
+Once the UCX command `databricks labs install ucx` has completed
 successfully, the installation can be verified with the following steps:
 
 1.  Go to the Databricks Catalog Explorer and check if a new schema for
