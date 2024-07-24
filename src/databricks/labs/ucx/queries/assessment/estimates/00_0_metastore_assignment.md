@@ -18,4 +18,4 @@ If you haven't created a metastore yet, follow the docs below to attach your wor
 If any incompatible submit runs has been detected, follow the steps highlighted below:
 
 1. Find out the incompatible jobs in your local orchestrator based on the object_id identified by UCX
-2. Change the job configuration to include the following in the ClusterInfo:   “data_security_mode”: “NONE”
+2. Change the job configuration to include the following in the ClusterInfo:   "data_security_mode": "NON"
