@@ -213,9 +213,12 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
 @pytest.mark.parametrize(
     "child, parent",
     [
-        ("_child_that_uses_value_from_parent.py", "parent_that_runs_child_that_uses_value_from_parent.py"),
-        ("_child_that_uses_value_from_parent.py", "grand_parent_that_runs_parent_that_runs_child.py"),
+        ("_child_that_uses_value_from_parent.py", "parent_that_magic_runs_child_that_uses_value_from_parent.py"),
+        ("_child_that_uses_value_from_parent.py", "grand_parent_that_magic_runs_parent_that_magic_runs_child.py"),
         ("_child_that_uses_missing_value.py", "parent_that_dbutils_runs_child_that_misses_value_from_parent.py"),
+        ("_child_that_uses_value_from_parent.py", "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"),
+        ("_child_that_uses_missing_value.py", "parent_that_imports_child_that_misses_value_from_parent.py"),
+        ("_child_that_uses_value_from_parent.py", "grand_parent_that_imports_parent_that_magic_runs_child.py"),
     ],
 )
 def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simple_dependency_resolver) -> None:

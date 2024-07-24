@@ -7,7 +7,6 @@ from pathlib import Path
 from collections.abc import Callable
 
 from astroid import (  # type: ignore
-    Module,
     NodeNG,
 )
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
@@ -538,10 +537,6 @@ class InheritedContext:
         if tree is None:
             return InheritedContext(self._tree, found)
         if self._tree is None:
-            node = Module("root")
-            # ensure locals to not hold copies lof globals otherwise
-            # it misleads the inference engine looking for a non-reachable value
-            node.locals = {}
-            self._tree = Tree(node)
+            self._tree = Tree.new_module()
         self._tree.append_tree(context.tree)
         return InheritedContext(self._tree, found)

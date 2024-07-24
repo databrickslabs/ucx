@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TypeVar, cast
 
-from astroid import Call, Const, ImportFrom, Module, Name, NodeNG  # type: ignore
+from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
@@ -443,7 +443,7 @@ class PythonCodeAnalyzer:
             return InheritedContext(None, False)
         if len(nodes) == 0:
             return InheritedContext(tree, False)
-        context = InheritedContext(Tree(Module("root")), False)
+        context = InheritedContext(Tree.new_module(), False)
         last_line = -1
         for base_node in nodes:
             # append nodes

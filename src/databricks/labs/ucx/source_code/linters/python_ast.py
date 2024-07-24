@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from abc import ABC
 import logging
 import re
@@ -84,6 +85,11 @@ class Tree:
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
 
+    @classmethod
+    def new_module(cls):
+        node = Module("root")
+        return Tree(node)
+
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
 
@@ -133,18 +139,37 @@ class Tree:
         self.append_nodes(tree_module.body)
         self.append_globals(tree_module.globals)
         # the following may seem strange but it's actually ok to use the original module as tree root
+        # because each node points to the correct parent (practically, the tree is now only a list of statements)
         return tree
 
     def append_globals(self, globs: dict):
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
-        for name, value in globs.items():
+        for name, values in globs.items():
+            # need local copies that we can fiddle with
+            values = self._clone_values_removing_lineno(values)
             statements: list[Expr] = self_module.globals.get(name, None)
             if statements is None:
-                self_module.globals[name] = list(value)  # clone the source list to avoid side-effects
+                self_module.globals[name] = list(values)  # clone the source list to avoid side-effects
                 continue
-            statements.extend(value)
+            statements.extend(values)
+
+    @classmethod
+    def _clone_values_removing_lineno(cls, values: list[NodeNG]) -> list[NodeNG]:
+        copies = []
+        for value in values:
+            # hacky stuff for fooling Astroid's inference engine
+            # the engine checks line numbers to skip variables that are not in scope of the current frame
+            # for globals we fool the engine by pretending that the assign statement lineno is None
+            # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L101
+            if isinstance(value.parent, Assign):
+                parent = copy.copy(value.parent)
+                parent.fromlineno = None
+                value = copy.copy(value)
+                value.parent = parent
+            copies.append(value)
+        return copies
 
     def append_nodes(self, nodes: list[NodeNG]):
         if not isinstance(self.node, Module):
