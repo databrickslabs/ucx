@@ -490,12 +490,17 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self):
+    def run(self) -> bool:
+        """Run workflow installation.
+
+        Returns
+            bool :
+                True, installation finished. False installation did not finish.
+        """
         logger.info(f"Installing UCX v{self._product_info.version()}")
-        install_tasks = [self._create_database()]  # Need the database before creating the dashboards
-        install_tasks.extend(self._create_dashboards())
+        install_tasks = [self._create_database_and_dashboards, self._workflows_installer.create_jobs]
         Threads.strict("installing components", install_tasks)
-        readme_url = self._workflows_installer.create_jobs()
+        readme_url = self._installation.workspace_link("README")
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
@@ -503,6 +508,10 @@ class WorkspaceInstallation(InstallationMixin):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
         return True
+
+    def _create_database_and_dashboards(self) -> None:
+        self._create_database()  # Need the database before creating the dashboards
+        Threads.strict("installing dashboards", list(self._get_create_dashboard_tasks()))
 
     def _create_database(self):
         try:
@@ -519,8 +528,8 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
-    def _create_dashboards(self) -> Iterable[Callable[[], None]]:
-        """Create the lakeview dashboards from the SQL queries in the queries subfolders"""
+    def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
+        """Get the tasks to create Lakeview dashboards from the SQL queries in the queries subfolders"""
         logger.info("Creating dashboards...")
         dashboard_folder_remote = f"{self._installation.install_folder()}/dashboards"
         try:
@@ -544,7 +553,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     # TODO: Confirm the assumption below is correct
     # An InternalError may occur when the dashboard is being published and the database does not exists
-    @retried(on=[InternalError], timeout=timedelta(minutes=2))
+    @retried(on=[InternalError], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
