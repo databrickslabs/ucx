@@ -381,6 +381,21 @@ def test_migrate_credentials_limit_azure(ws):
         migrate_credentials(ws, prompts, ctx=ctx)
 
 
+def test_migrate_credentials_limit_aws(ws):
+    ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
+
+    aws_resources = create_autospec(AWSResources)
+    aws_resources.validate_connection.return_value = {"Account": "123456789012"}
+    prompts = MockPrompts({'.*': 'yes'})
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
+    migrate_credentials(ws, prompts, ctx=ctx)
+    ws.storage_credentials.list.assert_called()
+
+    ws.storage_credentials.list.return_value = 201 * [StorageCredentialInfo(id="1234")]
+    with pytest.raises(RuntimeWarning):
+        migrate_credentials(ws, prompts, ctx=ctx)
+
+
 def test_create_master_principal_not_azure(ws):
     ws.config.is_azure = False
     ws.config.is_aws = False

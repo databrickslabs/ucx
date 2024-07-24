@@ -206,6 +206,8 @@ class AWSResourcePermissions:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
+        if len(list(self._ws.storage_credentials.list())) > 200:
+            raise RuntimeWarning('Migration will breach UC limits (Storage Credentials > 200).')
         external_locations = self._locations.snapshot()
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}
