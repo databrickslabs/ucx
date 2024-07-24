@@ -118,51 +118,6 @@ class Tree:
                 return self._node.body[0]
         return None
 
-    @classmethod
-    def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
-        """Given a call-chain, extract its sub-call by method name (if it has one)"""
-        assert isinstance(call, Call)
-        node = call
-        while True:
-            func = node.func
-            if not isinstance(func, Attribute):
-                return None
-            if func.attrname == name:
-                return node
-            if not isinstance(func.expr, Call):
-                return None
-            node = func.expr
-
-    @classmethod
-    def args_count(cls, node: Call) -> int:
-        """Count the number of arguments (positionals + keywords)"""
-        assert isinstance(node, Call)
-        return len(node.args) + len(node.keywords)
-
-    @classmethod
-    def get_arg(
-        cls,
-        node: Call,
-        arg_index: int | None,
-        arg_name: str | None,
-    ) -> NodeNG | None:
-        """Extract the call argument identified by an optional position or name (if it has one)"""
-        assert isinstance(node, Call)
-        if arg_index is not None and len(node.args) > arg_index:
-            return node.args[arg_index]
-        if arg_name is not None:
-            arg = [kw.value for kw in node.keywords if kw.arg == arg_name]
-            if len(arg) == 1:
-                return arg[0]
-        return None
-
-    @classmethod
-    def is_none(cls, node: NodeNG) -> bool:
-        """Check if the given AST expression is the None constant"""
-        if not isinstance(node, Const):
-            return False
-        return node.value is None
-
     def __repr__(self):
         truncate_after = 32
         code = repr(self._node)
@@ -170,48 +125,8 @@ class Tree:
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
 
-    @classmethod
-    def get_full_attribute_name(cls, node: Attribute) -> str:
-        return cls._get_attribute_value(node)
-
-    @classmethod
-    def get_function_name(cls, node: Call) -> str | None:
-        if not isinstance(node, Call):
-            return None
-        if isinstance(node.func, Attribute):
-            return node.func.attrname
-        if isinstance(node.func, Name):
-            return node.func.name
-        return None
-
-    @classmethod
-    def get_full_function_name(cls, node: Call) -> str | None:
-        if not isinstance(node, Call):
-            return None
-        if isinstance(node.func, Attribute):
-            return cls._get_attribute_value(node.func)
-        if isinstance(node.func, Name):
-            return node.func.name
-        return None
-
-    @classmethod
-    def _get_attribute_value(cls, node: Attribute):
-        if isinstance(node.expr, Name):
-            return node.expr.name + '.' + node.attrname
-        if isinstance(node.expr, Attribute):
-            parent = cls._get_attribute_value(node.expr)
-            return node.attrname if parent is None else parent + '.' + node.attrname
-        if isinstance(node.expr, Call):
-            name = cls.get_full_function_name(node.expr)
-            return node.attrname if name is None else name + '.' + node.attrname
-        name = type(node.expr).__name__
-        if name not in missing_handlers:
-            missing_handlers.add(name)
-            logger.debug(f"Missing handler for {name}")
-        return None
-
     def append_tree(self, tree: Tree) -> Tree:
-        """ returns the appended tree, not the consolidated one! """
+        """returns the appended tree, not the consolidated one!"""
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
@@ -279,14 +194,102 @@ class Tree:
             nodes.append(node)
         return nodes
 
-    def globals_between(self, first_line: int, last_line: int) -> dict[str, Any]:
+    def globals_between(self, _first_line: int, _last_line: int) -> dict[str, Any]:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't extract globals from {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         globs: dict[str, Any] = {}
-        for key, value in self_module.globals:
+        for _key, _value in self_module.globals:
             pass
         return globs
+
+
+class TreeHelper(ABC):
+
+    @classmethod
+    def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
+        """Given a call-chain, extract its sub-call by method name (if it has one)"""
+        assert isinstance(call, Call)
+        node = call
+        while True:
+            func = node.func
+            if not isinstance(func, Attribute):
+                return None
+            if func.attrname == name:
+                return node
+            if not isinstance(func.expr, Call):
+                return None
+            node = func.expr
+
+    @classmethod
+    def args_count(cls, node: Call) -> int:
+        """Count the number of arguments (positionals + keywords)"""
+        assert isinstance(node, Call)
+        return len(node.args) + len(node.keywords)
+
+    @classmethod
+    def get_arg(
+        cls,
+        node: Call,
+        arg_index: int | None,
+        arg_name: str | None,
+    ) -> NodeNG | None:
+        """Extract the call argument identified by an optional position or name (if it has one)"""
+        assert isinstance(node, Call)
+        if arg_index is not None and len(node.args) > arg_index:
+            return node.args[arg_index]
+        if arg_name is not None:
+            arg = [kw.value for kw in node.keywords if kw.arg == arg_name]
+            if len(arg) == 1:
+                return arg[0]
+        return None
+
+    @classmethod
+    def is_none(cls, node: NodeNG) -> bool:
+        """Check if the given AST expression is the None constant"""
+        if not isinstance(node, Const):
+            return False
+        return node.value is None
+
+    @classmethod
+    def get_full_attribute_name(cls, node: Attribute) -> str:
+        return cls._get_attribute_value(node)
+
+    @classmethod
+    def get_function_name(cls, node: Call) -> str | None:
+        if not isinstance(node, Call):
+            return None
+        if isinstance(node.func, Attribute):
+            return node.func.attrname
+        if isinstance(node.func, Name):
+            return node.func.name
+        return None
+
+    @classmethod
+    def get_full_function_name(cls, node: Call) -> str | None:
+        if not isinstance(node, Call):
+            return None
+        if isinstance(node.func, Attribute):
+            return cls._get_attribute_value(node.func)
+        if isinstance(node.func, Name):
+            return node.func.name
+        return None
+
+    @classmethod
+    def _get_attribute_value(cls, node: Attribute):
+        if isinstance(node.expr, Name):
+            return node.expr.name + '.' + node.attrname
+        if isinstance(node.expr, Attribute):
+            parent = cls._get_attribute_value(node.expr)
+            return node.attrname if parent is None else parent + '.' + node.attrname
+        if isinstance(node.expr, Call):
+            name = cls.get_full_function_name(node.expr)
+            return node.attrname if name is None else name + '.' + node.attrname
+        name = type(node.expr).__name__
+        if name not in missing_handlers:
+            missing_handlers.add(name)
+            logger.debug(f"Missing handler for {name}")
+        return None
 
 
 class TreeVisitor:

@@ -8,7 +8,7 @@ from ast import parse as parse_python
 from collections.abc import Callable, Iterable
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from astroid import Call, Const, ImportFrom, Module, Name, NodeNG  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
@@ -469,10 +469,10 @@ class PythonCodeAnalyzer:
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(import_problems)
-        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
+        magic_lines, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
-        nodes = syspath_changes + run_calls + import_sources + magic_commands
         # need to evaluate things in intertwined sequence so concat and sort them
+        nodes: list[NodeBase] = cast(list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines)
         nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return tree, nodes, problems
 

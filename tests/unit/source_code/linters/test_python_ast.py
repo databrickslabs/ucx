@@ -1,7 +1,7 @@
 import pytest
 from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Name  # type: ignore
 
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 
 
@@ -23,7 +23,7 @@ def test_extract_call_by_name():
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = Tree.extract_call_by_name(stmt.value, "m2")
+    act = TreeHelper.extract_call_by_name(stmt.value, "m2")
     assert isinstance(act, Call)
     assert isinstance(act.func, Attribute)
     assert act.func.attrname == "m2"
@@ -34,7 +34,7 @@ def test_extract_call_by_name_none():
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = Tree.extract_call_by_name(stmt.value, "m5000")
+    act = TreeHelper.extract_call_by_name(stmt.value, "m5000")
     assert act is None
 
 
@@ -60,7 +60,7 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected):
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = Tree.get_arg(stmt.value, arg_index, arg_name)
+    act = TreeHelper.get_arg(stmt.value, arg_index, arg_name)
     if expected is None:
         assert act is None
     else:
@@ -85,7 +85,7 @@ def test_args_count(code, expected):
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = Tree.args_count(stmt.value)
+    act = TreeHelper.args_count(stmt.value)
     assert act == expected
 
 
