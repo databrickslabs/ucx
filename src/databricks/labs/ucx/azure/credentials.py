@@ -278,9 +278,6 @@ class ServicePrincipalMigration(SecretsMixin):
 
         execution_results = []
         for access_connector, url in access_connectors:
-            if len(list(self._ws.storage_credentials.list())) > 200:
-                raise RuntimeWarning('Migration will breach UC limits (Storage Credentials > 200).')
-
             storage_credential_info = self._ws.storage_credentials.create(
                 access_connector.name,
                 azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
