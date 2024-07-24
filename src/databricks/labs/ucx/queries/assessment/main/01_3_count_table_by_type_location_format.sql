@@ -1,4 +1,4 @@
-/* --title 'Table counts by type, location and format' --width 2 --height 4 */
+/* --title 'Table counts by type, location and format' --width 2 --height 3 */
 SELECT
   object_type AS source_table_type,
   table_format AS format,
