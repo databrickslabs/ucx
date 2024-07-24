@@ -1429,7 +1429,7 @@ higher.
 
 **Databricks CLI:** Databricks CLI v0.213 or higher is needed.
 
-**Solution:** Check the current version with "databricks --version". For
+**Solution:** Check the current version with `databricks --version`. For
 lower versions of CLI,
 [<u>update</u>](https://docs.databricks.com/en/dev-tools/cli/install.html#update)
 the Databricks CLI on the local machine.
