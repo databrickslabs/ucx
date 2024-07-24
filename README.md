@@ -1443,8 +1443,8 @@ UCX version.
 **Solution:** Upgrade UCX, and rerun the assessment job before running
 the migration workflows. For some reason, if you want to install a
 specific version of UCX, you can do it using the command
-"databricks labs install ucx@\<version\>", for example,
-"databricks labs install ucx@v0.21.0".
+`databricks labs install ucx@\<version\>`, for example,
+`databricks labs install ucx@v0.21.0`.
 
 [[back to top](#databricks-labs-ucx)]
 
