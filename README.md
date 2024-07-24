@@ -1484,8 +1484,8 @@ workspace.
 [<u>profile</u>](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
 using "*--profile \<profile_name\>*" or "*-p \<profile_name\>*". You can
 test that the correct workspace is getting selected by running any
-Databricks CLI command. For example, you can run "*databricks clusters
-list -p prod*" and check that the Prod clusters are being returned. Once
+Databricks CLI command. For example, you can run `databricks clusters
+list -p prod` and check that the Prod clusters are being returned. Once
 the profile is verified, you can run UCX install for that specific
 profile: `databricks labs install ucx -p prod`.
 
