@@ -6,53 +6,43 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
-from databricks.sdk.service.provisioning import Workspace
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.catalog import ExternalLocationInfo, StorageCredentialInfo
-from databricks.sdk.service.compute import ClusterDetails, ClusterSource
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.sdk.errors.platform import BadRequest
+from databricks.sdk.service import iam, jobs, sql
+from databricks.sdk.service.catalog import (ExternalLocationInfo,
+                                            StorageCredentialInfo)
+from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.provisioning import Workspace
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureResources, AccessConnector, AzureResource
-from databricks.labs.ucx.cli import (
-    alias,
-    assign_metastore,
-    cluster_remap,
-    create_account_groups,
-    create_catalogs_schemas,
-    create_missing_principals,
-    create_table_mapping,
-    create_uber_principal,
-    ensure_assessment_run,
-    installations,
-    logs,
-    manual_workspace_info,
-    migrate_credentials,
-    migrate_dbsql_dashboards,
-    migrate_local_code,
-    migrate_locations,
-    migrate_tables,
-    move,
-    open_remote_config,
-    principal_prefix_access,
-    repair_run,
-    revert_cluster_remap,
-    revert_dbsql_dashboards,
-    revert_migrated_tables,
-    show_all_metastores,
-    skip,
-    sync_workspace_info,
-    validate_external_locations,
-    validate_groups_membership,
-    workflows,
-    join_collection,
-)
+from databricks.labs.ucx.azure.resources import (AccessConnector,
+                                                 AzureResource, AzureResources)
+from databricks.labs.ucx.cli import (alias, assign_metastore, cluster_remap,
+                                     create_account_groups,
+                                     create_catalogs_schemas,
+                                     create_missing_principals,
+                                     create_table_mapping,
+                                     create_uber_principal,
+                                     ensure_assessment_run, installations,
+                                     join_collection, logs,
+                                     manual_workspace_info,
+                                     migrate_credentials,
+                                     migrate_dbsql_dashboards,
+                                     migrate_local_code, migrate_locations,
+                                     migrate_tables, move, open_remote_config,
+                                     principal_prefix_access, repair_run,
+                                     revert_cluster_remap,
+                                     revert_dbsql_dashboards,
+                                     revert_migrated_tables,
+                                     show_all_metastores, skip,
+                                     sync_workspace_info,
+                                     validate_external_locations,
+                                     validate_groups_membership, workflows)
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
