@@ -1423,7 +1423,7 @@ Admin privileges required for commands:
 
 **Python:** UCX needs Python version 3.10 or later.
 
-**Solution:** Check the current version using "python --version". If the
+**Solution:** Check the current version using `python --version`. If the
 version is lower than 3.10, upgrade the local Python version to 3.10 or
 higher.
 
