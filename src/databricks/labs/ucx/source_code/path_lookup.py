@@ -35,7 +35,7 @@ class PathLookup:
     def resolve(self, path: Path) -> Path | None:
         try:
             if path.is_absolute() and path.exists():
-                # eliminate “..” components
+                # eliminate ".." components
                 return path.resolve()
         except PermissionError:
             logger.warning(f"Permission denied to access {path}")
@@ -55,7 +55,7 @@ class PathLookup:
             return None
         absolute_path = library_root / path
         if absolute_path.exists():
-            return absolute_path.resolve()  # eliminate “..” components
+            return absolute_path.resolve()  # eliminate ".." components
         return self._resolve_egg_in_library_root(library_root, path)
 
     def _resolve_egg_in_library_root(self, library: Path, path: Path) -> Path | None:
@@ -64,7 +64,7 @@ class PathLookup:
                 continue
             absolute_path = child / path
             if absolute_path.exists():
-                return absolute_path.resolve()  # eliminate “..” components
+                return absolute_path.resolve()  # eliminate ".." components
         return None
 
     @staticmethod
