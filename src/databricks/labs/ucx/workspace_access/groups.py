@@ -644,16 +644,17 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
-        logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes}...")
-        # these attributes can get too large causing the api to timeout
-        # so we're fetching groups without these attributes first
-        # and then calling get on each of them to fetch all attributes
+        logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes} ...")
+        # If members are requested during enumeration the API can time out. In this case we fall back on
+        # a strategy of enumerating the bare minimum and request full attributes for each group individually.
         attributes = scim_attributes.split(",")
         if "members" in attributes:
             attributes.remove("members")
             retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
             get_group = retry_on_internal_error(self._get_group)
-            for group in self._ws.groups.list(attributes=",".join(attributes)):
+            # Limit to the attributes we need for determining if the group is out of scope; the rest are fetched later.
+            scan_attributes = [attribute for attribute in attributes if attribute in {"id", "displayName", "meta"}]
+            for group in self._ws.groups.list(attributes=",".join(scan_attributes)):
                 if self._is_group_out_of_scope(group, resource_type):
                     continue
                 group_with_all_attributes = get_group(group.id)
