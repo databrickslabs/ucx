@@ -154,7 +154,7 @@ The Assessment Report (Main) is the output of the Databricks Labs UCX assessment
 [[back to top](#migration-assessment-report)]
 
 ## Readiness
-This is an overall summary of rediness detailed in the Readiness dashlet. This value is based on the ratio of findings divided by the total number of assets scanned.
+This is an overall summary of readiness detailed in the Readiness dashlet. This value is based on the ratio of findings divided by the total number of assets scanned.
 
 [[back to top](#migration-assessment-report)]
 
@@ -247,7 +247,7 @@ The next row contains the "Table Types" widget
 This widget is a detailed list of each table, it's format, storage type, location property and if a DBFS table approximate table size. Upgrade strategies include:
 - DEEP CLONE or CTAS for DBFS ROOT tables
 - SYNC for DELTA tables (managed or external) for tables stored on a non-DBFS root (Mount point or direct cloud storage path)
-- Managed non DELTA tables need to be upgraded to to Unity Catalog by either:
+- Managed non DELTA tables need to be upgraded to Unity Catalog by either:
    - Use CTAS to convert targeting the Unity Catalog catalog, schema and table name
    - Moved to an EXTERNAL LOCATION and create an EXTERNAL table in Unity Catalog.
 
@@ -355,7 +355,7 @@ using UCX. As a transition strategy, "No Isolation Shared" clusters or "Assigned
 ### AF115 - Uses passthrough config: spark.databricks.passthrough.enabled.
 
 Passthrough security model is not supported by Unity Catalog. Passthrough mode relied upon file based authorization which is incompatible with Fine Grained Access Controls supported by Unity Catalog.
-Recommend mapping your Passthrough security model to a External Location/Volume/Table/View based security model compatible with Unity Catalog.
+Recommend mapping your Passthrough security model to an External Location/Volume/Table/View based security model compatible with Unity Catalog.
 
 [[back to top](#migration-assessment-report)]
 
@@ -524,20 +524,20 @@ Recommend upgrading your shared cluster DBR to 13.3 LTS or greater or using Assi
 The minimum DBR version to access Unity Catalog was not met. The recommendation is to upgrade to the latest Long Term Supported (LTS) version of the Databricks Runtime.
 
 ### AF300.4 - ML Runtime cpu
-The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundry.
+The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundary.
 
 ### AF300.5 - ML Runtime gpu
-The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundry.
+The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundary.
 
 ### AF301.1 - spark.catalog.x
 
-The `spark.catalog.` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. DBR 14.1 and above have made these commands available. Upgrade your DBR version.
+The `spark.catalog.` pattern was found. Commonly used functions in `spark.catalog`, such as `tableExists`, `listTables`, `setCurrentCatalog` are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. DBR 14.1 and above have made these commands available. Upgrade your DBR version.
 
 [[back to top](#migration-assessment-report)]
 
 ### AF301.2 - spark.catalog.x (spark._jsparkSession.catalog)
 
-The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. The corresponding `spark.catalog.x` methods may work on DBR 14.1 and above.
+The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in `spark.catalog`, such as `tableExists`, `listTables`, `setCurrentCatalog` are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. The corresponding `spark.catalog.x` methods may work on DBR 14.1 and above.
 
 [[back to top](#migration-assessment-report)]
 
@@ -687,7 +687,7 @@ The `dbfs:/mnt` is used as a mount point. This is not supported by Unity Catalog
 
 ### AF311.6 - dbfs usage (`dbfs:/`)
 
-The `dbfs:/` pattern was found. DBFS is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES. There may be false positives with this pattern because `dbfs:/Volumes/mycatalog/myschema/myvolume` is ligitamate usage.
+The `dbfs:/` pattern was found. DBFS is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES. There may be false positives with this pattern because `dbfs:/Volumes/mycatalog/myschema/myvolume` is legitimate usage.
 
 Please Note: `dbfs:/Volumes/<catalog>/<schema>/<volume>` is a supported access pattern for spark.
 
@@ -1100,7 +1100,7 @@ Is shortcut for CREATE TABLE DEEP CLONE <target table> <source table> which only
 [STORAGE CREDENTIAL]([url](https://docs.databricks.com/en/sql/language-manual/sql-ref-storage-credentials.html)https://docs.databricks.com/en/sql/language-manual/sql-ref-storage-credentials.html) are a UC object encapsulating the credentials necessary to access cloud storage.
 
 ## Assigned Clusters or Single User Clusters
-"Assigned Clusters" are Interactive clusters assigned to a single principal. Implicit in this term is that these clusters are enabled for Unity Catalog. Publically available today, "Assigned Clusters" can be assigned to a user and the user's identity is used to access data resources. The access to the cluster is restricted to that single user to ensure accountability and accuracy of the audit logs.
+"Assigned Clusters" are Interactive clusters assigned to a single principal. Implicit in this term is that these clusters are enabled for Unity Catalog. Publicly available today, "Assigned Clusters" can be assigned to a user and the user's identity is used to access data resources. The access to the cluster is restricted to that single user to ensure accountability and accuracy of the audit logs.
 
 "Single User Clusters" are Interactive clusters that name one specific user account as user.
 
