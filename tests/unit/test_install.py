@@ -228,7 +228,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
             raise e.errs[0]
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
-    wheels.upload_to_wsfs.assert_not_called()
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_install_cluster_override_jobs(ws, mock_installation):
