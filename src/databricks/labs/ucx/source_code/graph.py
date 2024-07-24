@@ -199,25 +199,43 @@ class DependencyGraph:
         return False
 
     def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
+        # leaf is not on the route so handle case where it doesn't inherit context
+        maybe = self.locate_dependency(leaf)
+        assert maybe.graph  # assume caller knows what they're doing
+        if not maybe.graph.dependency.inherits_context:
+            return []
+        # handle generic case
+        route = self._do_compute_route(root, leaf, visited)
+        return self._trim_route(route)
+
+    def _do_compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
         maybe = self.locate_dependency(root)
         assert maybe.graph  # assume caller knows what they're doing
         route: list[Dependency] = []
 
-        def compute_route(graph: DependencyGraph) -> bool:
+        def do_compute_route(graph: DependencyGraph) -> bool:
             route.append(graph.dependency)
             for dependency in graph.local_dependencies:
                 if dependency.path == leaf:
                     return True
             for dependency in graph.local_dependencies:
-                sub_route = self._compute_route(dependency.path, leaf, visited)
+                sub_route = self._do_compute_route(dependency.path, leaf, visited)
                 if len(sub_route) > 0:
                     route.extend(sub_route)
                     return True
             route.pop()
             return False
 
-        maybe.graph.visit(compute_route, visited)
+        maybe.graph.visit(do_compute_route, visited)
         return route
+
+    def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
+        """don't inherit context if dependency is loaded via dbutils.notebook.run"""
+        for i, dependency in enumerate(dependencies):
+            if dependency.inherits_context:
+                continue
+            return [dependency] + self._trim_route(dependencies[i+1:])
+        return dependencies
 
     def build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
         route = self._compute_route(root, leaf, set())
@@ -239,7 +257,7 @@ class DependencyGraphContext:
 
 class Dependency(abc.ABC):
 
-    def __init__(self, loader: DependencyLoader, path: Path, inherits_context: bool = False):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
         self._path = path
         self._inherits_context = inherits_context

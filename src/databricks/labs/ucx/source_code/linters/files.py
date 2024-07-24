@@ -85,7 +85,7 @@ class Folder(SourceContainer):
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
             loader = self._folder_loader if child_path.is_dir() else self._file_loader
-            dependency = Dependency(loader, child_path)
+            dependency = Dependency(loader, child_path, False)
             yield from parent.register_dependency(dependency).problems
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
@@ -136,8 +136,9 @@ class LocalCodeLinter:
         return located_advices
 
     def lint_path(self, path: Path, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
-        loader = self._folder_loader if path.is_dir() else self._file_loader
-        dependency = Dependency(loader, path)
+        is_dir = path.is_dir()
+        loader = self._folder_loader if is_dir else self._file_loader
+        dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it

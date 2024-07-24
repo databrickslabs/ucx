@@ -58,7 +58,7 @@ class JobProblem:
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
         loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
-        super().__init__(loader, Path(f'/jobs/{task.task_key}'))
+        super().__init__(loader, Path(f'/jobs/{task.task_key}'), False)
         self._task = task
         self._job = job
 
