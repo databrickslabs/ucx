@@ -1492,7 +1492,7 @@ profile: "*databricks labs install ucx -p prod*".
 **Account Level:** Multiple account level profiles are set in the
 .databrickscfg file.
 
-**Solution:** The installation command "*databricks labs install ucx*"
+**Solution:** The installation command `databricks labs install ucx`
 will provide an option to select one account profile.
 
 [[back to top](#databricks-labs-ucx)]
