@@ -531,13 +531,13 @@ The Databricks ML Runtime is not supported on Shared Compute mode clusters. Reco
 
 ### AF301.1 - spark.catalog.x
 
-The `spark.catalog.` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. DBR 14.1 and above have made these commands available. Upgrade your DBR version.
+The `spark.catalog.` pattern was found. Commonly used functions in `spark.catalog`, such as `tableExists`, `listTables`, `setCurrentCatalog` are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. DBR 14.1 and above have made these commands available. Upgrade your DBR version.
 
 [[back to top](#migration-assessment-report)]
 
 ### AF301.2 - spark.catalog.x (spark._jsparkSession.catalog)
 
-The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. The corresponding `spark.catalog.x` methods may work on DBR 14.1 and above.
+The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in `spark.catalog`, such as `tableExists`, `listTables`, `setCurrentCatalog` are not allowed on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative. The corresponding `spark.catalog.x` methods may work on DBR 14.1 and above.
 
 [[back to top](#migration-assessment-report)]
 
