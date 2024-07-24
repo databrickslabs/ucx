@@ -326,7 +326,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             absolute_path = path_lookup.resolve(relative_path)
             if not absolute_path:
                 continue
-            dependency = Dependency(self._file_loader, absolute_path)
+            dependency = Dependency(self._file_loader, absolute_path, False)
             return MaybeDependency(dependency, [])
         return None
 

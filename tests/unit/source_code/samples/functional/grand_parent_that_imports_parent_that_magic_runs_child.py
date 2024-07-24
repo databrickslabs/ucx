@@ -1,0 +1,3 @@
+# Databricks notebook source
+
+from parent_that_magic_runs_child_that_uses_value_from_parent import other_table_name

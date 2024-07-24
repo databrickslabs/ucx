@@ -537,6 +537,10 @@ class InheritedContext:
         if tree is None:
             return InheritedContext(self._tree, found)
         if self._tree is None:
-            self._tree = Tree(Module("root"))
+            node = Module("root")
+            # ensure locals to not hold copies lof globals otherwise
+            # it misleads the inference engine looking for a non-reachable value
+            node.locals = {}
+            self._tree = Tree(node)
         self._tree.append_tree(context.tree)
         return InheritedContext(self._tree, found)
