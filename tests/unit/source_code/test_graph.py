@@ -60,7 +60,7 @@ def test_graph_computes_magic_run_route(mock_path_lookup, simple_dependency_reso
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(parent, child)
-    assert [dep.path for dep in route] == [parent]
+    assert [dep.path for dep in route] == [parent, child]
 
 
 def test_graph_computes_magic_run_route_recursively(mock_path_lookup, simple_dependency_resolver):
@@ -74,7 +74,7 @@ def test_graph_computes_magic_run_route_recursively(mock_path_lookup, simple_dep
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(grand_parent, child)
-    assert [dep.path for dep in route] == [grand_parent, parent]
+    assert [dep.path for dep in route] == [grand_parent, parent, child]
 
 
 def test_graph_computes_dbutils_run_route(mock_path_lookup, simple_dependency_resolver):
@@ -87,7 +87,7 @@ def test_graph_computes_dbutils_run_route(mock_path_lookup, simple_dependency_re
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(parent, child)
-    assert not route
+    assert [dep.path for dep in route] == [child]
 
 
 def test_graph_computes_dbutils_run_route_recursively(mock_path_lookup, simple_dependency_resolver):
@@ -101,7 +101,7 @@ def test_graph_computes_dbutils_run_route_recursively(mock_path_lookup, simple_d
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(grand_parent, child)
-    assert [dep.path for dep in route] == [parent]
+    assert [dep.path for dep in route] == [parent, child]
 
 
 def test_graph_computes_import_route(mock_path_lookup, simple_dependency_resolver):
@@ -114,7 +114,7 @@ def test_graph_computes_import_route(mock_path_lookup, simple_dependency_resolve
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(parent, child)
-    assert not route
+    assert [dep.path for dep in route] == [child]
 
 
 def test_graph_computes_import_route_recursively(mock_path_lookup, simple_dependency_resolver):
@@ -128,7 +128,7 @@ def test_graph_computes_import_route_recursively(mock_path_lookup, simple_depend
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     route = root_graph.compute_route(grand_parent, child)
-    assert [dep.path for dep in route] == [parent]
+    assert [dep.path for dep in route] == [parent, child]
 
 
 def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_resolver):

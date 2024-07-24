@@ -203,7 +203,7 @@ class DependencyGraph:
         maybe = self.locate_dependency(leaf)
         assert maybe.graph  # assume caller knows what they're doing
         if not maybe.graph.dependency.inherits_context:
-            return []
+            return [maybe.graph.dependency]
         # handle generic case
         route = self._do_compute_route(root, leaf, visited)
         return self._trim_route(route)
@@ -217,6 +217,7 @@ class DependencyGraph:
             route.append(graph.dependency)
             for dependency in graph.local_dependencies:
                 if dependency.path == leaf:
+                    route.append(dependency)
                     return True
             for dependency in graph.local_dependencies:
                 sub_route = self._do_compute_route(dependency.path, leaf, visited)
@@ -234,12 +235,12 @@ class DependencyGraph:
         for i, dependency in enumerate(dependencies):
             if dependency.inherits_context:
                 continue
-            return [dependency] + self._trim_route(dependencies[i+1:])
+            return [dependency] + self._trim_route(dependencies[i + 1 :])
         return dependencies
 
     def build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
         route = self._compute_route(root, leaf, set())
-        return InheritedContext.from_route(self, self.path_lookup, route, leaf)
+        return InheritedContext.from_route(self, self.path_lookup, route)
 
     def new_graph_builder_context(self):
         return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
@@ -502,19 +503,19 @@ class MaybeGraph:
 class InheritedContext:
 
     @classmethod
-    def from_route(
-        cls, graph: DependencyGraph, path_lookup: PathLookup, route: list[Dependency], leaf: Path
-    ) -> InheritedContext:
+    def from_route(cls, graph: DependencyGraph, path_lookup: PathLookup, route: list[Dependency]) -> InheritedContext:
         context = InheritedContext(None, False)
         for i, dependency in enumerate(route):
-            is_last = i >= len(route) - 1
-            next_path = leaf if is_last else route[i + 1].path
+            if i >= len(route) - 1:
+                break
+            next_path = route[i + 1].path
             container = dependency.load(path_lookup)
             if container is None:
                 logger.warning(f"Could not load content of {dependency.path}")
                 return context
             local = container.build_inherited_context(graph, next_path)
-            context = context.append(local, is_last)
+            # only copy 'found' flag if this is the last parent
+            context = context.append(local, i == len(route) - 2)
         return context
 
     def __init__(self, tree: Tree | None, found: bool):
