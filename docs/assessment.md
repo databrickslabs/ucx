@@ -247,7 +247,7 @@ The next row contains the "Table Types" widget
 This widget is a detailed list of each table, it's format, storage type, location property and if a DBFS table approximate table size. Upgrade strategies include:
 - DEEP CLONE or CTAS for DBFS ROOT tables
 - SYNC for DELTA tables (managed or external) for tables stored on a non-DBFS root (Mount point or direct cloud storage path)
-- Managed non DELTA tables need to be upgraded to to Unity Catalog by either:
+- Managed non DELTA tables need to be upgraded to Unity Catalog by either:
    - Use CTAS to convert targeting the Unity Catalog catalog, schema and table name
    - Moved to an EXTERNAL LOCATION and create an EXTERNAL table in Unity Catalog.
 
