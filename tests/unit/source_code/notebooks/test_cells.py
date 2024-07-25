@@ -182,8 +182,7 @@ def test_graph_builder_parse_error(
     # Fixture.
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    graph.new_graph_builder_context()
-    analyser = PythonCodeAnalyzer(graph.new_graph_builder_context(), "this is not valid python")
+    analyser = PythonCodeAnalyzer(graph.new_dependency_graph_context(), "this is not valid python")
 
     # Run the test.
     problems = analyser.build_graph()

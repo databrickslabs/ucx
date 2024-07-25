@@ -40,7 +40,7 @@ class LocalFile(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
-            context = parent.new_graph_builder_context()
+            context = parent.new_dependency_graph_context()
             analyser = PythonCodeAnalyzer(context, self._original_code)
             return analyser.build_graph()
         # supported language that does not generate dependencies
