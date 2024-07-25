@@ -263,7 +263,8 @@ class WorkflowTaskContainer(SourceContainer):
                 notebook_path = library.notebook.path
                 # Notebooks can't be on DBFS.
                 path = WorkspacePath(self._ws, notebook_path)
-                yield from graph.register_notebook(path, False)
+                # the notebook is the root of the graph, so there's no context to inherit
+                yield from graph.register_notebook(path, inherit_context=False)
             if library.jar:
                 yield from self._register_library(graph, compute.Library(jar=library.jar))
             if library.maven:

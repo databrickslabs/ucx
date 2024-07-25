@@ -69,6 +69,8 @@ class Functional:
 
     @classmethod
     def all(cls) -> list[Functional]:
+        # child notebooks can only be linted in context, where they inherit globals from parent notebooks
+        # to avoid linting them as standalone notebooks, we name them with '_' prefix, which we skip
         return [Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")]
 
     @classmethod
