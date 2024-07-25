@@ -543,9 +543,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         waiting_tasks = []
         deleted_groups = []
         for migrated_group in migrated_groups:
-            if migrated_group.temporary_name not in workspace_groups_in_workspace:
-                logger.info(f"Skipping {migrated_group.name_in_workspace}: no longer in workspace")
-                continue
             if migrated_group.name_in_account not in account_groups_in_workspace:
                 logger.warning(
                     f"Not deleting group {migrated_group.temporary_name}(id={migrated_group.id_in_workspace}) (originally {migrated_group.name_in_workspace}): its migrated account group ({migrated_group.name_in_account}) cannot be found."
