@@ -5,10 +5,10 @@ import re
 import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
@@ -16,7 +16,7 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, GraphBuilderContext
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, DependencyGraphContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsLinter,
@@ -103,9 +103,9 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        context = parent.new_graph_builder_context()
-        builder = GraphBuilder(context)
-        python_dependency_problems = builder.build_graph_from_python_source(self._original_code)
+        context = parent.new_dependency_graph_context()
+        analyzer = PythonCodeAnalyzer(context, self._original_code)
+        python_dependency_problems = analyzer.build_graph()
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
         return [
             problem.replace(
@@ -392,12 +392,13 @@ class CellLanguage(Enum):
         return "\n".join(lines)
 
 
-class GraphBuilder:
+class PythonCodeAnalyzer:
 
-    def __init__(self, context: GraphBuilderContext):
+    def __init__(self, context: DependencyGraphContext, python_code: str):
         self._context = context
+        self._python_code = python_code
 
-    def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
+    def build_graph(self) -> list[DependencyProblem]:
         """Check python code for dependency-related problems.
 
         Returns:
@@ -405,23 +406,14 @@ class GraphBuilder:
         """
         problems: list[DependencyProblem] = []
         try:
-            tree = Tree.normalize_and_parse(python_code)
+            _, nodes, parse_problems = self._parse_and_extract_nodes()
+            problems.extend(parse_problems)
         except AstroidSyntaxError as e:
-            logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
+            logger.debug(f"Could not parse Python code: {self._python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
-        syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-        import_sources: list[ImportSource]
-        import_problems: list[DependencyProblem]
-        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(import_problems)
-        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(command_problems)
-        nodes = syspath_changes + run_calls + import_sources + magic_commands
-        # need to execute things in intertwined sequence so concat and sort them
-        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            for problem in self._process_node(base_node):
+        for base_node in nodes:
+            for problem in self._build_graph_from_node(base_node):
                 # Astroid line numbers are 1-based.
                 problem = problem.replace(
                     start_line=base_node.node.lineno - 1,
@@ -432,7 +424,23 @@ class GraphBuilder:
                 problems.append(problem)
         return problems
 
-    def _process_node(self, base_node: NodeBase):
+    def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:
+        problems: list[DependencyProblem] = []
+        tree = Tree.normalize_and_parse(self._python_code)
+        syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources: list[ImportSource]
+        import_problems: list[DependencyProblem]
+        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(import_problems)
+        magic_lines, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(command_problems)
+        # need to evaluate things in intertwined sequence so concat and sort them
+        nodes: list[NodeBase] = cast(list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines)
+        nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
+        return tree, nodes, problems
+
+    def _build_graph_from_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
         elif isinstance(base_node, NotebookRunCall):
@@ -510,10 +518,10 @@ class MagicLine(NodeBase):
             return RunCommand(self.node, self._command)
         return None
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         magic = self.as_magic()
         if magic is not None:
-            return magic.build_dependency_graph(graph)
+            return magic.build_dependency_graph(parent)
         problem = DependencyProblem.from_node(
             code='unsupported-magic-line', message=f"magic line '{self._command}' is not supported yet", node=self.node
         )
@@ -531,18 +539,10 @@ class MagicCommand(ABC):
         self._code = code
 
     @abstractmethod
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]: ...
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
 
 
 class RunCommand(MagicCommand):
-
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        path = self.notebook_path
-        if path is not None:
-            problems = graph.register_notebook(path)
-            return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
-        problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
-        return [problem]
 
     @property
     def notebook_path(self) -> Path | None:
@@ -552,10 +552,18 @@ class RunCommand(MagicCommand):
         path = self._code[start + 1 :].strip().strip('"').strip("'")
         return Path(path)
 
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        path = self.notebook_path
+        if path is not None:
+            problems = parent.register_notebook(path)
+            return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
+        problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
+        return [problem]
+
 
 class PipCommand(MagicCommand):
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         argv = self._split(self._code)
         if len(argv) == 1:
             return [DependencyProblem.from_node("library-install-failed", "Missing command after 'pip'", self._node)]
@@ -571,7 +579,7 @@ class PipCommand(MagicCommand):
                     "library-install-failed", "Missing arguments after 'pip install'", self._node
                 )
             ]
-        problems = graph.register_library(*argv[2:])  # Skipping %pip install
+        problems = parent.register_library(*argv[2:])  # Skipping %pip install
         return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
 
     # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
