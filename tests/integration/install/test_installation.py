@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
+from typing import NoReturn
 
 import pytest
 
@@ -186,8 +187,8 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
     # happened.
     # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
     @retried(on=[KeyError], timeout=timedelta(seconds=90))
-    def get_group(group_id: str):
-        ws.groups.get(group_id)
+    def get_group(group_id: str) -> NoReturn:
+        _ = ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
     with pytest.raises(NotFound, match=f"Group with id {ws_group_a.id} not found."):
