@@ -1369,7 +1369,7 @@ NO_MATCHING_DISTRIBUTION_ERROR.
 
 **Solution:** Version 0.24.0 of UCX supports workspace with no internet
 access. Please upgrade UCX and rerun the installation. Reply *yes* to
-the question “Does the given workspace block Internet access?” asked
+the question "Does the given workspace block Internet access?" asked
 during installation. It will then upload all necessary dependencies to
 the workspace. Also, please note that UCX uses both UC and non-UC
 enabled clusters. If you have different proxy settings for each, then
@@ -1423,13 +1423,13 @@ Admin privileges required for commands:
 
 **Python:** UCX needs Python version 3.10 or later.
 
-**Solution:** Check the current version using “python --version”. If the
+**Solution:** Check the current version using `python --version`. If the
 version is lower than 3.10, upgrade the local Python version to 3.10 or
 higher.
 
 **Databricks CLI:** Databricks CLI v0.213 or higher is needed.
 
-**Solution:** Check the current version with “databricks --version”. For
+**Solution:** Check the current version with `databricks --version`. For
 lower versions of CLI,
 [<u>update</u>](https://docs.databricks.com/en/dev-tools/cli/install.html#update)
 the Databricks CLI on the local machine.
@@ -1443,8 +1443,8 @@ UCX version.
 **Solution:** Upgrade UCX, and rerun the assessment job before running
 the migration workflows. For some reason, if you want to install a
 specific version of UCX, you can do it using the command
-“databricks labs install ucx@\<version\>”, for example,
-“databricks labs install ucx@v0.21.0”.
+`databricks labs install ucx@\<version\>`, for example,
+`databricks labs install ucx@v0.21.0`.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1459,8 +1459,8 @@ profiles, and tokens.
 **Account Level:** Not only workspace, but account level authentication
 is also needed for installing UCX. If you do not have an account
 configured in .databrickscfg, you will get an error message
-“.databrickscfg does not contain account profiles; please create one
-first”.
+".databrickscfg does not contain account profiles; please create one
+first".
 
 **Solution:** To authenticate with a Databricks account, consider using
 one of the following authentication types: [<u>OAuth machine-to-machine
@@ -1482,17 +1482,17 @@ workspace.
 
 **Solution:** The Databricks CLI provides an option to select the
 [<u>profile</u>](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
-using “*--profile \<profile_name\>*” or “*-p \<profile_name\>*”. You can
+using `--profile \<profile_name\>` or `-p \<profile_name\>`. You can
 test that the correct workspace is getting selected by running any
-Databricks CLI command. For example, you can run “*databricks clusters
-list -p prod*” and check that the Prod clusters are being returned. Once
+Databricks CLI command. For example, you can run `databricks clusters
+list -p prod` and check that the Prod clusters are being returned. Once
 the profile is verified, you can run UCX install for that specific
-profile: “*databricks labs install ucx -p prod*”.
+profile: `databricks labs install ucx -p prod`.
 
 **Account Level:** Multiple account level profiles are set in the
 .databrickscfg file.
 
-**Solution:** The installation command “*databricks labs install ucx*”
+**Solution:** The installation command `databricks labs install ucx`
 will provide an option to select one account profile.
 
 [[back to top](#databricks-labs-ucx)]
@@ -1529,7 +1529,7 @@ under Data Access Configuration of SQL Warehouse Admin Settings.
 
 ### Verify the Installation
 
-Once the UCX command “*databricks labs install ucx*” has completed
+Once the UCX command `databricks labs install ucx` has completed
 successfully, the installation can be verified with the following steps:
 
 1.  Go to the Databricks Catalog Explorer and check if a new schema for

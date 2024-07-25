@@ -432,6 +432,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
 
+        logger.info(f"Starting to rename {len(groups_to_migrate)} groups for migration...")
         for migrated_group in groups_to_migrate:
             if migrated_group.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
@@ -472,13 +473,15 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _wait_for_rename(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
         group = self._ws.groups.get(group_id)
         if group.display_name == old_group_name:
-            # Rename still pending.
+            logger.debug(
+                f"Group {group_id} still has old name; still waiting for rename to take effect: {old_group_name} -> {new_group_name}"
+            )
             raise GroupRenameIncompleteError(group_id, old_group_name, new_group_name)
         if group.display_name != new_group_name:
             # Group has an entirely unexpected name; something else is interfering.
-            msg = f"While waiting for group {group_id} rename ({old_group_name} -> {new_group_name} an unexpected name was observed: {group.display_name}"
+            msg = f"While waiting for group {group_id} rename ({old_group_name} -> {new_group_name}) an unexpected name was observed: {group.display_name}"
             raise RuntimeError(msg)
-        # Normal exit; group has been renamed.
+        logger.debug(f"Group {group_id} rename has taken effect: {old_group_name} -> {new_group_name}")
 
     @retried(on=[ManyError], timeout=timedelta(minutes=2))
     def _wait_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]]) -> None:
@@ -492,9 +495,15 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         for group_id, expected_name in expected_groups:
             found_name = found_groups.get(group_id, None)
             if found_name is None:
-                pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name}"))
+                logger.warning(f"Group enumeration omits renamed group: {group_id} (renamed to {expected_name})")
+                pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name})"))
             elif found_name != expected_name:
+                logger.debug(
+                    f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {found_name})"
+                )
                 pending_renames.append(GroupRenameIncompleteError(group_id, found_name, expected_name))
+            else:
+                logger.debug(f"Group enumeration reflects renamed group: {group_id} (renamed to {expected_name})")
         if pending_renames:
             raise ManyError(pending_renames)
 
@@ -503,6 +512,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
+        logger.info(f"Starting to reflect {len(groups_to_migrate)} account groups into workspace for migration...")
         for migrated_group in groups_to_migrate:
             if migrated_group.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
@@ -523,7 +533,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         tasks = []
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_workspace = self._account_groups_in_workspace()
-        for migrated_group in self.snapshot():
+        migrated_groups = self.snapshot()
+        logger.info(f"Starting to remove {len(migrated_groups)} migrated workspace groups...")
+        for migrated_group in migrated_groups:
             if migrated_group.temporary_name not in workspace_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_workspace}: no longer in workspace")
                 continue
@@ -570,19 +582,25 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_account = self._account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
-        migrated_groups = strategy.generate_migrated_groups()
+        migrated_groups = list(strategy.generate_migrated_groups())
         mismatch_group = []
         retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
         get_account_group = retry_on_internal_error(self._get_account_group)
+        logger.info(f"Starting to validate {len(migrated_groups)} migrated workspace groups...")
         for ws_group in migrated_groups:
             # Users with the same display name but different email will be deduplicated!
             ws_members_set = {m.get("display") for m in json.loads(ws_group.members)} if ws_group.members else set()
-            acc_group = get_account_group(account_groups_in_account[ws_group.name_in_account].id)
+            acc_group_id = account_groups_in_account[ws_group.name_in_account].id
+            acc_group = get_account_group(acc_group_id)
             if not acc_group:
+                logger.debug(
+                    f"Skipping validation; account group no longer present: {ws_group.name_in_account} (id={acc_group_id})"
+                )
                 continue  # group not present anymore
             acc_members_set = {a.as_dict().get("display") for a in acc_group.members} if acc_group.members else set()
             set_diff = (ws_members_set - acc_members_set).union(acc_members_set - ws_members_set)
             if not set_diff:
+                logger.debug(f"Validated group, no differences found: {ws_group.name_in_account} (id={acc_group_id})")
                 continue
             mismatch_group.append(
                 {
@@ -594,9 +612,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 }
             )
         if not mismatch_group:
-            logger.info("There are no groups with different membership between account and workspace")
+            logger.info("There are no groups with different membership between account and workspace.")
         else:
-            logger.info("There are groups with different membership between account and workspace")
+            logger.info(
+                f"There are {len(mismatch_group)} (of {len(migrated_groups)}) groups with different membership between account and workspace."
+            )
         return mismatch_group
 
     def has_workspace_group(self, name):
@@ -612,6 +632,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         groups = {}
         for group in self._list_workspace_groups("WorkspaceGroup", attributes):
             if not group.display_name:
+                logger.debug(f"Ignoring workspace group without name: {group.id}")
                 continue
             groups[group.display_name] = group
         return groups
@@ -620,6 +641,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         groups = {}
         for group in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
             if not group.display_name:
+                logger.debug(f"Ignoring account group in workspace without name: {group.id}")
                 continue
             groups[group.display_name] = group
         return groups
@@ -628,6 +650,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         groups = {}
         for group in self._list_account_groups("id,displayName,externalId"):
             if not group.display_name:
+                logger.debug(f"Ignoring account group in without name: {group.id}")
                 continue
             groups[group.display_name] = group
         return groups
@@ -644,16 +667,17 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
-        logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes}...")
-        # these attributes can get too large causing the api to timeout
-        # so we're fetching groups without these attributes first
-        # and then calling get on each of them to fetch all attributes
+        logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes} ...")
+        # If members are requested during enumeration the API can time out. In this case we fall back on
+        # a strategy of enumerating the bare minimum and request full attributes for each group individually.
         attributes = scim_attributes.split(",")
         if "members" in attributes:
             attributes.remove("members")
             retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
             get_group = retry_on_internal_error(self._get_group)
-            for group in self._ws.groups.list(attributes=",".join(attributes)):
+            # Limit to the attributes we need for determining if the group is out of scope; the rest are fetched later.
+            scan_attributes = [attribute for attribute in attributes if attribute in {"id", "displayName", "meta"}]
+            for group in self._ws.groups.list(attributes=",".join(scan_attributes)):
                 if self._is_group_out_of_scope(group, resource_type):
                     continue
                 group_with_all_attributes = get_group(group.id)
