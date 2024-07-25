@@ -672,7 +672,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # a strategy of enumerating the bare minimum and request full attributes for each group individually.
         attributes = scim_attributes.split(",")
         if "members" in attributes:
-            attributes.remove("members")
             retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
             get_group = retry_on_internal_error(self._get_group)
             # Limit to the attributes we need for determining if the group is out of scope; the rest are fetched later.
