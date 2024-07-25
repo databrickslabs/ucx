@@ -84,6 +84,11 @@ class Tree:
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
 
+    @classmethod
+    def new_module(cls):
+        node = Module("root")
+        return Tree(node)
+
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
 
@@ -117,6 +122,132 @@ class Tree:
             if len(self._node.body) > 0:
                 return self._node.body[0]
         return None
+
+    def __repr__(self):
+        truncate_after = 32
+        code = repr(self._node)
+        if len(code) > truncate_after:
+            code = code[0:truncate_after] + "..."
+        return f"<Tree: {code}>"
+
+    def append_tree(self, tree: Tree) -> Tree:
+        """returns the appended tree, not the consolidated one!"""
+        if not isinstance(tree.node, Module):
+            raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
+        tree_module: Module = cast(Module, tree.node)
+        self.append_nodes(tree_module.body)
+        self.append_globals(tree_module.globals)
+        # the following may seem strange but it's actually ok to use the original module as tree root
+        # because each node points to the correct parent (practically, the tree is now only a list of statements)
+        return tree
+
+    def append_globals(self, globs: dict[str, list[NodeNG]]) -> None:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for name, values in globs.items():
+            statements: list[Expr] = self_module.globals.get(name, None)
+            if statements is None:
+                self_module.globals[name] = list(values)  # clone the source list to avoid side-effects
+                continue
+            statements.extend(values)
+
+    def append_nodes(self, nodes: list[NodeNG]) -> None:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for node in nodes:
+            node.parent = self_module
+            self_module.body.append(node)
+
+    def is_from_module(self, module_name: str) -> bool:
+        # if this is the call's root node, check it against the required module
+        if isinstance(self._node, Name):
+            if self._node.name == module_name:
+                return True
+            root = self.root
+            if not isinstance(root, Module):
+                return False
+            for value in root.globals.get(self._node.name, []):
+                if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
+                    continue
+                if Tree(value.parent.value).is_from_module(module_name):
+                    return True
+            return False
+        # walk up intermediate calls such as spark.range(...)
+        if isinstance(self._node, Call):
+            return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
+        if isinstance(self._node, Attribute):
+            return Tree(self._node.expr).is_from_module(module_name)
+        return False
+
+    def has_global(self, name: str) -> bool:
+        if not isinstance(self.node, Module):
+            return False
+        self_module: Module = cast(Module, self.node)
+        return self_module.globals.get(name, None) is not None
+
+    def nodes_between(self, first_line: int, last_line: int) -> list[NodeNG]:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't extract nodes from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        nodes: list[NodeNG] = []
+        for node in self_module.body:
+            if node.lineno < first_line:
+                continue
+            if node.lineno > last_line:
+                break
+            nodes.append(node)
+        return nodes
+
+    def globals_between(self, first_line: int, last_line: int) -> dict[str, list[NodeNG]]:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't extract globals from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        globs: dict[str, list[NodeNG]] = {}
+        for key, nodes in self_module.globals.items():
+            nodes_in_scope: list[NodeNG] = []
+            for node in nodes:
+                if node.lineno < first_line or node.lineno > last_line:
+                    continue
+                nodes_in_scope.append(node)
+            if len(nodes_in_scope) > 0:
+                globs[key] = nodes_in_scope
+        return globs
+
+    def line_count(self):
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't count lines from {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        nodes_count = len(self_module.body)
+        if nodes_count == 0:
+            return 0
+        return 1 + self_module.body[nodes_count - 1].lineno - self_module.body[0].lineno
+
+    def renumber(self, start: int) -> Tree:
+        assert start != 0
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't renumber {type(self.node).__name__}")
+        root: Module = self.node
+        # for now renumber in place to avoid the complexity of rebuilding the tree with clones
+
+        def renumber_node(node: NodeNG, offset: int) -> None:
+            for child in node.get_children():
+                renumber_node(child, offset + child.lineno - node.lineno)
+            if node.end_lineno:
+                node.end_lineno = node.end_lineno + offset
+                node.lineno = node.lineno + offset
+
+        nodes = root.body if start > 0 else reversed(root.body)
+        for node in nodes:
+            offset = start - node.lineno
+            renumber_node(node, offset)
+            num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
+            start = start + num_lines if start > 0 else start - num_lines
+        return self
+
+
+class TreeHelper(ABC):
 
     @classmethod
     def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
@@ -163,13 +294,6 @@ class Tree:
             return False
         return node.value is None
 
-    def __repr__(self):
-        truncate_after = 32
-        code = repr(self._node)
-        if len(code) > truncate_after:
-            code = code[0:truncate_after] + "..."
-        return f"<Tree: {code}>"
-
     @classmethod
     def get_full_attribute_name(cls, node: Attribute) -> str:
         return cls._get_attribute_value(node)
@@ -209,55 +333,6 @@ class Tree:
             missing_handlers.add(name)
             logger.debug(f"Missing handler for {name}")
         return None
-
-    def append_tree(self, tree: Tree) -> Tree:
-        if not isinstance(tree.node, Module):
-            raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
-        tree_module: Module = cast(Module, tree.node)
-        self.append_nodes(tree_module.body)
-        self.append_globals(tree_module.globals)
-        # the following may seem strange but it's actually ok to use the original module as tree root
-        return tree
-
-    def append_globals(self, globs: dict):
-        if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
-        self_module: Module = cast(Module, self.node)
-        for name, value in globs.items():
-            statements: list[Expr] = self_module.globals.get(name, None)
-            if statements is None:
-                self_module.globals[name] = list(value)  # clone the source list to avoid side-effects
-                continue
-            statements.extend(value)
-
-    def append_nodes(self, nodes: list[NodeNG]):
-        if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
-        self_module: Module = cast(Module, self.node)
-        for node in nodes:
-            node.parent = self_module
-            self_module.body.append(node)
-
-    def is_from_module(self, module_name: str):
-        # if this is the call's root node, check it against the required module
-        if isinstance(self._node, Name):
-            if self._node.name == module_name:
-                return True
-            root = self.root
-            if not isinstance(root, Module):
-                return False
-            for value in root.globals.get(self._node.name, []):
-                if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
-                    continue
-                if Tree(value.parent.value).is_from_module(module_name):
-                    return True
-            return False
-        # walk up intermediate calls such as spark.range(...)
-        if isinstance(self._node, Call):
-            return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
-        if isinstance(self._node, Attribute):
-            return Tree(self._node.expr).is_from_module(module_name)
-        return False
 
 
 class TreeVisitor:
