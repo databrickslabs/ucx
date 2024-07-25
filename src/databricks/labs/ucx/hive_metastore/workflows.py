@@ -73,6 +73,10 @@ class TableMigration(Workflow):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
 
+    @job_task(job_cluster="table_migration", depends_on=[migrate_external_tables_sync, migrate_dbfs_root_delta_tables, migrate_dbfs_root_non_delta_tables,migrate_views])
+    def refresh_not_migrated_status(self, ctx: RuntimeContext):
+        """Refresh the not migrated tables status to present it in the dashboard."""
+        ctx.tables_migrator.not_migrated_refresh()
 
 class MigrateHiveSerdeTablesInPlace(Workflow):
     def __init__(self):

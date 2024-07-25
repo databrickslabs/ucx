@@ -57,6 +57,13 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
+    def not_migrated_refresh(self) -> list[Table]:
+        table_rows: list[Table] = []
+        for crawled_table in self._tc.snapshot():
+            if not self.is_migrated(crawled_table.database, crawled_table.name):
+                table_rows.append(crawled_table)
+        return table_rows # depending on how to publish this data, we may need to convert it to other forms to able to show it in the dashboard
+
     def index(self):
         return self._migration_status_refresher.index()
 

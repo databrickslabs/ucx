@@ -70,3 +70,8 @@ def test_refresh_migration_status_is_refreshed(run_workflow, workflow):
     assert "DELETE FROM hive_metastore.ucx.migration_status" in ctx.sql_backend.queries
     assert "SHOW DATABASES" in ctx.sql_backend.queries
     # No "SHOW TABLE FROM" query as table are not mocked
+
+#TODO: create a unit test for the new task in the workflow
+# def test_refresh_not_migrated_status_is_refreshed(run_workflow):
+#     ctx = run_workflow(TableMigration.refresh_not_migrated_status)
+#     # ctx.workspace_client.catalogs.list.assert_called()
