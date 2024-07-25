@@ -530,17 +530,26 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return MigrationState(self.snapshot())
 
     def delete_original_workspace_groups(self):
-        tasks = []
-        workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_workspace = self._account_groups_in_workspace()
         migrated_groups = self.snapshot()
         logger.info(f"Starting to remove {len(migrated_groups)} migrated workspace groups...")
+        # Group deletion is eventually consistent, and not monotonically consistent, with a rather long time to
+        # converge: internally API caches some things for up to 60s. To avoid excessive wait times when large numbers of
+        # groups need to be deleted (some deployments have >10K groups) we use the following steps:
+        #  1. Delete the groups.
+        #  2. Confirm that direct GETs no longer see the group.
+        #  3. Confirm that account enumeration no longer includes the deleted groups.
+        deletion_tasks = []
+        waiting_tasks = []
+        deleted_groups = []
         for migrated_group in migrated_groups:
             if migrated_group.temporary_name not in workspace_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_workspace}: no longer in workspace")
                 continue
             if migrated_group.name_in_account not in account_groups_in_workspace:
-                logger.info(f"Skipping {migrated_group.name_in_account}: not reflected in workspace")
+                logger.warning(
+                    f"Not deleting group {migrated_group.temporary_name}(id={migrated_group.id_in_workspace}) (originally {migrated_group.name_in_workspace}): its migrated account group ({migrated_group.name_in_account}) cannot be found."
+                )
                 continue
             tasks.append(
                 functools.partial(
