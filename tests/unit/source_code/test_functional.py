@@ -69,7 +69,7 @@ class Functional:
 
     @classmethod
     def all(cls) -> list[Functional]:
-        return [Functional(path) for path in cls._location.glob('**/*.py')]
+        return [Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")]
 
     @classmethod
     def test_id(cls, sample: Functional) -> str:
