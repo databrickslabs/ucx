@@ -562,14 +562,14 @@ class WorkspaceInstallation(InstallationMixin):
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard = Dashboards(self._ws).deploy_dashboard(
-            metadata.as_lakeview(),
+        dashboard = Dashboards(self._ws).create_dashboard(
+            metadata,
             dashboard_id=self._install_state.dashboards.get(reference),
             parent_path=parent_path,
             warehouse_id=self._warehouse_id,
+            publish=True,
         )
         assert dashboard.dashboard_id is not None
-        self._ws.lakeview.publish(dashboard.dashboard_id)
         self._install_state.dashboards[reference] = dashboard.dashboard_id
 
     def uninstall(self):
