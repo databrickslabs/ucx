@@ -135,19 +135,35 @@ class DependencyGraph:
 
         def add_to_dependencies(graph: DependencyGraph) -> bool:
             dependency = graph.dependency
+            # if already encountered we're done
             if dependency in children:
-                return False  # Nothing to do
+                return False
+            # if it's not a real file, then it's not a root
+            if not dependency.path.is_file():
+                children.add(dependency)
+                return False
+            # if it appears more than once then it can't be a root
             if dependency in roots:
                 roots.remove(dependency)
                 children.add(dependency)
                 return False
+            # if it doesn't have a parent, it's a root
             if graph.parent is None:
                 roots.add(dependency)
                 return False
-            children.add(dependency)
+            # if it has a 'real' parent, it's a child
+            parent_graph = graph.parent
+            while parent_graph is not None:
+                dep = parent_graph.dependency
+                if dep.path.is_file():
+                    children.add(dependency)
+                    return False
+                parent_graph = parent_graph.parent
+            # ok, it's a root
+            roots.add(dependency)
             return False
 
-        self.visit(add_to_dependencies, set())
+        self.visit(add_to_dependencies, None)
         return roots
 
     @property
@@ -186,10 +202,12 @@ class DependencyGraph:
         return self._relative_names(self.root_dependencies)
 
     # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
-        if self.path in visited:
-            return False
-        visited.add(self.path)
+    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
+        """ provide visited set to ensure nodes are only visited once """
+        if visited:
+            if self.path in visited:
+                return False
+            visited.add(self.path)
         if visit_node(self):
             return True
         for dependency in self._dependencies.values():

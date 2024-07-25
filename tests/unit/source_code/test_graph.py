@@ -29,22 +29,24 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     assert graph.path_lookup.resolve(Path("pkgdir")).exists()
 
 
-def test_folder_loads_content(mock_path_lookup):
-    path = Path(Path(__file__).parent, "samples")
-    file_loader = FileLoader()
-    allow_list = KnownList()
-    session_state = CurrentSessionState()
-    dependency_resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list),
-        NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
-        mock_path_lookup,
-    )
-    dependency = Dependency(FolderLoader(file_loader), path, False)
-    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)
+def test_folder_loads_content(mock_path_lookup, simple_dependency_resolver):
+    path = Path(__file__).parent / "samples"
+    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(graph)
     assert len(graph.all_paths) > 1
+
+
+def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependency_resolver):
+    path = Path(__file__).parent / "samples" / "parent-child-context"
+    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    container = dependency.load(mock_path_lookup)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    container.build_dependency_graph(graph)
+    roots = graph.root_dependencies
+    actual = list(root.path for root in roots)
+    assert actual == [ path / "grand_parent.py" ]
 
 
 class _TestDependencyGraph(DependencyGraph):
