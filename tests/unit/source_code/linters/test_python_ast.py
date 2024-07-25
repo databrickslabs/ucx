@@ -209,3 +209,15 @@ df.write.format("delta").saveAsTable("old.things")
     assert len(nodes) == 2
     assert nodes[0].lineno == -2
     assert nodes[1].lineno == -1
+
+
+@pytest.mark.parametrize(
+    "source, line_count",
+    [
+        ("""df = spark.read.csv("hi")""", 1),
+        ("""df = spark.read.csv("hi")\ndf.write.format("delta").saveAsTable("old.things")""", 2),
+    ],
+)
+def test_counts_lines(source: str, line_count: int):
+    tree = Tree.normalize_and_parse(source)
+    assert tree.line_count() == line_count
