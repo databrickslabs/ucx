@@ -215,7 +215,9 @@ df.write.format("delta").saveAsTable("old.things")
     "source, line_count",
     [
         ("""df = spark.read.csv("hi")""", 1),
+        ("""# comment\ndf = spark.read.csv("hi")\n# comment""", 1),
         ("""df = spark.read.csv("hi")\ndf.write.format("delta").saveAsTable("old.things")""", 2),
+        ("""df = spark.read.csv("hi")\n# comment\ndf.write.format("delta").saveAsTable("old.things")""", 3),
     ],
 )
 def test_counts_lines(source: str, line_count: int):

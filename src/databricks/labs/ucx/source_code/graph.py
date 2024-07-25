@@ -201,18 +201,21 @@ class DependencyGraph:
         return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
 
     def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
-        # leaf is not on the route so handle case where it doesn't inherit context
-        maybe = self.locate_dependency(leaf)
-        assert maybe.graph  # assume caller knows what they're doing
-        if not maybe.graph.dependency.inherits_context:
-            return [maybe.graph.dependency]
-        # handle generic case
-        route = self._do_compute_route(root, leaf, visited)
-        return self._trim_route(route)
+        """given 2 files or notebooks root and leaf, compute the list of dependencies that must be traversed
+        in order to lint the leaf in the context of its parents"""
+        try:
+            route = self._do_compute_route(root, leaf, visited)
+            return self._trim_route(route)
+        except ValueError:
+            # we only compute routes on graphs so _compute_route can't fail
+            # but we return an empty route in case it does
+            return []
 
     def _do_compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
         maybe = self.locate_dependency(root)
-        assert maybe.graph  # assume caller knows what they're doing
+        if not maybe.graph:
+            logger.warning(f"Could not compute route because dependency {root} cannot be located")
+            raise ValueError()
         route: list[Dependency] = []
 
         def do_compute_route(graph: DependencyGraph) -> bool:
@@ -403,7 +406,8 @@ class DependencyResolver:
     def build_notebook_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path, False)
+        # the notebook is the root of the graph, so there's no context to inherit
+        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path, inherit_context=False)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)

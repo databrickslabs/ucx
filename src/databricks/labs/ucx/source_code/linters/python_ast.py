@@ -141,7 +141,7 @@ class Tree:
         # because each node points to the correct parent (practically, the tree is now only a list of statements)
         return tree
 
-    def append_globals(self, globs: dict):
+    def append_globals(self, globs: dict[str, list[NodeNG]]) -> None:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
@@ -152,7 +152,7 @@ class Tree:
                 continue
             statements.extend(values)
 
-    def append_nodes(self, nodes: list[NodeNG]):
+    def append_nodes(self, nodes: list[NodeNG]) -> None:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
@@ -160,7 +160,7 @@ class Tree:
             node.parent = self_module
             self_module.body.append(node)
 
-    def is_from_module(self, module_name: str):
+    def is_from_module(self, module_name: str) -> bool:
         # if this is the call's root node, check it against the required module
         if isinstance(self._node, Name):
             if self._node.name == module_name:
@@ -231,27 +231,19 @@ class Tree:
         root: Module = self.node
         # for now renumber in place to avoid the complexity of rebuilding the tree with clones
 
-        def renumber_node(node: NodeNG, offset: int):
+        def renumber_node(node: NodeNG, offset: int) -> None:
             for child in node.get_children():
                 renumber_node(child, offset + child.lineno - node.lineno)
             if node.end_lineno:
                 node.end_lineno = node.end_lineno + offset
                 node.lineno = node.lineno + offset
 
-        nodes = root.body
-        if start > 0:
-            for node in nodes:
-                offset = start - node.lineno
-                renumber_node(node, offset)
-                num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
-                start = start + num_lines
-        else:
-            for node in reversed(nodes):
-                offset = start - node.lineno
-                renumber_node(node, offset)
-                num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
-                start = start - num_lines
-
+        nodes = root.body if start > 0 else reversed(root.body)
+        for node in nodes:
+            offset = start - node.lineno
+            renumber_node(node, offset)
+            num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
+            start = start + num_lines if start > 0 else start - num_lines
         return self
 
 

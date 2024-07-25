@@ -611,14 +611,6 @@ class MagicCommand(ABC):
 
 class RunCommand(MagicCommand):
 
-    @property
-    def notebook_path(self) -> Path | None:
-        start = self._code.find(' ')
-        if start < 0:
-            return None
-        path = self._code[start + 1 :].strip().strip('"').strip("'")
-        return Path(path)
-
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         path = self.notebook_path
         if path is not None:
@@ -626,6 +618,14 @@ class RunCommand(MagicCommand):
             return [problem.from_node(problem.code, problem.message, self._node) for problem in problems]
         problem = DependencyProblem.from_node('invalid-run-cell', "Missing notebook path in %run command", self._node)
         return [problem]
+
+    @property
+    def notebook_path(self) -> Path | None:
+        start = self._code.find(' ')
+        if start < 0:
+            return None
+        path = self._code[start + 1 :].strip().strip('"').strip("'")
+        return Path(path)
 
     def build_inherited_context(self, context: DependencyGraphContext, child_path: Path) -> InheritedContext:
         path = self.notebook_path
