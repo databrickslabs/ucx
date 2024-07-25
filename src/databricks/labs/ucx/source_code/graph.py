@@ -547,11 +547,11 @@ class InheritedContext:
         return InheritedContext(self._tree, found)
 
     def finalize(self) -> InheritedContext:
-        # hacky stuff for fooling Astroid's inference engine
+        # hacky stuff for aligning with Astroid's inference engine behavior
         # the engine checks line numbers to skip variables that are not in scope of the current frame
-        # this is problematic when linting code fragments that refer to inherited code with unrelated line numbers
         # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L113
-        # we fool the engine by pretending that all nodes from context have negative line numbers
+        # this is problematic when linting code fragments that refer to inherited code with unrelated line numbers
+        # here we fool the engine by pretending that all nodes from context have negative line numbers
         if self._tree is None:
             return self
         tree = self._tree.renumber(-1)
