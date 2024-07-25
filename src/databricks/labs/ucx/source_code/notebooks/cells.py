@@ -109,7 +109,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        context = parent.new_graph_builder_context()
+        context = parent.new_dependency_graph_context()
         analyzer = PythonCodeAnalyzer(context, self._original_code)
         python_dependency_problems = analyzer.build_graph()
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
@@ -121,7 +121,7 @@ class PythonCell(Cell):
         ]
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        context = graph.new_graph_builder_context()
+        context = graph.new_dependency_graph_context()
         analyzer = PythonCodeAnalyzer(context, self._original_code)
         return analyzer.build_inherited_context(child_path)
 

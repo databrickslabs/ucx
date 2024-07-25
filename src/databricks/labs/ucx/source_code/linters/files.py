@@ -45,7 +45,7 @@ class LocalFile(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
-            context = parent.new_graph_builder_context()
+            context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             return analyzer.build_graph()
         # supported language that does not generate dependencies
@@ -56,7 +56,7 @@ class LocalFile(SourceContainer):
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         if self._language is CellLanguage.PYTHON:
-            context = graph.new_graph_builder_context()
+            context = graph.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             return analyzer.build_inherited_context(child_path)
         return InheritedContext(None, False)

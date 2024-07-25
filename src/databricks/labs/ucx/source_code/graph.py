@@ -197,6 +197,9 @@ class DependencyGraph:
                 return True
         return False
 
+    def new_dependency_graph_context(self):
+        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
+
     def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
         # leaf is not on the route so handle case where it doesn't inherit context
         maybe = self.locate_dependency(leaf)
@@ -230,7 +233,7 @@ class DependencyGraph:
         return route
 
     def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
-        """don't inherit context if dependency is loaded via dbutils.notebook.run"""
+        """don't inherit context if dependency is loaded via dbutils.notebook.run or via import"""
         for i, dependency in enumerate(dependencies):
             if dependency.inherits_context:
                 continue
@@ -240,9 +243,6 @@ class DependencyGraph:
     def build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
         route = self._compute_route(root, leaf, set())
         return InheritedContext.from_route(self, self.path_lookup, route)
-
-    def new_graph_builder_context(self):
-        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
 
     def __repr__(self):
         return f"<DependencyGraph {self.path}>"
