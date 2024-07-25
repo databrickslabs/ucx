@@ -291,8 +291,8 @@ class SourceContainer(abc.ABC):
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
 
-    @abc.abstractmethod
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext: ...
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        raise ValueError(f"Building an inherited context from {type(self).__name__} is not supported!")
 
 
 class DependencyLoader(abc.ABC):
@@ -535,7 +535,8 @@ class InheritedContext:
 
     def append(self, context: InheritedContext, copy_found: bool) -> InheritedContext:
         # we should never append to a found context
-        assert not self.found
+        if self.found:
+            raise ValueError("Appending to an already resolved InheritedContext is illegal!")
         tree = context.tree
         found = copy_found and context.found
         if tree is None:

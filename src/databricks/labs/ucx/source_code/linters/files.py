@@ -88,9 +88,6 @@ class Folder(SourceContainer):
             dependency = Dependency(loader, child_path, False)
             yield from parent.register_dependency(dependency).problems
 
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        raise NotImplementedError("Should never get there!")
-
     def __repr__(self):
         return f"<Folder {self._path}>"
 
@@ -232,9 +229,6 @@ class StubContainer(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         return []
-
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        raise NotImplementedError("Should never get there!")
 
 
 class FileLoader(DependencyLoader):
