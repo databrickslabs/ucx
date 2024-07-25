@@ -2,14 +2,14 @@ import dataclasses
 import json
 import logging
 from collections.abc import Generator, Sequence
-from unittest.mock import create_autospec, patch, Mock
+from unittest.mock import call, create_autospec, patch, Mock
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, InternalError, NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import InternalError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
@@ -551,32 +551,44 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
     )
 
 
-def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_workspace():
+def test_delete_original_workspace_groups_should_delete_reflected_acc_groups_in_workspace(fake_sleep: Mock) -> None:
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
     wsclient = create_autospec(WorkspaceClient)
-
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
-    wsclient.groups.list.return_value = [temp_group, reflected_group]
-    wsclient.groups.get.return_value = temp_group
+    wsclient.groups.list.side_effect = (
+        # Enumerating groups to find the account groups and check that reflection has happened.
+        (temp_group, reflected_group),
+        # After deletion, enumerating to check that deletion has occurred: simulate non-monotonic consistency failures.
+        (temp_group, reflected_group),
+        (reflected_group,),
+        (temp_group, reflected_group),
+        # Finally simulate deletion having taken effect.
+        (reflected_group,),
+        (reflected_group,),
+    )
+    wsclient.groups.get.side_effect = (
+        # Getting details of groups while enumerating all groups in the workspace.
+        temp_group,
+        # First few checks that deletion has taken effect: simulate non-monotonic consistency failures.
+        temp_group,
+        NotFound,
+        temp_group,
+        # Finally simulate the deletion having taken effect. (It is checked twice.)
+        NotFound,
+        NotFound,
+    )
+
+    # Run the actual test.
     GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
-    wsclient.groups.delete.assert_called_with(id=ws_id)
 
-
-def test_delete_original_workspace_groups_should_not_delete_groups_not_renamed():
-    account_id = "11"
-    ws_id = "1"
-    backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = create_autospec(WorkspaceClient)
-
-    temp_group = Group(id=ws_id, display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
-    wsclient.groups.list.return_value = [temp_group, reflected_group]
-    wsclient.groups.get.return_value = temp_group
-    GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
-    wsclient.groups.delete.assert_not_called()
+    # Verify interactions during test.
+    assert wsclient.groups.list.call_count == 6
+    wsclient.groups.delete.assert_called_once_with(id=ws_id)
+    wsclient.groups.get.assert_has_calls(6 * (call(id=ws_id),))
+    fake_sleep.assert_called()
 
 
 def test_delete_original_workspace_groups_should_not_delete_groups_not_reflected_to_workspace():
@@ -592,20 +604,34 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_reflected
     wsclient.groups.delete.assert_not_called()
 
 
-def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt_exist():
+def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt_exist() -> None:
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
     wsclient = create_autospec(WorkspaceClient)
-
-    temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
-    wsclient.groups.list.return_value = [temp_group, reflected_group]
+    wsclient.groups.list.side_effect = (
+        # Enumerating groups to find the account groups and check that reflection has happened.
+        # Note: target group isn't present, but deletion should happen anyway.
+        (reflected_group,),
+        # After deletion, enumerating (twice) to check that deletion has occurred.
+        (reflected_group,),
+        (reflected_group,),
+    )
+    wsclient.groups.delete.side_effect = NotFound("Simulated failure: group being deleted does not exist")
+    wsclient.groups.get.side_effect = (
+        # Should only be checked (twice) after the deletion has happened.
+        NotFound,
+        NotFound,
+    )
 
-    wsclient.groups.delete.side_effect = DatabricksError(message="None Group with id 100 not found")
-    group_manager = GroupManager(backend, wsclient, inventory_database="inv")
+    # Run the test.
+    GroupManager(backend, wsclient, inventory_database="inv").delete_original_workspace_groups()
 
-    group_manager.delete_original_workspace_groups()
+    # Verify interactions.
+    assert wsclient.groups.list.call_count == 3
+    wsclient.groups.delete.assert_called_once_with(id=ws_id)
+    wsclient.groups.get.assert_has_calls(2 * (call(id=ws_id),))
 
 
 def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():

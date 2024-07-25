@@ -100,15 +100,20 @@ def sql_fetch_all(sql_backend):
 
 @pytest.fixture
 def make_ucx_group(make_random, make_group, make_acc_group, make_user):
-    def inner(workspace_group_name=None, account_group_name=None):
+    def inner(workspace_group_name=None, account_group_name=None, **kwargs):
         if not workspace_group_name:
             workspace_group_name = f"ucx_G{make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
         members = [user.id]
-        ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
-        acc_group = make_acc_group(display_name=account_group_name, members=members)
+        ws_group = make_group(
+            display_name=workspace_group_name,
+            members=members,
+            entitlements=["allow-cluster-create"],
+            **kwargs,
+        )
+        acc_group = make_acc_group(display_name=account_group_name, members=members, **kwargs)
         return ws_group, acc_group
 
     return inner
