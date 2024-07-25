@@ -562,14 +562,22 @@ class WorkspaceInstallation(InstallationMixin):
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard = Dashboards(self._ws).deploy_dashboard(
-            metadata.as_lakeview(),
-            dashboard_id=self._install_state.dashboards.get(reference),
+        dashboard_id = self._install_state.dashboards.get(reference)
+        if dashboard_id is not None and "-" in dashboard_id:  # Upgrading from Redash to Lakeview
+            logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
+            try:
+                self._ws.dashboards.delete(dashboard_id=dashboard_id)
+            except RuntimeError as e:
+                logger.info(f"Cannot delete dashboard: {e}")
+            dashboard_id = None
+        dashboard = Dashboards(self._ws).create_dashboard(
+            metadata,
+            dashboard_id=dashboard_id,
             parent_path=parent_path,
             warehouse_id=self._warehouse_id,
+            publish=True,
         )
         assert dashboard.dashboard_id is not None
-        self._ws.lakeview.publish(dashboard.dashboard_id)
         self._install_state.dashboards[reference] = dashboard.dashboard_id
 
     def uninstall(self):

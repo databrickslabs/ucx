@@ -46,7 +46,7 @@ def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependenc
     container.build_dependency_graph(graph)
     roots = graph.root_dependencies
     actual = list(root.path for root in roots)
-    assert actual == [ path / "grand_parent.py" ]
+    assert actual == [path / "grand_parent.py"]
 
 
 class _TestDependencyGraph(DependencyGraph):

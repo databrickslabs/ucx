@@ -1,4 +1,4 @@
-/* --title 'UC readiness' --width 2 --height 4 */
+/* --title 'UC readiness' --height 4 */
 WITH raw AS (
   SELECT
     object_type,

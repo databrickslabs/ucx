@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import timedelta
+from typing import NoReturn
 
 import pytest
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -92,7 +93,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, _ = make_ucx_group()
+    ws_group, _ = make_ucx_group(wait_for_provisioning=True)
 
     group_manager = GroupManager(
         sql_backend,
@@ -105,10 +106,13 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     group_manager.reflect_account_groups_on_workspace()
     group_manager.delete_original_workspace_groups()
 
-    # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
-    def get_group(group_id: str):
-        ws.groups.get(group_id)
+    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
+    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
+    # happened.
+    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
+    @retried(on=[KeyError], timeout=timedelta(seconds=90))
+    def get_group(group_id: str) -> NoReturn:
+        _ = ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
     with pytest.raises(NotFound, match=f"Group with id {ws_group.id} not found."):
