@@ -317,7 +317,7 @@ class AzureResourcePermissions:
             list[AccessConnector, str] : The access connectors with a storage url to which it has access.
         """
         used_storage_accounts = self._get_storage_accounts()
-        if len(list(self._ws.storage_credentials.list())) > 200:
+        if len(used_storage_accounts) > 200:
             raise RuntimeWarning('Migration will breach UC limits (Storage Credentials > 200).')
         if len(used_storage_accounts) == 0:
             logger.warning(
