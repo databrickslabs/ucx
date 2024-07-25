@@ -238,7 +238,7 @@ class PythonSequentialLinter(Linter):
             # error already reported when linting enclosing notebook
             logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
 
-    def _make_tree(self):
+    def _make_tree(self) -> Tree:
         if self._tree is None:
             self._tree = Tree.new_module()
         return self._tree
