@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
+from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
 
@@ -221,27 +221,24 @@ class PythonSequentialLinter(Linter):
         return tree
 
     def append_tree(self, tree: Tree):
-        if self._tree is None:
-            self._tree = Tree(Module("root"))
-        self._tree.append_tree(tree)
+        self._make_tree().append_tree(tree)
 
     def append_nodes(self, nodes: list[NodeNG]):
-        if self._tree is None:
-            self._tree = Tree(Module("root"))
-        self._tree.append_nodes(nodes)
+        self._make_tree().append_nodes(nodes)
 
     def append_globals(self, globs: dict):
-        if self._tree is None:
-            self._tree = Tree(Module("root"))
-        self._tree.append_globals(globs)
+        self._make_tree().append_globals(globs)
 
     def process_child_cell(self, code: str):
         try:
+            this_tree = self._make_tree()
             tree = Tree.normalize_and_parse(code)
-            if self._tree is None:
-                self._tree = tree
-            else:
-                self._tree.append_tree(tree)
+            this_tree.append_tree(tree)
         except AstroidSyntaxError as e:
             # error already reported when linting enclosing notebook
             logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
+
+    def _make_tree(self):
+        if self._tree is None:
+            self._tree = Tree.new_module()
+        return self._tree

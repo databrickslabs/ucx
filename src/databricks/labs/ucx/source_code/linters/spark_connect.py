@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     CurrentSessionState,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
 
 @dataclass
@@ -96,7 +96,7 @@ class RDDApiMatcher(SharedClusterMatcher):
             return
         if node.func.attrname not in self._SC_METHODS:
             return
-        function_name = Tree.get_full_function_name(node)
+        function_name = TreeHelper.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
             return
         yield self._rdd_failure(node)
@@ -149,7 +149,7 @@ class LoggingMatcher(SharedClusterMatcher):
             return
         if node.func.attrname != 'setLogLevel':
             return
-        function_name = Tree.get_full_function_name(node)
+        function_name = TreeHelper.get_full_function_name(node)
         if not function_name or not function_name.endswith('sc.setLogLevel'):
             return
 
@@ -163,7 +163,7 @@ class LoggingMatcher(SharedClusterMatcher):
     def _match_jvm_log(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        attribute_name = Tree.get_full_attribute_name(node)
+        attribute_name = TreeHelper.get_full_attribute_name(node)
         if attribute_name and attribute_name.endswith('org.apache.log4j'):
             yield Failure.from_node(
                 code='spark-logging-in-shared-clusters',
@@ -179,7 +179,7 @@ class UDFMatcher(SharedClusterMatcher):
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Call):
             return
-        function_name = Tree.get_function_name(node)
+        function_name = TreeHelper.get_function_name(node)
 
         if function_name == 'registerJavaFunction':
             yield Failure.from_node(
@@ -214,7 +214,7 @@ class CatalogApiMatcher(SharedClusterMatcher):
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        if node.attrname == 'catalog' and Tree.get_full_attribute_name(node).endswith('spark.catalog'):
+        if node.attrname == 'catalog' and TreeHelper.get_full_attribute_name(node).endswith('spark.catalog'):
             yield Failure.from_node(
                 code='catalog-api-in-shared-clusters',
                 message=f'spark.catalog functions require DBR 14.3 LTS or above on {self._cluster_type_str()}',
@@ -226,7 +226,7 @@ class CommandContextMatcher(SharedClusterMatcher):
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Call):
             return
-        function_name = Tree.get_full_function_name(node)
+        function_name = TreeHelper.get_full_function_name(node)
         if function_name and function_name.endswith('getContext.toJson'):
             yield Failure.from_node(
                 code='to-json-in-shared-clusters',
