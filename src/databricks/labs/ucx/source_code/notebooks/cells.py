@@ -16,7 +16,7 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, GraphBuilderContext
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, DependencyGraphContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsLinter,
@@ -103,7 +103,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        context = parent.new_graph_builder_context()
+        context = parent.new_dependency_graph_context()
         analyzer = PythonCodeAnalyzer(context, self._original_code)
         python_dependency_problems = analyzer.build_graph()
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
@@ -394,7 +394,7 @@ class CellLanguage(Enum):
 
 class PythonCodeAnalyzer:
 
-    def __init__(self, context: GraphBuilderContext, python_code: str):
+    def __init__(self, context: DependencyGraphContext, python_code: str):
         self._context = context
         self._python_code = python_code
 

@@ -196,15 +196,15 @@ class DependencyGraph:
                 return True
         return False
 
-    def new_graph_builder_context(self):
-        return GraphBuilderContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
+    def new_dependency_graph_context(self):
+        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
 
     def __repr__(self):
         return f"<DependencyGraph {self.path}>"
 
 
 @dataclass
-class GraphBuilderContext:
+class DependencyGraphContext:
     parent: DependencyGraph
     path_lookup: PathLookup
     session_state: CurrentSessionState
