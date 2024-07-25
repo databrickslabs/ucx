@@ -1,6 +1,6 @@
 # Databricks notebook source
 
-some_table_name = "some_table_name"
+some_table_name = "old.thing"
 
 
 # COMMAND ----------
@@ -9,4 +9,4 @@ some_table_name = "some_table_name"
 
 # COMMAND ----------
 
-other_table_name = "other_table_name"
+other_table_name = "old.thing"

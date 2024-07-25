@@ -1,6 +1,6 @@
 # Databricks notebook source
 
-some_table_name = "some_table_name"
+some_table_name = "old.thing"
 
 
 # COMMAND ----------
