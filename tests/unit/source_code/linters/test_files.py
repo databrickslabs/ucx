@@ -104,8 +104,8 @@ def test_migrator_walks_directory():
     assert languages.fixer.call_count > 1
 
 
-def test_linter_walks_directory(mock_path_lookup, migration_index):
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+@pytest.fixture()
+def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     allow_list = KnownList()
@@ -117,15 +117,29 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
         ImportFileResolver(file_loader, allow_list),
         mock_path_lookup,
     )
-    path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
-    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
-    linter = LocalCodeLinter(
+    return LocalCodeLinter(
         file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
+
+
+def test_linter_walks_directory(mock_path_lookup, local_code_linter):
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+    path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
+    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
     paths: set[Path] = set()
-    advices = linter.lint(prompts, paths, None)
+    advices = local_code_linter.lint(prompts, paths, None)
     assert len(paths) > 10
     assert not advices
+
+
+def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter):
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+    path = Path(Path(__file__).parent, "../samples", "parent-child-context")
+    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.resolve().as_posix()})
+    paths: set[Path] = set()
+    advices = local_code_linter.lint(prompts, paths, None)
+    assert len(paths) == 3
+    assert advices == []
 
 
 def test_triple_dot_import():
