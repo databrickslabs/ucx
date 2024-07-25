@@ -177,3 +177,35 @@ def test_supports_recursive_refs_when_checking_module():
     main_tree.append_tree(tree)
     assign = tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
+
+
+def test_renumbers_positively():
+    source = """df = spark.read.csv("hi")
+df.write.format("delta").saveAsTable("old.things")
+"""
+    tree = Tree.normalize_and_parse(source)
+    nodes = list(tree.node.get_children())
+    assert len(nodes) == 2
+    assert nodes[0].lineno == 1
+    assert nodes[1].lineno == 2
+    tree = tree.renumber(5)
+    nodes = list(tree.node.get_children())
+    assert len(nodes) == 2
+    assert nodes[0].lineno == 5
+    assert nodes[1].lineno == 6
+
+
+def test_renumbers_negatively():
+    source = """df = spark.read.csv("hi")
+df.write.format("delta").saveAsTable("old.things")
+"""
+    tree = Tree.normalize_and_parse(source)
+    nodes = list(tree.node.get_children())
+    assert len(nodes) == 2
+    assert nodes[0].lineno == 1
+    assert nodes[1].lineno == 2
+    tree = tree.renumber(-1)
+    nodes = list(tree.node.get_children())
+    assert len(nodes) == 2
+    assert nodes[0].lineno == -2
+    assert nodes[1].lineno == -1

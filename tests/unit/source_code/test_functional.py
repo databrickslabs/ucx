@@ -138,8 +138,8 @@ class Functional:
         container = root_dependency.load(path_lookup)
         assert container is not None
         container.build_dependency_graph(root_graph)
-        inference_context = root_graph.build_inherited_context(self.parent, self.path)
-        linter = FileLinter(ctx, path_lookup, session_state, self.path, inference_context)
+        inherited_context = root_graph.build_inherited_context(self.parent, self.path)
+        linter = FileLinter(ctx, path_lookup, session_state, self.path, inherited_context)
         return linter.lint()
 
     def _is_notebook(
@@ -229,7 +229,7 @@ def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simpl
 
 @pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup, simple_dependency_resolver):
-    path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_magic_line.py"))
+    path = mock_path_lookup.resolve(Path("functional/widgets.py"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)
     sample.verify(path_lookup, simple_dependency_resolver)

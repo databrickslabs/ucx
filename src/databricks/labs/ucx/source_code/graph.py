@@ -515,7 +515,7 @@ class InheritedContext:
             local = container.build_inherited_context(graph, next_path)
             # only copy 'found' flag if this is the last parent
             context = context.append(local, i == len(route) - 2)
-        return context
+        return context.renumber()
 
     def __init__(self, tree: Tree | None, found: bool):
         self._tree = tree
@@ -540,3 +540,14 @@ class InheritedContext:
             self._tree = Tree.new_module()
         self._tree.append_tree(context.tree)
         return InheritedContext(self._tree, found)
+
+    def renumber(self) -> InheritedContext:
+        # hacky stuff for fooling Astroid's inference engine
+        # the engine checks line numbers to skip variables that are not in scope of the current frame
+        # this is problematic when linting code fragments that refer to
+        # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L113
+        # we fool the engine by pretending that all nodes from context have negative line numbers
+        if self._tree is None:
+            return self
+        tree = self._tree.renumber(-1)
+        return InheritedContext(tree, self.found)

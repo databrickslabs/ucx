@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from abc import ABC
 import logging
 import re
@@ -147,29 +146,11 @@ class Tree:
             raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for name, values in globs.items():
-            # need local copies that we can fiddle with
-            values = self._clone_values_removing_lineno(values)
             statements: list[Expr] = self_module.globals.get(name, None)
             if statements is None:
                 self_module.globals[name] = list(values)  # clone the source list to avoid side-effects
                 continue
             statements.extend(values)
-
-    @classmethod
-    def _clone_values_removing_lineno(cls, values: list[NodeNG]) -> list[NodeNG]:
-        copies = []
-        for value in values:
-            # hacky stuff for fooling Astroid's inference engine
-            # the engine checks line numbers to skip variables that are not in scope of the current frame
-            # for globals we fool the engine by pretending that the assign statement lineno is None
-            # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L101
-            if isinstance(value.parent, Assign):
-                parent = copy.copy(value.parent)
-                parent.fromlineno = None
-                value = copy.copy(value)
-                value.parent = parent
-            copies.append(value)
-        return copies
 
     def append_nodes(self, nodes: list[NodeNG]):
         if not isinstance(self.node, Module):
@@ -242,6 +223,36 @@ class Tree:
         if nodes_count == 0:
             return 0
         return 1 + self_module.body[nodes_count - 1].lineno - self_module.body[0].lineno
+
+    def renumber(self, start: int) -> Tree:
+        assert start != 0
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't renumber {type(self.node).__name__}")
+        root: Module = self.node
+        # for now renumber in place to avoid the complexity of rebuilding the tree with clones
+
+        def renumber_node(node: NodeNG, offset: int):
+            for child in node.get_children():
+                renumber_node(child, offset + child.lineno - node.lineno)
+            if node.end_lineno:
+                node.end_lineno = node.end_lineno + offset
+                node.lineno = node.lineno + offset
+
+        nodes = root.body
+        if start > 0:
+            for node in nodes:
+                offset = start - node.lineno
+                renumber_node(node, offset)
+                num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
+                start = start + num_lines
+        else:
+            for node in reversed(nodes):
+                offset = start - node.lineno
+                renumber_node(node, offset)
+                num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
+                start = start - num_lines
+
+        return self
 
 
 class TreeHelper(ABC):
