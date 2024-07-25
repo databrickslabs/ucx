@@ -380,6 +380,16 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             )
 
 
+class GroupDeletionIncompleteError(RuntimeError):
+    __slots__ = ("group_id", "display_name")
+
+    def __init__(self, group_id: str, display_name: str | None) -> None:
+        msg = f"Group deletion incomplete: {display_name if display_name else '<name-missing>'} (id={group_id})"
+        super().__init__(msg)
+        self.group_id = group_id
+        self.display_name = display_name
+
+
 class GroupRenameIncompleteError(RuntimeError):
     __slots__ = ("group_id", "old_name", "new_name")
 
@@ -548,15 +558,31 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                     f"Not deleting group {migrated_group.temporary_name}(id={migrated_group.id_in_workspace}) (originally {migrated_group.name_in_workspace}): its migrated account group ({migrated_group.name_in_account}) cannot be found."
                 )
                 continue
-            tasks.append(
+            deletion_tasks.append(
                 functools.partial(
                     self._delete_workspace_group, migrated_group.id_in_workspace, migrated_group.temporary_name
                 )
             )
-        _, errors = Threads.gather("removing original workspace groups", tasks)
+            waiting_tasks.append(
+                functools.partial(
+                    self._wait_for_workspace_group_deletion,
+                    migrated_group.id_in_workspace,
+                    migrated_group.temporary_name,
+                )
+            )
+            deleted_groups.append(migrated_group)
+        # Step 1: Delete the groups.
+        _, errors = Threads.gather("removing original workspace groups", deletion_tasks)
         if len(errors) > 0:
-            logger.error(f"During account-to-workspace reflection got {len(errors)} errors. See debug logs")
+            logger.error(f"During deletion of workspace groups got {len(errors)} errors. See debug logs.")
             raise ManyError(errors)
+        # Step 2: Confirm that direct gets no longer return the deleted group.
+        _, errors = Threads.gather("waiting for removal of original workspace groups", waiting_tasks)
+        if len(errors) > 0:
+            logger.error(f"Waiting for deletion of workspace groups got {len(errors)} errors. See debug logs.")
+            raise ManyError(errors)
+        # Step 3: Confirm that enumeration no longer returns the deleted groups.
+        self._wait_for_deleted_workspace_groups(deleted_groups)
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
         state = []
@@ -731,16 +757,86 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
         return sorted_groups
 
+    def _delete_workspace_group_and_wait_for_deletion(self, group_id: str, display_name: str) -> str:
+        logger.debug(f"Deleting workspace group: {display_name} (id={group_id})")
+        self._delete_workspace_group(group_id, display_name)
+        logger.debug(f"Waiting for workspace group deletion to take effect: {display_name} (id={group_id})")
+        self._wait_for_workspace_group_deletion(group_id, display_name)
+        return group_id
+
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=35, burst_period_seconds=60)
-    def _delete_workspace_group(self, group_id: str, display_name: str) -> None:
+    def _rate_limited_group_delete_with_retry(self, group_id: str) -> None:
         try:
-            logger.info(f"Deleting the workspace-level group {display_name} with id {group_id}")
             self._ws.groups.delete(id=group_id)
-            logger.info(f"Workspace-level group {display_name} with id {group_id} was deleted")
-            return None
         except NotFound:
-            return None
+            pass
+
+    def _delete_workspace_group(self, group_id: str, display_name: str) -> None:
+        logger.debug(f"Deleting workspace group: {display_name} (id={group_id})")
+        self._rate_limited_group_delete_with_retry(group_id)
+
+    @retried(on=[GroupDeletionIncompleteError], timeout=timedelta(seconds=90))
+    def _wait_for_workspace_group_deletion(self, group_id: str, display_name: str) -> None:
+        # The groups API is eventually consistent, but not monotonically consistent. Here we verify that the group
+        # has been deleted, and try to compensate for the lack of monotonic consistency by requiring two subsequent
+        # calls to confirm deletion. REST API internals cache things for up to 60s, and we see times close to this
+        # during testing. The retry timeout reflects this: if it's taking much longer then something else is wrong.
+        self._check_workspace_group_deletion(group_id, display_name, logging.DEBUG)
+        self._check_workspace_group_deletion(group_id, display_name, logging.WARNING)
+        logger.debug(f"Workspace group is assumed deleted: {display_name} (id={group_id})")
+
+    def _check_workspace_group_deletion(self, group_id: str, display_name: str, still_present_level_level: int) -> None:
+        try:
+            _ = self._ws.groups.get(id=group_id)
+            logger.log(
+                still_present_level_level,
+                f"Deleted group is still present; still waiting for deletion to take effect: {display_name} (id={group_id})",
+            )
+            # Deletion is still pending.
+            raise GroupDeletionIncompleteError(group_id, display_name)
+        except NotFound:
+            logger.debug(f"Workspace group not found; possibly deleted: {display_name} (id={group_id})")
+
+    @retried(on=[ManyError], timeout=timedelta(minutes=5))
+    def _wait_for_deleted_workspace_groups(self, deleted_workspace_groups: list[MigratedGroup]) -> None:
+        # The groups API is eventually consistent, but not monotonically consistent. Here we verify that enumerating
+        # all groups no longer includes the deleted groups. We try to compensate for the lack of monotonic consistency
+        # by requiring two subsequent enumerations to omit all deleted groups. REST API internals cache things for up
+        # to 60s. The retry timeout reflects this, and the fact that enumeration can take a long time for large numbers
+        # of groups. (Currently there is no way to configure the retry handler to retry at least once, so the timeout
+        # needs to be high enough to allow at least one retry.)
+        self._check_for_deleted_workspace_groups(deleted_workspace_groups, logging.DEBUG)
+        self._check_for_deleted_workspace_groups(deleted_workspace_groups, logging.WARNING)
+        logger.debug(
+            f"Group enumeration omitted all {len(deleted_workspace_groups)} workspace groups; assuming deleted."
+        )
+
+    def _check_for_deleted_workspace_groups(
+        self, deleted_workspace_groups: list[MigratedGroup], still_present_log_level: int
+    ) -> None:
+        attributes = "id,displayName"
+        expected_deletions = {group.id_in_workspace for group in deleted_workspace_groups}
+        pending_deletions = [
+            GroupDeletionIncompleteError(group.id, group.display_name)
+            for group in self._list_workspace_groups("WorkspaceGroup", attributes)
+            if group.id in expected_deletions
+        ]
+        if pending_deletions:
+            if logger.isEnabledFor(still_present_log_level):
+                logger.log(
+                    still_present_log_level,
+                    f"Group enumeration still contains {len(pending_deletions)}/{len(expected_deletions)} deleted workspace groups.",
+                )
+                for pending_deletion in pending_deletions:
+                    logger.log(
+                        still_present_log_level,
+                        f"Group enumeration still contains deleted group: {pending_deletion.display_name}(id={pending_deletion.group_id})",
+                    )
+            raise ManyError(pending_deletions)
+        logger.debug(
+            f"Group enumeration does not contain any of the {len(expected_deletions)} deleted workspace groups; possibly deleted."
+        )
 
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=5)

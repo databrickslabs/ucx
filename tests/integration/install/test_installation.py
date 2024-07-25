@@ -10,7 +10,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
@@ -27,6 +27,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
+from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +169,8 @@ def test_job_cluster_policy(ws, installation_ctx):
 
 
 @retried(on=[NotFound, InvalidParameterValue])
-def test_running_real_remove_backup_groups_job(ws, installation_ctx):
-    ws_group_a, _ = installation_ctx.make_ucx_group()
+def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
+    ws_group_a, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.workspace_installation.run()
@@ -180,8 +181,11 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[KeyError], timeout=timedelta(minutes=6))
+    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
+    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
+    # happened.
+    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
+    @retried(on=[KeyError], timeout=timedelta(seconds=90))
     def get_group(group_id: str):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")

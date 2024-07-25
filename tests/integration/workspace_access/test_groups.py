@@ -105,8 +105,11 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     group_manager.reflect_account_groups_on_workspace()
     group_manager.delete_original_workspace_groups()
 
-    # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
+    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
+    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
+    # happened.
+    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
+    @retried(on=[KeyError], timeout=timedelta(seconds=90))
     def get_group(group_id: str):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
