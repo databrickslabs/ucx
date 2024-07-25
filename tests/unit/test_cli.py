@@ -55,7 +55,8 @@ from databricks.labs.ucx.cli import (
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
@@ -365,18 +366,30 @@ def test_migrate_credentials_aws(ws):
 
 
 def test_migrate_credentials_limit_azure(ws):
-    ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
+    # ws.storage_credentials.list.return_value = 200 * [StorageCredentialInfo(id="1234")]
+    azure_resources = create_autospec(AzureResources)
+    ws.workspace.upload.return_value = "test"
 
+    external_locations = create_autospec(ExternalLocations)
+    external_locations_mock = []
+    for i in range(200):
+        external_locations_mock.append(
+            ExternalLocation(location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}"
+                             , table_count=i % 20))
+    external_locations.snapshot.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
         azure_subscription_id='test',
+        azure_resources=azure_resources,
+        external_locations=external_locations,
     )
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
 
-    ws.storage_credentials.list.return_value = 201 * [StorageCredentialInfo(id="1234")]
+    external_locations_mock.append(ExternalLocation(
+        location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25))
     with pytest.raises(RuntimeWarning):
         migrate_credentials(ws, prompts, ctx=ctx)
 
