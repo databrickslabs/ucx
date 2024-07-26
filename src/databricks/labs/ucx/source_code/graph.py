@@ -154,7 +154,7 @@ class DependencyGraph:
                     children.add(dependency)
                     return False
                 parent_graph = parent_graph.parent
-            # ok, it's a root 
+            # ok, it's a root
             roots.add(dependency)
             return False
 
@@ -198,8 +198,8 @@ class DependencyGraph:
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
-        """provide visited set to ensure nodes are only visited once"""
-        if visited:
+        """provide visited set if you want to ensure nodes are only visited once"""
+        if visited is not None:
             if self.path in visited:
                 return False
             visited.add(self.path)
