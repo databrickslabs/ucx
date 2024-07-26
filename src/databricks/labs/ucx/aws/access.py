@@ -222,7 +222,8 @@ class AWSResourcePermissions:
                 roles[role.role_arn].paths.add(external_location.location)
                 if role.privilege == Privilege.WRITE_FILES.value:
                     roles[role.role_arn].privilege = Privilege.WRITE_FILES.value
-
+        if len(roles) > 200:
+            raise RuntimeWarning('Migration will breach UC limits (Storage Credentials > 200).')
         return list(roles.values())
 
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
