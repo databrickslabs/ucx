@@ -78,17 +78,18 @@ dbutils.library.restartPython()
 
 import logging
 from pathlib import Path
+from databricks.sdk.config import with_user_agent_extra
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.sdk import WorkspaceClient
+from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
 install_logger()
+with_user_agent_extra("cmd", "debug-notebook")
 logging.getLogger("databricks").setLevel("DEBUG")
 
-cfg = Installation.load_local(WorkspaceConfig, Path("/Workspace{config_file}"))
-ws = WorkspaceClient()
+# ctx.<TAB> to see all available objects for you to use
+ctx = RuntimeContext({'config': "/Workspace{config_file}"})
 
 print(__version__)
 """
