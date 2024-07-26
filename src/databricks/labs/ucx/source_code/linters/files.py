@@ -146,7 +146,8 @@ class LocalCodeLinter:
         if linted_paths is None:
             linted_paths = set()
         for dependency in graph.root_dependencies:
-            yield from self._lint_one(dependency, graph, path, linted_paths)
+            root = dependency.path  # since it's a root
+            yield from self._lint_one(dependency, graph, root, linted_paths)
 
     def _lint_one(
         self, dependency: Dependency, graph: DependencyGraph, root_path: Path, linted_paths: set[Path]
