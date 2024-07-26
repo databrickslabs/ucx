@@ -146,7 +146,7 @@ class NotebookLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         notebook: Notebook,
-        inherited_context: InheritedContext | None = None,
+        inherited_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -155,8 +155,8 @@ class NotebookLinter:
         # reuse Python linter across related files and notebook cells
         # this is required in order to accumulate statements for improved inference
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
-        if inherited_context is not None and inherited_context.tree is not None:
-            self._python_linter.append_tree(inherited_context.tree)
+        if inherited_tree is not None:
+            self._python_linter.append_tree(inherited_tree)
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
@@ -389,14 +389,14 @@ class FileLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         path: Path,
-        inherited_context: InheritedContext | None = None,
+        inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
         self._ctx: LinterContext = ctx
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._path = path
-        self._inherited_context = inherited_context
+        self._inherited_tree = inherited_tree
         self._content = content
 
     @cached_property
@@ -449,8 +449,8 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
-                if self._inherited_context is not None and isinstance(linter, PythonSequentialLinter):
-                    linter.append_tree(self._inherited_context.tree)
+                if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
+                    linter.append_tree(self._inherited_tree)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
@@ -459,6 +459,6 @@ class FileLinter:
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
         notebook_linter = NotebookLinter(
-            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_context
+            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
         )
         yield from notebook_linter.lint()

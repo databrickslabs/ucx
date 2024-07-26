@@ -4,7 +4,7 @@ import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, InheritedContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
@@ -52,6 +52,9 @@ def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependenc
 class _TestDependencyGraph(DependencyGraph):
     def compute_route(self, root: Path, leaf: Path) -> list[Dependency]:
         return self._compute_route(root, leaf, set())
+
+    def build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
+        return self._build_inherited_context(root, leaf)
 
 
 @pytest.fixture()
@@ -138,7 +141,9 @@ def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_reso
     parent = mock_path_lookup.cwd / "functional/grand_parent_that_magic_runs_parent_that_magic_runs_child.py"
     child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), parent)
-    root_graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    root_graph = _TestDependencyGraph(
+        dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState()
+    )
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
     inference_context = root_graph.build_inherited_context(parent, child)

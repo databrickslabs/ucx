@@ -140,8 +140,8 @@ class Functional:
         container = root_dependency.load(path_lookup)
         assert container is not None
         container.build_dependency_graph(root_graph)
-        inherited_context = root_graph.build_inherited_context(self.parent, self.path)
-        linter = FileLinter(ctx, path_lookup, session_state, self.path, inherited_context)
+        inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
+        linter = FileLinter(ctx, path_lookup, session_state, self.path, inherited_tree)
         return linter.lint()
 
     def _is_notebook(

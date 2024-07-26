@@ -257,7 +257,10 @@ class DependencyGraph:
             return [dependency] + self._trim_route(dependencies[i + 1 :])
         return dependencies
 
-    def build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
+    def build_inherited_tree(self, root: Path, leaf: Path) -> Tree | None:
+        return self._build_inherited_context(root, leaf).tree
+
+    def _build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
         route = self._compute_route(root, leaf, set())
         return InheritedContext.from_route(self, self.path_lookup, route)
 
