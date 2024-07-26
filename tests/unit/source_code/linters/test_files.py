@@ -136,9 +136,7 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter):
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(Path(__file__).parent, "../samples", "parent-child-context")
     prompts = MockPrompts({"Which file or directory do you want to lint ?": path.resolve().as_posix()})
-    paths: set[Path] = set()
-    advices = local_code_linter.lint(prompts, paths, None)
-    assert len(paths) == 3
+    advices = local_code_linter.lint(prompts, None)
     assert advices == []
 
 
@@ -197,7 +195,6 @@ def test_known_issues(path: Path, migration_index):
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linted: set[Path] = set()
-    advices = linter.lint(MockPrompts({}), linted, path)
+    advices = linter.lint(MockPrompts({}), path)
     for advice in advices:
         print(repr(advice))

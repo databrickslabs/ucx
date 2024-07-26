@@ -252,6 +252,7 @@ class DependencyGraph:
     def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
         """don't inherit context if dependency is loaded via dbutils.notebook.run or via import"""
         for i, dependency in enumerate(dependencies):
+            if not 
             if dependency.inherits_context:
                 continue
             return [dependency] + self._trim_route(dependencies[i + 1 :])

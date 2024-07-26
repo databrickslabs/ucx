@@ -114,7 +114,6 @@ class LocalCodeLinter:
     def lint(
         self,
         prompts: Prompts,
-        linted_paths: set[Path],
         path: Path | None,
         stdout: TextIO = sys.stdout,
     ) -> list[LocatedAdvice]:
@@ -126,13 +125,13 @@ class LocalCodeLinter:
                 validate=lambda p_: Path(p_).exists(),
             )
             path = Path(response)
-        located_advices = list(self.lint_path(path, linted_paths))
+        located_advices = list(self.lint_path(path))
         for located in located_advices:
             message = located.message_relative_to(path)
             stdout.write(f"{message}\n")
         return located_advices
 
-    def lint_path(self, path: Path, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
+    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
         is_dir = path.is_dir()
         loader = self._folder_loader if is_dir else self._file_loader
         dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
@@ -143,18 +142,20 @@ class LocalCodeLinter:
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
+        linted_paths: set[Path] = set()
         for dependency in graph.root_dependencies:
-            yield from self._lint_one(dependency, graph, linted_paths)
+            yield from self._lint_one(dependency, graph, path, linted_paths)
 
     def _lint_one(
-        self, dependency: Dependency, graph: DependencyGraph, linted_paths: set[Path]
+        self, dependency: Dependency, graph: DependencyGraph, root_path: Path, linted_paths: set[Path]
     ) -> Iterable[LocatedAdvice]:
         if dependency.path in linted_paths:
             return
         linted_paths.add(dependency.path)
         if dependency.path.is_file():
+            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             ctx = self._new_linter_context()
-            linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path)
+            linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path, inherited_tree)
             for advice in linter.lint():
                 yield advice.for_path(dependency.path)
         maybe_graph = graph.locate_dependency(dependency.path)
@@ -162,7 +163,7 @@ class LocalCodeLinter:
         if maybe_graph.graph:
             child_graph = maybe_graph.graph
             for child_dependency in child_graph.local_dependencies:
-                yield from self._lint_one(child_dependency, child_graph, linted_paths)
+                yield from self._lint_one(child_dependency, child_graph, root_path, linted_paths)
 
 
 class LocalFileMigrator:
