@@ -642,6 +642,9 @@ class RunCommand(MagicCommand):
         if absolute_path == absolute_child:
             return InheritedContext(None, True)
         container = maybe.dependency.load(context.path_lookup)
+        if not container:
+            logger.warning(f"Could not load notebook {path}")
+            return InheritedContext(None, False)
         return container.build_inherited_context(context.parent, child_path)
 
 
