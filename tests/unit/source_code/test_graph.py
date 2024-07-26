@@ -29,22 +29,24 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     assert graph.path_lookup.resolve(Path("pkgdir")).exists()
 
 
-def test_folder_loads_content(mock_path_lookup):
-    path = Path(Path(__file__).parent, "samples")
-    file_loader = FileLoader()
-    allow_list = KnownList()
-    session_state = CurrentSessionState()
-    dependency_resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list),
-        NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
-        mock_path_lookup,
-    )
-    dependency = Dependency(FolderLoader(file_loader), path, False)
-    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)
+def test_folder_loads_content(mock_path_lookup, simple_dependency_resolver):
+    path = Path(__file__).parent / "samples"
+    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(graph)
     assert len(graph.all_paths) > 1
+
+
+def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependency_resolver):
+    path = Path(__file__).parent / "samples" / "parent-child-context"
+    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    container = dependency.load(mock_path_lookup)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    container.build_dependency_graph(graph)
+    roots = graph.root_dependencies
+    actual = list(root.path for root in roots)
+    assert actual == [path / "grand_parent.py"]
 
 
 class _TestDependencyGraph(DependencyGraph):
@@ -64,8 +66,8 @@ def dependency_graph_factory(mock_path_lookup, simple_dependency_resolver):
 
 
 def test_graph_computes_magic_run_route(mock_path_lookup, dependency_graph_factory):
-    parent = mock_path_lookup.cwd / "functional/parent_that_magic_runs_child_that_uses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_magic_runs_child_that_uses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
@@ -75,9 +77,9 @@ def test_graph_computes_magic_run_route(mock_path_lookup, dependency_graph_facto
 
 
 def test_graph_computes_magic_run_route_recursively(mock_path_lookup, dependency_graph_factory):
-    grand_parent = mock_path_lookup.cwd / "functional/grand_parent_that_magic_runs_parent_that_magic_runs_child.py"
-    parent = mock_path_lookup.cwd / "functional/parent_that_magic_runs_child_that_uses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
+    grand_parent = mock_path_lookup.cwd / "functional" / "grand_parent_that_magic_runs_parent_that_magic_runs_child.py"
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_magic_runs_child_that_uses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), grand_parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
@@ -86,9 +88,25 @@ def test_graph_computes_magic_run_route_recursively(mock_path_lookup, dependency
     assert [dep.path for dep in route] == [grand_parent, parent, child]
 
 
+def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_lookup, dependency_graph_factory):
+    parent_folder = mock_path_lookup.cwd / "parent-child-context"
+    grand_parent = parent_folder / "grand_parent.py"
+    parent = parent_folder / "parent.py"
+    child = parent_folder / "child.py"
+    dependency = Dependency(FolderLoader(FileLoader()), parent_folder)
+    root_graph = dependency_graph_factory(dependency)
+    container = dependency.load(mock_path_lookup)
+    container.build_dependency_graph(root_graph)
+    roots = root_graph.root_dependencies
+    assert len(roots) == 1
+    assert grand_parent in [dep.path for dep in roots]
+    route = root_graph.compute_route(grand_parent, child)
+    assert [dep.path for dep in route] == [grand_parent, parent, child]
+
+
 def test_graph_computes_dbutils_run_route(mock_path_lookup, dependency_graph_factory):
-    parent = mock_path_lookup.cwd / "functional/parent_that_dbutils_runs_child_that_misses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_missing_value.py"
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_dbutils_runs_child_that_misses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_missing_value.py"
     dependency = Dependency(NotebookLoader(), parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
@@ -98,9 +116,11 @@ def test_graph_computes_dbutils_run_route(mock_path_lookup, dependency_graph_fac
 
 
 def test_graph_computes_dbutils_run_route_recursively(mock_path_lookup, dependency_graph_factory):
-    grand_parent = mock_path_lookup.cwd / "functional/grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"
-    parent = mock_path_lookup.cwd / "functional/parent_that_magic_runs_child_that_uses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
+    grand_parent = (
+        mock_path_lookup.cwd / "functional" / "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"
+    )
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_magic_runs_child_that_uses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), grand_parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
@@ -110,8 +130,8 @@ def test_graph_computes_dbutils_run_route_recursively(mock_path_lookup, dependen
 
 
 def test_graph_computes_import_route(mock_path_lookup, dependency_graph_factory):
-    parent = mock_path_lookup.cwd / "functional/parent_that_imports_child_that_misses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_missing_value.py"
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_imports_child_that_misses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_missing_value.py"
     dependency = Dependency(NotebookLoader(), parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
@@ -121,9 +141,9 @@ def test_graph_computes_import_route(mock_path_lookup, dependency_graph_factory)
 
 
 def test_graph_computes_import_route_recursively(mock_path_lookup, dependency_graph_factory):
-    grand_parent = mock_path_lookup.cwd / "functional/grand_parent_that_imports_parent_that_magic_runs_child.py"
-    parent = mock_path_lookup.cwd / "functional/parent_that_magic_runs_child_that_uses_value_from_parent.py"
-    child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
+    grand_parent = mock_path_lookup.cwd / "functional" / "grand_parent_that_imports_parent_that_magic_runs_child.py"
+    parent = mock_path_lookup.cwd / "functional" / "parent_that_magic_runs_child_that_uses_value_from_parent.py"
+    child = mock_path_lookup.cwd / "functional" / "_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), grand_parent)
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
