@@ -116,7 +116,9 @@ def test_graph_computes_dbutils_run_route(mock_path_lookup, dependency_graph_fac
 
 
 def test_graph_computes_dbutils_run_route_recursively(mock_path_lookup, dependency_graph_factory):
-    grand_parent = mock_path_lookup.cwd / "functional" / "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"
+    grand_parent = (
+        mock_path_lookup.cwd / "functional" / "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"
+    )
     parent = mock_path_lookup.cwd / "functional" / "parent_that_magic_runs_child_that_uses_value_from_parent.py"
     child = mock_path_lookup.cwd / "functional" / "_child_that_uses_value_from_parent.py"
     dependency = Dependency(NotebookLoader(), grand_parent)
