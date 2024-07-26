@@ -149,7 +149,7 @@ def principal_acl(w, install, cluster_spn: list):
 
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    locations = {}
+    locations = []
     if w.config.is_azure:
         locations = azure_acl(w, install, cluster_spn).get_eligible_locations_principals()
     if w.config.is_aws:
@@ -249,7 +249,9 @@ def test_get_eligible_locations_principals(ws, installation):
     locations = azure_acl(ws, installation, [cluster_spn])
     eligible_locations = locations.get_eligible_locations_principals()
     assert len(eligible_locations) == 1
-    assert eligible_locations['abc'] == {'abfss://container1@storage1.dfs.core.windows.net/folder1': 'WRITE_FILES'}
+    assert eligible_locations[0].locations == {
+        'abfss://container1@storage1.dfs.core.windows.net/folder1': 'WRITE_FILES'
+    }
 
 
 def test_interactive_cluster_no_acl(ws, installation):
@@ -327,6 +329,7 @@ def test_interactive_cluster_multiple_spn(ws, installation):
 
 def test_get_eligible_locations_principals_no_cluster_return_empty(ws, installation):
     ws.clusters.list.return_value = []
+    ws.warehouses.list.return_value = []
     locations = aws_acl(ws, installation)
     locations.get_eligible_locations_principals()
     ws.external_locations.list.assert_not_called()
@@ -429,7 +432,7 @@ def test_get_eligible_locations_principals_aws(ws, installation):
     locations = aws_acl(ws, installation)
     eligible_locations = locations.get_eligible_locations_principals()
     assert len(eligible_locations) == 1
-    assert eligible_locations['cluster1'] == {'s3://storage5/folder5': 'WRITE_FILES'}
+    assert eligible_locations[0].locations == {'s3://storage5/folder5': 'WRITE_FILES'}
 
 
 def test_interactive_cluster_aws_no_acl(ws, installation):

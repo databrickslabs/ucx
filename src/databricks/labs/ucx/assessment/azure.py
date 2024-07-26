@@ -193,3 +193,12 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                 set_service_principals = self._get_azure_spn_from_cluster_config(cluster)
                 spn_cluster_mapping.append(ServicePrincipalClusterMapping(cluster.cluster_id, set_service_principals))
         return spn_cluster_mapping
+
+    def get_warehouse_to_storage_mapping(self):
+        # this function gives a mapping between a sql warehouse and the spn used by it
+        set_service_principals = set[AzureServicePrincipalInfo]()
+        spn_warehouse_mapping = []
+        for cluster in self._ws.warehouses.list():
+            set_service_principals = self._list_all_spn_in_sql_warehouses_spark_conf()
+            spn_warehouse_mapping.append(ServicePrincipalClusterMapping(cluster.cluster_id, set_service_principals))
+        return spn_warehouse_mapping

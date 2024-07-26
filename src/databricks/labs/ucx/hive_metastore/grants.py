@@ -43,9 +43,10 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class LocationACL:
-    location_name: str
-    principal: str
+class ComputeLocations:
+    compute_id: str
+    locations: dict
+    compute_type: str
 
 
 @dataclass(frozen=True)
@@ -386,6 +387,7 @@ class AwsACL:
         # this function gives a mapping between an interactive cluster and the instance profile used by it
         # either directly or through a cluster policy.
         cluster_instance_profiles = {}
+
         for cluster in self._ws.clusters.list():
             if (
                 cluster.cluster_id is None
@@ -403,14 +405,27 @@ class AwsACL:
 
         return cluster_instance_profiles
 
-    def get_eligible_locations_principals(self) -> dict[str, dict]:
-        cluster_locations = {}
+    def _update_warehouse_to_instance_profile_mapping(
+        self,
+    ) -> dict[str, str]:
+        warehouse_instance_profiles = {}
+        sql_config = self._ws.warehouses.get_workspace_warehouse_config()
+        if sql_config.instance_profile_arn is not None:
+            role_name = sql_config.instance_profile_arn
+            for warehouse in self._ws.warehouses.list():
+                if warehouse.id is not None:
+                    warehouse_instance_profiles[warehouse.id] = role_name
+        return warehouse_instance_profiles
+
+    def get_eligible_locations_principals(self) -> list[ComputeLocations]:
         eligible_locations = {}
         cluster_instance_profiles = self._get_cluster_to_instance_profile_mapping()
-        if len(cluster_instance_profiles) == 0:
-            # if there are no interactive clusters , then return empty grants
-            logger.info("No interactive cluster found with instance profiles configured")
-            return {}
+        warehouse_instance_profiles = self._update_warehouse_to_instance_profile_mapping()
+        compute_locations = []
+        if len(cluster_instance_profiles) == 0 and len(warehouse_instance_profiles)==0:
+            # if there are no interactive clusters or warehouse with instance profile , then return empty grants
+            logger.info("No interactive cluster or sql warehouse found with instance profiles configured")
+            return []
         external_locations = list(self._ws.external_locations.list())
         if len(external_locations) == 0:
             # if there are no external locations, then throw an error to run migrate_locations cli command
@@ -434,12 +449,21 @@ class AwsACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        for cluster_id, role_name in cluster_instance_profiles.items():
-            eligible_locations.update(self._get_external_locations(role_name, external_locations, permission_mappings))
+        for cluster_id, role_compute in cluster_instance_profiles.items():
+            eligible_locations.update(
+                self._get_external_locations(role_compute, external_locations, permission_mappings)
+            )
             if len(eligible_locations) == 0:
                 continue
-            cluster_locations[cluster_id] = eligible_locations
-        return cluster_locations
+            compute_locations.append(ComputeLocations(cluster_id, eligible_locations, "clusters"))
+        for cluster_id, role_compute in warehouse_instance_profiles.items():
+            eligible_locations.update(
+                self._get_external_locations(role_compute, external_locations, permission_mappings)
+            )
+            if len(eligible_locations) == 0:
+                continue
+            compute_locations.append(ComputeLocations(cluster_id, eligible_locations, "clusters"))
+        return compute_locations
 
     @staticmethod
     def _get_external_locations(
@@ -475,14 +499,15 @@ class AzureACL:
         self._spn_crawler = spn_crawler
         self._installation = installation
 
-    def get_eligible_locations_principals(self) -> dict[str, dict]:
-        cluster_locations = {}
+    def get_eligible_locations_principals(self) -> list[ComputeLocations]:
+        compute_locations = []
         eligible_locations = {}
         spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
-        if len(spn_cluster_mapping) == 0:
+        spn_warehouse_mapping = self._spn_crawler.get_warehouse_to_storage_mapping()
+        if len(spn_cluster_mapping) == 0 and len(spn_warehouse_mapping) == 0:
             # if there are no interactive clusters , then return empty grants
             logger.info("No interactive cluster found with spn configured")
-            return {}
+            return []
         external_locations = list(self._ws.external_locations.list())
         if len(external_locations) == 0:
             # if there are no external locations, then throw an error to run migrate_locations cli command
@@ -509,8 +534,14 @@ class AzureACL:
         for cluster_spn in spn_cluster_mapping:
             for spn in cluster_spn.spn_info:
                 eligible_locations.update(self._get_external_locations(spn, external_locations, permission_mappings))
-            cluster_locations[cluster_spn.cluster_id] = eligible_locations
-        return cluster_locations
+            compute_locations.append(ComputeLocations(cluster_spn.cluster_id, eligible_locations, "clusters"))
+
+        for warehouse_spn in spn_warehouse_mapping:
+            for spn in warehouse_spn.spn_info:
+                eligible_locations.update(self._get_external_locations(spn, external_locations, permission_mappings))
+            compute_locations.append(ComputeLocations(warehouse_spn.cluster_id, eligible_locations, "warehouses"))
+
+        return compute_locations
 
     def _get_external_locations(
         self,
@@ -543,25 +574,25 @@ class PrincipalACL:
         installation: Installation,
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
-        cluster_locations: dict[str, dict],
+        cluster_locations: list[ComputeLocations],
     ):
         self._backend = backend
         self._ws = ws
         self._installation = installation
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
-        self._cluster_locations = cluster_locations
+        self._compute_locations = cluster_locations
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
-        for cluster_id, locations in self._cluster_locations.items():
-            principals = self._get_cluster_principal_mapping(cluster_id)
+        for compute_location in self._compute_locations:
+            principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
-            cluster_usage = self._get_grants(locations, principals, tables, mounts)
+            cluster_usage = self._get_grants(compute_location.locations, principals, tables, mounts)
             grants.update(cluster_usage)
         return list(grants)
 
@@ -628,11 +659,11 @@ class PrincipalACL:
 
         return grants
 
-    def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
+    def _get_cluster_principal_mapping(self, cluster_id: str, object_type: str) -> list[str]:
         # gets all the users,groups,spn which have access to the clusters and returns a dataclass of that mapping
         principal_list = []
         try:
-            cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+            cluster_permission = self._ws.permissions.get(object_type, cluster_id)
         except ResourceDoesNotExist:
             return []
         if cluster_permission.access_control_list is None:
@@ -661,12 +692,12 @@ class PrincipalACL:
             "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
         )
         # get the eligible location mapped for each interactive cluster
-        for cluster_id, locations in self._cluster_locations.items():
+        for compute_location in self._compute_locations:
             # get interactive cluster users
-            principals = self._get_cluster_principal_mapping(cluster_id)
+            principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
-            for location_url in locations.keys():
+            for location_url in compute_location.locations.keys():
                 # get the location name for the given url
                 location_name = self._get_location_name(location_url)
                 if location_name is None:
