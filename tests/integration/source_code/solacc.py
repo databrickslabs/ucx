@@ -70,7 +70,7 @@ def print_advices(advices: list[LocatedAdvice], file: Path):
 
 def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int, int]:
     try:
-        advices = list(ctx.local_code_linter.lint_path(file))
+        advices = list(ctx.local_code_linter.lint_path(file, set()))
         missing_imports = collect_missing_imports(advices)
         not_computed = collect_not_computed(advices)
         print_advices(advices, file)
