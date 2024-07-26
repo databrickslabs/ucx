@@ -422,7 +422,7 @@ class AwsACL:
         cluster_instance_profiles = self._get_cluster_to_instance_profile_mapping()
         warehouse_instance_profiles = self._update_warehouse_to_instance_profile_mapping()
         compute_locations = []
-        if len(cluster_instance_profiles) == 0 and len(warehouse_instance_profiles)==0:
+        if len(cluster_instance_profiles) == 0 and len(warehouse_instance_profiles) == 0:
             # if there are no interactive clusters or warehouse with instance profile , then return empty grants
             logger.info("No interactive cluster or sql warehouse found with instance profiles configured")
             return []
