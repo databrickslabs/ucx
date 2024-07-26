@@ -146,10 +146,6 @@ class DependencyGraph:
                 roots.remove(dependency)
                 children.add(dependency)
                 return False
-            # if it doesn't have a parent, it's a root
-            if graph.parent is None:
-                roots.add(dependency)
-                return False
             # if it has a 'real' parent, it's a child
             parent_graph = graph.parent
             while parent_graph is not None:
@@ -158,7 +154,7 @@ class DependencyGraph:
                     children.add(dependency)
                     return False
                 parent_graph = parent_graph.parent
-            # ok, it's a root
+            # ok, it's a root 
             roots.add(dependency)
             return False
 
