@@ -1,4 +1,4 @@
-/* --title 'Total Jobs' --height 4 */
+/* --title 'Total Jobs' --width 1 --height 3 */
 SELECT
   COUNT(*) AS count_total_jobs
 FROM inventory.jobs
