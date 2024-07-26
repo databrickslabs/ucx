@@ -131,18 +131,20 @@ class LocalCodeLinter:
             stdout.write(f"{message}\n")
         return located_advices
 
-    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
+    def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         is_dir = path.is_dir()
         loader = self._folder_loader if is_dir else self._file_loader
+        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
         dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
-        container = dependency.load(self._path_lookup)
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, path_lookup, self._session_state)
+        container = dependency.load(path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
-        linted_paths: set[Path] = set()
+        if linted_paths is None:
+            linted_paths = set()
         for dependency in graph.root_dependencies:
             yield from self._lint_one(dependency, graph, path, linted_paths)
 
@@ -155,7 +157,8 @@ class LocalCodeLinter:
         if dependency.path.is_file():
             inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             ctx = self._new_linter_context()
-            linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path, inherited_tree)
+            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+            linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
             for advice in linter.lint():
                 yield advice.for_path(dependency.path)
         maybe_graph = graph.locate_dependency(dependency.path)

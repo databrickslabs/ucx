@@ -632,16 +632,17 @@ class RunCommand(MagicCommand):
         if path is None:
             logger.warning("Missing notebook path in %run command")
             return InheritedContext(None, False)
+        maybe = context.resolver.resolve_notebook(context.path_lookup, path, inherit_context=True)
+        if not maybe.dependency:
+            logger.warning(f"Could not load notebook {path}")
+            return InheritedContext(None, False)
+        child_path = maybe.dependency.path
         absolute_path = context.path_lookup.resolve(path)
         absolute_child = context.path_lookup.resolve(child_path)
         if absolute_path == absolute_child:
             return InheritedContext(None, True)
-        maybe = context.parent.locate_dependency(path)
-        if not maybe.graph:
-            logger.warning(f"Could not load notebook {path}")
-            return InheritedContext(None, False)
-        container = maybe.graph.dependency.load(context.path_lookup)
-        return container.build_inherited_context(maybe.graph, child_path)
+        container = maybe.dependency.load(context.path_lookup)
+        return container.build_inherited_context(context.parent, child_path)
 
 
 class PipCommand(MagicCommand):

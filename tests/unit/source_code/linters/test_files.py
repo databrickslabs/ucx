@@ -1,10 +1,10 @@
-from pathlib import Path
+from pathlib import Path, PosixPath
 from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advisory, Advice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
@@ -124,20 +124,26 @@ def local_code_linter(mock_path_lookup, migration_index):
 
 def test_linter_walks_directory(mock_path_lookup, local_code_linter):
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
-    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
+    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
-    advices = local_code_linter.lint(prompts, paths, None)
+    advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) > 10
     assert not advices
 
 
 def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter):
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(Path(__file__).parent, "../samples", "parent-child-context")
-    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.resolve().as_posix()})
-    advices = local_code_linter.lint(prompts, None)
-    assert advices == []
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
+    paths: set[Path] = set()
+    advices = list(local_code_linter.lint_path(path, paths))
+    assert len(paths) == 3
+    assert advices == [LocatedAdvice(advice=Advice(code='default-format-changed-in-dbr8',
+                             message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
+                             start_line=3,
+                             start_col=0,
+                             end_line=3,
+                             end_col=33),
+                             path=path/"child.py")] != []
 
 
 def test_triple_dot_import():

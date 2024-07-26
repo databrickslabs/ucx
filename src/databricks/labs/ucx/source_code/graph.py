@@ -212,7 +212,7 @@ class DependencyGraph:
         return False
 
     def new_dependency_graph_context(self):
-        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
+        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, resolver=self._resolver, session_state=self._session_state)
 
     def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
         """given 2 files or notebooks root and leaf, compute the list of dependencies that must be traversed
@@ -255,7 +255,6 @@ class DependencyGraph:
         dependencies = list(dependency for dependency in dependencies if dependency.path.is_file())
         # restart when not inheriting context
         for i, dependency in enumerate(dependencies):
-            if not 
             if dependency.inherits_context:
                 continue
             return [dependency] + self._trim_route(dependencies[i + 1 :])
@@ -276,6 +275,7 @@ class DependencyGraph:
 class DependencyGraphContext:
     parent: DependencyGraph
     path_lookup: PathLookup
+    resolver: DependencyResolver
     session_state: CurrentSessionState
 
 
