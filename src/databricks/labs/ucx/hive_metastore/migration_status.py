@@ -127,11 +127,8 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
             yield table_migration_status
 
     def _try_fetch(self) -> Iterable[MigrationStatus]:
-        try:
-            for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-                yield MigrationStatus(*row)
-        except NotFound:
-            logger.warning(f"Table {self._schema}.{self._table} does not exist. Skipping loading of migration status.")
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield MigrationStatus(*row)
 
     def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
