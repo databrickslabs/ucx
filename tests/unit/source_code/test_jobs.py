@@ -221,10 +221,10 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
 
     expected_path_instance = expected_cls(ws, expected_path)
 
-    registered_notebooks = tuple(
-        notebook for args in dep_graph.register_notebook.call_args_list for notebook in args[0]
-    )
-    assert registered_notebooks == (expected_path_instance,)
+    registered_notebooks = []
+    for call in dep_graph.register_notebook.call_args_list:
+        registered_notebooks.append(call.args[0])
+    assert registered_notebooks == [expected_path_instance]
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):

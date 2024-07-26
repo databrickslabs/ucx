@@ -139,7 +139,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
 
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -157,7 +157,7 @@ def get_status_side_effect(*args) -> ObjectInfo:
 def test_notebook_builds_depth1_dependency_graph(mock_path_lookup) -> None:
     paths = ["root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -170,7 +170,7 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup) -> None:
 def test_notebook_builds_depth2_dependency_graph(mock_path_lookup) -> None:
     paths = ["root2.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -183,7 +183,7 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup) -> None:
 def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup) -> None:
     paths = ["root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -197,7 +197,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup) 
 def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup) -> None:
     paths = ["cyclical1.run.py", "cyclical2.run.py"]
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -210,7 +210,7 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup) -> None:
 def test_notebook_builds_python_dependency_graph(mock_path_lookup) -> None:
     paths = ["root4.py", "leaf3.py"]
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -223,7 +223,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup) -> None:
 def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> None:
     path = "run_notebooks.py"
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(path), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
@@ -236,7 +236,7 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> 
 def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_lookup) -> None:
     path = "run_notebooks_with_fstring.py"
     resolver = dependency_resolver(mock_path_lookup)
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(path), False)
     assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
