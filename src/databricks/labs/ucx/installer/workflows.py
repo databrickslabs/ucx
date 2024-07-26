@@ -88,8 +88,9 @@ install_logger()
 with_user_agent_extra("cmd", "debug-notebook")
 logging.getLogger("databricks").setLevel("DEBUG")
 
-# ctx.<TAB> to see all available objects for you to use
-ctx = RuntimeContext({'config': "/Workspace{config_file}"})
+# ctx.<TAB> to see all available objects for you to
+named_parameters = dict(config="/Workspace{config_file}")
+ctx = RuntimeContext(named_parameters)
 
 print(__version__)
 """
