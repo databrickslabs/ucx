@@ -79,17 +79,29 @@ def ws():
                 ),
             ],
         ),
+        'warehouse1': iam.ObjectPermissions(
+            object_id='warehouse1',
+            object_type="warehouses",
+            access_control_list=[
+                iam.AccessControlResponse(group_name='group1', all_permissions=[iam.Permission(inherited=False)]),
+                iam.AccessControlResponse(
+                    user_name='foo.bar@imagine.com',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
+            ],
+        ),
     }
     w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
 
     return w
 
 
-def azure_acl(w, install, cluster_spn: list):
+def azure_acl(w, install, cluster_spn: list, warehouse_spn: list):
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
+    spn_crawler.get_warehouse_to_storage_mapping.return_value = warehouse_spn
     return AzureACL(w, sql_backend, spn_crawler, install)
 
 
@@ -99,7 +111,7 @@ def aws_acl(w, install):
     return AwsACL(w, sql_backend, install)
 
 
-def principal_acl(w, install, cluster_spn: list):
+def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     table_crawler = create_autospec(TablesCrawler)
@@ -151,7 +163,7 @@ def principal_acl(w, install, cluster_spn: list):
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
     locations = []
     if w.config.is_azure:
-        locations = azure_acl(w, install, cluster_spn).get_eligible_locations_principals()
+        locations = azure_acl(w, install, cluster_spn, warehouse_spn).get_eligible_locations_principals()
     if w.config.is_aws:
         locations = aws_acl(w, install).get_eligible_locations_principals()
     return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, locations)
@@ -208,7 +220,7 @@ def installation():
 
 def test_get_eligible_locations_principals_no_cluster_mapping(ws, installation):
     ws.config.is_azure = True
-    locations = azure_acl(ws, installation, [])
+    locations = azure_acl(ws, installation, [], [])
     locations.get_eligible_locations_principals()
     ws.external_locations.list.assert_not_called()
 
@@ -218,7 +230,10 @@ def test_get_eligible_locations_principals_no_external_location(ws, installation
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
-    locations = azure_acl(ws, installation, [cluster_spn])
+    warehouse_spn = ServicePrincipalClusterMapping(
+        'warehouse1', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
+    )
+    locations = azure_acl(ws, installation, [cluster_spn], [warehouse_spn])
     ws.external_locations.list.return_value = []
     with pytest.raises(ResourceDoesNotExist):
         locations.get_eligible_locations_principals()
@@ -229,13 +244,16 @@ def test_get_eligible_locations_principals_no_permission_mapping(ws):
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
+    warehouse_spn = ServicePrincipalClusterMapping(
+        'warehouse1', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
+    )
     install = MockInstallation(
         {
             "config.yml": {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
             "azure_storage_account_info.csv": [],
         }
     )
-    locations = azure_acl(ws, install, [cluster_spn])
+    locations = azure_acl(ws, install, [cluster_spn], [warehouse_spn])
 
     with pytest.raises(ResourceDoesNotExist):
         locations.get_eligible_locations_principals()
@@ -246,12 +264,16 @@ def test_get_eligible_locations_principals(ws, installation):
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
     )
-    locations = azure_acl(ws, installation, [cluster_spn])
+    warehouse_spn = ServicePrincipalClusterMapping(
+        'warehouse1', {AzureServicePrincipalInfo(application_id='client2', storage_account='storage2')}
+    )
+    locations = azure_acl(ws, installation, [cluster_spn], [warehouse_spn])
     eligible_locations = locations.get_eligible_locations_principals()
-    assert len(eligible_locations) == 1
+    assert len(eligible_locations) == 2
     assert eligible_locations[0].locations == {
         'abfss://container1@storage1.dfs.core.windows.net/folder1': 'WRITE_FILES'
     }
+    assert eligible_locations[1].locations == {'abfss://container1@storage2.dfs.core.windows.net/folder2': 'READ_FILES'}
 
 
 def test_interactive_cluster_no_acl(ws, installation):
@@ -272,8 +294,9 @@ def test_interactive_cluster_not_found(ws, installation):
         'cluster1',
         {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
     )
+
     ws.permissions.get.side_effect = ResourceDoesNotExist
-    grants = principal_acl(ws, installation, [cluster_spn])
+    grants = principal_acl(ws, installation, [cluster_spn], [])
     actual_grants = grants.get_interactive_cluster_grants()
     assert len(actual_grants) == 0
 
@@ -285,7 +308,10 @@ def test_interactive_cluster_single_spn(ws, installation):
         'cluster1',
         {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
     )
-    grants = principal_acl(ws, installation, [cluster_spn])
+    warehouse_spn = ServicePrincipalClusterMapping(
+        'warehouse1', {AzureServicePrincipalInfo(application_id='client2', storage_account='storage2')}
+    )
+    grants = principal_acl(ws, installation, [cluster_spn], [warehouse_spn])
     expected_grants = [
         Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
         Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table1'),

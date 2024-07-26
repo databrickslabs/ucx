@@ -501,7 +501,7 @@ class AzureACL:
 
     def get_eligible_locations_principals(self) -> list[ComputeLocations]:
         compute_locations = []
-        eligible_locations = {}
+        eligible_locations: dict[str, str] = {}
         spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
         spn_warehouse_mapping = self._spn_crawler.get_warehouse_to_storage_mapping()
         if len(spn_cluster_mapping) == 0 and len(spn_warehouse_mapping) == 0:
@@ -532,11 +532,13 @@ class AzureACL:
             raise ResourceDoesNotExist(msg) from None
 
         for cluster_spn in spn_cluster_mapping:
+            eligible_locations = {}
             for spn in cluster_spn.spn_info:
                 eligible_locations.update(self._get_external_locations(spn, external_locations, permission_mappings))
             compute_locations.append(ComputeLocations(cluster_spn.cluster_id, eligible_locations, "clusters"))
 
         for warehouse_spn in spn_warehouse_mapping:
+            eligible_locations = {}
             for spn in warehouse_spn.spn_info:
                 eligible_locations.update(self._get_external_locations(spn, external_locations, permission_mappings))
             compute_locations.append(ComputeLocations(warehouse_spn.cluster_id, eligible_locations, "warehouses"))
