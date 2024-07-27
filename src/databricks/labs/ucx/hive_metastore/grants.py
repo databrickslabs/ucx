@@ -464,7 +464,7 @@ class AwsACL:
             )
             if len(eligible_locations) == 0:
                 continue
-            compute_locations.append(ComputeLocations(warehouse_id, eligible_locations, "clusters"))
+            compute_locations.append(ComputeLocations(warehouse_id, eligible_locations, "warehouses"))
         return compute_locations
 
     @staticmethod
