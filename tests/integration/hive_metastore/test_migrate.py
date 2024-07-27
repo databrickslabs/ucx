@@ -7,7 +7,6 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
-from databricks.sdk.service.sql import EndpointConfPair, SetWorkspaceWarehouseConfigRequestSecurityPolicy
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
@@ -571,12 +570,6 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
     ctx, table_full_name, _, _ = prepared_principal_acl
     ctx.with_dummy_resource_permission()
     warehouse = make_warehouse()
-    warehouse_config = ws.warehouses.get_workspace_warehouse_config()
-    #ws.warehouses.set_workspace_warehouse_config(
-    #    data_access_config=warehouse_config.data_access_config,
-    #    sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
-    #    instance_profile_arn=env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-    #)
     table_migrate = ctx.tables_migrator
     user = make_user()
     make_warehouse_permissions(
@@ -593,6 +586,7 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
             match = True
             break
     assert match
+
 
 def test_migrate_table_in_mount(
     ws,
