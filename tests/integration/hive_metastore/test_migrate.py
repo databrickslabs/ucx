@@ -567,6 +567,8 @@ def test_migrate_external_tables_with_principal_acl_aws(
 def test_migrate_external_tables_with_principal_acl_aws_warehouse(
     ws, make_user, prepared_principal_acl, make_warehouse_permissions, make_warehouse, env_or_skip
 ):
+    if not ws.config.is_aws:
+        pytest.skip("temporary: only works in aws test env")
     ctx, table_full_name, _, _ = prepared_principal_acl
     ctx.with_dummy_resource_permission()
     warehouse = make_warehouse()
