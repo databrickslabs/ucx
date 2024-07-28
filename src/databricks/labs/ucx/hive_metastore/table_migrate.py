@@ -57,12 +57,22 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
-    def not_migrated_refresh(self) -> list[Table]:
+    def get_remaining_tables(self) -> list[Table]:
         table_rows: list[Table] = []
         for crawled_table in self._tc.snapshot():
-            if not self.is_migrated(crawled_table.database, crawled_table.name):
+            if not self._is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
-        return table_rows # depending on how to publish this data, we may need to convert it to other forms to able to show it in the dashboard
+                logger.info(f"remained-table-to-migrate: {crawled_table.key}")
+        return table_rows
+
+
+    # def get_remaining_tables(self, workspace_name) -> list[Table]:
+    #     table_rows: list[Table] = []
+    #     for crawled_table in self._tc.snapshot():
+    #         if not self._is_migrated(crawled_table.database, crawled_table.name):
+    #             table_rows.append(crawled_table)
+    #             logger.info(f"remained-table-to-migrate: {crawled_table.key} in {workspace_name}")
+    #     return table_rows
 
     def index(self):
         return self._migration_status_refresher.index()
@@ -496,3 +506,6 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
+    def _is_migrated(self, schema: str, table: str) -> bool:
+        index = self._migration_status_refresher.index()
+        return index.is_migrated(schema, table)

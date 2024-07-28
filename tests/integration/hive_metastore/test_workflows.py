@@ -97,3 +97,23 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+
+#TODO: add an integration test for refresh_not_migrated_status task in migrate-tables workflow
+@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
+def test_refresh_not_migrated_status_job(ws, installation_ctx, prepare_tables_for_migration):
+    tables, dst_schema = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-tables")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
+#     # assert the tables are migrated
+#     for table in tables.values():
+#         try:
+#             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+#         except NotFound:
+#             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
