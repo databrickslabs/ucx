@@ -15,6 +15,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
+    BadRequest,
     InvalidParameterValue,
     NotFound,
     ResourceConflict,
@@ -205,6 +206,28 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
     installation_ctx.deployed_workflows.repair_run("failing")
 
     assert installation_ctx.deployed_workflows.validate_step("failing")
+
+
+def test_installation_when_upgrading_from_redash(ws, installation_ctx, make_dashboard):
+    """The installation should handle upgrading Dashboards from redash."""
+    @retried(on=[ValueError], timeout=timedelta(minutes=2))
+    def check_dashboard_is_archived(dashboard_id: str):
+        dashboard = ws.dashboards.get(dashboard_id)
+        if not dashboard.is_archived:
+            raise ValueError("Dashboard is not archived")
+
+    dashboard = make_dashboard()
+    installation_ctx.install_state.dashboards["assessment_main"] = dashboard.id
+    try:
+        installation_ctx.workspace_installation.run()
+        assert True, "Installation succeeded when upgrading from redash"
+    except BadRequest:
+        assert False, "Installation failed when upgrading from redash"
+    try:
+        check_dashboard_is_archived(dashboard.id)
+        assert True, "Lakeview dashboard was deleted"
+    except TimeoutError:
+        assert False, "Lakeview dashboard was not deleted"
 
 
 def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
