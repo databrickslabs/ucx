@@ -1083,6 +1083,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
         str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
 
+        if hiveserde_ddl:
+            ddl = hiveserde_ddl
+            data_source_format = None
+            table_type = TableType.EXTERNAL
+            storage_location = storage_override
+
         # table properties fails with CTAS statements
         alter_table_tbl_properties = ""
         if ctas or non_delta:
@@ -1091,12 +1097,6 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             )
         else:
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
-
-        if hiveserde_ddl:
-            ddl = hiveserde_ddl
-            data_source_format = None
-            table_type = TableType.EXTERNAL
-            storage_location = storage_override
 
         sql_backend.execute(ddl)
 

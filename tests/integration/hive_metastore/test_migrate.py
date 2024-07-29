@@ -671,3 +671,45 @@ def test_migrate_external_tables_with_spn_azure(
             match = True
             break
     assert match
+
+
+def test_migrate_table_uppercase_column_names(ws,
+                                              sql_backend,
+                                              runtime_ctx,
+                                              make_catalog,
+                                              make_mounted_location,
+                                              make_random):
+    table_name = f"ucx_{make_random(4)}".lower()
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    storage_override = f'dbfs:/user/hive/warehouse/{src_schema.name}/{table_name}'
+    table_ddl = f"CREATE TABLE hive_metastore.{src_schema.name}.{table_name} (ID int, VALUE string)"
+    src_table = runtime_ctx.make_table(schema_name=src_schema.name,
+                                       name=table_name,
+                                       hiveserde_ddl=table_ddl,
+                                       storage_override=storage_override)
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_table.full_name}")
+    rules = [Rule.from_src_dst(src_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+    target_table = ws.tables.get(f"{dst_schema.full_name}.{src_table.name}")
+    target_table_properties = target_table.properties
+    assert target_table_properties["upgraded_from"] == src_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = list(runtime_ctx.migration_status_refresher.snapshot())
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_table.schema_name
+    assert migration_status[0].src_table == src_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_table.name
+
+    assert target_table.columns[0].name == "ID"
+    assert target_table.columns[1].name == "VALUE"
