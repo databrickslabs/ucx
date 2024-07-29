@@ -620,7 +620,9 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     wheels.upload_to_dbfs.assert_not_called()
 
 
-def test_installation_creates_dashboard(ws, caplog, mock_installation, any_prompt):
+@pytest.fixture
+def new_workspace_installation(ws, any_prompt) -> WorkspaceInstallation:
+    mock_installation = MockInstallation()
     install_state = InstallState.from_installation(mock_installation)
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -643,10 +645,19 @@ def test_installation_creates_dashboard(ws, caplog, mock_installation, any_promp
         any_prompt,
         PRODUCT_INFO,
     )
+    return workspace_installation
 
-    workspace_installation.run()
+
+def test_installation_creates_dashboard(ws, new_workspace_installation):
+    new_workspace_installation.run()
     ws.lakeview.create.assert_called()
-    wheels.assert_not_called()
+
+
+def test_installation_updates_dashboard(ws, new_workspace_installation):
+    new_workspace_installation.run()
+    ws.lakeview.update.assert_not_called()
+    new_workspace_installation.run()
+    ws.lakeview.update.assert_called()
 
 
 def test_validate_dashboards(ws):
