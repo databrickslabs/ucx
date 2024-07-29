@@ -212,7 +212,11 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
     installation_ctx.workspace_installation.run()
     dashboard_id = list(installation_ctx.install_state.dashboards.values())[0]
     ws.lakeview.trash(dashboard_id)
-    installation_ctx.workspace_installation.run()
+    try:
+        installation_ctx.workspace_installation.run()
+        assert True, "Installation succeeded when dashboard was trashed"
+    except NotFound:
+        assert False, "Installation failed when dashboard was trashed"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
