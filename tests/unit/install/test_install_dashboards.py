@@ -25,16 +25,16 @@ def workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
     install_state = InstallState.from_installation(mock_installation)
     wheels = WheelsV2(mock_installation, PRODUCT_INFO)
     workflows_installation = WorkflowsDeployment(
-        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        WorkspaceConfig(inventory_database="..."),
         mock_installation,
         install_state,
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
+        timedelta(seconds=10),
         [],
     )
-    workspace_installation = WorkspaceInstallation(
+    return WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation,
         install_state,
@@ -44,7 +44,6 @@ def workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
         any_prompt,
         PRODUCT_INFO,
     )
-    return workspace_installation
 
 
 def test_installation_creates_dashboard(ws, workspace_installation):
