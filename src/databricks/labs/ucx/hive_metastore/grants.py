@@ -418,7 +418,6 @@ class AwsACL:
         return warehouse_instance_profiles
 
     def get_eligible_locations_principals(self) -> list[ComputeLocations]:
-        eligible_locations: dict[str, str] = {}
         cluster_instance_profiles = self._get_cluster_to_instance_profile_mapping()
         warehouse_instance_profiles = self._update_warehouse_to_instance_profile_mapping()
         compute_locations = []
@@ -503,7 +502,6 @@ class AzureACL:
 
     def get_eligible_locations_principals(self) -> list[ComputeLocations]:
         compute_locations = []
-        eligible_locations: dict[str, str] = {}
         spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
         spn_warehouse_mapping = self._spn_crawler.get_warehouse_to_storage_mapping()
         if len(spn_cluster_mapping) == 0 and len(spn_warehouse_mapping) == 0:

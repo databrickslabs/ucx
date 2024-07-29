@@ -181,7 +181,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
             )
         return set_service_principals
 
-    def get_cluster_to_storage_mapping(self):
+    def get_cluster_to_storage_mapping(self) -> list[ServicePrincipalClusterMapping]:
         # this function gives a mapping between an interactive cluster and the spn used by it
         # either directly or through a cluster policy.
         set_service_principals = set[AzureServicePrincipalInfo]()
@@ -189,18 +189,19 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         for cluster in self._ws.clusters.list():
             if cluster.cluster_source != ClusterSource.JOB and (
                 cluster.data_security_mode in [DataSecurityMode.LEGACY_SINGLE_USER, DataSecurityMode.NONE]
+                and cluster.cluster_id is not None
             ):
                 set_service_principals = self._get_azure_spn_from_cluster_config(cluster)
                 spn_cluster_mapping.append(ServicePrincipalClusterMapping(cluster.cluster_id, set_service_principals))
         return spn_cluster_mapping
 
-    def get_warehouse_to_storage_mapping(self):
+    def get_warehouse_to_storage_mapping(self) -> list[ServicePrincipalClusterMapping]:
         # this function gives a mapping between a sql warehouse and the spn used by it
-        set_service_principals = set[AzureServicePrincipalInfo]()
         spn_warehouse_mapping = []
         set_service_principals = self._list_all_spn_in_sql_warehouses_spark_conf()
         if len(set_service_principals) == 0:
             return []
         for warehouse in self._ws.warehouses.list():
-            spn_warehouse_mapping.append(ServicePrincipalClusterMapping(warehouse.id, set_service_principals))
+            if warehouse.id is not None:
+                spn_warehouse_mapping.append(ServicePrincipalClusterMapping(warehouse.id, set_service_principals))
         return spn_warehouse_mapping
