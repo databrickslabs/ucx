@@ -669,7 +669,7 @@ def test_installation_updates_dashboard(ws, new_workspace_installation):
 def test_installation_upgrades_redash_dashboard(caplog, ws, new_workspace_installation):
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
         new_workspace_installation.run()
-    assert "Upgrading dashboard to Lakeview:" in caplog.text
+    assert "Upgrading dashboard to Lakeview" in caplog.text
     ws.dashboards.delete.assert_called_once()
 
 
@@ -682,7 +682,7 @@ def test_installation_upgrades_non_existing_redash_dashboard(caplog, ws, new_wor
     ws.dashboards.delete.side_effect = BadRequest
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
         new_workspace_installation.run()
-    assert "Upgrading dashboard to Lakeview:" in caplog.text
+    assert "Upgrading dashboard to Lakeview" in caplog.text
     assert "Cannot delete dashboard" in caplog.text
     ws.dashboards.delete.assert_called_once()
 
@@ -708,7 +708,7 @@ def test_installation_recreates_lakeview_dashboard_without_lifecycle_state(caplo
     ws.lakeview.get.return_value = LakeviewDashboard(lifecycle_state=None)
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
         new_workspace_installation.run()
-    assert "Recovering invalid dashboard: " in caplog.text
+    assert "Recovering invalid dashboard" in caplog.text
     ws.lakeview.create.assert_called()
     ws.lakeview.update.assert_not_called()
 
@@ -722,7 +722,7 @@ def test_installation_recreates_trashed_lakeview_dashboard(caplog, ws, new_works
     ws.lakeview.get.return_value = LakeviewDashboard(lifecycle_state=LifecycleState.TRASHED)
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
         new_workspace_installation.run()
-    assert "Recreating trashed dashboard: " in caplog.text
+    assert "Recreating trashed dashboard" in caplog.text
     ws.lakeview.create.assert_called()
     ws.lakeview.update.assert_not_called()
 
