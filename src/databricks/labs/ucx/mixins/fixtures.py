@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta, datetime, UTC
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import BinaryIO
 
@@ -1464,10 +1464,10 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
 
 
 def get_test_purge_time(timeout: timedelta = TEST_RESOURCE_PURGE_TIMEOUT) -> str:
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     purge_deadline = now + timeout
     # Round UP to the next hour boundary: that is when resources will be deleted.
-    purge_hour = purge_deadline + (datetime.min.replace(tzinfo=UTC) - purge_deadline) % timedelta(hours=1)
+    purge_hour = purge_deadline + (datetime.min.replace(tzinfo=timezone.utc) - purge_deadline) % timedelta(hours=1)
     return purge_hour.strftime("%Y%m%d%H")
 
 
