@@ -42,6 +42,7 @@ from databricks.sdk.errors import (
     Unauthenticated,
 )
 from databricks.sdk.retries import retried
+from databricks.sdk.service.dashboards import LifecycleState
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -563,13 +564,22 @@ class WorkspaceInstallation(InstallationMixin):
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
-        if dashboard_id is not None and "-" in dashboard_id:  # Upgrading from Redash to Lakeview
+        if dashboard_id is not None:
+            try:
+                dashboard = self._ws.lakeview.get(dashboard_id)
+                if dashboard.lifecycle_state == LifecycleState.TRASHED:
+                    logger.info(f"Recreating trashed dashboard: {dashboard_id}")
+                    dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
+            except (NotFound, InvalidParameterValue):
+                logger.info(f"Recovering invalid dashboard reference: {dashboard_id}")
+                dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
+        if dashboard_id is not None and "-" in dashboard_id:
             logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
             try:
                 self._ws.dashboards.delete(dashboard_id=dashboard_id)
-            except RuntimeError as e:
-                logger.info(f"Cannot delete dashboard: {e}")
-            dashboard_id = None
+            except BadRequest as e:
+                logger.warning(f"Cannot delete dashboard: {e}")
+            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
         dashboard = Dashboards(self._ws).create_dashboard(
             metadata,
             dashboard_id=dashboard_id,
