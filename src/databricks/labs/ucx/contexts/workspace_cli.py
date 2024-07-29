@@ -1,9 +1,11 @@
+import logging
 import os
 import shutil
 from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.framework.utils import run_command
@@ -15,11 +17,14 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator, LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceContext(CliContext):
@@ -180,7 +185,11 @@ class LocalCheckoutContext(WorkspaceContext):
     for running local operations."""
 
     def linter_context_factory(self, session_state: CurrentSessionState | None = None):
-        index = self.tables_migrator.index()
+        try:
+            index = self.tables_migrator.index()
+        except NotFound:
+            logger.warning("Metastore does not seem to exist yet. Skipping loading of migration status.")
+            index = MigrationIndex([])
         if session_state is None:
             session_state = CurrentSessionState()
         return LinterContext(index, session_state)
