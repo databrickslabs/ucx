@@ -19,7 +19,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     group_match_by_external_id: bool = False
     # Includes group names for migration. If not specified, all matching groups will be picked up
     include_group_names: list[str] | None = None
-    renamed_group_prefix: str | None = "ucx-renamed-"
+    renamed_group_prefix: str | None = "db-temp-"
     instance_pool_id: str | None = None
     # in v3, warehouse_id should be part of connect
     warehouse_id: str | None = None
