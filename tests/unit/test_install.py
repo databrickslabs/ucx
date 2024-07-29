@@ -32,6 +32,7 @@ from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import ClusterDetails, CreatePolicyResponse, DataSecurityMode, Policy, State
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
+from databricks.sdk.service.dashboards import Dashboard as LakeviewDashboard, LifecycleState
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -684,6 +685,18 @@ def test_installation_upgrades_non_existing_redash_dashboard(caplog, ws, new_wor
     assert "Upgrading dashboard to Lakeview:" in caplog.text
     assert "Cannot delete dashboard" in caplog.text
     ws.dashboards.delete.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "new_workspace_installation",
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
+    indirect=True,
+)
+def test_installation_updates_existing_lakeview_dashboard(ws, new_workspace_installation):
+    ws.lakeview.get.return_value = LakeviewDashboard(lifecycle_state=LifecycleState.ACTIVE)
+    new_workspace_installation.run()
+    ws.lakeview.get.assert_called_with("lakeview_id")
+    ws.lakeview.update.assert_called_once()
 
 
 def test_validate_dashboards(ws):
