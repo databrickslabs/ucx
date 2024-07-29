@@ -570,25 +570,25 @@ class WorkspaceInstallation(InstallationMixin):
         if dashboard_id is None:
             return None  # Create the dashboard if it does not exist yet
         if dashboard_id is not None and "-" in dashboard_id:
-            logger.info(f"Upgrading dashboard to Lakeview: {display_name}")
+            logger.info(f"Upgrading dashboard to Lakeview: {display_name} ({dashboard_id})")
             try:
                 self._ws.dashboards.delete(dashboard_id=dashboard_id)
             except BadRequest as e:
-                logger.warning(f"Cannot delete dashboard: {e}")
+                logger.warning(f"Cannot delete dashboard {display_name} ({dashboard_id}): {e}")
             return None  # Recreate the dashboard if upgrading from Redash
         try:
             dashboard = self._ws.lakeview.get(dashboard_id)
             if dashboard.lifecycle_state is None:
-                raise NotFound(f"Dashboard life cycle state: {dashboard_id}")
+                raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
             if dashboard.lifecycle_state == LifecycleState.TRASHED:
-                logger.info(f"Recreating trashed dashboard: {dashboard_id}")
+                logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
                 return None  # Recreate the dashboard if it is trashed (manually)
         except (NotFound, InvalidParameterValue):
-            logger.info(f"Recovering invalid dashboard: {dashboard_id}")
+            logger.info(f"Recovering invalid dashboard: {display_name} ({dashboard_id})")
             try:
                 dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
                 self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
-                logger.debug(f"Deleted dangling dashboard: {dashboard_path}")
+                logger.debug(f"Deleted dangling dashboard {display_name} ({dashboard_id}): {dashboard_path}")
             except NotFound:
                 pass
             return None  # Recreate the dashboard if it's reference is corrupted (manually)
