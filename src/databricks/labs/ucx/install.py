@@ -572,6 +572,12 @@ class WorkspaceInstallation(InstallationMixin):
                     dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
             except (NotFound, InvalidParameterValue):
                 logger.info(f"Recovering invalid dashboard reference: {dashboard_id}")
+                dashboard_path = f"{parent_path}/{metadata.display_name}.lvdash.json"
+                try:
+                    self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
+                    logger.debug(f"Deleted dangling dashboard: {dashboard_path}")
+                except NotFound:
+                    pass
                 dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
         if dashboard_id is not None and "-" in dashboard_id:
             logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
