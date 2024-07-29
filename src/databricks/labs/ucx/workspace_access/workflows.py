@@ -18,7 +18,7 @@ class GroupMigration(Workflow):
 
     @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
-        """Renames workspace local groups by adding `ucx-renamed-` prefix."""
+        """Renames workspace local groups by adding `db-temp-` prefix."""
         ctx.group_manager.rename_groups()
 
     @job_task(depends_on=[rename_workspace_local_groups])
@@ -61,7 +61,7 @@ class PermissionsMigrationAPI(Workflow):
 
     @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] Renames workspace local groups by adding `ucx-renamed-` prefix."""
+        """[EXPERIMENTAL] Renames workspace local groups by adding `db-temp-` prefix."""
         ctx.group_manager.rename_groups()
 
     @job_task(depends_on=[rename_workspace_local_groups])

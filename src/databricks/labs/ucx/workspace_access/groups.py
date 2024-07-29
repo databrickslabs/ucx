@@ -409,7 +409,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         ws: WorkspaceClient,
         inventory_database: str,
         include_group_names: list[str] | None = None,
-        renamed_group_prefix: str | None = "ucx-renamed-",
+        renamed_group_prefix: str | None = "db-temp-",
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
@@ -419,7 +419,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         if not renamed_group_prefix:
-            renamed_group_prefix = "ucx-renamed-"
+            renamed_group_prefix = "db-temp-"
 
         self._ws = ws
         self._include_group_names = include_group_names
