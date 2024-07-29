@@ -567,22 +567,20 @@ class WorkspaceInstallation(InstallationMixin):
                 The dashboard id. If None, the dashboard will be recreated.
         """
         dashboard_id = self._install_state.dashboards.get(reference)
-        if dashboard_id is None:
-            return None  # Create the dashboard if it does not exist yet
         if dashboard_id is not None and "-" in dashboard_id:
             logger.info(f"Upgrading dashboard to Lakeview: {display_name} ({dashboard_id})")
             try:
                 self._ws.dashboards.delete(dashboard_id=dashboard_id)
-            except BadRequest as e:
-                logger.warning(f"Cannot delete dashboard {display_name} ({dashboard_id}): {e}")
-            return None  # Recreate the dashboard if upgrading from Redash
+            except BadRequest:
+                logger.warning(f"Cannot delete dashboard: {display_name} ({dashboard_id})")
+            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
         try:
             dashboard = self._ws.lakeview.get(dashboard_id or "")
             if dashboard.lifecycle_state is None:
                 raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
             if dashboard.lifecycle_state == LifecycleState.TRASHED:
                 logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
-                return None  # Recreate the dashboard if it is trashed (manually)
+                dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
         except (NotFound, InvalidParameterValue):
             logger.info(f"Recovering invalid dashboard: {display_name} ({dashboard_id})")
             try:
@@ -591,7 +589,7 @@ class WorkspaceInstallation(InstallationMixin):
                 logger.debug(f"Deleted dangling dashboard {display_name} ({dashboard_id}): {dashboard_path}")
             except NotFound:
                 pass
-            return None  # Recreate the dashboard if it's reference is corrupted (manually)
+            dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
         return dashboard_id  # Update the existing dashboard
 
     # TODO: Confirm the assumption below is correct
