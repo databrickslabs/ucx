@@ -137,7 +137,6 @@ class DependencyGraph:
             # if already encountered we're done
             if dependency in children:
                 return False
-            logger.warning(f"Considering {dependency.path}")
             # if it's not a real file, then it's not a root
             if not dependency.path.is_file():
                 children.add(dependency)
