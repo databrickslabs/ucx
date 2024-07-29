@@ -625,7 +625,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
 def new_workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
     mock_installation = request.param if hasattr(request, "param") else MockInstallation()
     install_state = InstallState.from_installation(mock_installation)
-    wheels = create_autospec(WheelsV2)
+    wheels = WheelsV2(mock_installation, PRODUCT_INFO)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
