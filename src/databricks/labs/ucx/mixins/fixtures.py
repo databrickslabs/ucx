@@ -58,7 +58,9 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
-TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)  # 15 minutes grace for jobs starting at the end of the hour
+
+"""Preserve resources created during tests for at least this long."""
+TEST_RESOURCE_PURGE_TIMEOUT = timedelta(hours=1)
 
 
 def factory(name, create, remove):
@@ -1461,8 +1463,8 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
     yield from factory("dashboard", create, delete)
 
 
-def get_test_purge_time() -> str:
-    return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+def get_test_purge_time(timeout: timedelta = TEST_RESOURCE_PURGE_TIMEOUT) -> str:
+    return (datetime.utcnow() + timeout).strftime("%Y%m%d%H")
 
 
 def get_purge_suffix() -> str:
