@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -91,12 +92,21 @@ def test_graph_computes_magic_run_route_recursively(mock_path_lookup, dependency
     assert [dep.path for dep in route] == [grand_parent, parent, child]
 
 
-def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_lookup, dependency_graph_factory):
+@pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
+def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_lookup, dependency_graph_factory, order):
     parent_folder = mock_path_lookup.cwd / "parent-child-context"
     grand_parent = parent_folder / "grand_parent.py"
     parent = parent_folder / "parent.py"
     child = parent_folder / "child.py"
-    dependency = Dependency(FolderLoader(FileLoader()), parent_folder)
+    all_paths = [grand_parent, parent, child]
+
+    class ScrambledFolderPath(type(parent_folder)):
+
+        def iterdir(self):
+            scrambled = [all_paths[order[0]], all_paths[order[1]], all_paths[order[2]]]
+            yield from scrambled
+
+    dependency = Dependency(FolderLoader(FileLoader()), ScrambledFolderPath(parent_folder))
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)
