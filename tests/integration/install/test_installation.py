@@ -219,6 +219,18 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
         assert False, "Installation failed when dashboard was trashed"
 
 
+def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx):
+    """A dashboard reference might be invalid (after manual changes), the upgrade should handle this."""
+    installation_ctx.workspace_installation.run()
+    dashboard_key = list(installation_ctx.install_state.dashboards.keys())[0]
+    installation_ctx.install_state.dashboards[dashboard_key] = "01ef4d7b294112968fa07ffae17dd55f"
+    try:
+        installation_ctx.workspace_installation.run()
+        assert True, "Installation succeeded when dashboard reference was invalid"
+    except NotFound:
+        assert False, "Installation failed when dashboard reference was invalid"
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uninstallation(ws, sql_backend, installation_ctx):
     installation_ctx.workspace_installation.run()
