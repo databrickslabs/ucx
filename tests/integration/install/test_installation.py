@@ -207,6 +207,14 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
     assert installation_ctx.deployed_workflows.validate_step("failing")
 
 
+def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
+    """A dashboard might be trashed (manually), the upgrade should handle this."""
+    installation_ctx.workspace_installation.run()
+    dashboard_id = list(installation_ctx.install_state.dashboards.values())[0]
+    ws.lakeview.trash(dashboard_id)
+    installation_ctx.workspace_installation.run()
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uninstallation(ws, sql_backend, installation_ctx):
     installation_ctx.workspace_installation.run()
