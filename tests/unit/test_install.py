@@ -699,6 +699,20 @@ def test_installation_updates_existing_lakeview_dashboard(ws, new_workspace_inst
     ws.lakeview.update.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    "new_workspace_installation",
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
+    indirect=True,
+)
+def test_installation_recreates_lakeview_dashboard_without_lifecycle_state(caplog, ws, new_workspace_installation):
+    ws.lakeview.get.return_value = LakeviewDashboard(lifecycle_state=None)
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
+        new_workspace_installation.run()
+    assert "Recovering invalid dashboard: " in caplog.text
+    ws.lakeview.create.assert_called()
+    ws.lakeview.update.assert_not_called()
+
+
 def test_validate_dashboards(ws):
     queries_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     for step_folder in queries_path.iterdir():
