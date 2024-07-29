@@ -133,7 +133,7 @@ class Functional:
             linter = FileLinter(ctx, path_lookup, session_state, self.path)
             return linter.lint()
         # use dependency graph built from parent
-        is_notebook = self._is_notebook(ctx, path_lookup, session_state, self.parent)
+        is_notebook = FileLinter.is_notebook(self.parent)
         loader = NotebookLoader() if is_notebook else FileLoader()
         root_dependency = Dependency(loader, self.parent)
         root_graph = DependencyGraph(root_dependency, None, dependency_resolver, path_lookup, session_state)
@@ -143,18 +143,6 @@ class Functional:
         inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
         linter = FileLinter(ctx, path_lookup, session_state, self.path, inherited_tree)
         return linter.lint()
-
-    def _is_notebook(
-        self, ctx: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, path: Path
-    ) -> bool:
-
-        class LocalFileLinter(FileLinter):
-
-            def is_notebook(self):
-                return self._is_notebook()
-
-        linter = LocalFileLinter(ctx, path_lookup, session_state, path)
-        return linter.is_notebook()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
         with self.path.open('rb') as f:
