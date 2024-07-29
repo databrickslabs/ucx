@@ -620,6 +620,35 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     wheels.upload_to_dbfs.assert_not_called()
 
 
+def test_installation_creates_dashboard(ws, caplog, mock_installation, any_prompt):
+    install_state = InstallState.from_installation(mock_installation)
+    wheels = create_autospec(WheelsV2)
+    workflows_installation = WorkflowsDeployment(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        mock_installation,
+        install_state,
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        [],
+    )
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation,
+        install_state,
+        MockBackend(),
+        ws,
+        workflows_installation,
+        any_prompt,
+        PRODUCT_INFO,
+    )
+
+    workspace_installation.run()
+    ws.lakeview.create.assert_called()
+    wheels.assert_not_called()
+
+
 def test_validate_dashboards(ws):
     queries_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     for step_folder in queries_path.iterdir():
