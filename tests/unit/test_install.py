@@ -621,8 +621,8 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
 
 
 @pytest.fixture
-def new_workspace_installation(ws, any_prompt) -> WorkspaceInstallation:
-    mock_installation = MockInstallation()
+def new_workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
+    mock_installation = request.param if hasattr(request, "param") else MockInstallation()
     install_state = InstallState.from_installation(mock_installation)
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -658,6 +658,18 @@ def test_installation_updates_dashboard(ws, new_workspace_installation):
     ws.lakeview.update.assert_not_called()
     new_workspace_installation.run()
     ws.lakeview.update.assert_called()
+
+
+@pytest.mark.parametrize(
+    "new_workspace_installation",
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview-id"}}}})],
+    indirect=True,
+)
+def test_installation_upgrades_redash_dashboard(caplog, ws, new_workspace_installation):
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
+        new_workspace_installation.run()
+    assert "Upgrading dashboard to Lakeview:" in caplog.text
+    ws.dashboards.delete.assert_called_once()
 
 
 def test_validate_dashboards(ws):
