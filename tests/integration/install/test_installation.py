@@ -15,7 +15,6 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
-    BadRequest,
     InvalidParameterValue,
     NotFound,
     ResourceConflict,
