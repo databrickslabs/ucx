@@ -47,8 +47,8 @@ class DependencyGraph:
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
 
-    def register_notebook(self, path: Path) -> list[DependencyProblem]:
-        maybe = self._resolver.resolve_notebook(self.path_lookup, path)
+    def register_notebook(self, path: Path, inherit_context: bool) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_notebook(self.path_lookup, path, inherit_context)
         if not maybe.dependency:
             return maybe.problems
         maybe_graph = self.register_dependency(maybe.dependency)
@@ -199,6 +199,52 @@ class DependencyGraph:
     def new_dependency_graph_context(self):
         return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
 
+    def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
+        """given 2 files or notebooks root and leaf, compute the list of dependencies that must be traversed
+        in order to lint the leaf in the context of its parents"""
+        try:
+            route = self._do_compute_route(root, leaf, visited)
+            return self._trim_route(route)
+        except ValueError:
+            # we only compute routes on graphs so _compute_route can't fail
+            # but we return an empty route in case it does
+            return []
+
+    def _do_compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
+        maybe = self.locate_dependency(root)
+        if not maybe.graph:
+            logger.warning(f"Could not compute route because dependency {root} cannot be located")
+            raise ValueError()
+        route: list[Dependency] = []
+
+        def do_compute_route(graph: DependencyGraph) -> bool:
+            route.append(graph.dependency)
+            for dependency in graph.local_dependencies:
+                if dependency.path == leaf:
+                    route.append(dependency)
+                    return True
+            for dependency in graph.local_dependencies:
+                sub_route = self._do_compute_route(dependency.path, leaf, visited)
+                if len(sub_route) > 0:
+                    route.extend(sub_route)
+                    return True
+            route.pop()
+            return False
+
+        maybe.graph.visit(do_compute_route, visited)
+        return route
+
+    def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
+        """don't inherit context if dependency is not a file/notebook, or it is loaded via dbutils.notebook.run or via import"""
+        # filter out intermediate containers
+        dependencies = list(dependency for dependency in dependencies if dependency.path.is_file())
+        # restart when not inheriting context
+        for i, dependency in enumerate(dependencies):
+            if dependency.inherits_context:
+                continue
+            return [dependency] + self._trim_route(dependencies[i + 1 :])
+        return dependencies
+
     def __repr__(self):
         return f"<DependencyGraph {self.path}>"
 
@@ -212,13 +258,18 @@ class DependencyGraphContext:
 
 class Dependency(abc.ABC):
 
-    def __init__(self, loader: DependencyLoader, path: Path):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
         self._path = path
+        self._inherits_context = inherits_context
 
     @property
     def path(self) -> Path:
         return self._path
+
+    @property
+    def inherits_context(self):
+        return self._inherits_context
 
     def __hash__(self):
         return hash(self.path)
@@ -236,14 +287,12 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        """builds a dependency graph from the contents of this container"""
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
 
 
 class DependencyLoader(abc.ABC):
     @abc.abstractmethod
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        """loads a dependency"""
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None: ...
 
 
 class WrappingLoader(DependencyLoader):
@@ -267,8 +316,7 @@ class LibraryResolver(abc.ABC):
 class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        """locates a notebook"""
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency: ...
 
     @staticmethod
     def _fail(code: str, message: str) -> MaybeDependency:
@@ -315,8 +363,8 @@ class DependencyResolver:
         self._import_resolver = import_resolver
         self._path_lookup = path_lookup
 
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._notebook_resolver.resolve_notebook(path_lookup, path)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency:
+        return self._notebook_resolver.resolve_notebook(path_lookup, path, inherit_context)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
@@ -353,7 +401,8 @@ class DependencyResolver:
     def build_notebook_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
+        # the notebook is the root of the graph, so there's no context to inherit
+        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path, inherit_context=False)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)

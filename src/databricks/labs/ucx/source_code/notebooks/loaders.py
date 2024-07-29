@@ -26,11 +26,11 @@ class NotebookResolver(BaseNotebookResolver):
         super().__init__()
         self._notebook_loader = notebook_loader
 
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency:
         absolute_path = self._notebook_loader.resolve(path_lookup, path)
         if not absolute_path:
             return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
-        dependency = Dependency(self._notebook_loader, absolute_path)
+        dependency = Dependency(self._notebook_loader, absolute_path, inherit_context)
         return MaybeDependency(dependency, [])
 
 

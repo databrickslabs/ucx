@@ -38,20 +38,20 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
+    @property
+    def path(self) -> Path:
+        return self._path
+
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
             context = parent.new_dependency_graph_context()
-            analyser = PythonCodeAnalyzer(context, self._original_code)
-            return analyser.build_graph()
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            return analyzer.build_graph()
         # supported language that does not generate dependencies
         if self._language is CellLanguage.SQL:
             return []
         logger.warning(f"Unsupported language: {self._language.language}")
         return []
-
-    @property
-    def path(self) -> Path:
-        return self._path
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"
@@ -76,7 +76,7 @@ class Folder(SourceContainer):
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
             loader = self._folder_loader if child_path.is_dir() else self._file_loader
-            dependency = Dependency(loader, child_path)
+            dependency = Dependency(loader, child_path, False)
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
@@ -310,7 +310,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             absolute_path = path_lookup.resolve(relative_path)
             if not absolute_path:
                 continue
-            dependency = Dependency(self._file_loader, absolute_path)
+            dependency = Dependency(self._file_loader, absolute_path, False)
             return MaybeDependency(dependency, [])
         return None
 

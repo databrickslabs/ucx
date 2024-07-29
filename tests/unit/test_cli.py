@@ -2,21 +2,21 @@ import io
 import json
 import time
 from pathlib import Path
-from unittest.mock import create_autospec, patch
+from unittest.mock import create_autospec, patch, Mock
 
 import pytest
 import yaml
-from databricks.sdk.service.provisioning import Workspace
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
-from databricks.sdk.errors.platform import BadRequest
 
-from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
@@ -31,6 +31,7 @@ from databricks.labs.ucx.cli import (
     create_uber_principal,
     ensure_assessment_run,
     installations,
+    join_collection,
     logs,
     manual_workspace_info,
     migrate_credentials,
@@ -51,11 +52,11 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    join_collection,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
@@ -362,6 +363,79 @@ def test_migrate_credentials_aws(ws):
     ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
+
+
+def test_migrate_credentials_limit_azure(ws):
+    azure_resources = create_autospec(AzureResources)
+    external_locations = create_autospec(ExternalLocations)
+    external_locations_mock = []
+    for i in range(200):
+        external_locations_mock.append(
+            ExternalLocation(
+                location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}", table_count=i % 20
+            )
+        )
+    external_locations.snapshot.return_value = external_locations_mock
+    prompts = MockPrompts({'.*': 'yes'})
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azure_resources,
+        external_locations=external_locations,
+    )
+    migrate_credentials(ws, prompts, ctx=ctx)
+    ws.storage_credentials.list.assert_called()
+    azure_resources.storage_accounts.assert_called()
+
+    external_locations_mock.append(
+        ExternalLocation(
+            location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25
+        )
+    )
+    with pytest.raises(RuntimeWarning):
+        migrate_credentials(ws, prompts, ctx=ctx)
+
+
+def test_migrate_credentials_limit_aws(ws):
+    aws_resources = create_autospec(AWSResources)
+    external_locations = create_autospec(ExternalLocations)
+
+    external_locations_mock = []
+    aws_role_actions_mock = []
+    for i in range(200):
+        location = f"s3://labsawsbucket/{i}"
+        role = f"arn:aws:iam::123456789012:role/role_name{i}"
+        external_locations_mock.append(ExternalLocation(location=location, table_count=i % 20))
+        aws_role_actions_mock.append(
+            AWSRoleAction(
+                role_arn=role,
+                privilege="READ_FILES",
+                resource_path=location,
+                resource_type="s3",
+            )
+        )
+    external_locations.snapshot.return_value = external_locations_mock
+    aws_resources.validate_connection.return_value = {"Account": "123456789012"}
+
+    prompts = MockPrompts({'.*': 'yes'})
+    AWSResourcePermissions.load_uc_compatible_roles = Mock()
+    AWSResourcePermissions.load_uc_compatible_roles.return_value = aws_role_actions_mock
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources, external_locations=external_locations)
+    migrate_credentials(ws, prompts, ctx=ctx)
+    ws.storage_credentials.list.assert_called()
+
+    external_locations_mock.append(ExternalLocation(location="s3://labsawsbucket/201", table_count=25))
+    aws_role_actions_mock.append(
+        AWSRoleAction(
+            role_arn="arn:aws:iam::123456789012:role/role_name201",
+            privilege="READ_FILES",
+            resource_path="s3://labsawsbucket/201",
+            resource_type="s3",
+        )
+    )
+    with pytest.raises(RuntimeWarning):
+        migrate_credentials(ws, prompts, ctx=ctx)
 
 
 def test_create_master_principal_not_azure(ws):
