@@ -220,14 +220,13 @@ def test_installation_when_upgrading_from_redash(ws, installation_ctx, make_dash
     installation_ctx.install_state.dashboards["assessment_main"] = dashboard.id
     try:
         installation_ctx.workspace_installation.run()
-        assert True, "Installation succeeded when upgrading from redash"
     except BadRequest:
         assert False, "Installation failed when upgrading from redash"
     try:
         check_dashboard_is_archived(dashboard.id)
-        assert True, "Lakeview dashboard was deleted"
     except TimeoutError:
         assert False, "Lakeview dashboard was not deleted"
+    assert True, "Lakeview dashboard was deleted"
 
 
 def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
@@ -237,9 +236,9 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
     ws.lakeview.trash(dashboard_id)
     try:
         installation_ctx.workspace_installation.run()
-        assert True, "Installation succeeded when dashboard was trashed"
     except NotFound:
         assert False, "Installation failed when dashboard was trashed"
+    assert True, "Installation succeeded when dashboard was trashed"
 
 
 @pytest.mark.parametrize(
