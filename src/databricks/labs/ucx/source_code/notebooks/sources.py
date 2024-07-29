@@ -381,8 +381,24 @@ class FileLinter:
             self._content = self._path.read_text(_guess_encoding(self._path))
         return self._content
 
+    @classmethod
+    def file_language(cls, path: Path) -> Language | None:
+        return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
+
     def _file_language(self):
-        return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
+        return self.file_language(self._path)
+
+    @classmethod
+    def is_notebook(cls, path: Path) -> bool:
+        language = cls.file_language(path)
+        if not language:
+            return False
+        try:
+            content = path.read_text(_guess_encoding(path))
+            return content.startswith(CellLanguage.of_language(language).file_magic_header)
+        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+            logger.warning(f"Could not read file {path}")
+            return False
 
     def _is_notebook(self):
         language = self._file_language()

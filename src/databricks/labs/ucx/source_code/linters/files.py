@@ -75,8 +75,10 @@ class Folder(SourceContainer):
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
-            loader = self._folder_loader if child_path.is_dir() else self._file_loader
-            dependency = Dependency(loader, child_path, False)
+            is_file = child_path.is_file()
+            loader = self._file_loader if is_file else self._folder_loader
+            inherits_context = is_file and FileLinter.is_notebook(child_path)
+            dependency = Dependency(loader, child_path, inherits_context)
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
