@@ -210,6 +210,7 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
 
 def test_installation_when_upgrading_from_redash(ws, installation_ctx, make_dashboard):
     """The installation should handle upgrading Dashboards from redash."""
+
     @retried(on=[ValueError], timeout=timedelta(minutes=2))
     def check_dashboard_is_archived(dashboard_id: str):
         dashboard = ws.dashboards.get(dashboard_id)
