@@ -1,4 +1,5 @@
-from pathlib import Path, PurePath
+import os
+from pathlib import Path
 
 import pytest
 
@@ -96,8 +97,7 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_l
     child = parent_folder / "child.py"
     all_paths = [grand_parent, parent, child]
 
-    # need PurePath on Linux to inherit the _flavour cls field
-    class ScrambledFolderPath(Path, PurePath):
+    class ScrambledFolderPath(type(parent_folder)):
 
         def iterdir(self):
             scrambled = [all_paths[order[0]], all_paths[order[1]], all_paths[order[2]]]
