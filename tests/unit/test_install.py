@@ -662,7 +662,7 @@ def test_installation_updates_dashboard(ws, new_workspace_installation):
 
 @pytest.mark.parametrize(
     "new_workspace_installation",
-    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview-id"}}}})],
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "redash-id"}}}})],
     indirect=True,
 )
 def test_installation_upgrades_redash_dashboard(caplog, ws, new_workspace_installation):
@@ -674,7 +674,7 @@ def test_installation_upgrades_redash_dashboard(caplog, ws, new_workspace_instal
 
 @pytest.mark.parametrize(
     "new_workspace_installation",
-    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview-id"}}}})],
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "redash-id"}}}})],
     indirect=True,
 )
 def test_installation_upgrades_non_existing_redash_dashboard(caplog, ws, new_workspace_installation):
