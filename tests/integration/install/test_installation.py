@@ -252,14 +252,14 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
 )
 def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboard_id, exception):
     """A dashboard reference might be invalid (after manual changes), the upgrade should handle this."""
-    installation_ctx.workspace_installation.run()
-    dashboard_key = list(installation_ctx.install_state.dashboards.keys())[0]
+    dashboard_key = "assessment_main"
     installation_ctx.install_state.dashboards[dashboard_key] = dashboard_id
     try:
         installation_ctx.workspace_installation.run()
-        assert True, "Installation succeeded when dashboard reference was invalid"
     except exception:
         assert False, "Installation failed when dashboard reference was invalid"
+    new_dashboard_id = installation_ctx.install_state.dashboards[dashboard_key]
+    assert dashboard_id != new_dashboard_id, "Dashboard id is not updated"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
