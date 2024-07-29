@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, UTC
 from pathlib import Path
 from typing import BinaryIO
 
@@ -1464,7 +1464,9 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
 
 
 def get_test_purge_time(timeout: timedelta = TEST_RESOURCE_PURGE_TIMEOUT) -> str:
-    return (datetime.utcnow() + timeout).strftime("%Y%m%d%H")
+    now = datetime.now(UTC)
+    purge_deadline = now + timeout
+    return purge_deadline.strftime("%Y%m%d%H")
 
 
 def get_purge_suffix() -> str:
