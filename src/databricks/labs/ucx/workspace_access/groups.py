@@ -585,11 +585,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         migrated_groups = self.snapshot()
         logger.info(f"Starting to remove {len(migrated_groups)} migrated workspace groups...")
         # Group deletion is eventually consistent, and not monotonically consistent, with a rather long time to
-        # converge: internally API caches some things for up to 60s. To avoid excessive wait times when large numbers of
-        # groups need to be deleted (some deployments have >10K groups) we use the following steps:
-        #  1. Delete the groups.
-        #  2. Confirm that direct GETs no longer see the group.
-        #  3. Confirm that account enumeration no longer includes the deleted groups.
+        # converge: internally the Databricks API caches some things for up to 60s. To avoid excessive wait times when
+        # large numbers of groups need to be deleted (some deployments have >10K groups) we use the following steps:
+        #  1. Delete all the groups.
+        #  2. Confirm for each group that direct GETs no longer see the group.
+        #  3. Confirm that group enumeration no longer includes the deleted groups.
         deletion_tasks = []
         waiting_tasks = []
         deleted_groups = []
@@ -614,12 +614,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             deleted_groups.append(migrated_group)
         # Step 1: Delete the groups.
         _, errors = Threads.gather("removing original workspace groups", deletion_tasks)
-        if len(errors) > 0:
+        if errors:
             logger.error(f"During deletion of workspace groups got {len(errors)} errors. See debug logs.")
             raise ManyError(errors)
-        # Step 2: Confirm that direct gets no longer return the deleted group.
+        # Step 2: Confirm that direct GETs no longer return the deleted group.
         _, errors = Threads.gather("waiting for removal of original workspace groups", waiting_tasks)
-        if len(errors) > 0:
+        if errors:
             logger.error(f"Waiting for deletion of workspace groups got {len(errors)} errors. See debug logs.")
             raise ManyError(errors)
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
@@ -827,11 +827,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._check_workspace_group_deletion(group_id, display_name, logging.WARNING)
         logger.debug(f"Workspace group is assumed deleted: {display_name} (id={group_id})")
 
-    def _check_workspace_group_deletion(self, group_id: str, display_name: str, still_present_level_level: int) -> None:
+    def _check_workspace_group_deletion(self, group_id: str, display_name: str, pending_log_level: int) -> None:
         try:
             _ = self._ws.groups.get(id=group_id)
             logger.log(
-                still_present_level_level,
+                pending_log_level,
                 f"Deleted group is still present; still waiting for deletion to take effect: {display_name} (id={group_id})",
             )
             # Deletion is still pending.
