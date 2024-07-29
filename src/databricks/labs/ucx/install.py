@@ -552,11 +552,10 @@ class WorkspaceInstallation(InstallationMixin):
                 )
                 yield task
 
-    def _get_dashboard_id(self, reference: str, display_name: str, parent_path: str) -> str | None:
-        """Get the dashboard id
+    def _handle_existing_dashboard(self, dashboard_id: str, display_name: str, parent_path: str) -> str | None:
+        """Handle an existing dashboard
 
         This method handles the following scenarios:
-        - dashboard is not created yet
         - dashboard exists and needs to be updated
         - dashboard needs to be upgraded from Redash to Lakeview
         - dashboard is trashed and needs to be recreated
@@ -566,21 +565,20 @@ class WorkspaceInstallation(InstallationMixin):
             str | None :
                 The dashboard id. If None, the dashboard will be recreated.
         """
-        dashboard_id = self._install_state.dashboards.get(reference)
-        if dashboard_id is not None and "-" in dashboard_id:
+        if "-" in dashboard_id:
             logger.info(f"Upgrading dashboard to Lakeview: {display_name} ({dashboard_id})")
             try:
                 self._ws.dashboards.delete(dashboard_id=dashboard_id)
             except BadRequest:
                 logger.warning(f"Cannot delete dashboard: {display_name} ({dashboard_id})")
-            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
+            return None  # Recreate the dashboard if upgrading from Redash
         try:
             dashboard = self._ws.lakeview.get(dashboard_id or "")
             if dashboard.lifecycle_state is None:
                 raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
             if dashboard.lifecycle_state == LifecycleState.TRASHED:
                 logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
-                dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
+                return None  # Recreate the dashboard if it is trashed (manually)
         except (NotFound, InvalidParameterValue):
             logger.info(f"Recovering invalid dashboard: {display_name} ({dashboard_id})")
             try:
@@ -589,7 +587,7 @@ class WorkspaceInstallation(InstallationMixin):
                 logger.debug(f"Deleted dangling dashboard {display_name} ({dashboard_id}): {dashboard_path}")
             except NotFound:
                 pass
-            dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
+            return None  # Recreate the dashboard if it's reference is corrupted (manually)
         return dashboard_id  # Update the existing dashboard
 
     # TODO: Confirm the assumption below is correct
@@ -603,7 +601,9 @@ class WorkspaceInstallation(InstallationMixin):
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard_id = self._get_dashboard_id(reference, metadata.display_name, parent_path)
+        dashboard_id = self._install_state.dashboards.get(reference)
+        if dashboard_id is not None:
+            dashboard_id = self._handle_existing_dashboard(dashboard_id, metadata.display_name, parent_path)
         dashboard = Dashboards(self._ws).create_dashboard(
             metadata,
             dashboard_id=dashboard_id,
