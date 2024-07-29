@@ -552,10 +552,52 @@ class WorkspaceInstallation(InstallationMixin):
                 )
                 yield task
 
+    def _get_dashboard_id(self, reference: str, display_name: str, parent_path: str) -> str | None:
+        """Get the dashboard id
+
+        This method handles the following scenarios:
+        - dashboard is not created yet
+        - dashboard exists and needs to be updated
+        - dashboard needs to be upgraded from Redash to Lakeview
+        - dashboard is trashed and needs to be recreated
+        - dashboard reference is invalid and the dashboard needs to be recreated
+
+        Returns
+            str | None :
+                The dashboard id. If None, the dashboard will be recreated.
+        """
+        dashboard_id = self._install_state.dashboards.get(reference)
+        if dashboard_id is None:
+            return None  # Create the dashboard if it does not exist yet
+        if dashboard_id is not None and "-" in dashboard_id:
+            logger.info(f"Upgrading dashboard to Lakeview: {display_name}")
+            try:
+                self._ws.dashboards.delete(dashboard_id=dashboard_id)
+            except BadRequest as e:
+                logger.warning(f"Cannot delete dashboard: {e}")
+            return None  # Recreate the dashboard if upgrading from Redash
+        try:
+            dashboard = self._ws.lakeview.get(dashboard_id)
+            if dashboard.lifecycle_state is None:
+                raise NotFound(f"Dashboard life cycle state: {dashboard_id}")
+            if dashboard.lifecycle_state == LifecycleState.TRASHED:
+                logger.info(f"Recreating trashed dashboard: {dashboard_id}")
+                return None  # Recreate the dashboard if it is trashed (manually)
+        except (NotFound, InvalidParameterValue):
+            logger.info(f"Recovering invalid dashboard: {dashboard_id}")
+            try:
+                dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
+                self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
+                logger.debug(f"Deleted dangling dashboard: {dashboard_path}")
+            except NotFound:
+                pass
+            return None  # Recreate the dashboard if it's reference is corrupted (manually)
+        return dashboard_id  # Update the existing dashboard
+
     # TODO: Confirm the assumption below is correct
     # An InternalError may occur when the dashboard is being published and the database does not exists
     @retried(on=[InternalError], timeout=timedelta(minutes=4))
-    def _create_dashboard(self, folder: Path, *, parent_path: str | None = None) -> None:
+    def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
         metadata = DashboardMetadata.from_path(folder).replace_database(
@@ -563,31 +605,7 @@ class WorkspaceInstallation(InstallationMixin):
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
-        dashboard_id = self._install_state.dashboards.get(reference)
-        if dashboard_id is not None and "-" in dashboard_id:
-            logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
-            try:
-                self._ws.dashboards.delete(dashboard_id=dashboard_id)
-            except BadRequest as e:
-                logger.warning(f"Cannot delete dashboard: {e}")
-            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
-        elif dashboard_id is not None:
-            try:
-                dashboard = self._ws.lakeview.get(dashboard_id)
-                if dashboard.lifecycle_state is None:
-                    raise NotFound(f"Dashboard life cycle state: {dashboard_id}")
-                if dashboard.lifecycle_state == LifecycleState.TRASHED:
-                    logger.info(f"Recreating trashed dashboard: {dashboard_id}")
-                    dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
-            except (NotFound, InvalidParameterValue):
-                logger.info(f"Recovering invalid dashboard reference: {dashboard_id}")
-                dashboard_path = f"{parent_path}/{metadata.display_name}.lvdash.json"
-                try:
-                    self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
-                    logger.debug(f"Deleted dangling dashboard: {dashboard_path}")
-                except NotFound:
-                    pass
-                dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
+        dashboard_id = self._get_dashboard_id(reference, metadata.display_name, parent_path)
         dashboard = Dashboards(self._ws).create_dashboard(
             metadata,
             dashboard_id=dashboard_id,
