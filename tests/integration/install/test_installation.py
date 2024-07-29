@@ -208,7 +208,7 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
     assert installation_ctx.deployed_workflows.validate_step("failing")
 
 
-def test_installation_when_upgrading_from_redash(ws, installation_ctx, make_dashboard):
+def test_installation_deletes_redash_dashboard_when_upgrading_to_lakeview(ws, installation_ctx, make_dashboard):
     """The installation should handle upgrading dashboards from redash."""
 
     @retried(on=[ValueError], timeout=timedelta(minutes=2))
@@ -219,10 +219,7 @@ def test_installation_when_upgrading_from_redash(ws, installation_ctx, make_dash
 
     dashboard = make_dashboard()
     installation_ctx.install_state.dashboards["assessment_main"] = dashboard.id
-    try:
-        installation_ctx.workspace_installation.run()
-    except BadRequest:
-        assert False, "Installation failed when upgrading from redash"
+    installation_ctx.workspace_installation.run()
     try:
         check_dashboard_is_archived(dashboard.id)
     except TimeoutError:
@@ -242,22 +239,12 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
     assert True, "Installation succeeded when dashboard was trashed"
 
 
-@pytest.mark.parametrize(
-    "dashboard_id, exception",
-    [
-        ("01ef4d7b294112968fa07ffae17dd55f", NotFound),
-        ("invalid-dashboard-id", InvalidParameterValue),
-        ("", NotFound),
-    ],
-)
-def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboard_id, exception):
+@pytest.mark.parametrize("dashboard_id", ["01ef4d7b294112968fa07ffae17dd55f", "invalid-dashboard-id", ""])
+def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboard_id):
     """A dashboard reference might be invalid (after manual changes), the upgrade should handle this."""
     dashboard_key = "assessment_main"
     installation_ctx.install_state.dashboards[dashboard_key] = dashboard_id
-    try:
-        installation_ctx.workspace_installation.run()
-    except exception:
-        assert False, "Installation failed when dashboard reference was invalid"
+    installation_ctx.workspace_installation.run()
     new_dashboard_id = installation_ctx.install_state.dashboards[dashboard_key]
     assert dashboard_id != new_dashboard_id, "Dashboard id is not updated"
 
