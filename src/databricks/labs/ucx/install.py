@@ -567,6 +567,8 @@ class WorkspaceInstallation(InstallationMixin):
         if dashboard_id is not None:
             try:
                 dashboard = self._ws.lakeview.get(dashboard_id)
+                if dashboard.lifecycle_state is None:
+                    raise NotFound(f"Dashboard life cycle state: {dashboard_id}")
                 if dashboard.lifecycle_state == LifecycleState.TRASHED:
                     logger.info(f"Recreating trashed dashboard: {dashboard_id}")
                     dashboard_id = None  # Recreate the dashboard if it is trashed (manually)
