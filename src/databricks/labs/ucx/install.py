@@ -573,7 +573,7 @@ class WorkspaceInstallation(InstallationMixin):
                 logger.warning(f"Cannot delete dashboard: {display_name} ({dashboard_id})")
             return None  # Recreate the dashboard if upgrading from Redash
         try:
-            dashboard = self._ws.lakeview.get(dashboard_id or "")
+            dashboard = self._ws.lakeview.get(dashboard_id)
             if dashboard.lifecycle_state is None:
                 raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
             if dashboard.lifecycle_state == LifecycleState.TRASHED:
