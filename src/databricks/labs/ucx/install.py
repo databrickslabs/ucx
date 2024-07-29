@@ -564,7 +564,14 @@ class WorkspaceInstallation(InstallationMixin):
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
-        if dashboard_id is not None:
+        if dashboard_id is not None and "-" in dashboard_id:
+            logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
+            try:
+                self._ws.dashboards.delete(dashboard_id=dashboard_id)
+            except BadRequest as e:
+                logger.warning(f"Cannot delete dashboard: {e}")
+            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
+        elif dashboard_id is not None:
             try:
                 dashboard = self._ws.lakeview.get(dashboard_id)
                 if dashboard.lifecycle_state is None:
@@ -581,13 +588,6 @@ class WorkspaceInstallation(InstallationMixin):
                 except NotFound:
                     pass
                 dashboard_id = None  # Recreate the dashboard if it's reference is corrupted (manually)
-        if dashboard_id is not None and "-" in dashboard_id:
-            logger.info(f"Upgrading dashboard to Lakeview: {metadata.display_name}")
-            try:
-                self._ws.dashboards.delete(dashboard_id=dashboard_id)
-            except BadRequest as e:
-                logger.warning(f"Cannot delete dashboard: {e}")
-            dashboard_id = None  # Recreate the dashboard if upgrading from Redash
         dashboard = Dashboards(self._ws).create_dashboard(
             metadata,
             dashboard_id=dashboard_id,
