@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
-from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.parallel import Threads, ManyError
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
@@ -194,12 +194,15 @@ class TablesMigrator:
         src_view: ViewToMigrate,
         grants: list[Grant] | None = None,
     ):
-        if self._table_already_migrated(src_view.rule.as_uc_table_key):
-            logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
-            return True
-        if self._view_can_be_migrated(src_view):
-            return self._migrate_view_table(src_view, grants)
-        logger.info(f"View {src_view.src.key} is not supported for migration")
+        try:
+            if self._table_already_migrated(src_view.rule.as_uc_table_key):
+                logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
+                return True
+            if self._view_can_be_migrated(src_view):
+                return self._migrate_view_table(src_view, grants)
+            logger.info(f"View {src_view.src.key} is not supported for migration")
+        except ManyError as e:
+            logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
         return True
 
     def _view_can_be_migrated(self, view: ViewToMigrate):
