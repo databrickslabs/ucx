@@ -502,5 +502,12 @@ def lint_local_code(
     ctx.local_code_linter.lint(prompts, None if path is None else Path(path))
 
 
+@ucx.command
+def create_federated_catalog(w: WorkspaceClient, prompts: Prompts):
+    """(Experimental) Create federated catalog from current workspace Hive Metastore."""
+    ctx = WorkspaceContext(w)
+    ctx.federation.run()
+
+
 if __name__ == "__main__":
     ucx()
