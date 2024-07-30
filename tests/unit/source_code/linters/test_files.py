@@ -106,8 +106,9 @@ def test_migrator_walks_directory():
 
 @pytest.fixture()
 def local_code_linter(mock_path_lookup, migration_index):
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
-    folder_loader = FolderLoader(file_loader)
+    folder_loader = FolderLoader(notebook_loader, file_loader)
     allow_list = KnownList()
     pip_resolver = PythonLibraryResolver(allow_list)
     session_state = CurrentSessionState()
@@ -177,8 +178,9 @@ def test_single_dot_import():
 
 
 def test_folder_has_repr():
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
-    folder = Folder(Path("test"), file_loader, FolderLoader(file_loader))
+    folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
     assert len(repr(folder)) > 0
 
 
@@ -191,7 +193,8 @@ site_packages = locate_site_packages()
 )
 def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
-    folder_loader = FolderLoader(file_loader)
+    notebook_loader = NotebookLoader()
+    folder_loader = FolderLoader(notebook_loader, file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     session_state = CurrentSessionState()
     allow_list = KnownList()

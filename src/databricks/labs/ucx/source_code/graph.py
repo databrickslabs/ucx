@@ -254,13 +254,16 @@ class DependencyGraph:
     def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
         """don't inherit context if dependency is not a file/notebook, or it is loaded via dbutils.notebook.run or via import"""
         # filter out intermediate containers
-        dependencies = list(dependency for dependency in dependencies if dependency.path.is_file())
+        deps_with_source: list[Dependency] = []
+        for dependency in dependencies:
+            if dependency.path.is_file() or is_a_notebook(dependency.path):
+                deps_with_source.append(dependency)
         # restart when not inheriting context
-        for i, dependency in enumerate(dependencies):
+        for i, dependency in enumerate(deps_with_source):
             if dependency.inherits_context:
                 continue
-            return [dependency] + self._trim_route(dependencies[i + 1 :])
-        return dependencies
+            return [dependency] + self._trim_route(deps_with_source[i + 1 :])
+        return deps_with_source
 
     def build_inherited_tree(self, root: Path, leaf: Path) -> Tree | None:
         return self._build_inherited_context(root, leaf).tree

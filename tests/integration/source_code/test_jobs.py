@@ -25,6 +25,7 @@ from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
 
@@ -207,6 +208,7 @@ def test_lint_local_code(simple_ctx):
 
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
 def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order):
+    # order in which we consider files influences the algorithm so we check all order
     parent_local_path = (
         Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "parent-child-context"
     )
@@ -221,6 +223,8 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx,
             file_path = parent_local_path / f"{name}.py"
             # use intermediate string because WorkspacePath does not yet support BOMs
             content = file_path.read_text("utf-8")
+            # workspace notebooks don't have extensions
+            content = content.replace(".py", "")
             data = content.encode("utf-8")
             client.workspace.upload(
                 ws_path.as_posix(), data, format=ImportFormat.SOURCE, overwrite=True, language=Language.PYTHON
@@ -232,7 +236,7 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx,
             scrambled = [all_ws_paths[order[0]], all_ws_paths[order[1]], all_ws_paths[order[2]]]
             yield from scrambled
 
-    dependency = Dependency(FolderLoader(FileLoader()), ScrambledFolderPath(client, parent_ws_path))
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), ScrambledFolderPath(client, parent_ws_path))
     root_graph = _TestDependencyGraph(
         dependency, None, simple_ctx.dependency_resolver, simple_ctx.path_lookup, CurrentSessionState()
     )

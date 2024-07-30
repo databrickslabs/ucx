@@ -30,17 +30,17 @@ def test_dependency_graph_registers_library(mock_path_lookup):
 
 
 def test_folder_loads_content(mock_path_lookup, simple_dependency_resolver):
-    path = Path(__file__).parent / "samples"
-    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    path = Path(__file__).parent / "samples" / "parent-child-context"
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), path, False)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(graph)
-    assert len(graph.all_paths) > 1
+    assert len(graph.all_paths) == 4
 
 
 def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependency_resolver):
     path = Path(__file__).parent / "samples" / "parent-child-context"
-    dependency = Dependency(FolderLoader(FileLoader()), path, False)
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), path, False)
     container = dependency.load(mock_path_lookup)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container.build_dependency_graph(graph)
@@ -93,6 +93,7 @@ def test_graph_computes_magic_run_route_recursively(mock_path_lookup, dependency
 
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
 def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_lookup, dependency_graph_factory, order):
+    # order in which we consider files influences the algorithm so we check all order
     parent_folder = mock_path_lookup.cwd / "parent-child-context"
     grand_parent = parent_folder / "grand_parent.py"
     parent = parent_folder / "parent.py"
@@ -105,7 +106,7 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(mock_path_l
             scrambled = [all_paths[order[0]], all_paths[order[1]], all_paths[order[2]]]
             yield from scrambled
 
-    dependency = Dependency(FolderLoader(FileLoader()), ScrambledFolderPath(parent_folder))
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), ScrambledFolderPath(parent_folder))
     root_graph = dependency_graph_factory(dependency)
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(root_graph)

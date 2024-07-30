@@ -7,6 +7,7 @@ import sys
 from typing import TextIO
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import KnownList
@@ -67,8 +68,11 @@ class LocalFile(SourceContainer):
 
 class Folder(SourceContainer):
 
-    def __init__(self, path: Path, file_loader: FileLoader, folder_loader: FolderLoader):
+    def __init__(
+        self, path: Path, notebook_loader: NotebookLoader, file_loader: FileLoader, folder_loader: FolderLoader
+    ):
         self._path = path
+        self._notebook_loader = notebook_loader
         self._file_loader = file_loader
         self._folder_loader = folder_loader
 
@@ -86,7 +90,7 @@ class Folder(SourceContainer):
         for child_path in self._path.iterdir():
             is_file = child_path.is_file()
             is_notebook = is_a_notebook(child_path)
-            loader = self._file_loader if is_file or is_notebook else self._folder_loader
+            loader = self._notebook_loader if is_notebook else self._file_loader if is_file else self._folder_loader
             dependency = Dependency(loader, child_path, inherits_context=is_notebook)
             yield from parent.register_dependency(dependency).problems
 
@@ -263,14 +267,15 @@ class FileLoader(DependencyLoader):
 
 class FolderLoader(FileLoader):
 
-    def __init__(self, file_loader: FileLoader):
+    def __init__(self, notebook_loader: NotebookLoader, file_loader: FileLoader):
+        self._notebook_loader = notebook_loader
         self._file_loader = file_loader
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        return Folder(absolute_path, self._file_loader, self)
+        return Folder(absolute_path, self._notebook_loader, self._file_loader, self)
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):

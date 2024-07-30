@@ -6,6 +6,7 @@ from pathlib import Path
 
 from databricks.sdk.errors import NotFound
 
+from databricks.labs.ucx.source_code.base import is_a_notebook, file_language
 from databricks.labs.ucx.source_code.graph import (
     BaseNotebookResolver,
     Dependency,
@@ -13,7 +14,6 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     SourceContainer,
 )
-from databricks.labs.ucx.source_code.linters.files import file_language
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -37,10 +37,15 @@ class NotebookResolver(BaseNotebookResolver):
 
 class NotebookLoader(DependencyLoader, abc.ABC):
     def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
-        """When exported through Git, notebooks are saved with a .py extension. If the path is a notebook, return the
-        path to the notebook. If the path is a Python file, return the path to the Python file. If the path is neither,
+        """If the path is a Python file, return the path to the Python file. If the path is neither,
         return None."""
-        for candidate in (path, self._adjust_path(path)):
+        # check current working directory first
+        absolute_path = path_lookup.cwd / path
+        if is_a_notebook(absolute_path):
+            return absolute_path
+        # When exported through Git, notebooks are saved with a .py extension. So check with and without extension
+        candidates = (path, self._adjust_path(path)) if not path.suffix else (path,)
+        for candidate in candidates:
             absolute_path = path_lookup.resolve(candidate)
             if not absolute_path:
                 continue
