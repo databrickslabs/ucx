@@ -449,18 +449,12 @@ class AwsACL:
             raise ResourceDoesNotExist(msg) from None
 
         for cluster_id, role_compute in cluster_instance_profiles.items():
-            eligible_locations = {}
-            eligible_locations.update(
-                self._get_external_locations(role_compute, external_locations, permission_mappings)
-            )
+            eligible_locations = self._get_external_locations(role_compute, external_locations, permission_mappings)
             if len(eligible_locations) == 0:
                 continue
             compute_locations.append(ComputeLocations(cluster_id, eligible_locations, "clusters"))
         for warehouse_id, role_compute in warehouse_instance_profiles.items():
-            eligible_locations = {}
-            eligible_locations.update(
-                self._get_external_locations(role_compute, external_locations, permission_mappings)
-            )
+            eligible_locations = self._get_external_locations(role_compute, external_locations, permission_mappings)
             if len(eligible_locations) == 0:
                 continue
             compute_locations.append(ComputeLocations(warehouse_id, eligible_locations, "warehouses"))
