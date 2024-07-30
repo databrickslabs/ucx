@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import codecs
 import locale
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
 from functools import cached_property
 from pathlib import Path
 from typing import cast
@@ -12,6 +11,7 @@ from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -20,6 +20,8 @@ from databricks.labs.ucx.source_code.base import (
     PythonSequentialLinter,
     CurrentSessionState,
     Advisory,
+    guess_encoding,
+    file_language,
 )
 
 from databricks.labs.ucx.source_code.graph import (
@@ -47,6 +49,23 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
+
+
+def is_a_notebook(path: Path, content: str | None = None) -> bool:
+    if isinstance(path, WorkspacePath):
+        return path.is_notebook()
+    if not path.is_file():
+        return False
+    language = file_language(path)
+    if not language:
+        return False
+    if content is None:
+        try:
+            content = path.read_text(guess_encoding(path))
+        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+            logger.warning(f"Could not read file {path}")
+            return False
+    return content.startswith(CellLanguage.of_language(language).file_magic_header)
 
 
 class Notebook(SourceContainer):
@@ -279,12 +298,12 @@ class NotebookLinter:
         if resolved is None:
             return None  # already reported during dependency building
         # TODO deal with workspace notebooks
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
+        language = file_language(resolved)
         # we only support Python notebooks for now
         if language is not Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
-        source = resolved.read_text(_guess_encoding(resolved))
+        source = resolved.read_text(guess_encoding(resolved))
         return Notebook.parse(path, source, language)
 
     def _linter(self, language: Language) -> Linter:
@@ -299,12 +318,10 @@ class NotebookLinter:
         resolved = self._path_lookup.resolve(path)
         if resolved is None:
             return  # already reported during dependency building
-        # transient workspace notebook suffix is inferred from object info
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
-        # we only support Python for now
+        language = file_language(resolved)
         if language is not Language.PYTHON:
             return
-        source = resolved.read_text(_guess_encoding(resolved))
+        source = resolved.read_text(guess_encoding(resolved))
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             if isinstance(cell, RunCell):
@@ -317,26 +334,6 @@ class NotebookLinter:
     @staticmethod
     def name() -> str:
         return "notebook-linter"
-
-
-SUPPORTED_EXTENSION_LANGUAGES = {
-    '.py': Language.PYTHON,
-    '.sql': Language.SQL,
-}
-
-
-def _guess_encoding(path: Path):
-    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
-    with path.open('rb') as _file:
-        raw = _file.read(4)
-        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
-            return 'utf-32'
-        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
-            return 'utf-16'
-        if raw.startswith(codecs.BOM_UTF8):
-            return 'utf-8-sig'
-        # no BOM, let's use default encoding
-        return locale.getpreferredencoding(False)
 
 
 class FileLinter:
@@ -402,38 +399,17 @@ class FileLinter:
     @cached_property
     def _source_code(self) -> str:
         if self._content is None:
-            self._content = self._path.read_text(_guess_encoding(self._path))
+            self._content = self._path.read_text(guess_encoding(self._path))
         return self._content
-
-    @classmethod
-    def file_language(cls, path: Path) -> Language | None:
-        return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
-
-    def _file_language(self):
-        return self.file_language(self._path)
-
-    @classmethod
-    def is_notebook(cls, path: Path) -> bool:
-        language = cls.file_language(path)
-        if not language:
-            return False
-        try:
-            content = path.read_text(_guess_encoding(path))
-            return content.startswith(CellLanguage.of_language(language).file_magic_header)
-        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-            logger.warning(f"Could not read file {path}")
-            return False
-
-    def _is_notebook(self):
-        language = self._file_language()
-        if not language:
-            return False
-        return self._source_code.startswith(CellLanguage.of_language(language).file_magic_header)
 
     def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
         try:
-            is_notebook = self._is_notebook()
+            # silently ignore unsupported languages
+            language = file_language(self._path)
+            if not language:
+                return False
+            is_notebook = is_a_notebook(self._path, self._source_code)
         except FileNotFoundError:
             failure_message = f"File not found: {self._path}"
             yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
@@ -453,7 +429,7 @@ class FileLinter:
             yield from self._lint_file()
 
     def _lint_file(self):
-        language = self._file_language()
+        language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
             if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
@@ -473,7 +449,7 @@ class FileLinter:
                 yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
     def _lint_notebook(self):
-        notebook = Notebook.parse(self._path, self._source_code, self._file_language())
+        notebook = Notebook.parse(self._path, self._source_code, file_language(self._path))
         notebook_linter = NotebookLinter(
             self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
         )

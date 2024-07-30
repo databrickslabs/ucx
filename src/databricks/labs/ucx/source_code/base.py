@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import codecs
+import locale
 import logging
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -9,6 +11,7 @@ from pathlib import Path
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -242,3 +245,27 @@ class PythonSequentialLinter(Linter):
         if self._tree is None:
             self._tree = Tree.new_module()
         return self._tree
+
+
+SUPPORTED_EXTENSION_LANGUAGES = {
+    '.py': Language.PYTHON,
+    '.sql': Language.SQL,
+}
+
+
+def file_language(path: Path) -> Language | None:
+    return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
+
+
+def guess_encoding(path: Path):
+    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
+    with path.open('rb') as _file:
+        raw = _file.read(4)
+        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
+            return 'utf-32'
+        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
+            return 'utf-16'
+        if raw.startswith(codecs.BOM_UTF8):
+            return 'utf-8-sig'
+        # no BOM, let's use default encoding
+        return locale.getpreferredencoding(False)

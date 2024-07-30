@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, 
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.linters.files import FileLoader, is_a_notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -133,7 +133,7 @@ class Functional:
             linter = FileLinter(ctx, path_lookup, session_state, self.path)
             return linter.lint()
         # use dependency graph built from parent
-        is_notebook = FileLinter.is_notebook(self.parent)
+        is_notebook = is_a_notebook(self.parent)
         loader = NotebookLoader() if is_notebook else FileLoader()
         root_dependency = Dependency(loader, self.parent)
         root_graph = DependencyGraph(root_dependency, None, dependency_resolver, path_lookup, session_state)

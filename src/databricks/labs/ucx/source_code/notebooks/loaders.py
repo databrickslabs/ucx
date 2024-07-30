@@ -13,8 +13,9 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     SourceContainer,
 )
+from databricks.labs.ucx.source_code.linters.files import file_language
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook, SUPPORTED_EXTENSION_LANGUAGES
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
 
     @staticmethod
     def _detect_language(path: Path, content: str):
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix, None)
+        language = file_language(path)
         if language:
             return language
         for cell_language in CellLanguage:

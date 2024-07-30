@@ -6,8 +6,8 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
+from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, is_a_notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
@@ -85,9 +85,9 @@ class Folder(SourceContainer):
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
             is_file = child_path.is_file()
-            loader = self._file_loader if is_file else self._folder_loader
-            inherits_context = is_file and FileLinter.is_notebook(child_path)
-            dependency = Dependency(loader, child_path, inherits_context)
+            is_notebook = is_a_notebook(child_path)
+            loader = self._file_loader if is_file or is_notebook else self._folder_loader
+            dependency = Dependency(loader, child_path, inherits_context=is_notebook)
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
@@ -243,7 +243,7 @@ class FileLoader(DependencyLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(absolute_path.suffix.lower())
+        language = file_language(absolute_path)
         if not language:
             return StubContainer(absolute_path)
         for encoding in ("utf-8", "ascii"):
