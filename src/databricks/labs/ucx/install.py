@@ -508,6 +508,7 @@ class WorkspaceInstallation(InstallationMixin):
         if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
+        self._install_state.save()
         return True
 
     def _create_database_and_dashboards(self) -> None:
