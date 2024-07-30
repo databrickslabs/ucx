@@ -14,7 +14,7 @@ from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
+from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
