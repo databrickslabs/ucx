@@ -566,7 +566,7 @@ class WorkflowsDeployment(InstallationMixin):
         wheel_paths = []
         with self._wheels:
             if self._config.upload_dependencies:
-                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot"])
+                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
             wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
             wheel_paths.append(self._wheels.upload_to_wsfs())
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]

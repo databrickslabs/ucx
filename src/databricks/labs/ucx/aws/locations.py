@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -27,7 +27,7 @@ class AWSExternalLocationsMigration:
         self._aws_resource_permissions = aws_resource_permissions
         self._principal_acl = principal_acl
 
-    def run(self, location_prefix="UCX_location"):
+    def run(self):
         """
         For each path find out the role that has access to it
         Find out the credential that is pointing to this path
@@ -43,24 +43,18 @@ class AWSExternalLocationsMigration:
             if role_arn not in credential_dict:
                 logger.error(f"Missing credential for role {role_arn} for path {path}")
                 continue
+            location_name = self._generate_external_location_name(path)
             self._ws.external_locations.create(
-                self._generate_external_location_name(location_prefix),
+                location_name,
                 path,
                 credential_dict[role_arn],
                 skip_validation=True,
             )
         self._principal_acl.apply_location_acl()
 
-    def _generate_external_location_name(self, location_prefix: str):
-        external_location_num = 1
-        existing_external_locations = self._ws.external_locations.list()
-        external_location_names = [external_location.name for external_location in existing_external_locations]
-        while True:
-            external_location_name = f"{location_prefix}_{external_location_num}"
-            if external_location_name not in external_location_names:
-                break
-            external_location_num += 1
-        return external_location_name
+    @staticmethod
+    def _generate_external_location_name(path: str) -> str:
+        return "_".join(Path(path.lower()).parts[1:])
 
     @staticmethod
     def _identify_missing_external_locations(
