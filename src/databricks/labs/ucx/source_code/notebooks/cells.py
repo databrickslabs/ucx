@@ -16,6 +16,7 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyProblem,
@@ -35,7 +36,6 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 logger = logging.getLogger(__name__)
 
-NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'

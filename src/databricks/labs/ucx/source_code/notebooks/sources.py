@@ -11,7 +11,6 @@ from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -22,6 +21,7 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     guess_encoding,
     file_language,
+    is_a_notebook,
 )
 
 from databricks.labs.ucx.source_code.graph import (
@@ -49,23 +49,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
-
-
-def is_a_notebook(path: Path, content: str | None = None) -> bool:
-    if isinstance(path, WorkspacePath):
-        return path.is_notebook()
-    if not path.is_file():
-        return False
-    language = file_language(path)
-    if not language:
-        return False
-    if content is None:
-        try:
-            content = path.read_text(guess_encoding(path))
-        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-            logger.warning(f"Could not read file {path}")
-            return False
-    return content.startswith(CellLanguage.of_language(language).file_magic_header)
 
 
 class Notebook(SourceContainer):

@@ -6,8 +6,8 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, is_a_notebook
+from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
+from databricks.labs.blueprint.paths import WorkspacePath
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
@@ -269,3 +270,26 @@ def guess_encoding(path: Path):
             return 'utf-8-sig'
         # no BOM, let's use default encoding
         return locale.getpreferredencoding(False)
+
+
+# duplicated from CellLanguage to prevent cyclic import
+LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
+NOTEBOOK_HEADER = "Databricks notebook source"
+
+
+def is_a_notebook(path: Path, content: str | None = None) -> bool:
+    if isinstance(path, WorkspacePath):
+        return path.is_notebook()
+    if not path.is_file():
+        return False
+    language = file_language(path)
+    if not language:
+        return False
+    if content is None:
+        try:
+            content = path.read_text(guess_encoding(path))
+        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+            logger.warning(f"Could not read file {path}")
+            return False
+    magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
+    return content.startswith(magic_header)

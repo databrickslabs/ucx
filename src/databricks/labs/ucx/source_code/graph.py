@@ -9,7 +9,7 @@ from collections.abc import Callable
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -139,7 +139,7 @@ class DependencyGraph:
             if dependency in children:
                 return False
             # if it's not a real file, then it's not a root
-            if not dependency.path.is_file():
+            if not dependency.path.is_file() and not is_a_notebook(dependency.path):
                 children.add(dependency)
                 return False
             # if it appears more than once then it can't be a root
@@ -151,7 +151,7 @@ class DependencyGraph:
             parent_graph = graph.parent
             while parent_graph is not None:
                 dep = parent_graph.dependency
-                if dep.path.is_file():
+                if dep.path.is_file() or is_a_notebook(dep.path):
                     children.add(dependency)
                     return False
                 parent_graph = parent_graph.parent
