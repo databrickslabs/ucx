@@ -13,7 +13,7 @@ from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
-from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.hive_metastore.tables import What, AclMigrationWhat
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 
@@ -477,6 +477,17 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             f", do you want to run the migrate-external-tables-ctas workflow?"
         ):
             deployed_workflows.run_workflow("migrate-external-tables-ctas")
+
+
+@ucx.command
+def migrate_acls(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
+    """
+    Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
+    workflow and migrate-external-tables-ctas.
+    """
+    if ctx is None:
+        ctx = WorkspaceContext(w)
+    ctx.acl_migrator.migrate_acls([AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @ucx.command

@@ -500,6 +500,109 @@ class TablesMigrator:
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
 
+
+class ACLMigrator:
+    def __init__(
+        self,
+        table_crawler: TablesCrawler,
+        grant_crawler: GrantsCrawler,
+        ws: WorkspaceClient,
+        workspace_name: str,
+        backend: SqlBackend,
+        group_manager: GroupManager,
+        migration_status_refresher: MigrationStatusRefresher,
+        principal_grants: PrincipalACL,
+    ):
+        self._tc = table_crawler
+        self._gc = grant_crawler
+        self._backend = backend
+        self._workspace_name = workspace_name
+        self._ws = ws
+        self._group = group_manager
+        self._migration_status_refresher = migration_status_refresher
+        self._seen_tables: dict[str, str] = {}
+        self._principal_grants = principal_grants
+
+    def migrate_acls(self, acl_strategy: list[AclMigrationWhat] | None = None):
+        if acl_strategy is None:
+            return
+        all_grants_to_migrate = self._gc.snapshot()
+        all_migrated_groups = self._group.snapshot()
+        all_principal_grants = self._principal_grants.get_interactive_cluster_grants()
+        tables = self._tc.snapshot()
+        tables_to_migrate = []
+        for table in tables:
+            rule = Rule(self._workspace_name, self._workspace_name, table.database, table.database, table.name, table.name)
+            table_to_migrate = TableToMigrate(table, rule)
+            tables_to_migrate.append(table_to_migrate)
+
+        return self._migrate_acls(
+            acl_strategy,
+            all_grants_to_migrate,
+            all_migrated_groups,
+            all_principal_grants, tables_to_migrate)
+
+    def _migrate_acls(
+        self,
+        acl_strategy,
+        all_grants_to_migrate,
+        all_migrated_groups,
+        all_principal_grants,
+        tables_in_scope,
+    ):
+        tasks = []
+        for table in tables_in_scope:
+            grants = self._compute_grants(
+                table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+            )
+            tasks.append(partial(self._migrate_acl, table.src, table.rule, grants))
+        Threads.strict("migrate tables", tasks)
+        if not tasks:
+            logger.info(f"No acls to migrate")
+        # the below is useful for testing
+        return tasks
+
+    def _compute_grants(
+        self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+    ):
+        if acl_strategy is None:
+            acl_strategy = []
+        grants = []
+        if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+            grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
+        if AclMigrationWhat.PRINCIPAL in acl_strategy:
+            grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
+        return grants
+
+    @staticmethod
+    def _match_grants(table: Table, grants: Iterable[Grant], migrated_groups: list[MigratedGroup]) -> list[Grant]:
+        matched_grants = []
+        for grant in grants:
+            if grant.database != table.database:
+                continue
+            if table.name not in (grant.table, grant.view):
+                continue
+            matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
+            if len(matched_group) > 0:
+                grant = dataclasses.replace(grant, principal=matched_group[0])
+            matched_grants.append(grant)
+        return matched_grants
+
+    def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
+        if grants is None:
+            return True
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
+            try:
+                self._backend.execute(acl_migrate_sql)
+            except DatabricksError as e:
+                logger.warning(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
+        return True
+
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()
         return index.is_migrated(schema, table)

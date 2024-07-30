@@ -233,6 +233,10 @@ commands:
       Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental
       workflow and migrate-external-tables-ctas workflow.
 
+  - name: migrate-acls
+    description: |
+      Migrate ACLs from legacy metastore to UC metastore.
+
   - name: migrate-dbsql-dashboards
     description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
     flags:
