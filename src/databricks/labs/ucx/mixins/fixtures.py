@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import BinaryIO
 
@@ -58,7 +58,9 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
-TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)  # 15 minutes grace for jobs starting at the end of the hour
+
+"""Preserve resources created during tests for at least this long."""
+TEST_RESOURCE_PURGE_TIMEOUT = timedelta(hours=1)
 
 
 def factory(name, create, remove):
@@ -1461,8 +1463,15 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
     yield from factory("dashboard", create, delete)
 
 
-def get_test_purge_time() -> str:
-    return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+def get_test_purge_time(timeout: timedelta = TEST_RESOURCE_PURGE_TIMEOUT) -> str:
+    """Purge time for test objects, representing the (UTC-based) hour from which objects may be purged."""
+    # Note: this code is duplicated in the workflow installer (WorkflowsDeployment) so that it can avoid the
+    # transitive pytest deployment from this module.
+    now = datetime.now(timezone.utc)
+    purge_deadline = now + timeout
+    # Round UP to the next hour boundary: that is when resources will be deleted.
+    purge_hour = purge_deadline + (datetime.min.replace(tzinfo=timezone.utc) - purge_deadline) % timedelta(hours=1)
+    return purge_hour.strftime("%Y%m%d%H")
 
 
 def get_purge_suffix() -> str:

@@ -66,7 +66,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -178,7 +178,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members=None,
             external_id="1234",
             roles=None,
@@ -269,24 +269,30 @@ def test_snapshot_should_rename_groups_defined_in_conf():
     ]
 
 
-def test_rename_groups_should_patch_eligible_groups():
+def test_rename_groups_should_patch_eligible_groups(fake_sleep: Mock) -> None:
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     updated_group1 = dataclasses.replace(group1, display_name="test-group-de")
-    wsclient.groups.list.side_effect = (
+    list_side_effects = (
         # Preparing for the rename.
         *[[group1]] * 3,
-        # Checking the rename completed
+        # Checking (twice) that enumeration reflects the rename.
+        [updated_group1],
         [updated_group1],
     )
-    wsclient.groups.get.side_effect = (
+    wsclient.groups.list.side_effect = list_side_effects
+    get_side_effects = (
         # Preparing for the rename.
         *[group1] * 2,
-        # Checking the rename completed.
+        # Checking that the rename completed: emulate "not yet".
+        updated_group1,
+        group1,
+        # Checking (twice) that the rename completed.
+        updated_group1,
         updated_group1,
     )
-    wsclient.groups.get.return_value = group1
+    wsclient.groups.get.side_effect = get_side_effects
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in (account_admins_group_1,)],
@@ -296,6 +302,9 @@ def test_rename_groups_should_patch_eligible_groups():
         "1",
         operations=[iam.Patch(iam.PatchOp.REPLACE, "displayName", "test-group-de")],
     )
+    assert wsclient.groups.list.call_count == len(list_side_effects)
+    assert wsclient.groups.get.call_count == len(get_side_effects)
+    fake_sleep.assert_called()
 
 
 def test_rename_groups_should_filter_account_groups_in_workspace():
@@ -337,10 +346,14 @@ def test_rename_groups_should_wait_for_renames_to_complete(fake_sleep: Mock) -> 
         *[[original_group]] * 3,
         # Checking the rename completed; simulate:
         # 1. Rename incomplete: original group still visible.
-        # 2. Still incomplete: group missing entirely.
-        # 3. Rename has finished: updated group is now visible.
         [original_group],
+        # 2. Still incomplete: group missing entirely.
         [],
+        # 3. Maybe complete: update visible, but not twice in a row.
+        [updated_group],
+        [original_group],
+        # 4. Rename has finished: updated group is now visible (twice).
+        [updated_group],
         [updated_group],
     )
     wsclient.groups.list.side_effect = list_side_effect_values
@@ -355,9 +368,11 @@ def test_rename_groups_should_wait_for_renames_to_complete(fake_sleep: Mock) -> 
     get_return_values = (
         # Enumerating the workspace groups and loading the migration state.
         *[original_group] * 2,
-        # First call after rename: simulate the rename not yet being visible.
+        # First calls after the rename: simulate the rename not yet being visible.
+        updated_group,
         original_group,
-        # Second call, simulate things now being complete.
+        # Final calls after the rename: simulate things now being complete.
+        updated_group,
         updated_group,
     )
     wsclient.groups.get.side_effect = get_return_values
@@ -380,7 +395,8 @@ def test_rename_groups_should_retry_on_internal_error(fake_sleep: Mock) -> None:
     wsclient.groups.list.side_effect = (
         # Preparing for the rename.
         *[[original_group]] * 3,
-        # Checking the rename completed.
+        # Checking (twice) that the rename completed.
+        [updated_group],
         [updated_group],
     )
     matching_account_admin_group = dataclasses.replace(
@@ -392,7 +408,8 @@ def test_rename_groups_should_retry_on_internal_error(fake_sleep: Mock) -> None:
     wsclient.groups.get.side_effect = (
         # Preparing for the rename.
         *[original_group] * 2,
-        # Checking the rename completed.
+        # Checking (twice) that the rename completed.
+        updated_group,
         updated_group,
     )
     # The response to the PATCH call is ignored; set things up to fail on the first call and succeed on the second.
@@ -756,7 +773,7 @@ def test_snapshot_with_group_matched_by_suffix():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de_sx",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -795,7 +812,7 @@ def test_snapshot_with_group_matched_by_prefix():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="px_de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -854,7 +871,7 @@ def test_snapshot_with_group_matched_by_subset():
             id_in_workspace="1",
             name_in_workspace="de_(1234)",
             name_in_account="px_1234",
-            temporary_name="ucx-renamed-de_(1234)",
+            temporary_name="db-temp-de_(1234)",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -911,7 +928,7 @@ def test_snapshot_with_group_matched_by_external_id():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="xxxx",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -1310,7 +1327,7 @@ def test_regex_sub_strategy_replaces_with_empty_replace():
     strategy = RegexSubStrategy(
         workspace_groups,
         account_groups,
-        renamed_groups_prefix="ucx-renamed-",
+        renamed_groups_prefix="db-temp-",
         include_group_names=["group_old"],
         workspace_group_regex="_old",
         workspace_group_replace="",
@@ -1321,4 +1338,4 @@ def test_regex_sub_strategy_replaces_with_empty_replace():
     assert migrated_group is not None
     assert migrated_group.name_in_workspace == "group_old"
     assert migrated_group.name_in_account == "group"
-    assert migrated_group.temporary_name == "ucx-renamed-group_old"
+    assert migrated_group.temporary_name == "db-temp-group_old"

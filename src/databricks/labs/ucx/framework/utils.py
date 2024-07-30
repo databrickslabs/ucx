@@ -1,7 +1,6 @@
 import logging
 import string
 import subprocess
-from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +29,7 @@ def escape_sql_identifier(path: str, optional: bool | None = True) -> str:
     return ".".join(escaped)
 
 
-@lru_cache(maxsize=1024)
-def run_command(command):
+def run_command(command: str) -> tuple[int, str, str]:
     logger.info(f"Invoking command: {command}")
     with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
         output, error = process.communicate()

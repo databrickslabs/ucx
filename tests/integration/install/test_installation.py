@@ -8,6 +8,7 @@ import pytest
 
 import databricks
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
@@ -205,6 +206,58 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
     installation_ctx.deployed_workflows.repair_run("failing")
 
     assert installation_ctx.deployed_workflows.validate_step("failing")
+
+
+def test_installation_deletes_redash_dashboard_when_upgrading_to_lakeview(ws, installation_ctx, make_dashboard):
+    """The installation should handle upgrading dashboards from redash."""
+
+    @retried(on=[ValueError], timeout=timedelta(minutes=2))
+    def check_dashboard_is_archived(dashboard_id: str):
+        dashboard = ws.dashboards.get(dashboard_id)
+        if not dashboard.is_archived:
+            raise ValueError("Dashboard is not archived")
+
+    dashboard = make_dashboard()
+    installation_ctx.install_state.dashboards["assessment_main"] = dashboard.id
+    installation_ctx.workspace_installation.run()
+    try:
+        check_dashboard_is_archived(dashboard.id)
+    except TimeoutError:
+        assert False, "Lakeview dashboard was not deleted"
+    assert True, "Lakeview dashboard was deleted"
+
+
+def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
+    """A dashboard might be trashed (manually), the upgrade should handle this."""
+    installation_ctx.workspace_installation.run()
+    dashboard_id = list(installation_ctx.install_state.dashboards.values())[0]
+    ws.lakeview.trash(dashboard_id)
+    try:
+        installation_ctx.workspace_installation.run()
+    except NotFound:
+        assert False, "Installation failed when dashboard was trashed"
+    assert True, "Installation succeeded when dashboard was trashed"
+
+
+@pytest.mark.parametrize("dashboard_id", ["01ef4d7b294112968fa07ffae17dd55f", "invalid-dashboard-id", ""])
+def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboard_id):
+    """A dashboard reference might be invalid (after manual changes), the upgrade should handle this."""
+    dashboard_key = "assessment_main"
+    installation_ctx.install_state.dashboards[dashboard_key] = dashboard_id
+    installation_ctx.workspace_installation.run()
+    new_dashboard_id = installation_ctx.install_state.dashboards[dashboard_key]
+    assert dashboard_id != new_dashboard_id, "Dashboard id is not updated"
+
+
+def test_installation_stores_install_state_keys(ws, installation_ctx):
+    """The installation should store the keys in the installation state."""
+    expected_keys = "jobs", "dashboards"
+    installation_ctx.workspace_installation.run()
+    # Refresh the installation state, the installation context uses `@cached_property`
+    install_state = InstallState.from_installation(installation_ctx.installation)
+    for key in expected_keys:
+        assert hasattr(install_state, key), f"Missing key in install state: {key}"
+        assert getattr(install_state, key), f"Installation state is empty: {key}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

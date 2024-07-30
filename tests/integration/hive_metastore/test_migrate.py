@@ -7,7 +7,6 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
-
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
@@ -551,6 +550,33 @@ def test_migrate_external_tables_with_principal_acl_aws(
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
+        user_name=user.user_name,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_external_tables_with_principal_acl_aws_warehouse(
+    ws, make_user, prepared_principal_acl, make_warehouse_permissions, make_warehouse, env_or_skip
+):
+    if not ws.config.is_aws:
+        pytest.skip("temporary: only works in aws test env")
+    ctx, table_full_name, _, _ = prepared_principal_acl
+    ctx.with_dummy_resource_permission()
+    warehouse = make_warehouse()
+    table_migrate = ctx.tables_migrator
+    user = make_user()
+    make_warehouse_permissions(
+        object_id=warehouse.id,
+        permission_level=PermissionLevel.CAN_USE,
         user_name=user.user_name,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])

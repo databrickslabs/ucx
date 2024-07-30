@@ -409,7 +409,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         ws: WorkspaceClient,
         inventory_database: str,
         include_group_names: list[str] | None = None,
-        renamed_group_prefix: str | None = "ucx-renamed-",
+        renamed_group_prefix: str | None = "db-temp-",
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
         account_group_regex: str | None = None,
@@ -419,7 +419,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         if not renamed_group_prefix:
-            renamed_group_prefix = "ucx-renamed-"
+            renamed_group_prefix = "db-temp-"
 
         self._ws = ws
         self._include_group_names = include_group_names
@@ -437,11 +437,20 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return len(self.snapshot()) > 0
 
     def rename_groups(self):
-        tasks = []
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
+        # Renaming a group is eventually consistent, and not monotonically consistent, with a rather long time to
+        # converge: internally the Databricks API caches some things for up to 60s. To avoid excessive wait times when
+        # large numbers of groups need to be deleted (some deployments have >10K groups) we use the following steps:
+        #  1. Rename all the groups.
+        #  2. Confirm for each group that direct GETs yield the new name.
+        #  3. Confirm that group enumeration no longer includes the deleted groups.
+        # This caution is necessary because otherwise downstream tasks (like reflect_account_groups_on_workspace()) may
+        # skip a renamed group because it doesn't appear to be present.
         groups_to_migrate = self.get_migration_state().groups
-
+        rename_tasks = []
+        waiting_tasks = []
+        renamed_groups = []
         logger.info(f"Starting to rename {len(groups_to_migrate)} groups for migration...")
         for migrated_group in groups_to_migrate:
             if migrated_group.name_in_account in account_groups_in_workspace:
@@ -450,51 +459,82 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             if migrated_group.temporary_name in workspace_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_workspace}: already renamed")
                 continue
-            logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
-            tasks.append(
+            rename_tasks.append(
                 functools.partial(
-                    self._rename_group_and_wait_for_rename,
+                    self._rename_group,
                     migrated_group.id_in_workspace,
                     migrated_group.name_in_workspace,
                     migrated_group.temporary_name,
                 )
             )
-        renamed_groups = Threads.strict("rename groups in the workspace", tasks)
-        # Renaming is eventually consistent, and the tasks above have each polled to verify their rename completed.
-        # Here we also check that enumeration yields the updated names; this is necessary because otherwise downstream
-        # tasks (like reflect_account_groups_on_workspace()) may skip a renamed group because it doesn't appear to be
-        # present.
+            waiting_tasks.append(
+                functools.partial(
+                    self._wait_for_group_rename,
+                    migrated_group.id_in_workspace,
+                    migrated_group.name_in_workspace,
+                    migrated_group.temporary_name,
+                )
+            )
+            renamed_groups.append((migrated_group.id_in_workspace, migrated_group.temporary_name))
+        # Step 1: Rename all the groups.
+        _, errors = Threads.gather("rename groups in the workspace", rename_tasks)
+        if errors:
+            logger.error(f"During renaming of workspace groups {len(errors)} errors occurred. See debug logs.")
+            raise ManyError(errors)
+        # Step 2: Confirm that direct GETs yield the updated information.
+        _, errors = Threads.gather("waiting for renamed groups in the workspace", waiting_tasks)
+        if errors:
+            logger.error(f"While waiting for renamed workspace groups {len(errors)} errors occurred. See debug logs.")
+            raise ManyError(errors)
+        # Step 3: Wait for enumeration to also reflect the updated information.
         self._wait_for_renamed_groups(renamed_groups)
 
-    def _rename_group_and_wait_for_rename(self, group_id: str, old_group_name, new_group_name: str) -> tuple[str, str]:
-        logger.debug(f"Renaming group {group_id}: {old_group_name} -> {new_group_name}")
-        self._rename_group(group_id, new_group_name)
-        logger.debug(f"Waiting for group {group_id} rename to take effect: {old_group_name} -> {new_group_name}")
-        self._wait_for_rename(group_id, old_group_name, new_group_name)
-        return group_id, new_group_name
+    def _rename_group(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
+        logger.debug(f"Renaming group: {old_group_name} (id={group_id}) -> {new_group_name}")
+        self._rate_limited_rename_group_with_retry(group_id, new_group_name)
 
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10, burst_period_seconds=60)
-    def _rename_group(self, group_id: str, new_group_name: str) -> None:
+    def _rate_limited_rename_group_with_retry(self, group_id: str, new_group_name: str) -> None:
         ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
         self._ws.groups.patch(group_id, operations=ops)
 
-    @retried(on=[GroupRenameIncompleteError], timeout=timedelta(minutes=2))
-    def _wait_for_rename(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
+    @retried(on=[GroupRenameIncompleteError], timeout=timedelta(seconds=90))
+    def _wait_for_group_rename(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
+        # The groups API is eventually consistent, but not monotonically consistent. Here we verify that the effects of
+        # the rename have taken effect, and try to compensate for the lack of monotonic consistency by requiring two
+        # subsequent calls to confirm the rename. REST API internals cache things for up to 60s, and we see times close
+        # to this during testing. The retry timeout reflects this: if it's taking much longer then something else is
+        # wrong.
+        self._check_group_rename(group_id, old_group_name, new_group_name, logging.DEBUG)
+        self._check_group_rename(group_id, old_group_name, new_group_name, logging.WARNING)
+        logger.debug(f"Group rename is assumed complete: {old_group_name} (id={group_id}) -> {new_group_name}")
+
+    def _check_group_rename(self, group_id, old_group_name: str, new_group_name: str, pending_log_level: int) -> None:
         group = self._ws.groups.get(group_id)
         if group.display_name == old_group_name:
-            logger.debug(
-                f"Group {group_id} still has old name; still waiting for rename to take effect: {old_group_name} -> {new_group_name}"
+            logger.log(
+                pending_log_level,
+                f"Group still has old name; still waiting for rename to take effect: {old_group_name} (id={group_id}) -> {new_group_name}",
             )
             raise GroupRenameIncompleteError(group_id, old_group_name, new_group_name)
         if group.display_name != new_group_name:
             # Group has an entirely unexpected name; something else is interfering.
-            msg = f"While waiting for group {group_id} rename ({old_group_name} -> {new_group_name}) an unexpected name was observed: {group.display_name}"
+            msg = f"While waiting for group rename ({old_group_name} (id={group_id}) -> {new_group_name}) an unexpected name was observed: {group.display_name}"
             raise RuntimeError(msg)
-        logger.debug(f"Group {group_id} rename has taken effect: {old_group_name} -> {new_group_name}")
+        logger.debug(f"Group rename has possibly taken effect: {old_group_name} (id={group_id}) -> {new_group_name}")
 
     @retried(on=[ManyError], timeout=timedelta(minutes=2))
     def _wait_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]]) -> None:
+        # The groups API is eventually consistent, but not monotonically consistent. Here we verify that the group
+        # has been deleted, and try to compensate for the lack of monotonic consistency by requiring two subsequent
+        # calls to confirm deletion. REST API internals cache things for up to 60s, and we see times close to this
+        # during testing. The retry timeout reflects this: if it's taking much longer then something else is wrong.
+        self._check_for_renamed_groups(expected_groups, logging.DEBUG)
+        self._check_for_renamed_groups(expected_groups, logging.WARNING)
+        logger.debug(f"Group enumeration showed all {len(expected_groups)} renamed groups; assuming complete.")
+
+    def _check_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]], pending_log_level: int) -> None:
         attributes = "id,displayName"
         found_groups = {
             group.id: group.display_name
@@ -508,8 +548,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 logger.warning(f"Group enumeration omits renamed group: {group_id} (renamed to {expected_name})")
                 pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name})"))
             elif found_name != expected_name:
-                logger.debug(
-                    f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {found_name})"
+                logger.log(
+                    pending_log_level,
+                    f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {found_name})",
                 )
                 pending_renames.append(GroupRenameIncompleteError(group_id, found_name, expected_name))
             else:
@@ -544,11 +585,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         migrated_groups = self.snapshot()
         logger.info(f"Starting to remove {len(migrated_groups)} migrated workspace groups...")
         # Group deletion is eventually consistent, and not monotonically consistent, with a rather long time to
-        # converge: internally API caches some things for up to 60s. To avoid excessive wait times when large numbers of
-        # groups need to be deleted (some deployments have >10K groups) we use the following steps:
-        #  1. Delete the groups.
-        #  2. Confirm that direct GETs no longer see the group.
-        #  3. Confirm that account enumeration no longer includes the deleted groups.
+        # converge: internally the Databricks API caches some things for up to 60s. To avoid excessive wait times when
+        # large numbers of groups need to be deleted (some deployments have >10K groups) we use the following steps:
+        #  1. Delete all the groups.
+        #  2. Confirm for each group that direct GETs no longer see the group.
+        #  3. Confirm that group enumeration no longer includes the deleted groups.
         deletion_tasks = []
         waiting_tasks = []
         deleted_groups = []
@@ -573,12 +614,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             deleted_groups.append(migrated_group)
         # Step 1: Delete the groups.
         _, errors = Threads.gather("removing original workspace groups", deletion_tasks)
-        if len(errors) > 0:
+        if errors:
             logger.error(f"During deletion of workspace groups got {len(errors)} errors. See debug logs.")
             raise ManyError(errors)
-        # Step 2: Confirm that direct gets no longer return the deleted group.
+        # Step 2: Confirm that direct GETs no longer return the deleted group.
         _, errors = Threads.gather("waiting for removal of original workspace groups", waiting_tasks)
-        if len(errors) > 0:
+        if errors:
             logger.error(f"Waiting for deletion of workspace groups got {len(errors)} errors. See debug logs.")
             raise ManyError(errors)
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
@@ -786,11 +827,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._check_workspace_group_deletion(group_id, display_name, logging.WARNING)
         logger.debug(f"Workspace group is assumed deleted: {display_name} (id={group_id})")
 
-    def _check_workspace_group_deletion(self, group_id: str, display_name: str, still_present_level_level: int) -> None:
+    def _check_workspace_group_deletion(self, group_id: str, display_name: str, pending_log_level: int) -> None:
         try:
             _ = self._ws.groups.get(id=group_id)
             logger.log(
-                still_present_level_level,
+                pending_log_level,
                 f"Deleted group is still present; still waiting for deletion to take effect: {display_name} (id={group_id})",
             )
             # Deletion is still pending.

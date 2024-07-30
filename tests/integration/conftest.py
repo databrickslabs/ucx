@@ -102,7 +102,7 @@ def sql_fetch_all(sql_backend):
 def make_ucx_group(make_random, make_group, make_acc_group, make_user):
     def inner(workspace_group_name=None, account_group_name=None, **kwargs):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_G{make_random(4)}"
+            workspace_group_name = f"ucx_G{make_random(4)}-{get_purge_suffix()}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
