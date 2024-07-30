@@ -1465,6 +1465,8 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
 
 def get_test_purge_time(timeout: timedelta = TEST_RESOURCE_PURGE_TIMEOUT) -> str:
     """Purge time for test objects, representing the (UTC-based) hour from which objects may be purged."""
+    # Note: this code is duplicated in the workflow installer (WorkflowsDeployment) so that it can avoid the
+    # transitive pytest deployment from this module.
     now = datetime.now(timezone.utc)
     purge_deadline = now + timeout
     # Round UP to the next hour boundary: that is when resources will be deleted.

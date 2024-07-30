@@ -7,7 +7,7 @@ import sys
 import webbrowser
 from collections.abc import Iterator
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -51,10 +51,9 @@ from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 
-from ..mixins.fixtures import get_test_purge_time
-
 logger = logging.getLogger(__name__)
 
+TEST_RESOURCE_PURGE_TIMEOUT = timedelta(hours=1)
 TEST_NIGHTLY_CI_RESOURCES_PURGE_TIMEOUT = timedelta(hours=3)  # Buffer for debugging nightly integration test runs
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
@@ -463,10 +462,15 @@ class WorkflowsDeployment(InstallationMixin):
         ci_env = os.getenv("TEST_NIGHTLY")
         return ci_env is not None and ci_env.lower() == "true"
 
-    def _get_test_purge_time(self) -> str:
-        if self._is_nightly():
-            return get_test_purge_time(TEST_NIGHTLY_CI_RESOURCES_PURGE_TIMEOUT)
-        return get_test_purge_time()
+    @classmethod
+    def _get_test_purge_time(cls) -> str:
+        # Duplicate of mixins.fixtures.get_test_purge_time(); we don't want to import pytest as a transitive dependency.
+        timeout = TEST_NIGHTLY_CI_RESOURCES_PURGE_TIMEOUT if cls._is_nightly() else TEST_RESOURCE_PURGE_TIMEOUT
+        now = datetime.now(timezone.utc)
+        purge_deadline = now + timeout
+        # Round UP to the next hour boundary: that is when resources will be deleted.
+        purge_hour = purge_deadline + (datetime.min.replace(tzinfo=timezone.utc) - purge_deadline) % timedelta(hours=1)
+        return purge_hour.strftime("%Y%m%d%H")
 
     def _create_readme(self) -> None:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
