@@ -66,7 +66,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -178,7 +178,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members=None,
             external_id="1234",
             roles=None,
@@ -756,7 +756,7 @@ def test_snapshot_with_group_matched_by_suffix():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="de_sx",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -795,7 +795,7 @@ def test_snapshot_with_group_matched_by_prefix():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="px_de",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -854,7 +854,7 @@ def test_snapshot_with_group_matched_by_subset():
             id_in_workspace="1",
             name_in_workspace="de_(1234)",
             name_in_account="px_1234",
-            temporary_name="ucx-renamed-de_(1234)",
+            temporary_name="db-temp-de_(1234)",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -911,7 +911,7 @@ def test_snapshot_with_group_matched_by_external_id():
             id_in_workspace="1",
             name_in_workspace="de",
             name_in_account="xxxx",
-            temporary_name="ucx-renamed-de",
+            temporary_name="db-temp-de",
             members='[{"display": "test-user-1", "value": "20"}, {"display": "test-user-2", "value": "21"}]',
             external_id="1234",
             roles='[{"value": "arn:aws:iam::123456789098:instance-profile/ip1"}, '
@@ -1310,7 +1310,7 @@ def test_regex_sub_strategy_replaces_with_empty_replace():
     strategy = RegexSubStrategy(
         workspace_groups,
         account_groups,
-        renamed_groups_prefix="ucx-renamed-",
+        renamed_groups_prefix="db-temp-",
         include_group_names=["group_old"],
         workspace_group_regex="_old",
         workspace_group_replace="",
@@ -1321,4 +1321,4 @@ def test_regex_sub_strategy_replaces_with_empty_replace():
     assert migrated_group is not None
     assert migrated_group.name_in_workspace == "group_old"
     assert migrated_group.name_in_account == "group"
-    assert migrated_group.temporary_name == "ucx-renamed-group_old"
+    assert migrated_group.temporary_name == "db-temp-group_old"
