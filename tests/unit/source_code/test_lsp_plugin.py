@@ -27,9 +27,67 @@ def temp_document(doc_text, ws):
 
 
 def test_pylsp_lint(workspace):
-    code = 'sc.emptyRDD()'
+    code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
     _, doc = temp_document(code, workspace)
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace, doc), key=lambda d: d['code'])
+
+    workspace.update_config(
+        {
+            'pylsp': {
+                'plugins': {
+                    'pylsp_ucx': {
+                        'enabled': True,
+                        'dbrVersion': '14.2',
+                        'isServerless': False,
+                        'dataSecurityMode': 'USER_ISOLATION',
+                    },
+                }
+            }
+        }
+    )
+
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    assert diagnostics == [
+        {
+            'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 11}},
+            'code': 'legacy-context-in-shared-clusters',
+            'source': 'databricks.labs.ucx',
+            'message': 'sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            'severity': 1,
+            'tags': [],
+        },
+        {
+            'range': {'end': {'character': 35, 'line': 1}, 'start': {'character': 0, 'line': 1}},
+            'code': 'python-udf-in-shared-clusters',
+            'message': 'applyInPandas require DBR 14.3 LTS or above on UC Shared Clusters',
+            'severity': 1,
+            'source': 'databricks.labs.ucx',
+            'tags': [],
+        },
+        {
+            'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 13}},
+            'code': 'rdd-in-shared-clusters',
+            'source': 'databricks.labs.ucx',
+            'message': 'RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            'severity': 1,
+            'tags': [],
+        },
+    ]
+
+
+def test_pylsp_lint_no_dbr_version(workspace):
+    code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
+    _, doc = temp_document(code, workspace)
+    workspace.update_config(
+        {
+            'pylsp': {
+                'plugins': {
+                    'pylsp_ucx': {'enabled': True, 'isServerless': False, 'dataSecurityMode': 'USER_ISOLATION'},
+                }
+            }
+        }
+    )
+
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
     assert diagnostics == [
         {
             'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 11}},
@@ -48,3 +106,56 @@ def test_pylsp_lint(workspace):
             'tags': [],
         },
     ]
+
+
+def test_pylsp_no_config(workspace):
+    code = 'sc.emptyRDD()'
+    _, doc = temp_document(code, workspace)
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    assert diagnostics == []
+
+
+def test_pylsp_invalid_config(workspace):
+    code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
+    _, doc = temp_document(code, workspace)
+
+    workspace.update_config(
+        {
+            'pylsp': {
+                'plugins': {
+                    'pylsp_ucx': {
+                        'enabled': True,
+                        'dbrVersion': 'invalid-version',
+                        'isServerless': False,
+                        'dataSecurityMode': 'unknown',
+                    },
+                }
+            }
+        }
+    )
+
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    assert diagnostics == []
+
+
+def test_pylsp_lint_single_user_cluster(workspace):
+    code = 'sc.emptyRDD()'
+    _, doc = temp_document(code, workspace)
+
+    workspace.update_config(
+        {
+            'pylsp': {
+                'plugins': {
+                    'pylsp_ucx': {
+                        'enabled': True,
+                        'dbrVersion': '14.3',
+                        'isServerless': False,
+                        'dataSecurityMode': 'SINGLE_USER',
+                    },
+                }
+            }
+        }
+    )
+
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    assert diagnostics == []

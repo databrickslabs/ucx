@@ -1,3 +1,4 @@
+# ucx[session-state] {"data_security_mode": "USER_ISOLATION"}
 # ucx[to-json-in-shared-clusters:+1:6:+1:80] toJson() is not available on UC Shared Clusters. Use toSafeJson() on DBR 13.3 LTS or above to get a subset of command context information.
 print(dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson())
 dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()

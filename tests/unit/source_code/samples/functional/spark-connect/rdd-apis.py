@@ -1,3 +1,4 @@
+# ucx[session-state] {"data_security_mode": "USER_ISOLATION"}
 df = spark.createDataFrame([])
 # ucx[rdd-in-shared-clusters:+1:0:+1:27] RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead
 df.rdd.mapPartitions(myUdf)

@@ -1,4 +1,4 @@
-# ucx[session-state] {"dbr_version": [14, 3]}
+# ucx[session-state] {"dbr_version": [14, 3], "data_security_mode": "USER_ISOLATION"}
 from pyspark.sql.functions import udf, udtf, lit
 import pandas as pd
 

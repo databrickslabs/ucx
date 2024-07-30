@@ -1,3 +1,4 @@
+# ucx[session-state] {"data_security_mode": "USER_ISOLATION"}
 # ucx[legacy-context-in-shared-clusters:+2:0:+2:14] sc is not supported on UC Shared Clusters. Rewrite it using spark
 # ucx[spark-logging-in-shared-clusters:+1:0:+1:22] Cannot set Spark log level directly from code on UC Shared Clusters. Remove the call and set the cluster spark conf 'spark.log.level' instead
 sc.setLogLevel("INFO")
