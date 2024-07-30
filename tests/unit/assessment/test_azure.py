@@ -7,7 +7,7 @@ from databricks.sdk.service.compute import (
     ClusterSource,
     DataSecurityMode,
 )
-
+from databricks.sdk.service.sql import EndpointInfo
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
@@ -219,6 +219,13 @@ def test_get_cluster_to_storage_mapping_no_cluster_return_empty():
     assert not crawler.get_cluster_to_storage_mapping()
 
 
+def test_get_warehouse_to_storage_mapping_no_warehouse_return_empty():
+    ws = create_autospec(WorkspaceClient)
+    ws.warehouses.list.return_value = []
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    assert not crawler.get_warehouse_to_storage_mapping()
+
+
 def test_get_cluster_to_storage_mapping_no_interactive_cluster_return_empty():
     ws = mock_workspace_client(cluster_ids=['azure-spn-secret'])
     ws.clusters.list.return_value = [
@@ -227,6 +234,15 @@ def test_get_cluster_to_storage_mapping_no_interactive_cluster_return_empty():
     ]
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
     assert not crawler.get_cluster_to_storage_mapping()
+
+
+def test_get_warehouse_to_storage_mapping_no_spn_info_return_empty():
+    ws = mock_workspace_client()
+    ws.warehouses.list.return_value = [
+        EndpointInfo(id="123", name="warehouse1"),
+    ]
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    assert not crawler.get_warehouse_to_storage_mapping()
 
 
 def test_get_cluster_to_storage_mapping_interactive_cluster_no_spn_return_empty():
@@ -252,5 +268,31 @@ def test_get_cluster_to_storage_mapping_interactive_cluster_no_spn_return_empty(
     }
 
     assert cluster_spn_info[0].cluster_id == "azure-spn-secret-interactive"
+    assert len(cluster_spn_info[0].spn_info) == 2
+    assert cluster_spn_info[0].spn_info == spn_info
+
+
+def test_get_warehouse_to_storage_mapping_spn():
+    ws = mock_workspace_client(warehouse_config="spn-secret-config")
+    ws.warehouses.list.return_value = [
+        EndpointInfo(id="azure-spn-secret-warehouse", name="warehouse1"),
+    ]
+
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    cluster_spn_info = crawler.get_warehouse_to_storage_mapping()
+    spn_info = {
+        AzureServicePrincipalInfo(
+            application_id='Hello, World!',
+            tenant_id='dummy_tenant_id2',
+            storage_account='xyz',
+        ),
+        AzureServicePrincipalInfo(
+            application_id='dummy_application_id',
+            tenant_id='dummy_tenant_id',
+            storage_account='abcde',
+        ),
+    }
+
+    assert cluster_spn_info[0].cluster_id == "azure-spn-secret-warehouse"
     assert len(cluster_spn_info[0].spn_info) == 2
     assert cluster_spn_info[0].spn_info == spn_info
