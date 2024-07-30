@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import locale
 import logging
-from collections.abc import Iterable, Callable
+from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
 from typing import cast
@@ -405,11 +405,7 @@ class FileLinter:
     def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
         try:
-            # silently ignore unsupported languages
-            language = file_language(self._path)
-            if not language:
-                return False
-            is_notebook = is_a_notebook(self._path, self._source_code)
+            is_notebook = self._is_notebook()
         except FileNotFoundError:
             failure_message = f"File not found: {self._path}"
             yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
@@ -427,6 +423,13 @@ class FileLinter:
             yield from self._lint_notebook()
         else:
             yield from self._lint_file()
+
+    def _is_notebook(self):
+        # pre-check to avoid loading unsupported content
+        language = file_language(self._path)
+        if not language:
+            return False
+        return is_a_notebook(self._path, self._source_code)
 
     def _lint_file(self):
         language = file_language(self._path)
