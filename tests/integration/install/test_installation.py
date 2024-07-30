@@ -8,6 +8,7 @@ import pytest
 
 import databricks
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
@@ -246,6 +247,17 @@ def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboa
     installation_ctx.workspace_installation.run()
     new_dashboard_id = installation_ctx.install_state.dashboards[dashboard_key]
     assert dashboard_id != new_dashboard_id, "Dashboard id is not updated"
+
+
+def test_installation_stores_install_state_keys(ws, installation_ctx):
+    """The installation should store the keys in the installation state."""
+    expected_keys = "jobs", "dashboards"
+    installation_ctx.workspace_installation.run()
+    # Refresh the installation state, the installation context uses `@cached_property`
+    install_state = InstallState.from_installation(installation_ctx.installation)
+    for key in expected_keys:
+        assert hasattr(install_state, key), f"Missing key in install state: {key}"
+        assert getattr(install_state, key), f"Installation state is empty: {key}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
