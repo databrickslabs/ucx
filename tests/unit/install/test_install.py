@@ -501,7 +501,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     install_state = InstallState.from_installation(mock_installation)
     wheels = create_autospec(WheelsV2)
     workflows_installer = WorkflowsDeployment(
-        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
         mock_installation,
         install_state,
         ws,
@@ -511,7 +511,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         [],
     )
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
         mock_installation,
         install_state,
         sql_backend,
