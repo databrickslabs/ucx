@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TypeVar, cast
 
-from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
+from astroid import Call, Const, ImportFrom, Name, NodeNG, Try  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
@@ -438,7 +438,7 @@ class PythonCodeAnalyzer:
         nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return tree, nodes, problems
 
-    def _build_graph_from_node(self, base_node: NodeBase):
+    def _build_graph_from_node(self, base_node: NodeBase) -> Iterable[DependencyProblem]:
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
         elif isinstance(base_node, NotebookRunCall):
@@ -450,14 +450,42 @@ class PythonCodeAnalyzer:
         else:
             logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
 
-    def _register_import(self, base_node: ImportSource):
+    def _register_import(self, base_node: ImportSource) -> Iterable[DependencyProblem]:
         prefix = ""
         if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
             prefix = "." * base_node.node.level
         name = base_node.name or ""
-        yield from self._context.parent.register_import(prefix + name)
+        problems = self._context.parent.register_import(prefix + name)
+        for problem in problems:
+            prob = self._filter_import_problem_in_try_except(problem, base_node)
+            if prob is not None:
+                yield prob
 
-    def _register_notebook(self, base_node: NotebookRunCall):
+    @classmethod
+    def _filter_import_problem_in_try_except(
+        cls, problem: DependencyProblem, base_node: ImportSource
+    ) -> DependencyProblem | None:
+        if problem.code != 'import-not-found':
+            return problem
+        # is base_node in a try-except clause ?
+        node = base_node.node.parent
+        while node and not isinstance(node, Try):
+            node = node.parent
+        if cls._is_try_except_import_error(node):
+            return None
+        return problem
+
+    @classmethod
+    def _is_try_except_import_error(cls, node: Try | None) -> bool:
+        if not isinstance(node, Try):
+            return False
+        for handler in node.handlers:
+            if isinstance(handler.type, Name):
+                if handler.type.name == "ImportError":
+                    return True
+        return False
+
+    def _register_notebook(self, base_node: NotebookRunCall) -> Iterable[DependencyProblem]:
         has_unresolved, paths = base_node.get_notebook_paths(self._context.session_state)
         if has_unresolved:
             yield DependencyProblem(
@@ -468,7 +496,7 @@ class PythonCodeAnalyzer:
             # notebooks ran via dbutils.notebook.run do not inherit or propagate context
             yield from self._context.parent.register_notebook(Path(path), False)
 
-    def _mutate_path_lookup(self, change: SysPathChange):
+    def _mutate_path_lookup(self, change: SysPathChange) -> Iterable[DependencyProblem]:
         if isinstance(change, UnresolvedPath):
             yield DependencyProblem(
                 'sys-path-cannot-compute-value',

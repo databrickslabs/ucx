@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyProblem
+from databricks.labs.ucx.source_code.graph import DependencyProblem, DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.linters.files import FileLoader
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.cells import PythonCodeAnalyzer
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
@@ -27,27 +31,27 @@ for i in z:
 
 def test_linter_returns_empty_list_of_imports():
     tree = Tree.parse('')
-    assert not ImportSource.extract_from_tree(tree, DependencyProblem)[0]
+    assert not ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]
 
 
 def test_linter_returns_import():
     tree = Tree.parse('import x')
-    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
 def test_linter_returns_import_from():
     tree = Tree.parse('from x import z')
-    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
 def test_linter_returns_import_module():
     tree = Tree.parse('importlib.import_module("x")')
-    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
 def test_linter_returns__import__():
     tree = Tree.parse('importlib.__import__("x")')
-    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
 def test_linter_returns_appended_absolute_paths():
@@ -191,3 +195,17 @@ def test_infers_dbutils_notebook_run_dynamic_value(code, expected) -> None:
         _, paths = call.get_notebook_paths(CurrentSessionState())
         all_paths.extend(paths)
     assert all_paths == expected
+
+
+def test_failing_import_in_try_except_is_silent(simple_dependency_resolver, mock_path_lookup) -> None:
+    code = """
+try:
+    import missing_library
+except ImportError as e:
+    pass
+"""
+    dep = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dep, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    analyzer = PythonCodeAnalyzer(graph.new_dependency_graph_context(), code)
+    problems = analyzer.build_graph()
+    assert not problems
