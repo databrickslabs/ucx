@@ -15,6 +15,7 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -499,7 +500,8 @@ def lint_local_code(
     """Lint local code files looking for problems."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    ctx.local_code_linter.lint(prompts, None if path is None else Path(path))
+    linter: LocalCodeLinter = ctx.local_code_linter
+    linter.lint(prompts, None if path is None else Path(path))
 
 
 if __name__ == "__main__":
