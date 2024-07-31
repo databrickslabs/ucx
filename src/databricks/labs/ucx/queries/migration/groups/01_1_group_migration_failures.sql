@@ -1,4 +1,4 @@
-/* --title 'Group Migration Failures' --height 4 --width 4
+/* --title 'Group Migration Failures' --height 4 --width 4 */ /*
  *
  * Messages that we're looking for are of the form:
  *   failed-group-migration: {name_in_workspace} -> {name_in_account}: {reason}
