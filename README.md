@@ -538,7 +538,7 @@ The upgrade process can be triggered using the `migrate-tables` [UCX command](#m
 
 Or by running the table migration workflows deployed to the workspace.
 
-##### table migration workflows
+#### Table migration workflows
 
 ```mermaid
 flowchart LR
