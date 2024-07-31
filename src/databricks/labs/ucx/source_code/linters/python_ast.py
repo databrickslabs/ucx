@@ -233,7 +233,7 @@ class Tree:
 
         def renumber_node(node: NodeNG, offset: int) -> None:
             for child in node.get_children():
-                renumber_node(child, offset + child.lineno - node.lineno)
+                renumber_node(child, offset + (child.lineno or 0) - (node.lineno or 0))
             if node.end_lineno:
                 node.end_lineno = node.end_lineno + offset
                 node.lineno = node.lineno + offset

@@ -9,7 +9,8 @@ from collections.abc import Callable
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.Logger(__name__)
@@ -134,19 +135,31 @@ class DependencyGraph:
 
         def add_to_dependencies(graph: DependencyGraph) -> bool:
             dependency = graph.dependency
+            # if already encountered we're done
             if dependency in children:
-                return False  # Nothing to do
+                return False
+            # if it's not a real file, then it's not a root
+            if not dependency.path.is_file() and not is_a_notebook(dependency.path):
+                children.add(dependency)
+                return False
+            # if it appears more than once then it can't be a root
             if dependency in roots:
                 roots.remove(dependency)
                 children.add(dependency)
                 return False
-            if graph.parent is None:
-                roots.add(dependency)
-                return False
-            children.add(dependency)
+            # if it has a 'real' parent, it's a child
+            parent_graph = graph.parent
+            while parent_graph is not None:
+                dep = parent_graph.dependency
+                if dep.path.is_file() or is_a_notebook(dep.path):
+                    children.add(dependency)
+                    return False
+                parent_graph = parent_graph.parent
+            # ok, it's a root
+            roots.add(dependency)
             return False
 
-        self.visit(add_to_dependencies, set())
+        self.visit(add_to_dependencies, None)
         return roots
 
     @property
@@ -185,10 +198,12 @@ class DependencyGraph:
         return self._relative_names(self.root_dependencies)
 
     # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
-        if self.path in visited:
-            return False
-        visited.add(self.path)
+    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
+        """provide visited set if you want to ensure nodes are only visited once"""
+        if visited is not None:
+            if self.path in visited:
+                return False
+            visited.add(self.path)
         if visit_node(self):
             return True
         for dependency in self._dependencies.values():
@@ -197,7 +212,9 @@ class DependencyGraph:
         return False
 
     def new_dependency_graph_context(self):
-        return DependencyGraphContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
+        return DependencyGraphContext(
+            parent=self, path_lookup=self._path_lookup, resolver=self._resolver, session_state=self._session_state
+        )
 
     def _compute_route(self, root: Path, leaf: Path, visited: set[Path]) -> list[Dependency]:
         """given 2 files or notebooks root and leaf, compute the list of dependencies that must be traversed
@@ -237,13 +254,23 @@ class DependencyGraph:
     def _trim_route(self, dependencies: list[Dependency]) -> list[Dependency]:
         """don't inherit context if dependency is not a file/notebook, or it is loaded via dbutils.notebook.run or via import"""
         # filter out intermediate containers
-        dependencies = list(dependency for dependency in dependencies if dependency.path.is_file())
+        deps_with_source: list[Dependency] = []
+        for dependency in dependencies:
+            if dependency.path.is_file() or is_a_notebook(dependency.path):
+                deps_with_source.append(dependency)
         # restart when not inheriting context
-        for i, dependency in enumerate(dependencies):
+        for i, dependency in enumerate(deps_with_source):
             if dependency.inherits_context:
                 continue
-            return [dependency] + self._trim_route(dependencies[i + 1 :])
-        return dependencies
+            return [dependency] + self._trim_route(deps_with_source[i + 1 :])
+        return deps_with_source
+
+    def build_inherited_tree(self, root: Path, leaf: Path) -> Tree | None:
+        return self._build_inherited_context(root, leaf).tree
+
+    def _build_inherited_context(self, root: Path, leaf: Path) -> InheritedContext:
+        route = self._compute_route(root, leaf, set())
+        return InheritedContext.from_route(self, self.path_lookup, route)
 
     def __repr__(self):
         return f"<DependencyGraph {self.path}>"
@@ -253,6 +280,7 @@ class DependencyGraph:
 class DependencyGraphContext:
     parent: DependencyGraph
     path_lookup: PathLookup
+    resolver: DependencyResolver
     session_state: CurrentSessionState
 
 
@@ -288,6 +316,9 @@ class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
+
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        raise ValueError(f"Building an inherited context from {type(self).__name__} is not supported!")
 
 
 class DependencyLoader(abc.ABC):
@@ -496,3 +527,58 @@ class MaybeGraph:
     @property
     def failed(self):
         return len(self.problems) > 0
+
+
+class InheritedContext:
+
+    @classmethod
+    def from_route(cls, graph: DependencyGraph, path_lookup: PathLookup, route: list[Dependency]) -> InheritedContext:
+        context = InheritedContext(None, False)
+        for i, dependency in enumerate(route):
+            if i >= len(route) - 1:
+                break
+            next_path = route[i + 1].path
+            container = dependency.load(path_lookup)
+            if container is None:
+                logger.warning(f"Could not load content of {dependency.path}")
+                return context
+            local = container.build_inherited_context(graph, next_path)
+            # only copy 'found' flag if this is the last parent
+            context = context.append(local, i == len(route) - 2)
+        return context.finalize()
+
+    def __init__(self, tree: Tree | None, found: bool):
+        self._tree = tree
+        self._found = found
+
+    @property
+    def tree(self):
+        return self._tree
+
+    @property
+    def found(self):
+        return self._found
+
+    def append(self, context: InheritedContext, copy_found: bool) -> InheritedContext:
+        # we should never append to a found context
+        if self.found:
+            raise ValueError("Appending to an already resolved InheritedContext is illegal!")
+        tree = context.tree
+        found = copy_found and context.found
+        if tree is None:
+            return InheritedContext(self._tree, found)
+        if self._tree is None:
+            self._tree = Tree.new_module()
+        self._tree.append_tree(context.tree)
+        return InheritedContext(self._tree, found)
+
+    def finalize(self) -> InheritedContext:
+        # hacky stuff for aligning with Astroid's inference engine behavior
+        # the engine checks line numbers to skip variables that are not in scope of the current frame
+        # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L113
+        # this is problematic when linting code fragments that refer to inherited code with unrelated line numbers
+        # here we fool the engine by pretending that all nodes from context have negative line numbers
+        if self._tree is None:
+            return self
+        tree = self._tree.renumber(-1)
+        return InheritedContext(tree, self.found)

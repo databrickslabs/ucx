@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 import locale
 import logging
 from collections.abc import Iterable
@@ -20,9 +19,17 @@ from databricks.labs.ucx.source_code.base import (
     PythonSequentialLinter,
     CurrentSessionState,
     Advisory,
+    guess_encoding,
+    file_language,
+    is_a_notebook,
 )
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.graph import (
+    SourceContainer,
+    DependencyGraph,
+    DependencyProblem,
+    InheritedContext,
+)
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
@@ -102,6 +109,15 @@ class Notebook(SourceContainer):
             problems.extend(cell_problems)
         return problems
 
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        context = InheritedContext(None, False)
+        for cell in self._cells:
+            child = cell.build_inherited_context(graph, child_path)
+            context = context.append(child, True)
+            if context.found:
+                return context
+        return context
+
     def __repr__(self):
         return f"<Notebook {self._path}>"
 
@@ -127,14 +143,22 @@ class NotebookLinter:
         return cls(ctx, path_lookup, session_state, notebook)
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, session_state: CurrentSessionState, notebook: Notebook
+        self,
+        context: LinterContext,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        notebook: Notebook,
+        inherited_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._notebook: Notebook = notebook
-        # reuse Python linter, which accumulates statements for improved inference
+        # reuse Python linter across related files and notebook cells
+        # this is required in order to accumulate statements for improved inference
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
+        if inherited_tree is not None:
+            self._python_linter.append_tree(inherited_tree)
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
@@ -257,12 +281,12 @@ class NotebookLinter:
         if resolved is None:
             return None  # already reported during dependency building
         # TODO deal with workspace notebooks
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
+        language = file_language(resolved)
         # we only support Python notebooks for now
         if language is not Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
-        source = resolved.read_text(_guess_encoding(resolved))
+        source = resolved.read_text(guess_encoding(resolved))
         return Notebook.parse(path, source, language)
 
     def _linter(self, language: Language) -> Linter:
@@ -277,12 +301,10 @@ class NotebookLinter:
         resolved = self._path_lookup.resolve(path)
         if resolved is None:
             return  # already reported during dependency building
-        # transient workspace notebook suffix is inferred from object info
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
-        # we only support Python for now
+        language = file_language(resolved)
         if language is not Language.PYTHON:
             return
-        source = resolved.read_text(_guess_encoding(resolved))
+        source = resolved.read_text(guess_encoding(resolved))
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             if isinstance(cell, RunCell):
@@ -295,26 +317,6 @@ class NotebookLinter:
     @staticmethod
     def name() -> str:
         return "notebook-linter"
-
-
-SUPPORTED_EXTENSION_LANGUAGES = {
-    '.py': Language.PYTHON,
-    '.sql': Language.SQL,
-}
-
-
-def _guess_encoding(path: Path):
-    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
-    with path.open('rb') as _file:
-        raw = _file.read(4)
-        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
-            return 'utf-32'
-        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
-            return 'utf-16'
-        if raw.startswith(codecs.BOM_UTF8):
-            return 'utf-8-sig'
-        # no BOM, let's use default encoding
-        return locale.getpreferredencoding(False)
 
 
 class FileLinter:
@@ -367,28 +369,21 @@ class FileLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         path: Path,
+        inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
         self._ctx: LinterContext = ctx
         self._path_lookup = path_lookup
         self._session_state = session_state
-        self._path: Path = path
+        self._path = path
+        self._inherited_tree = inherited_tree
         self._content = content
 
     @cached_property
     def _source_code(self) -> str:
         if self._content is None:
-            self._content = self._path.read_text(_guess_encoding(self._path))
+            self._content = self._path.read_text(guess_encoding(self._path))
         return self._content
-
-    def _file_language(self):
-        return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
-
-    def _is_notebook(self):
-        language = self._file_language()
-        if not language:
-            return False
-        return self._source_code.startswith(CellLanguage.of_language(language).file_magic_header)
 
     def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
@@ -412,8 +407,15 @@ class FileLinter:
         else:
             yield from self._lint_file()
 
+    def _is_notebook(self):
+        # pre-check to avoid loading unsupported content
+        language = file_language(self._path)
+        if not language:
+            return False
+        return is_a_notebook(self._path, self._source_code)
+
     def _lint_file(self):
-        language = self._file_language()
+        language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
             if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
@@ -425,12 +427,16 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
+                if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
+                    linter.append_tree(self._inherited_tree)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
                 yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
     def _lint_notebook(self):
-        notebook = Notebook.parse(self._path, self._source_code, self._file_language())
-        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook)
+        notebook = Notebook.parse(self._path, self._source_code, file_language(self._path))
+        notebook_linter = NotebookLinter(
+            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
+        )
         yield from notebook_linter.lint()

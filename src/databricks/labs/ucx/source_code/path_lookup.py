@@ -55,7 +55,7 @@ class PathLookup:
             return None
         absolute_path = library_root / path
         if absolute_path.exists():
-            return absolute_path.resolve()  # eliminate ".." components
+            return self._standardize_path(absolute_path)
         return self._resolve_egg_in_library_root(library_root, path)
 
     def _resolve_egg_in_library_root(self, library: Path, path: Path) -> Path | None:
@@ -64,8 +64,19 @@ class PathLookup:
                 continue
             absolute_path = child / path
             if absolute_path.exists():
-                return absolute_path.resolve()  # eliminate ".." components
+                return self._standardize_path(absolute_path)
         return None
+
+    @staticmethod
+    def _standardize_path(path: Path):
+        resolved = path.resolve()  # eliminate ".." components
+        # on MacOS "/var/..." resolves to "/private/var/.." which breaks path equality
+        index = 1 if path.parts[0] == path.anchor else 0
+        if path.parts[index] == resolved.parts[index]:
+            return resolved
+        posix = resolved.as_posix()
+        posix = posix[posix.index(path.as_posix()) :]
+        return Path(posix)
 
     @staticmethod
     def _is_egg_folder(path: Path) -> bool:
