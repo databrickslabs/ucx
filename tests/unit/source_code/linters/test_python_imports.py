@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyProblem, DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
