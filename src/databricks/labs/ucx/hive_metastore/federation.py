@@ -6,6 +6,8 @@ class DbfsRootResolver:
 
     def run(self) -> str:
         code = """
+// Warning: relying on an undocumented API here. This is brittle, as it may break.
+// TODO: switch to a publicly documented API when available.
 URI = spark._jvm.java.net.URI
 Some = spark._jvm.scala.Some
 HmsFedDbfsUtils = spark._jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
