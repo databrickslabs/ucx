@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 import pytest
 
 # pylint: disable-next=import-private-name
@@ -112,35 +112,39 @@ def test_dbfs_fixture(make_mounted_location):
 def test_remove_after_tag_jobs(ws, env_or_skip, make_job):
     new_job = make_job(spark_conf=_SPARK_CONF)
     created_job = ws.jobs.get(new_job.job_id)
-    assert "RemoveAfter" in created_job.settings.tags
+    job_tags = created_job.settings.tags
+    assert "RemoveAfter" in job_tags
 
-    purge_time = datetime.strptime(created_job.settings.tags.get("RemoveAfter"), "%Y%m%d%H")
-    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+    purge_time = datetime.strptime(job_tags["RemoveAfter"], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    assert (purge_time - datetime.now(timezone.utc)) < (TEST_RESOURCE_PURGE_TIMEOUT + timedelta(hours=1))  # noqa: F405
 
 
 def test_remove_after_tag_clusters(ws, env_or_skip, make_cluster):
     new_cluster = make_cluster(single_node=True, instance_pool_id=env_or_skip('TEST_INSTANCE_POOL_ID'))
     created_cluster = ws.clusters.get(new_cluster.cluster_id)
-    assert "RemoveAfter" in created_cluster.custom_tags
-    purge_time = datetime.strptime(created_cluster.custom_tags.get("RemoveAfter"), "%Y%m%d%H")
-    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+    cluster_tags = created_cluster.custom_tags
+    assert "RemoveAfter" in cluster_tags
+    purge_time = datetime.strptime(cluster_tags["RemoveAfter"], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    assert (purge_time - datetime.now(timezone.utc)) < (TEST_RESOURCE_PURGE_TIMEOUT + timedelta(hours=1))  # noqa: F405
 
 
 def test_remove_after_tag_warehouse(ws, env_or_skip, make_warehouse):
     new_warehouse = make_warehouse()
     created_warehouse = ws.warehouses.get(new_warehouse.response.id)
-    custom_tags = created_warehouse.tags.as_dict()
-    assert 'RemoveAfter' in custom_tags.get("custom_tags")[0]["key"]
-    purge_time = datetime.strptime(custom_tags.get("custom_tags")[0]["value"], "%Y%m%d%H")
-    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+    warehouse_tags = created_warehouse.tags.as_dict()
+    assert warehouse_tags["custom_tags"][0]["key"] == "RemoveAfter"
+    remove_after_tag = warehouse_tags["custom_tags"][0]["value"]
+    purge_time = datetime.strptime(remove_after_tag, "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    assert (purge_time - datetime.now(timezone.utc)) < (TEST_RESOURCE_PURGE_TIMEOUT + timedelta(hours=1))  # noqa: F405
 
 
 def test_remove_after_tag_instance_pool(ws, make_instance_pool):
     new_instance_pool = make_instance_pool()
     created_instance_pool = ws.instance_pools.get(new_instance_pool.instance_pool_id)
-    assert "RemoveAfter" in created_instance_pool.custom_tags
-    purge_time = datetime.strptime(created_instance_pool.custom_tags.get("RemoveAfter"), "%Y%m%d%H")
-    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+    pool_tags = created_instance_pool.custom_tags
+    assert "RemoveAfter" in pool_tags
+    purge_time = datetime.strptime(pool_tags["RemoveAfter"], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    assert (purge_time - datetime.now(timezone.utc)) < (TEST_RESOURCE_PURGE_TIMEOUT + timedelta(hours=1))  # noqa: F405
 
 
 def test_remove_after_property_table(ws, make_table, sql_backend):
