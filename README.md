@@ -269,7 +269,7 @@ Databricks CLI will confirm a few options:
 # Migration process
 
 On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow),
-followed by [group migration](#group-migration-workflow), [table migration workflow](#Table-Migration),
+followed by [group migration](#group-migration-workflow), [table migration process](#Table-Migration),
 finalised with the [code migration](#code-migration-commands). It can be described as:
 
 ```mermaid
@@ -369,7 +369,7 @@ Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow r
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
 Directories, Repos, and Files.
 
-Once done with the group migration, proceed to [table migration workflow](#Table-Migration).
+Once done with the group migration, proceed to [table migration process](#Table-Migration).
 
 Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
 If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
@@ -850,7 +850,7 @@ the metastore id of the metastore you want to assign to the workspace.
 
 # Table migration commands
 
-These commands are vital part of [table migration workflow](#Table-Migration) process and require
+These commands are vital part of [table migration process](#Table-Migration) process and require
 the [assessment workflow](#assessment-workflow) and
 [group migration workflow](#group-migration-workflow) to be completed.
 See the [migration process diagram](#migration-process) to understand the role of the table migration commands in
@@ -964,7 +964,7 @@ workflows. Once migration is complete, this service principal should be unprovis
 On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using
 Azure Resource Manager APIs.
 
-This command is one of prerequisites for the [table migration workflow](#table-migration).
+This command is one of prerequisites for the [table migration process](#table-migration).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1056,7 +1056,7 @@ multiple runs of the table migration workflow, you can use the [`revert-migrated
 to revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate
 using the [`skip` command](#skip-command).
 
-This command is one of prerequisites for the [table migration workflow](#Table-Migration).
+This command is one of prerequisites for the [table migration process](#Table-Migration).
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
@@ -1085,7 +1085,7 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
-This command is supposed to be run before migrating tables to UC using [table migration workflow](#Table-Migration).
+This command is supposed to be run before migrating tables to UC using [table migration process](#Table-Migration).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1328,7 +1328,7 @@ This command is useful for administrators who want to ensure that the groups hav
 used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and
 [group migration](#group-migration-workflow) for more details.
 
-Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration workflow](#Table-Migration)
+Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
 
 [[back to top](#databricks-labs-ucx)]
 
