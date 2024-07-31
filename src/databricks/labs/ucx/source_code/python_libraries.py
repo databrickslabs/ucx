@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import shlex
 import tempfile
 import zipfile
 from collections.abc import Callable
@@ -25,7 +24,9 @@ logger = logging.getLogger(__name__)
 class PythonLibraryResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, allow_list: KnownList, runner: Callable[[str | list[str]], tuple[int, str, str]] = run_command) -> None:
+    def __init__(
+        self, allow_list: KnownList, runner: Callable[[str | list[str]], tuple[int, str, str]] = run_command
+    ) -> None:
         self._allow_list = allow_list
         self._runner = runner
 
@@ -77,7 +78,8 @@ class PythonLibraryResolver(LibraryResolver):
         return_code, stdout, stderr = self._runner(args)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
-            problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
+            command = " ".join(args)
+            problem = DependencyProblem("library-install-failed", f"'{command}' failed with '{stderr}'")
             return [problem]
         return []
 
