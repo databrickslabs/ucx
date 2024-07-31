@@ -4,7 +4,7 @@
  *   failed-group-migration: {name_in_workspace} -> {name_in_account}: {reason}
  */
 SELECT
-  CAST(`timestamp` AS TIMESTAMP) as `timestamp`,
+  CAST(`timestamp` AS TIMESTAMP) AS `timestamp`,
   job_run_id,
   level,
   message
