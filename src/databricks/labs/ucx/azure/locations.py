@@ -20,12 +20,14 @@ class ExternalLocationsMigration:
         resource_permissions: AzureResourcePermissions,
         azurerm: AzureResources,
         principal_acl: PrincipalACL,
+        enable_hms_federation: bool
     ):
         self._ws = ws
         self._hms_locations = hms_locations
         self._resource_permissions = resource_permissions
         self._azurerm = azurerm
         self._principal_acl = principal_acl
+        self._enable_hms_federation = enable_hms_federation
 
     def _app_id_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
         # list all storage credentials.
@@ -120,7 +122,8 @@ class ExternalLocationsMigration:
     ) -> str | None:
         try:
             self._ws.external_locations.create(
-                name, url, credential, comment=comment, read_only=read_only, skip_validation=skip_validation
+                name, url, credential, comment=comment, read_only=read_only, skip_validation=skip_validation,
+                fallback=self._enable_hms_federation
             )
             return url
         except InvalidParameterValue as invalid:

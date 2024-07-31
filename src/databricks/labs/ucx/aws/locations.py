@@ -21,11 +21,13 @@ class AWSExternalLocationsMigration:
         external_locations: ExternalLocations,
         aws_resource_permissions: AWSResourcePermissions,
         principal_acl: PrincipalACL,
+        enable_hms_federation: bool,
     ):
         self._ws = ws
         self._external_locations = external_locations
         self._aws_resource_permissions = aws_resource_permissions
         self._principal_acl = principal_acl
+        self._enable_hms_federation = enable_hms_federation
 
     def run(self):
         """
@@ -49,6 +51,7 @@ class AWSExternalLocationsMigration:
                 path,
                 credential_dict[role_arn],
                 skip_validation=True,
+                fallback=self._enable_hms_federation
             )
         self._principal_acl.apply_location_acl()
 

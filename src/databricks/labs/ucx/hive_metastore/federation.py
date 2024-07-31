@@ -11,12 +11,22 @@ from databricks.sdk.service.catalog import (
     PermissionsChange,
 )
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 logger = logging.getLogger(__name__)
 
+class HiveMetastoreFederationEnabler:
+    def __init__(self, installation: Installation):
+        self._installation = installation
+
+    def enable(self):
+        config = self._installation.load(WorkspaceConfig)
+        config.enable_hms_federation = True
+        self._installation.save(config)
 
 class HiveMetastoreFederation:
     def __init__(
