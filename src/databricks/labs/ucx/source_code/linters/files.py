@@ -6,8 +6,9 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
+from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
@@ -25,6 +26,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     SourceContainer,
     DependencyResolver,
+    InheritedContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,13 +55,24 @@ class LocalFile(SourceContainer):
         logger.warning(f"Unsupported language: {self._language.language}")
         return []
 
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        if self._language is CellLanguage.PYTHON:
+            context = graph.new_dependency_graph_context()
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            return analyzer.build_inherited_context(child_path)
+        return InheritedContext(None, False)
+
     def __repr__(self):
         return f"<LocalFile {self._path}>"
 
 
 class Folder(SourceContainer):
-    def __init__(self, path: Path, file_loader: FileLoader, folder_loader: FolderLoader):
+
+    def __init__(
+        self, path: Path, notebook_loader: NotebookLoader, file_loader: FileLoader, folder_loader: FolderLoader
+    ):
         self._path = path
+        self._notebook_loader = notebook_loader
         self._file_loader = file_loader
         self._folder_loader = folder_loader
 
@@ -75,8 +88,10 @@ class Folder(SourceContainer):
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
-            loader = self._folder_loader if child_path.is_dir() else self._file_loader
-            dependency = Dependency(loader, child_path, False)
+            is_file = child_path.is_file()
+            is_notebook = is_a_notebook(child_path)
+            loader = self._notebook_loader if is_notebook else self._file_loader if is_file else self._folder_loader
+            dependency = Dependency(loader, child_path, inherits_context=is_notebook)
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
@@ -105,7 +120,6 @@ class LocalCodeLinter:
     def lint(
         self,
         prompts: Prompts,
-        linted_paths: set[Path],
         path: Path | None,
         stdout: TextIO = sys.stdout,
     ) -> list[LocatedAdvice]:
@@ -117,34 +131,41 @@ class LocalCodeLinter:
                 validate=lambda p_: Path(p_).exists(),
             )
             path = Path(response)
-        located_advices = list(self.lint_path(path, linted_paths))
+        located_advices = list(self.lint_path(path))
         for located in located_advices:
             message = located.message_relative_to(path)
             stdout.write(f"{message}\n")
         return located_advices
 
-    def lint_path(self, path: Path, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
-        loader = self._folder_loader if path.is_dir() else self._file_loader
-        dependency = Dependency(loader, path)
-        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
-        container = dependency.load(self._path_lookup)
+    def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
+        is_dir = path.is_dir()
+        loader = self._folder_loader if is_dir else self._file_loader
+        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
+        dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, path_lookup, self._session_state)
+        container = dependency.load(path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
+        if linted_paths is None:
+            linted_paths = set()
         for dependency in graph.root_dependencies:
-            yield from self._lint_one(dependency, graph, linted_paths)
+            root = dependency.path  # since it's a root
+            yield from self._lint_one(dependency, graph, root, linted_paths)
 
     def _lint_one(
-        self, dependency: Dependency, graph: DependencyGraph, linted_paths: set[Path]
+        self, dependency: Dependency, graph: DependencyGraph, root_path: Path, linted_paths: set[Path]
     ) -> Iterable[LocatedAdvice]:
         if dependency.path in linted_paths:
             return
         linted_paths.add(dependency.path)
         if dependency.path.is_file():
+            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             ctx = self._new_linter_context()
-            linter = FileLinter(ctx, self._path_lookup, self._session_state, dependency.path)
+            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+            linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
             for advice in linter.lint():
                 yield advice.for_path(dependency.path)
         maybe_graph = graph.locate_dependency(dependency.path)
@@ -152,7 +173,7 @@ class LocalCodeLinter:
         if maybe_graph.graph:
             child_graph = maybe_graph.graph
             for child_dependency in child_graph.local_dependencies:
-                yield from self._lint_one(child_dependency, child_graph, linted_paths)
+                yield from self._lint_one(child_dependency, child_graph, root_path, linted_paths)
 
 
 class LocalFileMigrator:
@@ -226,7 +247,7 @@ class FileLoader(DependencyLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        language = SUPPORTED_EXTENSION_LANGUAGES.get(absolute_path.suffix.lower())
+        language = file_language(absolute_path)
         if not language:
             return StubContainer(absolute_path)
         for encoding in ("utf-8", "ascii"):
@@ -246,14 +267,15 @@ class FileLoader(DependencyLoader):
 
 class FolderLoader(FileLoader):
 
-    def __init__(self, file_loader: FileLoader):
+    def __init__(self, notebook_loader: NotebookLoader, file_loader: FileLoader):
+        self._notebook_loader = notebook_loader
         self._file_loader = file_loader
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        return Folder(absolute_path, self._file_loader, self)
+        return Folder(absolute_path, self._notebook_loader, self._file_loader, self)
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
