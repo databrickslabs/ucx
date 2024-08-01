@@ -10,7 +10,7 @@ Workspace Group Migration
 Prerequisites for group migration are:
 
  - The assessment workflow has completed.
- - For each workspace group a corresponding account-level group must exist.
+ - For each workspace group a corresponding account-level group must exist. (Refer to the documentation for details about the different strategies that can be configured for associating workspace groups with their corresponding account-level group.)
 
 Group migration performs the following steps:
 
