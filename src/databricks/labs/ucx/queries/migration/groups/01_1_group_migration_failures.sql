@@ -1,7 +1,7 @@
 /*
 --title 'Group Migration Failures'
 --height 4
---width 4
+--width 5
 --overrides '{"spec":
     {"encodings":{"columns": [
         {"fieldName": "timestamp", "title": "Time of Failure", "booleanValues": ["false", "true"], "type": "datetime", "displayAs": "datetime", "dateTimeFormat": "ll LTS (z)"},
@@ -15,17 +15,16 @@
         {"fieldName": "workflow_name", "title": "Workflow", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{workflow_name}}", "linkTitleTemplate": "{{workflow_name}} (ID: {{job_id}})", "useMonospaceFont": true},
         {"fieldName": "task_name", "title": "Task", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{workflow_name}}/{{task_name}}", "linkTitleTemplate": "{{workflow_name}} (ID: {{job_id}})", "useMonospaceFont": true}
     ]}'
-*/
-/*
+*/ /*
  * Messages that we're looking for are of the form:
  *   failed-group-migration: {name_in_workspace} -> {name_in_account}: {reason}
  */
 SELECT
   CAST(timestamp AS TIMESTAMP) AS timestamp,
   job_run_id,
-  REGEXP_EXTRACT(message, r'^failed-group-migration: (.+?) -> (.+?): (.+?)$', 1) AS workspace_group,
-  REGEXP_EXTRACT(message, r'^failed-group-migration: (.+?) -> (.+?): (.+?)$', 2) AS account_group,
-  REGEXP_EXTRACT(message, r'^failed-group-migration: (.+?) -> (.+?): (.+?)$', 3) AS error_message,
+  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 1) AS workspace_group,
+  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 2) AS account_group,
+  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 3) AS error_message,
   job_id,
   workflow_name,
   task_name
