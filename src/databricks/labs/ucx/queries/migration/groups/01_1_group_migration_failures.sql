@@ -15,21 +15,61 @@
         {"fieldName": "workflow_name", "title": "Workflow", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true},
         {"fieldName": "task_name", "title": "Task", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}/{{ task_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true}
     ]}'
-*/ /*
- * Messages that we're looking for are of the form:
- *   failed-group-migration: {name_in_workspace} -> {name_in_account}: {reason}
- */
+*/
+WITH latest_job_runs AS (
+  SELECT
+    timestamp,
+    job_id,
+    job_run_id
+  FROM (
+    SELECT
+      CAST(timestamp AS TIMESTAMP) AS timestamp,
+      job_id,
+      job_run_id,
+      ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY CAST(timestamp AS TIMESTAMP) DESC) = 1 AS latest_run_of_job
+    FROM inventory.logs
+  )
+  WHERE
+    latest_run_of_job
+), logs_latest_job_runs AS (
+  SELECT
+    CAST(logs.timestamp AS TIMESTAMP) AS timestamp,
+    message,
+    job_run_id,
+    job_id,
+    workflow_name,
+    task_name
+  FROM inventory.logs
+  JOIN latest_job_runs
+    USING (job_id, job_run_id)
+  WHERE
+    workflow_name IN ('migrate-groups', 'migrate-groups-experimental')
+), migration_failures AS (
+  /* Messages that we're looking for are of the form:
+   *   failed-group-migration: {name_in_workspace} -> {name_in_account}: {reason}
+   */
+  SELECT
+    timestamp,
+    REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 1) AS workspace_group,
+    REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 2) AS account_group,
+    REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 3) AS error_message,
+    job_run_id,
+    job_id,
+    workflow_name,
+    task_name
+  FROM logs_latest_job_runs
+  WHERE
+    STARTSWITH(message, 'failed-group-migration: ')
+)
 SELECT
-  CAST(timestamp AS TIMESTAMP) AS timestamp,
+  timestamp,
+  workspace_group,
+  account_group,
+  error_message,
   job_run_id,
-  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 1) AS workspace_group,
-  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 2) AS account_group,
-  REGEXP_EXTRACT(message, '^failed-group-migration: (.+?) -> (.+?): (.+)$', 3) AS error_message,
   job_id,
   workflow_name,
   task_name
-FROM inventory.logs
-WHERE
-  workflow_name IN ('migrate-groups', 'migrate-groups-experimental') AND STARTSWITH(message, 'failed-group-migration: ')
+FROM migration_failures
 ORDER BY
-  1 DESC
+  1
