@@ -10,13 +10,19 @@ from enum import Enum
 from pathlib import Path
 from typing import TypeVar, cast
 
-from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
+from astroid import Call, Const, ImportFrom, Name, NodeNG, Try  # type: ignore
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, DependencyGraphContext
+from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.graph import (
+    DependencyGraph,
+    DependencyProblem,
+    DependencyGraphContext,
+    InheritedContext,
+)
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsLinter,
@@ -30,7 +36,6 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 logger = logging.getLogger(__name__)
 
-NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'
@@ -86,6 +91,9 @@ class Cell(ABC):
     def __repr__(self):
         return f"{self.language.name}: {self._original_code[:20]}"
 
+    def build_inherited_context(self, _graph: DependencyGraph, _child_path: Path) -> InheritedContext:
+        return InheritedContext(None, False)
+
 
 class PythonCell(Cell):
 
@@ -111,6 +119,11 @@ class PythonCell(Cell):
             )
             for problem in python_dependency_problems
         ]
+
+    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
+        context = graph.new_dependency_graph_context()
+        analyzer = PythonCodeAnalyzer(context, self._original_code)
+        return analyzer.build_inherited_context(child_path)
 
 
 class RCell(Cell):
@@ -422,6 +435,37 @@ class PythonCodeAnalyzer:
                 problems.append(problem)
         return problems
 
+    def build_inherited_context(self, child_path: Path) -> InheritedContext:
+        try:
+            tree, nodes, _ = self._parse_and_extract_nodes()
+        except AstroidSyntaxError:
+            logger.debug(f"Could not parse Python code: {self._python_code}", exc_info=True)
+            return InheritedContext(None, False)
+        if len(nodes) == 0:
+            return InheritedContext(tree, False)
+        context = InheritedContext(Tree.new_module(), False)
+        last_line = -1
+        for base_node in nodes:
+            # append nodes
+            node_line = base_node.node.lineno
+            nodes = tree.nodes_between(last_line + 1, node_line - 1)
+            context.tree.append_nodes(nodes)
+            globs = tree.globals_between(last_line + 1, node_line - 1)
+            context.tree.append_globals(globs)
+            last_line = node_line
+            # process node
+            child_context = self._build_inherited_context_from_node(base_node, child_path)
+            context = context.append(child_context, True)
+            if context.found:
+                return context
+        line_count = tree.line_count()
+        if last_line < line_count:
+            nodes = tree.nodes_between(last_line + 1, line_count)
+            context.tree.append_nodes(nodes)
+            globs = tree.globals_between(last_line + 1, line_count)
+            context.tree.append_globals(globs)
+        return context
+
     def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
         tree = Tree.normalize_and_parse(self._python_code)
@@ -438,7 +482,7 @@ class PythonCodeAnalyzer:
         nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return tree, nodes, problems
 
-    def _build_graph_from_node(self, base_node: NodeBase):
+    def _build_graph_from_node(self, base_node: NodeBase) -> Iterable[DependencyProblem]:
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
         elif isinstance(base_node, NotebookRunCall):
@@ -448,16 +492,59 @@ class PythonCodeAnalyzer:
         elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
         else:
-            logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
+            logger.warning(f"Can't build graph for node {NodeBase.__name__} of type {type(base_node).__name__}")
 
-    def _register_import(self, base_node: ImportSource):
+    def _build_inherited_context_from_node(self, base_node: NodeBase, child_path: Path) -> InheritedContext:
+        if isinstance(base_node, SysPathChange):
+            self._mutate_path_lookup(base_node)
+            return InheritedContext(None, False)
+        if isinstance(base_node, ImportSource):
+            # nothing to do, Astroid takes care of imports
+            return InheritedContext(None, False)
+        if isinstance(base_node, NotebookRunCall):
+            # nothing to do, dbutils.notebook.run uses a dedicated context
+            return InheritedContext(None, False)
+        if isinstance(base_node, MagicLine):
+            return base_node.build_inherited_context(self._context, child_path)
+        logger.warning(f"Can't build inherited context for node {NodeBase.__name__} of type {type(base_node).__name__}")
+        return InheritedContext(None, False)
+
+    def _register_import(self, base_node: ImportSource) -> Iterable[DependencyProblem]:
         prefix = ""
         if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
             prefix = "." * base_node.node.level
         name = base_node.name or ""
-        yield from self._context.parent.register_import(prefix + name)
+        problems = self._context.parent.register_import(prefix + name)
+        for problem in problems:
+            prob = self._filter_import_problem_in_try_except(problem, base_node)
+            if prob is not None:
+                yield prob
 
-    def _register_notebook(self, base_node: NotebookRunCall):
+    @classmethod
+    def _filter_import_problem_in_try_except(
+        cls, problem: DependencyProblem, base_node: ImportSource
+    ) -> DependencyProblem | None:
+        if problem.code != 'import-not-found':
+            return problem
+        # is base_node in a try-except clause ?
+        node = base_node.node.parent
+        while node and not isinstance(node, Try):
+            node = node.parent
+        if cls._is_try_except_import_error(node):
+            return None
+        return problem
+
+    @classmethod
+    def _is_try_except_import_error(cls, node: Try | None) -> bool:
+        if not isinstance(node, Try):
+            return False
+        for handler in node.handlers:
+            if isinstance(handler.type, Name):
+                if handler.type.name == "ImportError":
+                    return True
+        return False
+
+    def _register_notebook(self, base_node: NotebookRunCall) -> Iterable[DependencyProblem]:
         has_unresolved, paths = base_node.get_notebook_paths(self._context.session_state)
         if has_unresolved:
             yield DependencyProblem(
@@ -468,7 +555,7 @@ class PythonCodeAnalyzer:
             # notebooks ran via dbutils.notebook.run do not inherit or propagate context
             yield from self._context.parent.register_notebook(Path(path), False)
 
-    def _mutate_path_lookup(self, change: SysPathChange):
+    def _mutate_path_lookup(self, change: SysPathChange) -> Iterable[DependencyProblem]:
         if isinstance(change, UnresolvedPath):
             yield DependencyProblem(
                 'sys-path-cannot-compute-value',
@@ -526,6 +613,12 @@ class MagicLine(NodeBase):
         )
         return [problem]
 
+    def build_inherited_context(self, context: DependencyGraphContext, child_path: Path) -> InheritedContext:
+        magic = self.as_magic()
+        if magic is not None:
+            return magic.build_inherited_context(context, child_path)
+        return InheritedContext(None, False)
+
 
 class MagicNode(NodeNG):
     pass
@@ -539,6 +632,9 @@ class MagicCommand(ABC):
 
     @abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
+
+    def build_inherited_context(self, _context: DependencyGraphContext, _child_path: Path) -> InheritedContext:
+        return InheritedContext(None, False)
 
 
 class RunCommand(MagicCommand):
@@ -558,6 +654,26 @@ class RunCommand(MagicCommand):
             return None
         path = self._code[start + 1 :].strip().strip('"').strip("'")
         return Path(path)
+
+    def build_inherited_context(self, context: DependencyGraphContext, child_path: Path) -> InheritedContext:
+        path = self.notebook_path
+        if path is None:
+            logger.warning("Missing notebook path in %run command")
+            return InheritedContext(None, False)
+        maybe = context.resolver.resolve_notebook(context.path_lookup, path, inherit_context=True)
+        if not maybe.dependency:
+            logger.warning(f"Could not load notebook {path}")
+            return InheritedContext(None, False)
+        child_path = maybe.dependency.path
+        absolute_path = context.path_lookup.resolve(path)
+        absolute_child = context.path_lookup.resolve(child_path)
+        if absolute_path == absolute_child:
+            return InheritedContext(None, True)
+        container = maybe.dependency.load(context.path_lookup)
+        if not container:
+            logger.warning(f"Could not load notebook {path}")
+            return InheritedContext(None, False)
+        return container.build_inherited_context(context.parent, child_path)
 
 
 class PipCommand(MagicCommand):

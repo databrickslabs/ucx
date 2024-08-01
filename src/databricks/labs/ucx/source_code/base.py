@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import codecs
+import locale
 import logging
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -7,8 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
+from databricks.labs.blueprint.paths import WorkspacePath
 
 from databricks.sdk.service import compute
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -242,3 +246,50 @@ class PythonSequentialLinter(Linter):
         if self._tree is None:
             self._tree = Tree.new_module()
         return self._tree
+
+
+SUPPORTED_EXTENSION_LANGUAGES = {
+    '.py': Language.PYTHON,
+    '.sql': Language.SQL,
+}
+
+
+def file_language(path: Path) -> Language | None:
+    return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
+
+
+def guess_encoding(path: Path):
+    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
+    with path.open('rb') as _file:
+        raw = _file.read(4)
+        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
+            return 'utf-32'
+        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
+            return 'utf-16'
+        if raw.startswith(codecs.BOM_UTF8):
+            return 'utf-8-sig'
+        # no BOM, let's use default encoding
+        return locale.getpreferredencoding(False)
+
+
+# duplicated from CellLanguage to prevent cyclic import
+LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
+NOTEBOOK_HEADER = "Databricks notebook source"
+
+
+def is_a_notebook(path: Path, content: str | None = None) -> bool:
+    if isinstance(path, WorkspacePath):
+        return path.is_notebook()
+    if not path.is_file():
+        return False
+    language = file_language(path)
+    if not language:
+        return False
+    if content is None:
+        try:
+            content = path.read_text(guess_encoding(path))
+        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+            logger.warning(f"Could not read file {path}")
+            return False
+    magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
+    return content.startswith(magic_header)

@@ -16,16 +16,20 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.pipelines import NotebookLibrary
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
 from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
-from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
+
+from tests.unit.source_code.test_graph import _TestDependencyGraph
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -198,8 +202,51 @@ def test_lint_local_code(simple_ctx):
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )
-    problems = linter.lint(Prompts(), set(), path_to_scan, StringIO())
+    problems = linter.lint(Prompts(), path_to_scan, StringIO())
     assert len(problems) > 0
+
+
+@pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
+def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order):
+    # order in which we consider files influences the algorithm so we check all order
+    parent_local_path = (
+        Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "parent-child-context"
+    )
+    client: WorkspaceClient = simple_ctx.workspace_client
+    parent_ws_path = WorkspacePath(client, "/parent-child-context")
+    parent_ws_path.mkdir()
+    all_names = ["grand_parent", "parent", "child"]
+    all_ws_paths = list(WorkspacePath(client, parent_ws_path / name) for name in all_names)
+    for i, name in enumerate(all_names):
+        ws_path = all_ws_paths[i]
+        if not ws_path.exists():
+            file_path = parent_local_path / f"{name}.py"
+            # use intermediate string because WorkspacePath does not yet support BOMs
+            content = file_path.read_text("utf-8")
+            # workspace notebooks don't have extensions
+            content = content.replace(".py", "")
+            data = content.encode("utf-8")
+            client.workspace.upload(
+                ws_path.as_posix(), data, format=ImportFormat.SOURCE, overwrite=True, language=Language.PYTHON
+            )
+
+    class ScrambledFolderPath(WorkspacePath):
+
+        def iterdir(self):
+            scrambled = [all_ws_paths[order[0]], all_ws_paths[order[1]], all_ws_paths[order[2]]]
+            yield from scrambled
+
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), ScrambledFolderPath(client, parent_ws_path))
+    root_graph = _TestDependencyGraph(
+        dependency, None, simple_ctx.dependency_resolver, simple_ctx.path_lookup, CurrentSessionState()
+    )
+    container = dependency.load(simple_ctx.path_lookup)
+    container.build_dependency_graph(root_graph)
+    roots = root_graph.root_dependencies
+    assert len(roots) == 1
+    assert all_ws_paths[0] in [dep.path for dep in roots]
+    route = root_graph.compute_route(all_ws_paths[0], all_ws_paths[2])
+    assert [dep.path for dep in route] == all_ws_paths
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ from unittest.mock import Mock, create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
@@ -104,10 +104,11 @@ def test_migrator_walks_directory():
     assert languages.fixer.call_count > 1
 
 
-def test_linter_walks_directory(mock_path_lookup, migration_index):
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+@pytest.fixture()
+def local_code_linter(mock_path_lookup, migration_index):
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
-    folder_loader = FolderLoader(file_loader)
+    folder_loader = FolderLoader(notebook_loader, file_loader)
     allow_list = KnownList()
     pip_resolver = PythonLibraryResolver(allow_list)
     session_state = CurrentSessionState()
@@ -117,15 +118,39 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
         ImportFileResolver(file_loader, allow_list),
         mock_path_lookup,
     )
-    path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
-    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
-    linter = LocalCodeLinter(
+    return LocalCodeLinter(
         file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
+
+
+def test_linter_walks_directory(mock_path_lookup, local_code_linter):
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
-    advices = linter.lint(prompts, paths, None)
+    advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) > 10
     assert not advices
+
+
+def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter):
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
+    paths: set[Path] = set()
+    advices = list(local_code_linter.lint_path(path, paths))
+    assert len(paths) == 3
+    assert advices == [
+        LocatedAdvice(
+            advice=Advice(
+                code='default-format-changed-in-dbr8',
+                message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
+                start_line=3,
+                start_col=0,
+                end_line=3,
+                end_col=33,
+            ),
+            path=path / "child.py",
+        )
+    ]
 
 
 def test_triple_dot_import():
@@ -153,8 +178,9 @@ def test_single_dot_import():
 
 
 def test_folder_has_repr():
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
-    folder = Folder(Path("test"), file_loader, FolderLoader(file_loader))
+    folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
     assert len(repr(folder)) > 0
 
 
@@ -167,7 +193,8 @@ site_packages = locate_site_packages()
 )
 def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
-    folder_loader = FolderLoader(file_loader)
+    notebook_loader = NotebookLoader()
+    folder_loader = FolderLoader(notebook_loader, file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     session_state = CurrentSessionState()
     allow_list = KnownList()
@@ -183,7 +210,6 @@ def test_known_issues(path: Path, migration_index):
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linted: set[Path] = set()
-    advices = linter.lint(MockPrompts({}), linted, path)
+    advices = linter.lint(MockPrompts({}), path)
     for advice in advices:
         print(repr(advice))

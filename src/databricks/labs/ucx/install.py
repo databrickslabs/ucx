@@ -598,7 +598,8 @@ class WorkspaceInstallation(InstallationMixin):
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
         metadata = DashboardMetadata.from_path(folder).replace_database(
-            database=self._config.inventory_database, database_to_replace="inventory"
+            database=f"hive_metastore.{self._config.inventory_database}",
+            database_to_replace="inventory",
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()

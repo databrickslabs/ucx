@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import sqlglot
 from databricks.sdk.core import Config
 
 __all__ = ["WorkspaceConfig"]
@@ -70,16 +69,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
-
-    def transform_inventory_database(self, node: sqlglot.Expression) -> sqlglot.Expression:
-        """Replace the inventory database in a query."""
-        if (
-            isinstance(node, sqlglot.exp.Table)
-            and node.args.get("db") is not None
-            and getattr(node.args.get("db"), "this", "") == "inventory"
-        ):
-            node.args["db"].set("this", f"hive_metastore.{self.inventory_database}")
-        return node
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

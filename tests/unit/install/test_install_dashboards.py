@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -23,7 +24,7 @@ PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 def workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
     mock_installation = request.param if hasattr(request, "param") else MockInstallation()
     install_state = InstallState.from_installation(mock_installation)
-    wheels = WheelsV2(mock_installation, PRODUCT_INFO)
+    wheels = mock.create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="..."),
         mock_installation,

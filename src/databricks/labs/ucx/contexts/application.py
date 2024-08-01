@@ -381,7 +381,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def folder_loader(self):
-        return FolderLoader(self.file_loader)
+        return FolderLoader(self.notebook_loader, self.file_loader)
 
     @cached_property
     def allow_list(self):
