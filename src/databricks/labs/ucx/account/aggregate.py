@@ -13,6 +13,7 @@ from databricks.labs.blueprint.installation import NotInstalled
 
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.tables import Table as HiveMetastoreTable
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -26,6 +27,14 @@ class AssessmentObject:
     object_type: str
     object_id: str
     failures: list[str]
+
+
+@dataclass
+class Table(HiveMetastoreTable):
+    workspace_id: int = 0
+
+    def __str__(self):
+        return f"{self.workspace_id}:{super().__str__()}"
 
 
 class AccountAggregate:
@@ -87,6 +96,10 @@ class AccountAggregate:
             objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
+    def _fetch_tables(self) -> Iterable[Table]:
+        for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
+            yield Table(*row, workspace_id=workspace_id)
+
     def readiness_report(self):
         logger.info("Generating readiness report")
         all_objects = 0
@@ -107,11 +120,23 @@ class AccountAggregate:
         for failure, objects in failures.items():
             logger.info(f"{failure}: {len(objects)} objects")
 
-    @staticmethod
-    def validate() -> None:
+    def _validate_table_locations_not_overlapping(self) -> None:
+        """The table locations should not be overlapping."""
+        tables_with_location = sorted(
+            filter(lambda table: table.location is not None, self._fetch_tables()),
+            key=lambda table: table.location is not None,
+        )
+        if len(tables_with_location) <= 1:  # One table can not overlap
+            return
+        for previous_table, table in tables_with_location[:-1], tables_with_location[1:]:
+            if table is not None and table.location.startswith(previous_table.location):
+                logger.warning(f"Tables {previous_table} and {table} have overlapping locations")
+
+    def validate(self) -> None:
         """Validate migration readiness across workspaces:
 
         Readiness includes:
         - Tables can be migrated
         """
         logger.info("Validating migration readiness")
+        self._validate_table_locations_not_overlapping()
