@@ -135,7 +135,7 @@ class AccountAggregate:
         for table in tables_with_location[1:]:
             assert table.location is not None
             if table.location.startswith(previous_table.location):
-                logger.warning(f"Tables {previous_table} and {table} have overlapping locations")
+                logger.warning(f"Overlapping table locations: {previous_table} and {table}")
             else:
                 # Only set previous table if there is no overlap to capture overlaps between more than two tables
                 previous_table = table
