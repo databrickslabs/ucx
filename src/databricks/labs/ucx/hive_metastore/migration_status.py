@@ -26,6 +26,17 @@ class MigrationStatus:
     def destination(self):
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
+    @classmethod
+    def from_json(cls, json: dict):
+        return cls(
+            src_schema=json['src_schema'],
+            src_table=json['src_table'],
+            dst_catalog=json.get('dst_catalog', None),
+            dst_schema=json.get('dst_schema', None),
+            dst_table=json.get('dst_table', None),
+            update_ts=json.get('update_ts', None),
+        )
+
 
 @dataclass(frozen=True)
 class TableView:

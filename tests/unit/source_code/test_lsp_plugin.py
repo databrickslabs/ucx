@@ -159,3 +159,33 @@ def test_pylsp_lint_single_user_cluster(workspace):
 
     diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
     assert diagnostics == []
+
+
+def test_with_migration_index(workspace):
+    code = 'result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()'
+    _, doc = temp_document(code, workspace)
+
+    migration_index = [
+        {'src_schema': 'old', 'src_table': 'things', 'dst_catalog': 'brand', 'dst_schema': 'new', 'dst_table': 'stuff'}
+    ]
+    workspace.update_config(
+        {
+            'pylsp': {
+                'plugins': {
+                    'pylsp_ucx': {'migration_index': [st for st in migration_index]},
+                }
+            }
+        }
+    )
+
+    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    assert diagnostics == [
+        {
+            'range': {'end': {'character': 67, 'line': 0}, 'start': {'character': 9, 'line': 0}},
+            'code': 'table-migrated-to-uc',
+            'source': 'databricks.labs.ucx',
+            'message': 'Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            'severity': 2,
+            'tags': [2],
+        }
+    ]
