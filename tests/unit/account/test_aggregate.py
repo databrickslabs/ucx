@@ -4,7 +4,7 @@ from unittest.mock import create_autospec
 import pytest
 
 from databricks.sdk import AccountClient, Workspace, WorkspaceClient
-from databricks.sdk.service import iam, sql
+from databricks.sdk.service import iam
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.account.aggregate import AccountAggregate
@@ -46,7 +46,11 @@ def test_basic_readiness_report_no_workspaces(caplog, ws, account_client):
 
 def test_readiness_report_ucx_installed(caplog, ws, account_client):
     rows = UCX_OBJECTS[
-        ("jobs", "32432123", '["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]'),
+        (
+            "jobs",
+            "32432123",
+            '["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]',
+        ),
         ("jobs", "234234234", '["cluster type not supported : LEGACY_SINGLE_USER"]'),
         ("clusters", "21312312", '[]'),
         ("tables", "34234324", '["listTables returned null"]'),
@@ -90,7 +94,7 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
             ("c1", "d1", "t1", "VIEW", "DELTA", None, "SELECT * FROM c1.d1.t2"),
             ("c1", "d1", "t2", "TABLE", "DELTA", "/foo", None),
         ],
-    ]
+    ],
 )
 def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client, rows):
     mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
@@ -135,7 +139,7 @@ def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client
             ("c2", "d2", "t2", "TABLE", "DELTA", "/foo", None),
             ("c3", "d3", "t3", "TABLE", "DELTA", "/foo", None),
         ],
-    ]
+    ],
 )
 def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, rows):
     mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
