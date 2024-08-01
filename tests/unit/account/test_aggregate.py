@@ -67,6 +67,46 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
     "rows",
     [
         [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo", None),
+            ("c2", "d1", "t1", "TABLE", "DELTA", "/bar", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo", None),
+            ("c1", "d2", "t1", "TABLE", "DELTA", "/bar", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo", None),
+            ("c1", "d1", "t2", "TABLE", "DELTA", "/bar", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo", None),
+            ("c1", "d1", "t2", "TABLE", "PARQUET", "/bar", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", None, None),
+            ("c2", "d2", "t2", "TABLE", "DELTA", "/foo", None),
+        ],
+        [
+            ("c1", "d1", "t1", "VIEW", "DELTA", None, "SELECT * FROM c1.d1.t2"),
+            ("c1", "d1", "t2", "TABLE", "DELTA", "/foo", None),
+        ],
+    ]
+)
+def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client, rows):
+    mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
+    ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
+
+    account_ws = AccountWorkspaces(account_client)
+    account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
+        account_aggregate.validate()
+    assert "Overlapping table locations" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
             ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
             ("c2", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
         ],
@@ -87,7 +127,7 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
             ("c1", "d2", "t1", "TABLE", "DELTA", "/foo", None),
         ],
         [
-            ("c1", "d2", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
             ("c2", "d2", "t2", "TABLE", "DELTA", "/foo/bar/", None),
         ],
     ]
