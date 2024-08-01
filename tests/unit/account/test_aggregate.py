@@ -63,12 +63,21 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
     assert "cluster type not supported : LEGACY_SINGLE_USER: 2 objects" in caplog.text
 
 
-def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client):
-    rows = UCX_TABLES[
-        ("catalog", "database", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
-        ("catalog", "database", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [
+            ("catalog", "database", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("catalog", "database", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+        ],
+        [
+            ("catalog", "database", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
+            ("catalog", "database", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+        ],
     ]
-    mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": rows})
+)
+def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, rows):
+    mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
 
     account_ws = AccountWorkspaces(account_client)
