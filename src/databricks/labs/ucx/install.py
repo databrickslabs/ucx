@@ -591,8 +591,9 @@ class WorkspaceInstallation(InstallationMixin):
             return None  # Recreate the dashboard if it's reference is corrupted (manually)
         return dashboard_id  # Update the existing dashboard
 
-    # TODO: Confirm the assumption below is correct
-    # An InternalError may occur when the dashboard is being published and the database does not exists
+    # TODO: @JCZuurmond: wait for dashboard team to fix the error below, then update the retry decorator and document
+    # why this is needed
+    # databricks.sdk.errors.platform.InternalError: A database error occurred during import-dashboard-new
     @retried(on=[InternalError], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
