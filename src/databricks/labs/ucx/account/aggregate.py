@@ -128,9 +128,13 @@ class AccountAggregate:
         )
         if len(tables_with_location) <= 1:  # One table can not overlap
             return
-        for previous_table, table in tables_with_location[:-1], tables_with_location[1:]:
-            if table is not None and table.location.startswith(previous_table.location):
+        previous_table = tables_with_location[0]
+        for table in tables_with_location[1:]:
+            if table.location.startswith(previous_table.location):
                 logger.warning(f"Tables {previous_table} and {table} have overlapping locations")
+            else:
+                # Only set previous table if there is no overlap to capture overlaps between more than two tables
+                previous_table = table
 
     def validate(self) -> None:
         """Validate migration readiness across workspaces:
