@@ -31,7 +31,7 @@ def escape_sql_identifier(path: str, optional: bool | None = True) -> str:
 
 def run_command(command: str | list[str]) -> tuple[int, str, str]:
     args = command.split() if isinstance(command, str) else command
-    logger.info(f"Invoking command: {' '.join(args)}")
+    logger.info(f"Invoking command: {args!r}")
     with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
         output, error = process.communicate()
         return process.returncode, output.decode("utf-8"), error.decode("utf-8")
