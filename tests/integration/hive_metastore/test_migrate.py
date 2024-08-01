@@ -370,30 +370,61 @@ def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catalog):
-    src_schema1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_schema2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    table_to_migrate = runtime_ctx.make_table(schema_name=src_schema1.name)
-    table_databricks_dataset = runtime_ctx.make_table(
-        schema_name=src_schema1.name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
+    # using lists to avoid MyPi 'too-many-variables' error
+    src_schemas = [
+        runtime_ctx.make_schema(catalog_name="hive_metastore"),
+        runtime_ctx.make_schema(catalog_name="hive_metastore"),
+    ]
+    src_tables = [
+        runtime_ctx.make_table(schema_name=src_schemas[0].name),  # table to migrate
+        runtime_ctx.make_table(
+            schema_name=src_schemas[0].name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
+        ),  # table databricks dataset
+        runtime_ctx.make_table(schema_name=src_schemas[0].name),  # table to skip
+        runtime_ctx.make_table(schema_name=src_schemas[1].name),  # table in skipped database
+    ]
+    src_tables.extend(
+        [
+            runtime_ctx.make_table(
+                schema_name=src_schemas[0].name,
+                ctas=f"SELECT * FROM {src_tables[0].full_name}",
+                view=True,
+            ),  # view to migrate
+            runtime_ctx.make_table(
+                schema_name=src_schemas[0].name,
+                ctas=f"SELECT * FROM {src_tables[2].full_name}",
+                view=True,
+            ),  # view to skip
+            runtime_ctx.make_table(
+                schema_name=src_schemas[1].name,
+                ctas=f"SELECT * FROM {src_tables[3].full_name}",
+                view=True,
+            ),  # view in schema to skip
+        ]
     )
-    table_to_skip = runtime_ctx.make_table(schema_name=src_schema1.name)
-    table_in_skipped_database = runtime_ctx.make_table(schema_name=src_schema2.name)
 
     dst_catalog = make_catalog()
-    dst_schema1 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
-    dst_schema2 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+    dst_schemas = [
+        runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name) for src_schema in src_schemas
+    ]
 
     rules = [
-        Rule.from_src_dst(table_to_migrate, dst_schema1),
-        Rule.from_src_dst(table_to_skip, dst_schema1),
-        Rule.from_src_dst(table_databricks_dataset, dst_schema1),
-        Rule.from_src_dst(table_in_skipped_database, dst_schema2),
+        Rule.from_src_dst(src_tables[0], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[1], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[2], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[3], dst_schemas[1]),
+        Rule.from_src_dst(src_tables[4], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[5], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[6], dst_schemas[1]),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     table_mapping = runtime_ctx.table_mapping
-    table_mapping.skip_table(src_schema1.name, table_to_skip.name)
-    table_mapping.skip_schema(src_schema2.name)
-    assert len(table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)) == 1
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[2].name, is_view=False)
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[5].name, is_view=True)
+    table_mapping.skip_schema(src_schemas[1].name)
+    tables_to_migrate = table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)
+    full_names = set(tm.src.full_name for tm in tables_to_migrate)
+    assert full_names == {src_tables[0].full_name, src_tables[4].full_name}
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
