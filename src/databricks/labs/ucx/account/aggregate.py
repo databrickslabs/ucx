@@ -106,3 +106,12 @@ class AccountAggregate:
 
         for failure, objects in failures.items():
             logger.info(f"{failure}: {len(objects)} objects")
+
+    @staticmethod
+    def validate() -> None:
+        """Validate migration readiness across workspaces:
+
+        Readiness includes:
+        - Tables can be migrated
+        """
+        logger.info("Validating migration readiness")

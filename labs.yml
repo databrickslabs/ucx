@@ -51,6 +51,17 @@ commands:
       - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
+  - name: validate
+    is_account_level: true
+    description: |
+      Validate migration readiness across workspaces:
+      - Check if tables can be migrated
+    flags:
+      - name: workspace-ids
+        description: |
+          List of workspace IDs to include.
+          If --workspace-ids is not provided, it will use all workspaces present in the account.
+
   - name: manual-workspace-info
     description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
 
