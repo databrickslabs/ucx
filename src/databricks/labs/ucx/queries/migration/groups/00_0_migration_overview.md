@@ -18,7 +18,7 @@ Group migration performs the following steps:
 2. The account-level groups are then provisioned into the workspace.
 3. Permissions assigned to the workspace groups are replicated on the account-level groups.
 
-These steps are performed by either the `migrate-groups` or the `migrate-groups-experimental` workflows. (The latter uses a faster, but experimental, method to replicate group permissions.)
+These steps are performed by either the `migrate-groups` or the `migrate-groups-experimental` [workflows](/jobs). (The latter uses a faster, but experimental, method to replicate group permissions.)
 
 Once group migration has taken place:
 
