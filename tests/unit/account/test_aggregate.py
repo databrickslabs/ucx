@@ -21,6 +21,7 @@ UCX_TABLES = MockBackend.rows("catalog", "database", "table", "object_type", "ta
 def ws() -> WorkspaceClient:
     ws = create_autospec(WorkspaceClient)
     ws.current_user.me.return_value = iam.User(user_name="user", groups=[iam.ComplexValue(display="admins")])
+    ws.get_workspace_id.return_value = 123
     return ws
 
 
