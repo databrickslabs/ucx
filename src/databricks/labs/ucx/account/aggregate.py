@@ -124,7 +124,7 @@ class AccountAggregate:
         """The table locations should not be overlapping."""
         tables_with_location = sorted(
             filter(lambda table: table.location is not None, self._fetch_tables()),
-            key=lambda table: table.location is not None,
+            key=lambda table: table.location,
         )
         if len(tables_with_location) <= 1:  # One table can not overlap
             return
