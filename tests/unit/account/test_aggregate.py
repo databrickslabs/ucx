@@ -67,12 +67,24 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
     "rows",
     [
         [
-            ("catalog", "database", "t1", "TABLE", "DELTA", "/foo/bar/", None),
-            ("catalog", "database", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c2", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
         ],
         [
-            ("catalog", "database", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
-            ("catalog", "database", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d2", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+        ],
+        [
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t2", "TABLE", "PARQUET", "/foo/bar/", None),
+        ],
+        [
+            ("c1", "d2", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
+            ("c2", "d2", "t2", "TABLE", "DELTA", "/foo/bar/", None),
         ],
     ]
 )
