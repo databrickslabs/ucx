@@ -87,7 +87,7 @@ def test_pylsp_lint_no_dbr_version(workspace, config):
         }
     )
 
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == [
         {
             'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 11}},
@@ -108,10 +108,10 @@ def test_pylsp_lint_no_dbr_version(workspace, config):
     ]
 
 
-def test_pylsp_no_config(workspace):
+def test_pylsp_no_config(workspace, config):
     code = 'sc.emptyRDD()'
     _, doc = temp_document(code, workspace)
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == []
 
 
@@ -132,7 +132,7 @@ def test_pylsp_invalid_config(workspace, config):
         }
     )
 
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == []
 
 
@@ -153,7 +153,7 @@ def test_pylsp_lint_single_user_cluster(workspace, config):
         }
     )
 
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == []
 
 
@@ -172,7 +172,7 @@ def test_with_migration_index(workspace, config):
         }
     )
 
-    diagnostics = sorted(lsp_plugin.pylsp_lint(workspace._config, doc), key=lambda d: d['code'])
+    diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == [
         {
             'range': {'end': {'character': 67, 'line': 0}, 'start': {'character': 9, 'line': 0}},
