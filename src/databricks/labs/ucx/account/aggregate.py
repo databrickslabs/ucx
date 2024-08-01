@@ -98,7 +98,8 @@ class AccountAggregate:
 
     def _fetch_tables(self) -> Iterable[Table]:
         for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
-            yield Table(*row, workspace_id=workspace_id)
+            # Mypy complains about multiple values for `workspace_id`
+            yield Table(*row, workspace_id=workspace_id)  # type: ignore
 
     def readiness_report(self):
         logger.info("Generating readiness report")
