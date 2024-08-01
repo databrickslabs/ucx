@@ -127,7 +127,7 @@ def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client
             ("c1", "d2", "t1", "TABLE", "DELTA", "/foo", None),
         ],
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/test", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/fiz", None),
             ("c2", "d2", "t2", "TABLE", "DELTA", "/foo/bar/", None),
         ],
         [
