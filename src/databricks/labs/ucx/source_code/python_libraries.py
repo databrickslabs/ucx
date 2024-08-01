@@ -72,9 +72,7 @@ class PythonLibraryResolver(LibraryResolver):
         return libs
 
     def _install_pip(self, *libraries: str) -> list[DependencyProblem]:
-        args = ["pip", "--disable-pip-version-check", "install"]
-        args.extend(libraries)
-        args.extend(["-t", str(self._temporary_virtual_environment)])
+        args = ["pip", "--disable-pip-version-check", "install", *libraries, "-t", str(self._temporary_virtual_environment)]
         return_code, stdout, stderr = self._runner(args)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
