@@ -13,9 +13,9 @@
         {"fieldName": "error_message", "title": "Error Message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string"}
       ]},
     "invisibleColumns": [
-        {"fieldName": "job_id", "title": "Workflow", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true},
-        {"fieldName": "workflow_name", "title": "Workflow", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true}
-      ]
+      {"name": "job_id", "title": "Workflow", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true},
+      {"name": "workflow_name", "title": "Workflow", "booleanValues": ["false", "true"], "type": "string", "displayAs": "link", "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ workflow_name }}", "linkTitleTemplate": "{{ workflow_name }} (ID: {{ job_id }})", "useMonospaceFont": true}
+    ]
    }}'
 */
 WITH latest_job_runs AS (
