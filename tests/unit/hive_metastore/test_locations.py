@@ -18,32 +18,6 @@ from databricks.labs.ucx.hive_metastore.locations import (
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
-def test_trie():
-    locations = [
-        "s3://bucket1/a/b/c",
-        "s3://bucket1/a/b/d",
-        "s3://bucket1/a/b/e",
-        "s3://bucket1/a/b/f",
-        "s3://bucket1/a/b/f/g",
-        "s3://bucket1/a/b/f/h",
-        "s3://bucket1/b/c/d",
-        "s3://bucket1/b/e/f",
-        "s3://bucket1/c/d/e",
-        "s3://bucket1/c/e/f",
-    ]
-    root = LocationTrie()
-    for location in locations:
-        root.find(location)
-    for node in root:
-        print(node.full)
-
-    f_node = root.find("s3://bucket1/a/b/f")
-    assert f_node.has_children()
-
-    d_node = root.find("s3://bucket1/a/b/d")
-    assert not d_node.has_children()
-
-
 def test_location_trie_parts():
     trie = LocationTrie().find("s3://bucket1/a/b/c")
     assert trie.parts == ["s3:", "", "bucket1", "a", "b", "c"]
@@ -62,6 +36,23 @@ def test_location_trie_parts():
 def test_location_trie_full(location):
     trie = LocationTrie().find(location)
     assert trie.full == location
+
+
+def test_location_trie_has_children():
+    locations = [
+        "s3://bucket/a/b/c",
+        "s3://bucket/a/b/d",
+        "s3://bucket/a/b/d/g",
+    ]
+    root = LocationTrie()
+    for location in locations:
+        root.find(location)
+
+    c_node = root.find("s3://bucket/a/b/f")
+    assert not c_node.has_children()
+
+    d_node = root.find("s3://bucket/a/b/d")
+    assert d_node.has_children()
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
