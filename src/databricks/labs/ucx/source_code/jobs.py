@@ -194,10 +194,10 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.spark_python_task:
             return []
         self._parameters = self._task.spark_python_task.parameters
-        notebook_path = self._task.spark_python_task.python_file
-        logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
-        path = self._as_path(notebook_path)
-        return graph.register_notebook(path, False)
+        python_file = self._task.spark_python_task.python_file
+        logger.info(f'Discovering {self._task.task_key} entrypoint: {python_file}')
+        path = self._as_path(python_file)
+        return graph.register_file(path)
 
     @staticmethod
     def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:

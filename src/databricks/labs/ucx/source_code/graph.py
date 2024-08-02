@@ -60,6 +60,13 @@ class DependencyGraph:
         maybe_graph = self.register_dependency(maybe.dependency)
         return maybe_graph.problems
 
+    def register_file(self, path: Path) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_file(self.path_lookup, path)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
+
     def register_dependency(self, dependency: Dependency) -> MaybeGraph:
         # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
         # the only case we have for this method to be used outside of this class is for DistInfoPackage
