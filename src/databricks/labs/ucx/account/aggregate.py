@@ -97,13 +97,10 @@ class AccountAggregate:
             objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
-    @cached_property
-    def _tables(self) -> list[TableFromWorkspace]:
-        tables = []
+    def _fetch_tables(self) -> Iterable[TableFromWorkspace]:
         for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
             # Mypy complains about multiple values for `workspace_id`
-            tables.append(TableFromWorkspace(*row, workspace_id=workspace_id))  # type: ignore
-        return tables
+            yield TableFromWorkspace(*row, workspace_id=workspace_id)  # type: ignore
 
     def readiness_report(self):
         logger.info("Generating readiness report")
@@ -129,7 +126,7 @@ class AccountAggregate:
         """The table locations should not be overlapping."""
         logger.info("Validating migration readiness")
         trie = LocationTrie(get_key=lambda table: table.location)
-        for table in self._tables:
+        for table in sorted(self._fetch_tables(), key=lambda table: table.location or "", reverse=True):
             if table.location is None:
                 continue
             node = trie.find(table)
