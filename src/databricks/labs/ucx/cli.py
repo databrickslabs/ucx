@@ -103,7 +103,8 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
 
 @ucx.command(is_account=True)
 def validate(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
-    """Validate migration readiness across workspaces."""
+    """Validate migration readiness"""
+    logger.warning("The validate command is work in progress and does not cover a complete migration readiness (yet).")
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.validate()
