@@ -13,7 +13,7 @@ from databricks.labs.blueprint.installation import NotInstalled
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
-from databricks.labs.ucx.hive_metastore.tables import Table as HiveMetastoreTable
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -30,7 +30,7 @@ class AssessmentObject:
 
 
 @dataclass
-class Table(HiveMetastoreTable):
+class TableFromWorkspace(Table):
     workspace_id: int = 0
 
     def __str__(self):
@@ -96,10 +96,10 @@ class AccountAggregate:
             objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
-    def _fetch_tables(self) -> Iterable[Table]:
+    def _fetch_tables(self) -> Iterable[TableFromWorkspace]:
         for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
             # Mypy complains about multiple values for `workspace_id`
-            yield Table(*row, workspace_id=workspace_id)  # type: ignore
+            yield TableFromWorkspace(*row, workspace_id=workspace_id)  # type: ignore
 
     def readiness_report(self):
         logger.info("Generating readiness report")
