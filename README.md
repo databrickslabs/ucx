@@ -1417,6 +1417,35 @@ enabled clusters. If you have different proxy settings for each, then
 please update the necessary proxies (eg. with init scripts) for each
 cluster type.
 
+**Local machine to Databricks Account and Workspace connection failed due to proxy and self-signed cert:**
+When customer uses web proxy and self-singed certification, UCX may not be able to connect to Account and Workspace
+with following errors:
+```
+File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 466, in _make_request
+    self._validate_conn(conn)
+  File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 1095, in _validate_conn
+    conn.connect()
+  File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/connection.py", line 652, in connect
+    sock_and_verified = _ssl_wrap_socket_and_match_hostname(
+  File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/connection.py", line 805, in _ssl_wrap_socket_and_match_hostname
+    ssl_sock = ssl_wrap_socket(
+  File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/util/ssl_.py", line 465, in ssl_wrap_socket
+    ssl_sock = _ssl_wrap_socket_impl(sock, context, tls_in_tls, server_hostname)
+  File "/Users/userabc/.databricks/labs/ucx/state/venv/lib/python3.10/site-packages/urllib3/util/ssl_.py", line 509, in _ssl_wrap_socket_impl
+    return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
+  File "/opt/homebrew/Cellar/python@3.10/3.10.14/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 513, in wrap_socket
+    return self.sslsocket_class._create(
+  File "/opt/homebrew/Cellar/python@3.10/3.10.14/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1104, in _create
+    self.do_handshake()
+  File "/opt/homebrew/Cellar/python@3.10/3.10.14/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1375, in do_handshake
+    self._sslobj.do_handshake()
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1007)
+```
+
+**Solution:**  set both `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`
+[to force requests library to set verify=False](https://github.com/psf/requests/blob/8c211a96cdbe9fe320d63d9e1ae15c5c07e179f8/requests/sessions.py#L718)
+as well as set `SSL_CERT_DIR` env var pointing to the proxy CA cert for the urllib3 library.
+
 [[back to top](#databricks-labs-ucx)]
 
 ### Insufficient Privileges
