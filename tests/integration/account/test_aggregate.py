@@ -10,7 +10,7 @@ from databricks.labs.ucx.account.aggregate import AccountAggregate
 def test_account_aggregate_no_logs_overlapping_tables(caplog, acc):
     account_aggregate = AccountAggregate(AccountWorkspaces(acc))
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate()
+        account_aggregate.validate_table_locations()
     assert "Overlapping table locations" not in caplog.text
 
 
@@ -28,5 +28,5 @@ def test_account_aggregate_logs_overlapping_tables(caplog, acc, ws, sql_backend,
         lambda w: w_ctx if w.get_workspace_id() == ws.get_workspace_id() else WorkspaceContext(w),
     )
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate()
+        account_aggregate.validate_table_locations()
     assert "Overlapping table locations" in caplog.text
