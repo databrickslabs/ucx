@@ -7,6 +7,13 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.account.aggregate import AccountAggregate
 
 
+def test_account_aggregate_no_logs_overlapping_tables(caplog, acc):
+    account_aggregate = AccountAggregate(AccountWorkspaces(acc))
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
+        account_aggregate.validate()
+    assert "Overlapping table locations" not in caplog.text
+
+
 def test_account_aggregate_logs_overlapping_tables(caplog, acc, ws, sql_backend, inventory_schema):
     tables = [
         Table("hive_metastore", "d1", "t1", "EXTERNAL", "DELTA", "s3://test_location/test1/table1"),
