@@ -51,11 +51,9 @@ commands:
       - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
-  - name: validate
+  - name: validate-table-locations
     is_account_level: true
-    description: |
-      Validate migration readiness:
-      - Check if tables can be migrated across workspaces
+    description: Validate if the table locations are overlapping across workspaces
     flags:
       - name: workspace-ids
         description: |
