@@ -191,12 +191,14 @@ def test_skip_happy_path(caplog):
     sbe = create_autospec(SqlBackend)
     installation = MockInstallation()
     mapping = TableMapping(installation, ws, sbe)
-    crawler = create_autospec(TablesCrawler)
-    crawler.is_view.side_effect = lambda _, table: table == "view"
-    mapping.skip_table_or_view(schema="schema", table="table", crawler=crawler)
+    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
+    mapping.skip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
     ws.tables.get.assert_not_called()
     sbe.execute.assert_called_with(f"ALTER TABLE schema.table SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
-    mapping.skip_table_or_view(schema="schema", table="view", crawler=crawler)
+    view = Table(
+        catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
+    )
+    mapping.skip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
     ws.tables.get.assert_not_called()
     sbe.execute.assert_called_with(f"ALTER VIEW schema.view SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
@@ -222,7 +224,7 @@ def test_skip_missing_table(caplog):
     installation = MockInstallation()
     sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
     mapping = TableMapping(installation, ws, sbe)
-    mapping.skip_table_or_view('foo', table="table", crawler=TablesCrawler(sbe, "schema"))
+    mapping.skip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
     ws.tables.get.assert_not_called()
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 

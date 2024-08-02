@@ -366,11 +366,7 @@ class TablesCrawler(CrawlerBase):
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
-    def is_view(self, schema_name: str, table_name: str) -> bool:
-        table = self._try_load_one(schema_name, table_name)
-        return False if table is None else table.what == What.VIEW
-
-    def _try_load_one(self, schema_name: str, table_name: str) -> Table | None:
+    def load_one(self, schema_name: str, table_name: str) -> Table | None:
         query = f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE database='{schema_name}' AND name='{table_name}' LIMIT 1"
         for row in self._fetch(query):
             return Table(*row)
