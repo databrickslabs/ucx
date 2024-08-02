@@ -23,7 +23,7 @@ spark._jspark._jvm.com.my.custom.Name()
     expected = [
         Failure(
             code="jvm-access-in-shared-clusters",
-            message='Cannot access Spark Driver JVM on UC Shared Clusters',
+            message='Cannot access Spark Driver JVM on Unity Catalog clusters in Shared access mode',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -65,7 +65,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     expected = [
         Failure(
             code="rdd-in-shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            message='RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Rewrite it using DataFrame API',
             start_line=1,
             start_col=7,
             end_line=1,
@@ -73,7 +73,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
         ),
         Failure(
             code="rdd-in-shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            message='RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Rewrite it using DataFrame API',
             start_line=2,
             start_col=29,
             end_line=2,
@@ -81,7 +81,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
         ),
         Failure(
             code='legacy-context-in-shared-clusters',
-            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            message='sc is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using spark',
             start_line=1,
             start_col=7,
             end_line=1,
@@ -89,7 +89,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
         ),
         Failure(
             code="legacy-context-in-shared-clusters",
-            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            message='sc is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using spark',
             start_line=2,
             start_col=29,
             end_line=2,
@@ -152,7 +152,7 @@ df.rdd.mapPartitions(myUdf)
     expected = [
         Failure(
             code="rdd-in-shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead',
+            message='RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use mapInArrow() or Pandas UDFs instead',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -169,7 +169,7 @@ def test_conf_shared(session_state):
     assert [
         Failure(
             code='legacy-context-in-shared-clusters',
-            message='sparkContext and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf',
+            message='sparkContext and getConf are not supported on Unity Catalog clusters in Shared access mode. Rewrite it using spark.conf',
             start_line=0,
             start_col=0,
             end_line=0,
@@ -211,7 +211,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
     assert [
         Failure(
             code='spark-logging-in-shared-clusters',
-            message='Cannot set Spark log level directly from code on UC Shared Clusters. '
+            message='Cannot set Spark log level directly from code on Unity Catalog clusters in Shared access mode. '
             'Remove the call and set the cluster spark conf \'spark.log.level\' instead',
             start_line=1,
             start_col=0,
@@ -220,7 +220,8 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
         ),
         Failure(
             code='spark-logging-in-shared-clusters',
-            message='Cannot access Spark Driver JVM logger on UC Shared Clusters. ' 'Use logging.getLogger() instead',
+            message='Cannot access Spark Driver JVM logger on Unity Catalog clusters in Shared access mode. '
+            'Use logging.getLogger() instead',
             start_line=4,
             start_col=14,
             end_line=4,
@@ -228,7 +229,8 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
         ),
         Failure(
             code='spark-logging-in-shared-clusters',
-            message='Cannot access Spark Driver JVM logger on UC Shared Clusters. ' 'Use logging.getLogger() instead',
+            message='Cannot access Spark Driver JVM logger on Unity Catalog clusters in Shared access mode. '
+            'Use logging.getLogger() instead',
             start_line=6,
             start_col=0,
             end_line=6,
