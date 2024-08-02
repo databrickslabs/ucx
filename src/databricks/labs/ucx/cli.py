@@ -81,8 +81,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     ctx = WorkspaceContext(w)
     if table:
-        is_view = ctx.tables_crawler.is_view(schema, table)
-        return ctx.table_mapping.skip_table_or_view(schema, table, is_view)
+        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler)
     return ctx.table_mapping.skip_schema(schema)
 
 

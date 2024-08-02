@@ -116,10 +116,10 @@ class TableMapping:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
 
-    def skip_table_or_view(self, schema: str, table: str, is_view: bool):
+    def skip_table_or_view(self, schema: str, table: str, crawler: TablesCrawler):
         # Marks a table to be skipped in the migration process by applying a table property
         try:
-            what = "VIEW" if is_view else "TABLE"
+            what = "VIEW" if crawler.is_view(schema, table) else "TABLE"
             self._sql_backend.execute(
                 f"ALTER {what} {escape_sql_identifier(schema)}.{escape_sql_identifier(table)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
