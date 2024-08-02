@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
-from databricks.labs.blueprint.parallel import Threads, ManyError
+from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
@@ -139,6 +139,7 @@ class TablesMigrator:
                 )
             Threads.strict("migrate views", tasks)
             all_tasks.extend(tasks)
+            self._migration_status_refresher.reset()
         return all_tasks
 
     def _compute_grants(
@@ -194,21 +195,18 @@ class TablesMigrator:
         src_view: ViewToMigrate,
         grants: list[Grant] | None = None,
     ):
-        try:
-            if self._table_already_migrated(src_view.rule.as_uc_table_key):
-                logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
-                return True
-            if self._view_can_be_migrated(src_view):
-                return self._migrate_view_table(src_view, grants)
-            logger.info(f"View {src_view.src.key} is not supported for migration")
-        except ManyError as e:
-            logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
+        if self._table_already_migrated(src_view.rule.as_uc_table_key):
+            logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
+            return True
+        if self._view_can_be_migrated(src_view):
+            return self._migrate_view_table(src_view, grants)
+        logger.info(f"View {src_view.src.key} is not supported for migration")
         return True
 
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
         for table in view.dependencies:
-            if not self.index_full_refresh().get(table.schema, table.name):
+            if not self.index().get(table.schema, table.name):
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
