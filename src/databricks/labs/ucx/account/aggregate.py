@@ -8,9 +8,9 @@ from functools import cached_property
 from databricks.labs.lsql import Row
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.blueprint.installation import NotInstalled
 
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table as HiveMetastoreTable
