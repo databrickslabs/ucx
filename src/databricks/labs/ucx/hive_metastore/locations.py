@@ -55,20 +55,31 @@ class LocationTrie:
 
     @property
     def full(self):
-        return "/".join(self.parts)
+        scheme, netloc, *path = self.parts
+        return f"{scheme}://{netloc}/{'/'.join(path)}"
 
-    def find(self, path: str) -> "LocationTrie":
+    @staticmethod
+    def _parse_path(path: str) -> list[str]:
         parse_result = urlparse(path)
         parts = [parse_result.scheme, parse_result.netloc]
         parts.extend(parse_result.path.lstrip("/").split("/"))
+        return parts
 
+    def insert(self, path: str) -> None:
         current = self
-        for part in parts:
+        for part in self._parse_path(path):
             if part not in current.children:
                 parent = current
                 current = LocationTrie(part, parent)
                 parent.children[part] = current
-                continue
+            else:
+                current = current.children[part]
+
+    def find(self, path: str) -> Optional["LocationTrie"]:
+        current = self
+        for part in self._parse_path(path):
+            if part not in current.children:
+                return None
             current = current.children[part]
         return current
 

@@ -18,9 +18,13 @@ from databricks.labs.ucx.hive_metastore.locations import (
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
-def test_location_trie_parts():
-    trie = LocationTrie().find("s3://bucket1/a/b/c")
-    assert trie.parts == ["s3", "bucket1", "a", "b", "c"]
+def test_location_trie_node_parts():
+    location = "s3://bucket1/a/b/c"
+    trie = LocationTrie()
+    trie.insert(location)
+    node = trie.find(location)
+    assert node is not None
+    assert node.parts == ["s3", "bucket1", "a", "b", "c"]
 
 
 @pytest.mark.parametrize(
@@ -33,10 +37,13 @@ def test_location_trie_parts():
         "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
     ]
 )
-def test_location_trie_valid_and_full(location):
-    trie = LocationTrie().find(location)
-    assert trie.is_valid()
-    assert trie.full == location
+def test_location_trie_valid_and_full_location(location):
+    trie = LocationTrie()
+    trie.insert(location)
+    node = trie.find(location)
+    assert node is not None
+    assert node.is_valid()
+    assert node.full == location
 
 
 @pytest.mark.parametrize(
@@ -48,9 +55,11 @@ def test_location_trie_valid_and_full(location):
         "unsupported-file-scheme://bucket"
     ]
 )
-def test_location_trie_valid_and_full(location):
-    trie = LocationTrie().find(location)
-    assert not trie.is_valid()
+def test_location_trie_invalid_location(location):
+    trie = LocationTrie()
+    trie.insert(location)
+    node = trie.find(location)
+    assert not node.is_valid()
 
 
 def test_location_trie_has_children():
@@ -59,14 +68,14 @@ def test_location_trie_has_children():
         "s3://bucket/a/b/d",
         "s3://bucket/a/b/d/g",
     ]
-    root = LocationTrie()
+    trie = LocationTrie()
     for location in locations:
-        root.find(location)
+        trie.insert(location)
 
-    c_node = root.find("s3://bucket/a/b/f")
+    c_node = trie.find("s3://bucket/a/b/c")
     assert not c_node.has_children()
 
-    d_node = root.find("s3://bucket/a/b/d")
+    d_node = trie.find("s3://bucket/a/b/d")
     assert d_node.has_children()
 
 
