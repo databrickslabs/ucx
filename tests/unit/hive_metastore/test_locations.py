@@ -18,15 +18,6 @@ from databricks.labs.ucx.hive_metastore.locations import (
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
-def test_location_trie_node_parts():
-    location = "s3://bucket1/a/b/c"
-    trie = LocationTrie()
-    trie.insert(location)
-    node = trie.find(location)
-    assert node is not None
-    assert node._path == ["s3", "bucket1", "a", "b", "c"]
-
-
 @pytest.mark.parametrize(
     "location",
     [
@@ -38,9 +29,10 @@ def test_location_trie_node_parts():
     ]
 )
 def test_location_trie_valid_and_full_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
     trie = LocationTrie()
-    trie.insert(location)
-    node = trie.find(location)
+    trie.insert(table)
+    node = trie.find(table)
     assert node is not None
     assert node.is_valid()
     assert node.location == location
@@ -56,9 +48,10 @@ def test_location_trie_valid_and_full_location(location):
     ]
 )
 def test_location_trie_invalid_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
     trie = LocationTrie()
-    trie.insert(location)
-    node = trie.find(location)
+    trie.insert(table)
+    node = trie.find(table)
     assert not node.is_valid()
 
 
@@ -70,26 +63,27 @@ def test_location_trie_has_children():
     ]
     trie = LocationTrie()
     for location in locations:
-        trie.insert(location)
+        table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+        trie.insert(table)
 
-    c_node = trie.find("s3://bucket/a/b/c")
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", "s3://bucket/a/b/c")
+    c_node = trie.find(table)
     assert not c_node.has_children()
 
-    d_node = trie.find("s3://bucket/a/b/d")
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", "s3://bucket/a/b/d")
+    d_node = trie.find(table)
     assert d_node.has_children()
 
 
-def test_location_trie_nodes():
-    locations = [
-        "s3://bucket/a/b/c",
-        "s3://bucket/a/b/c",
-    ]
+def test_location_trie_tables():
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/c"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
     trie = LocationTrie()
-    for location in locations:
-        trie.insert(location)
+    for table in tables:
+        trie.insert(table)
 
-    c_node = trie.find("s3://bucket/a/b/c")
-    assert c_node.nodes == locations
+    c_node = trie.find(tables[0])
+    assert c_node.tables == tables
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
