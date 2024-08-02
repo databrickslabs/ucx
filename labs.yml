@@ -53,7 +53,7 @@ commands:
 
   - name: validate-table-locations
     is_account_level: true
-    description: Validate if the table locations are overlapping across workspaces
+    description: Validate if the table locations are overlapping in a workspace and across workspaces.
     flags:
       - name: workspace-ids
         description: |
