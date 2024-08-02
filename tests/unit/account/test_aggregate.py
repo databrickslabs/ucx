@@ -151,3 +151,21 @@ def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, r
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
         account_aggregate.validate()
     assert "Overlapping table locations" in caplog.text
+
+
+def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_client):
+    rows = UCX_TABLES[
+        # Maybe an impossible situation, but it's a good test case
+        ("c1", "d1", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+        ("c2", "d1", "t1", "TABLE", "DELTA", "/foo/", None),
+        ("c1", "d1", "t3", "TABLE", "DELTA", "/foo/fizz/", None),
+    ]
+    mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": rows})
+    ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
+
+    account_ws = AccountWorkspaces(account_client)
+    account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
+        account_aggregate.validate()
+    assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2" in caplog.text
+    assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t3" in caplog.text
