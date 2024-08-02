@@ -41,10 +41,6 @@ class DependencyGraph:
     def dependency(self):
         return self._dependency
 
-    @property
-    def path(self):
-        return self._dependency.path
-
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
 
@@ -97,7 +93,7 @@ class DependencyGraph:
         found: list[DependencyGraph] = []
 
         def check_registered_dependency(graph):
-            if graph.path == path:
+            if graph.dependency.path == path:
                 found.append(graph)
                 return True
             return False
@@ -201,9 +197,10 @@ class DependencyGraph:
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
         """provide visited set if you want to ensure nodes are only visited once"""
         if visited is not None:
-            if self.path in visited:
+            path = self.dependency.path
+            if path in visited:
                 return False
-            visited.add(self.path)
+            visited.add(path)
         if visit_node(self):
             return True
         for dependency in self._dependencies.values():
@@ -273,7 +270,7 @@ class DependencyGraph:
         return InheritedContext.from_route(self, self.path_lookup, route)
 
     def __repr__(self):
-        return f"<DependencyGraph {self.path}>"
+        return f"<DependencyGraph {self.dependency.path}>"
 
 
 @dataclass
