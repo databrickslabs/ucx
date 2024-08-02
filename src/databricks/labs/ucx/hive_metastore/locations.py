@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, Optional
+from typing import Any, Callable, ClassVar, Optional, TypeVar
 from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
@@ -37,25 +37,30 @@ class Mount:
     source: str
 
 
+N = TypeVar("N")
+
+
 @dataclass
 class LocationTrie:
-    part: str = ""
+    key: str = ""
     parent: Optional["LocationTrie"] = None
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
-    tables: list[Table] = dataclasses.field(default_factory=list)
+    nodes: list[N] = dataclasses.field(default_factory=list)
+    get_key: Callable[[N], str] = lambda x: x
 
     @cached_property
-    def parts(self):
+    def _path(self):
+        """The path to traverse to get to the current node."""
         parts = []
         current = self
         while current:
-            parts.append(current.part)
+            parts.append(current.key)
             current = current.parent
         return list(reversed(parts))[1:]
 
     @property
-    def full(self):
-        scheme, netloc, *path = self.parts
+    def location(self):
+        scheme, netloc, *path = self._path
         return f"{scheme}://{netloc}/{'/'.join(path)}"
 
     @staticmethod
@@ -65,8 +70,9 @@ class LocationTrie:
         parts.extend(parse_result.path.lstrip("/").split("/"))
         return parts
 
-    def insert(self, location: str) -> None:
+    def insert(self, node: Any) -> None:
         current = self
+        location = self.get_key(node)
         for part in self._parse_location(location):
             if part not in current.children:
                 parent = current
@@ -74,9 +80,11 @@ class LocationTrie:
                 parent.children[part] = current
             else:
                 current = current.children[part]
+        current.nodes.append(node)
 
-    def find(self, location: str) -> Optional["LocationTrie"]:
+    def find(self, node: Any) -> Optional["LocationTrie"]:
         current = self
+        location = self.get_key(node)
         for part in self._parse_location(location):
             if part not in current.children:
                 return None
@@ -85,9 +93,9 @@ class LocationTrie:
 
     def is_valid(self):
         """A valid location has a scheme and netloc; the path is optional."""
-        if len(self.parts) < 3:
+        if len(self._path) < 3:
             return False
-        scheme, netloc, *_ = self.parts
+        scheme, netloc, *_ = self._path
         return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
 
     def has_children(self):
