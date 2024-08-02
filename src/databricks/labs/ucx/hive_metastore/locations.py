@@ -59,15 +59,15 @@ class LocationTrie:
         return f"{scheme}://{netloc}/{'/'.join(path)}"
 
     @staticmethod
-    def _parse_path(path: str) -> list[str]:
-        parse_result = urlparse(path)
+    def _parse_location(location: str) -> list[str]:
+        parse_result = urlparse(location)
         parts = [parse_result.scheme, parse_result.netloc]
         parts.extend(parse_result.path.lstrip("/").split("/"))
         return parts
 
-    def insert(self, path: str) -> None:
+    def insert(self, location: str) -> None:
         current = self
-        for part in self._parse_path(path):
+        for part in self._parse_location(location):
             if part not in current.children:
                 parent = current
                 current = LocationTrie(part, parent)
@@ -75,16 +75,16 @@ class LocationTrie:
             else:
                 current = current.children[part]
 
-    def find(self, path: str) -> Optional["LocationTrie"]:
+    def find(self, location: str) -> Optional["LocationTrie"]:
         current = self
-        for part in self._parse_path(path):
+        for part in self._parse_location(location):
             if part not in current.children:
                 return None
             current = current.children[part]
         return current
 
     def is_valid(self):
-        """A valid path has a scheme and netloc; the path is optional."""
+        """A valid location has a scheme and netloc; the path is optional."""
         if len(self.parts) < 3:
             return False
         scheme, netloc, *_ = self.parts
