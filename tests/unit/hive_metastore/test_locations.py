@@ -33,9 +33,24 @@ def test_location_trie_parts():
         "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
     ]
 )
-def test_location_trie_full(location):
+def test_location_trie_valid_and_full(location):
     trie = LocationTrie().find(location)
     assert trie.full == location
+    assert trie.is_valid()
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3:/missing-slash",
+        "//missing-scheme",
+        "gcs:/not-empty/path",
+        "unsupported-file-scheme://bucket"
+    ]
+)
+def test_location_trie_valid_and_full(location):
+    trie = LocationTrie().find(location)
+    assert not trie.is_valid()
 
 
 def test_location_trie_has_children():

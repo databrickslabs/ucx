@@ -21,6 +21,9 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
+_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
+
+
 @dataclass
 class ExternalLocation:
     location: str
@@ -67,7 +70,13 @@ class LocationTrie:
 
     def is_valid(self):
         """A valid path has at least 3 slash-parts: scheme, empty string, and bucket name: s3://bucket1"""
-        return len(self.parts) >= 3
+        if len(self.parts) < 3:
+            return False
+        if self.parts[0] not in _EXTERNAL_FILE_LOCATION_SCHEMES:
+            return False
+        if len(self.parts[0]) > 0:
+            return False
+        return True
 
     def has_children(self):
         return len(self.children) > 0
@@ -190,9 +199,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         tf_script = []
         cnt = 1
         res_name = ""
-        supported_prefixes = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
         for loc in missing_locations:
-            for prefix in supported_prefixes:
+            for prefix in _EXTERNAL_FILE_LOCATION_SCHEMES:
                 prefix_len = len(prefix)
                 if not loc.location.startswith(prefix):
                     continue
