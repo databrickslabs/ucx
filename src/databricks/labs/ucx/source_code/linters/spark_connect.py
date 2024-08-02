@@ -19,7 +19,11 @@ class SharedClusterMatcher:
     session_state: CurrentSessionState
 
     def _cluster_type_str(self) -> str:
-        return 'UC Shared Clusters' if not self.session_state.is_serverless else 'Serverless Compute'
+        return (
+            'Unity Catalog clusters in Shared access mode'
+            if not self.session_state.is_serverless
+            else 'Serverless Compute'
+        )
 
     @abstractmethod
     def lint(self, node: NodeNG) -> Iterator[Advice]:
