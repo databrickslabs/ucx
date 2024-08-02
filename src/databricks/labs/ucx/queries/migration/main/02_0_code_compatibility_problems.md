@@ -6,4 +6,4 @@ problem code and workflow name. The table:
 - Explains the problem with a human-readable message and a code.
 
 The code compatibility problems are updated after running
-[Jobs Static Code Analysis Workflow](https://github.com/databrickslabs/ucx/blob/main/README.md#workflow-linter-workflow).
+[Jobs Static Code Analysis Workflow](https://github.com/databrickslabs/ucx/blob/main/README.md#jobs-static-code-analysis-workflow).
