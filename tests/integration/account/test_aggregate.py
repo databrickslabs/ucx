@@ -16,14 +16,17 @@ def test_account_aggregate_no_logs_overlapping_tables(caplog, acc):
 
 def test_account_aggregate_logs_overlapping_tables(caplog, acc, ws, sql_backend, inventory_schema):
     tables = [
-        Table("hive_metastore", "d1", "t1", "EXTERNAL", "DELTA", "s3://test_location/test1/table1"),
-        Table("hive_metastore", "d1", "t2", "EXTERNAL", "DELTA", "s3://test_location/test2/table2"),
+        Table("hive_metastore", "d1", "t1", "EXTERNAL", "DELTA", "s3://test_location/table1/"),
+        Table("hive_metastore", "d1", "t2", "EXTERNAL", "DELTA", "s3://test_location/table1/"),
     ]
     sql_backend.save_table(f"{inventory_schema}.tables", tables, Table)
 
     account_workspaces = AccountWorkspaces(acc)
     w_ctx = WorkspaceContext(ws).replace(sql_backend=sql_backend, config=WorkspaceConfig(inventory_schema))
-    account_aggregate = AccountAggregate(account_workspaces, lambda _: w_ctx)
+    account_aggregate = AccountAggregate(
+        account_workspaces,
+        lambda w: w_ctx if w.get_workspace_id() == ws.get_workspace_id() else WorkspaceContext(w),
+    )
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
         account_aggregate.validate()
     assert "Overlapping table locations" in caplog.text
