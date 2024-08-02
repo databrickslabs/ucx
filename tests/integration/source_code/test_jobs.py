@@ -509,6 +509,52 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     allow_list.distribution_compatibility.assert_called_once()
 
 
+def test_job_spark_python_task_workspace_linter_happy_path(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_workspace_directory,
+):
+    pyspark_job_path = make_workspace_directory() / "spark_job.py"
+    pyspark_job_path.write_text("import greenlet\n")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=pyspark_job_path.as_posix()),
+        existing_cluster_id=new_cluster.cluster_id,
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
+def test_job_spark_python_task_dbfs_linter_happy_path(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_dbfs_directory,
+):
+    pyspark_job_path = make_dbfs_directory() / "spark_job.py"
+    pyspark_job_path.write_text("import greenlet\n")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=f"dbfs:{pyspark_job_path.as_posix()}"),
+        existing_cluster_id=new_cluster.cluster_id,
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
 def test_job_dlt_task_linter_unhappy_path(
     simple_ctx,
     make_job,
