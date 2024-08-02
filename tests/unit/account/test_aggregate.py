@@ -2,7 +2,6 @@ import logging
 from unittest.mock import create_autospec
 
 import pytest
-
 from databricks.sdk import AccountClient, Workspace, WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.labs.lsql.backends import MockBackend
@@ -107,7 +106,7 @@ def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate()
+        account_aggregate.validate_table_locations()
     assert "Overlapping table locations" not in caplog.text
 
 
@@ -152,7 +151,7 @@ def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, r
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate()
+        account_aggregate.validate_table_locations()
     assert "Overlapping table locations" in caplog.text
 
 
@@ -169,6 +168,6 @@ def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate()
+        account_aggregate.validate_table_locations()
     assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2" in caplog.text
     assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t3" in caplog.text
