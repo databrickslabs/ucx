@@ -6,6 +6,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
+from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -21,7 +22,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
-_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
+_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss")
 
 
 @dataclass
@@ -57,7 +58,10 @@ class LocationTrie:
         return "/".join(self.parts)
 
     def find(self, path: str) -> "LocationTrie":
-        parts = path.split("/")
+        parse_result = urlparse(path)
+        parts = [parse_result.scheme, parse_result.netloc]
+        parts.extend(parse_result.path.lstrip("/").split("/"))
+
         current = self
         for part in parts:
             if part not in current.children:
@@ -69,14 +73,11 @@ class LocationTrie:
         return current
 
     def is_valid(self):
-        """A valid path has at least 3 slash-parts: scheme, empty string, and bucket name: s3://bucket1"""
+        """A valid path has a scheme and netloc; the path is optional."""
         if len(self.parts) < 3:
             return False
-        if self.parts[0] not in _EXTERNAL_FILE_LOCATION_SCHEMES:
-            return False
-        if len(self.parts[0]) > 0:
-            return False
-        return True
+        scheme, netloc, *_ = self.parts
+        return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
 
     def has_children(self):
         return len(self.children) > 0
@@ -200,7 +201,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         cnt = 1
         res_name = ""
         for loc in missing_locations:
-            for prefix in _EXTERNAL_FILE_LOCATION_SCHEMES:
+            for scheme in _EXTERNAL_FILE_LOCATION_SCHEMES:
+                prefix = f"{scheme}://"
                 prefix_len = len(prefix)
                 if not loc.location.startswith(prefix):
                     continue

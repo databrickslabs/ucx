@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 
 def test_location_trie_parts():
     trie = LocationTrie().find("s3://bucket1/a/b/c")
-    assert trie.parts == ["s3:", "", "bucket1", "a", "b", "c"]
+    assert trie.parts == ["s3", "bucket1", "a", "b", "c"]
 
 
 @pytest.mark.parametrize(
@@ -35,8 +35,8 @@ def test_location_trie_parts():
 )
 def test_location_trie_valid_and_full(location):
     trie = LocationTrie().find(location)
-    assert trie.full == location
     assert trie.is_valid()
+    assert trie.full == location
 
 
 @pytest.mark.parametrize(
@@ -44,7 +44,7 @@ def test_location_trie_valid_and_full(location):
     [
         "s3:/missing-slash",
         "//missing-scheme",
-        "gcs:/not-empty/path",
+        "gcs:/missing-netloc/path",
         "unsupported-file-scheme://bucket"
     ]
 )
