@@ -46,7 +46,7 @@ def parse_dbr_version(version_str: str | None) -> tuple[int, int] | None:
         release_version = version.parse(version_str).release
         return release_version[0], release_version[1]
     except version.InvalidVersion:
-        logger.error(f'Incorrect DBR version string: {version_str}')
+        logger.warning(f'Incorrect DBR version string: {version_str}')
         return None
 
 
@@ -56,5 +56,5 @@ def parse_data_security_mode(mode_str: str | None) -> DataSecurityMode | None:
     try:
         return DataSecurityMode(mode_str)
     except ValueError as _:
-        logger.error(f'Unknown data_security_mode: {mode_str}')
+        logger.warning(f'Unknown data_security_mode: {mode_str}')
         return None

@@ -178,21 +178,23 @@ class CurrentSessionState:
 
     @classmethod
     def from_json(cls, json: dict) -> CurrentSessionState:
-        mode_str = json.get('data_security_mode', None)
-        try:
-            data_security_mode = compute.DataSecurityMode(mode_str) if mode_str else None
-        except ValueError:
-            logger.error(f'Unknown data_security_mode {mode_str}')
-            data_security_mode = None
         return cls(
             schema=json.get('schema', DEFAULT_SCHEMA),
             catalog=json.get('catalog', DEFAULT_CATALOG),
             spark_conf=json.get('spark_conf', None),
             named_parameters=json.get('named_parameters', None),
-            data_security_mode=data_security_mode,
+            data_security_mode=CurrentSessionState._parse_security_mode(json.get('data_security_mode', None)),
             is_serverless=json.get('is_serverless', False),
             dbr_version=tuple(json['dbr_version']) if 'dbr_version' in json else None,
         )
+
+    @staticmethod
+    def _parse_security_mode(mode_str: str | None) -> compute.DataSecurityMode | None:
+        try:
+            return compute.DataSecurityMode(mode_str) if mode_str else None
+        except ValueError:
+            logger.warning(f'Unknown data_security_mode {mode_str}')
+            return None
 
 
 class SequentialLinter(Linter):
