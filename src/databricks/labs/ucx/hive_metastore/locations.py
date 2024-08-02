@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, ClassVar, Optional, TypeVar
+from typing import Any, Callable, ClassVar, Optional
 from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
@@ -37,16 +37,12 @@ class Mount:
     source: str
 
 
-N = TypeVar("N")
-
-
 @dataclass
 class LocationTrie:
     key: str = ""
     parent: Optional["LocationTrie"] = None
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
-    nodes: list[N] = dataclasses.field(default_factory=list)
-    get_key: Callable[[N], str] = lambda x: x
+    tables: list[Table] = dataclasses.field(default_factory=list)
 
     @cached_property
     def _path(self):
@@ -64,28 +60,26 @@ class LocationTrie:
         return f"{scheme}://{netloc}/{'/'.join(path)}"
 
     @staticmethod
-    def _parse_location(location: str) -> list[str]:
+    def _parse_location(location: str | None) -> list[str]:
         parse_result = urlparse(location)
         parts = [parse_result.scheme, parse_result.netloc]
         parts.extend(parse_result.path.strip("/").split("/"))
         return parts
 
-    def insert(self, node: Any) -> None:
+    def insert(self, table: Table) -> None:
         current = self
-        location = self.get_key(node)
-        for part in self._parse_location(location):
+        for part in self._parse_location(table.location):
             if part not in current.children:
                 parent = current
                 current = LocationTrie(part, parent)
                 parent.children[part] = current
             else:
                 current = current.children[part]
-        current.nodes.append(node)
+        current.tables.append(table)
 
-    def find(self, node: Any) -> Optional["LocationTrie"]:
+    def find(self, table: Table) -> Optional["LocationTrie"]:
         current = self
-        location = self.get_key(node)
-        for part in self._parse_location(location):
+        for part in self._parse_location(table.location):
             if part not in current.children:
                 return None
             current = current.children[part]
