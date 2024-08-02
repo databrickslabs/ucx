@@ -43,6 +43,11 @@ def test_trie():
     assert not d_node.has_children()
 
 
+def test_location_trie_parts():
+    trie = LocationTrie().find("s3://bucket1/a/b/c")
+    assert trie.parts == ["s3:", "", "bucket1", "a", "b", "c"]
+
+
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [

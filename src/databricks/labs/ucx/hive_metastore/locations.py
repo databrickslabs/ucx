@@ -40,18 +40,6 @@ class LocationTrie:
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
     tables: list[Table] = dataclasses.field(default_factory=list)
 
-    def find(self, path: str) -> "LocationTrie":
-        parts = path.split("/")
-        current = self
-        for part in parts:
-            if part not in current.children:
-                parent = current
-                current = LocationTrie(part, parent)
-                parent.children[part] = current
-                continue
-            current = current.children[part]
-        return current
-
     @cached_property
     def parts(self):
         parts = []
@@ -64,6 +52,18 @@ class LocationTrie:
     @property
     def full(self):
         return "/".join(self.parts)
+
+    def find(self, path: str) -> "LocationTrie":
+        parts = path.split("/")
+        current = self
+        for part in parts:
+            if part not in current.children:
+                parent = current
+                current = LocationTrie(part, parent)
+                parent.children[part] = current
+                continue
+            current = current.children[part]
+        return current
 
     def is_valid(self):
         """A valid path has at least 3 slash-parts: scheme, empty string, and bucket name: s3://bucket1"""
