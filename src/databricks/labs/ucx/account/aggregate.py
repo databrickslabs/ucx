@@ -13,6 +13,7 @@ from databricks.labs.blueprint.installation import NotInstalled
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.locations import LocationTrie
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
@@ -96,10 +97,13 @@ class AccountAggregate:
             objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
-    def _fetch_tables(self) -> Iterable[TableFromWorkspace]:
+    @cached_property
+    def _tables(self) -> list[TableFromWorkspace]:
+        tables = []
         for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
             # Mypy complains about multiple values for `workspace_id`
-            yield TableFromWorkspace(*row, workspace_id=workspace_id)  # type: ignore
+            tables.append(TableFromWorkspace(*row, workspace_id=workspace_id))  # type: ignore
+        return tables
 
     def readiness_report(self):
         logger.info("Generating readiness report")
@@ -124,18 +128,13 @@ class AccountAggregate:
     def validate_table_locations(self) -> None:
         """The table locations should not be overlapping."""
         logger.info("Validating migration readiness")
-        tables = sorted(self._fetch_tables(), key=lambda table: table.location or "")
-        if len(tables) <= 1:  # One table can not overlap
-            return
-        previous_table = tables[0]
-        for table in tables[1:]:
-            if previous_table.location is None:
-                previous_table = table
-                continue
+        trie = LocationTrie(get_key=lambda table: table.location)
+        for table in self._tables:
             if table.location is None:
                 continue
-            if table.location.startswith(previous_table.location):
-                logger.warning(f"Overlapping table locations: {previous_table} and {table}")
-            else:
-                # Only set previous table if there is no overlap to capture overlaps between more than two tables
-                previous_table = table
+            node = trie.find(table)
+            if node is not None:
+                for n in node:
+                    for t in n.nodes:
+                        logger.warning(f"Overlapping table locations: {table} and {t}")
+            trie.insert(table)

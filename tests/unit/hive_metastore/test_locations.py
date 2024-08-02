@@ -24,7 +24,7 @@ def test_location_trie_node_parts():
     trie.insert(location)
     node = trie.find(location)
     assert node is not None
-    assert node.parts == ["s3", "bucket1", "a", "b", "c"]
+    assert node._path == ["s3", "bucket1", "a", "b", "c"]
 
 
 @pytest.mark.parametrize(
@@ -43,7 +43,7 @@ def test_location_trie_valid_and_full_location(location):
     node = trie.find(location)
     assert node is not None
     assert node.is_valid()
-    assert node.full == location
+    assert node.location == location
 
 
 @pytest.mark.parametrize(
@@ -77,6 +77,19 @@ def test_location_trie_has_children():
 
     d_node = trie.find("s3://bucket/a/b/d")
     assert d_node.has_children()
+
+
+def test_location_trie_nodes():
+    locations = [
+        "s3://bucket/a/b/c",
+        "s3://bucket/a/b/c",
+    ]
+    trie = LocationTrie()
+    for location in locations:
+        trie.insert(location)
+
+    c_node = trie.find("s3://bucket/a/b/c")
+    assert c_node.nodes == locations
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
