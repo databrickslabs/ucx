@@ -54,8 +54,8 @@ commands:
   - name: validate
     is_account_level: true
     description: |
-      Validate migration readiness across workspaces:
-      - Check if tables can be migrated
+      Validate migration readiness:
+      - Check if tables can be migrated across workspaces
     flags:
       - name: workspace-ids
         description: |
