@@ -124,17 +124,16 @@ class AccountAggregate:
     def validate_table_locations(self) -> None:
         """The table locations should not be overlapping."""
         logger.info("Validating migration readiness")
-        tables_with_location = sorted(
-            # Mypy does not catch the filter below
-            filter(lambda table: table.location is not None, self._fetch_tables()),
-            key=lambda table: table.location or "",
-        )
-        if len(tables_with_location) <= 1:
+        tables = sorted(self._fetch_tables(), key=lambda table: table.location or "")
+        if len(tables) <= 1:  # One table can not overlap
             return
-        previous_table = tables_with_location[0]
-        assert previous_table.location is not None
-        for table in tables_with_location[1:]:
-            assert table.location is not None
+        previous_table = tables[0]
+        for table in tables[1:]:
+            if previous_table.location is None:
+                previous_table = table
+                continue
+            if table.location is None:
+                continue
             if table.location.startswith(previous_table.location):
                 logger.warning(f"Overlapping table locations: {previous_table} and {table}")
             else:
