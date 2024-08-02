@@ -35,5 +35,5 @@ df.groupby("id").applyInPandas(subtract_mean, schema="id long, v double").show()
 
 from pyspark.sql.types import IntegerType
 
-# ucx[python-udf-in-shared-clusters:+1:0:+1:73] Cannot register Java UDF from Python code on UC Shared Clusters. Use a %scala cell to register the Scala UDF using spark.udf.register.
+# ucx[python-udf-in-shared-clusters:+1:0:+1:73] Cannot register Java UDF from Python code on Unity Catalog clusters in Shared access mode. Use a %scala cell to register the Scala UDF using spark.udf.register.
 spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
