@@ -1,12 +1,21 @@
 from itertools import chain
 
+import pytest
+
+
 from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
+from databricks.sdk.service.compute import DataSecurityMode
 
 
-def test_jvm_access_match_shared():
-    linter = SparkConnectLinter(CurrentSessionState())
+@pytest.fixture
+def session_state() -> CurrentSessionState:
+    return CurrentSessionState(data_security_mode=DataSecurityMode.USER_ISOLATION)
+
+
+def test_jvm_access_match_shared(session_state):
+    linter = SparkConnectLinter(session_state)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -25,8 +34,9 @@ spark._jspark._jvm.com.my.custom.Name()
     assert actual == expected
 
 
-def test_jvm_access_match_serverless():
-    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
+def test_jvm_access_match_serverless(session_state):
+    session_state.is_serverless = True
+    linter = SparkConnectLinter(session_state)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -46,8 +56,8 @@ spark._jspark._jvm.com.my.custom.Name()
     assert actual == expected
 
 
-def test_rdd_context_match_shared():
-    linter = SparkConnectLinter(CurrentSessionState())
+def test_rdd_context_match_shared(session_state):
+    linter = SparkConnectLinter(session_state)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -90,8 +100,9 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     assert actual == expected
 
 
-def test_rdd_context_match_serverless():
-    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
+def test_rdd_context_match_serverless(session_state):
+    session_state.is_serverless = True
+    linter = SparkConnectLinter(session_state)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -132,8 +143,8 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     ] == list(linter.lint(code))
 
 
-def test_rdd_map_partitions():
-    linter = SparkConnectLinter(CurrentSessionState())
+def test_rdd_map_partitions(session_state):
+    linter = SparkConnectLinter(session_state)
     code = """
 df = spark.createDataFrame([])
 df.rdd.mapPartitions(myUdf)
@@ -152,8 +163,8 @@ df.rdd.mapPartitions(myUdf)
     assert actual == expected
 
 
-def test_conf_shared():
-    linter = SparkConnectLinter(CurrentSessionState())
+def test_conf_shared(session_state):
+    linter = SparkConnectLinter(session_state)
     code = """df.sparkContext.getConf().get('spark.my.conf')"""
     assert [
         Failure(
@@ -167,8 +178,9 @@ def test_conf_shared():
     ] == list(linter.lint(code))
 
 
-def test_conf_serverless():
-    linter = SparkConnectLinter(CurrentSessionState(is_serverless=True))
+def test_conf_serverless(session_state):
+    session_state.is_serverless = True
+    linter = SparkConnectLinter(session_state)
     code = """sc._conf().get('spark.my.conf')"""
     expected = [
         Failure(
@@ -184,8 +196,8 @@ def test_conf_serverless():
     assert actual == expected
 
 
-def test_logging_shared():
-    logging_matcher = LoggingMatcher(CurrentSessionState())
+def test_logging_shared(session_state):
+    logging_matcher = LoggingMatcher(session_state)
     code = """
 sc.setLogLevel("INFO")
 setLogLevel("WARN")
@@ -225,8 +237,9 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
     ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.parse(code).walk()]))
 
 
-def test_logging_serverless():
-    logging_matcher = LoggingMatcher(CurrentSessionState(is_serverless=True))
+def test_logging_serverless(session_state):
+    session_state.is_serverless = True
+    logging_matcher = LoggingMatcher(session_state)
     code = """
 sc.setLogLevel("INFO")
 log4jLogger = sc._jvm.org.apache.log4j
@@ -255,7 +268,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
 
 def test_valid_code():
-    linter = SparkConnectLinter(CurrentSessionState())
+    linter = SparkConnectLinter(CurrentSessionState(data_security_mode=DataSecurityMode.USER_ISOLATION))
     code = """
 df = spark.range(10)
 df.collect()

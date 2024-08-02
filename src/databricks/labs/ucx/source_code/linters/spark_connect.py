@@ -9,6 +9,8 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     CurrentSessionState,
 )
+from databricks.sdk.service.compute import DataSecurityMode
+
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
 
@@ -238,6 +240,10 @@ class CommandContextMatcher(SharedClusterMatcher):
 
 class SparkConnectLinter(PythonLinter):
     def __init__(self, session_state: CurrentSessionState):
+        if session_state.data_security_mode != DataSecurityMode.USER_ISOLATION:
+            self._matchers = []
+            return
+
         self._matchers = [
             JvmAccessMatcher(session_state=session_state),
             RDDApiMatcher(session_state=session_state),
