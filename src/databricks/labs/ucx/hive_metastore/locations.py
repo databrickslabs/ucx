@@ -67,7 +67,7 @@ class LocationTrie:
     def _parse_location(location: str) -> list[str]:
         parse_result = urlparse(location)
         parts = [parse_result.scheme, parse_result.netloc]
-        parts.extend(parse_result.path.lstrip("/").split("/"))
+        parts.extend(parse_result.path.strip("/").split("/"))
         return parts
 
     def insert(self, node: Any) -> None:

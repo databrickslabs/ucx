@@ -114,33 +114,33 @@ def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client
     "rows",
     [
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
-            ("c2", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
+            ("c2", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
         ],
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
-            ("c1", "d2", "t1", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
+            ("c1", "d2", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
         ],
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
-            ("c1", "d1", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
+            ("c1", "d1", "t2", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
         ],
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/", None),
-            ("c1", "d1", "t2", "TABLE", "PARQUET", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
+            ("c1", "d1", "t2", "TABLE", "PARQUET", "s3://bucket/foo/bar/", None),
         ],
         [
-            ("c2", "d2", "t2", "TABLE", "DELTA", "/foo/", None),
-            ("c1", "d2", "t1", "TABLE", "DELTA", "/foo", None),
+            ("c2", "d2", "t2", "TABLE", "DELTA", "s3://bucket/foo/", None),
+            ("c1", "d2", "t1", "TABLE", "DELTA", "s3://bucket/foo", None),
         ],
         [
-            ("c1", "d1", "t1", "TABLE", "DELTA", "/foo/bar/fiz", None),
-            ("c2", "d2", "t2", "TABLE", "DELTA", "/foo/bar/", None),
+            ("c1", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/bar/fiz", None),
+            ("c2", "d2", "t2", "TABLE", "DELTA", "s3://bucket/foo/bar", None),
         ],
         [
             ("c1", "d1", "t1", "TABLE", "DELTA", None, None),
-            ("c2", "d2", "t2", "TABLE", "DELTA", "/foo", None),
-            ("c3", "d3", "t3", "TABLE", "DELTA", "/foo", None),
+            ("c2", "d2", "t2", "TABLE", "DELTA", "s3://bucket/foo", None),
+            ("c3", "d3", "t3", "TABLE", "DELTA", "s3://bucket/foo", None),
         ],
     ],
 )
@@ -158,9 +158,9 @@ def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, r
 def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_client):
     rows = UCX_TABLES[
         # Maybe an impossible situation, but it's a good test case
-        ("c1", "d1", "t2", "TABLE", "DELTA", "/foo/bar/", None),
-        ("c2", "d1", "t1", "TABLE", "DELTA", "/foo/", None),
-        ("c1", "d1", "t3", "TABLE", "DELTA", "/foo/fizz/", None),
+        ("c1", "d1", "t2", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
+        ("c2", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/", None),
+        ("c1", "d1", "t3", "TABLE", "DELTA", "s3://bucket/foo/fizz/", None),
     ]
     mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": rows})
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
