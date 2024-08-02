@@ -7,7 +7,8 @@ from databricks.labs.ucx.source_code.known import KnownList
 
 def test_python_library_resolver_resolves_library(mock_path_lookup):
     def mock_pip_install(command):
-        assert command.startswith("pip --disable-pip-version-check install anything -t")
+        command_str = command if isinstance(command, str) else " ".join(command)
+        assert command_str.startswith("pip --disable-pip-version-check install anything -t")
         return 0, "", ""
 
     python_library_resolver = PythonLibraryResolver(KnownList(), mock_pip_install)
