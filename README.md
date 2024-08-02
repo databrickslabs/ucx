@@ -1355,8 +1355,9 @@ Options to resolve tables with overlapping locations are:
 - Duplicate the tables by copying the data into a managed table and [skip](#skip-command) the original tables.
 
 Considerations when resolving tables with overlapping locations are:
-- Migrate the tables one workspace at a time, let later migrated workspaces read tables from the earlier migrated
-  workspace catalogs.
+- Migrate the tables one workspace at a time:
+  - Let later migrated workspaces read tables from the earlier migrated workspace catalogs.
+  - [Move](#move-command) tables between schemas and catalogs when it fits the data management model.
 - The tables might have different:
   - Metadata, like:
     - Column schema (names, types, order)
