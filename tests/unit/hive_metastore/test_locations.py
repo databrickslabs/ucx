@@ -1,5 +1,6 @@
 from unittest.mock import Mock, call, create_autospec
 
+import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
@@ -46,6 +47,21 @@ def test_trie():
 def test_location_trie_parts():
     trie = LocationTrie().find("s3://bucket1/a/b/c")
     assert trie.parts == ["s3:", "", "bucket1", "a", "b", "c"]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://databricks-e2demofieldengwest/b169/b50"
+        "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
+        "s3n://bucket-name/path-to-file-in-bucket",
+        "gcs://test_location2/test2/table2",
+        "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
+    ]
+)
+def test_location_trie_full(location):
+    trie = LocationTrie().find(location)
+    assert trie.full == location
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
