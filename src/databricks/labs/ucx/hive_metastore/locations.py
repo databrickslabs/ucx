@@ -1,9 +1,11 @@
+import dataclasses
 import logging
 import os
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from functools import cached_property
+from typing import ClassVar, Optional
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -29,6 +31,52 @@ class ExternalLocation:
 class Mount:
     name: str
     source: str
+
+
+@dataclass
+class LocationTrie:
+    part: str = ""
+    parent: Optional["LocationTrie"] = None
+    children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
+    tables: list[Table] = dataclasses.field(default_factory=list)
+
+    def find(self, path: str) -> "LocationTrie":
+        parts = path.split("/")
+        current = self
+        for part in parts:
+            if part not in current.children:
+                parent = current
+                current = LocationTrie(part, parent)
+                parent.children[part] = current
+                continue
+            current = current.children[part]
+        return current
+
+    @cached_property
+    def parts(self):
+        parts = []
+        current = self
+        while current:
+            parts.append(current.part)
+            current = current.parent
+        return list(reversed(parts))[1:]
+
+    @property
+    def full(self):
+        return "/".join(self.parts)
+
+    def is_valid(self):
+        """A valid path has at least 3 slash-parts: scheme, empty string, and bucket name: s3://bucket1"""
+        return len(self.parts) >= 3
+
+    def has_children(self):
+        return len(self.children) > 0
+
+    def __iter__(self):
+        if self.is_valid():
+            yield self
+        for child in self.children.values():
+            yield from child
 
 
 class ExternalLocations(CrawlerBase[ExternalLocation]):

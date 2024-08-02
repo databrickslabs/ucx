@@ -10,10 +10,37 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
+    LocationTrie,
     Mounts,
     TablesInMounts,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table
+
+
+def test_trie():
+    locations = [
+        "s3://bucket1/a/b/c",
+        "s3://bucket1/a/b/d",
+        "s3://bucket1/a/b/e",
+        "s3://bucket1/a/b/f",
+        "s3://bucket1/a/b/f/g",
+        "s3://bucket1/a/b/f/h",
+        "s3://bucket1/b/c/d",
+        "s3://bucket1/b/e/f",
+        "s3://bucket1/c/d/e",
+        "s3://bucket1/c/e/f",
+    ]
+    root = LocationTrie()
+    for location in locations:
+        root.find(location)
+    for node in root:
+        print(node.full)
+
+    f_node = root.find("s3://bucket1/a/b/f")
+    assert f_node.has_children()
+
+    d_node = root.find("s3://bucket1/a/b/d")
+    assert not d_node.has_children()
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
