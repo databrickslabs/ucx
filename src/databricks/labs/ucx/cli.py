@@ -103,7 +103,7 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
 
 @ucx.command(is_account=True)
 def validate_table_locations(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
-    """Validate if the table locations are overlapping across workspaces"""
+    """Validate if the table locations are overlapping in a workspace and across workspaces"""
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.validate_table_locations()
