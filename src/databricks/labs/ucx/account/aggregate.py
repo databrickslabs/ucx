@@ -136,12 +136,11 @@ class AccountAggregate:
                 continue
             seen_tables.add(str(table))
             node = trie.find(table)
-            if node is None:
+            if node is None or not node.has_children() or len(node.tables) == 1:
                 continue
-            if node.has_children() or len(node.tables) > 1:
-                conflicts = []
-                for sub_node in node:
-                    for t in sub_node.tables:
-                        conflicts.append(str(t))
-                        seen_tables.add(str(t))
-                logger.warning(f"Overlapping table locations: {' and '.join(conflicts)}")
+            conflicts = []
+            for sub_node in node:
+                for conflicting_table in sub_node.tables:
+                    conflicts.append(str(conflicting_table))
+                    seen_tables.add(str(conflicting_table))
+            logger.warning(f"Overlapping table locations: {' and '.join(conflicts)}")
