@@ -5,15 +5,18 @@ import uuid
 from collections.abc import ValuesView
 from dataclasses import dataclass
 from functools import partial
+from datetime import timedelta
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists
+from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists, ResourceDoesNotExist
+from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import EndpointConfPair, SetWorkspaceWarehouseConfigRequestSecurityPolicy
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
@@ -295,7 +298,7 @@ class AzureResourcePermissions:
                 storage_account_info.append(storage)
         logger.info("Creating service principal")
         uber_principal = self._azurerm.create_service_principal(uber_principal_name)
-        self._create_scope(uber_principal, inventory_database)
+        self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
         config.uber_spn_id = uber_principal.client.client_id
         logger.info(
             f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
@@ -399,13 +402,23 @@ class AzureResourcePermissions:
             self._azurerm.apply_storage_permission(principal_id, storage, role_name, role_guid)
             logger.debug(f"{role_name} permission applied for spn {principal_id} to storage account {storage.name}")
 
-    def _create_scope(self, uber_principal: PrincipalSecret, inventory_database: str):
-        logger.info(f"Creating secret scope {inventory_database}.")
+    def _create_and_get_secret_for_uber_principal(self, principal_secret: PrincipalSecret, scope: str) -> GetSecretResponse:
+        """Create and get a workspace secret for the principal.
+
+        If the secret scope does not, it wil be recreated. If the secret already exists, it will be overwritten.
+        """
+        key = "uber_principal_secret"
+        logger.info(f"Creating secret scope {scope}.")
         try:
-            self._ws.secrets.create_scope(inventory_database)
+            self._ws.secrets.create_scope(scope)
         except ResourceAlreadyExists:
-            logger.warning(f"Secret scope {inventory_database} already exists, using the same")
-        self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
+            logger.warning(f"Secret scope {scope} already exists, using the same")
+        self._ws.secrets.put_secret(scope, key, string_value=principal_secret.secret)
+        return self._get_secret(scope, key)
+
+    @retried(on=ResourceDoesNotExist, timeout=timedelta(minutes=2))
+    def _get_secret(self, scope: str, secret: str) -> GetSecretResponse:
+        return self._ws.secrets.get_secret(scope, secret)
 
     def _safe_delete_scope(self, scope: str) -> None:
         try:
