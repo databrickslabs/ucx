@@ -43,6 +43,15 @@ OptionalLocationTrie = Optional["LocationTrie"]  # pylint: disable=consider-alte
 
 @dataclass
 class LocationTrie:
+    """A trie datastructure to search locations.
+
+    Used to find overlapping locations.
+
+    TODO
+    ----
+    - [ ] : Include external locations pointing to SQL sources
+        https://github.com/databrickslabs/ucx/issues/2355
+    """
     key: str = ""
     parent: OptionalLocationTrie = None
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
