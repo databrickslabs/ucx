@@ -360,6 +360,35 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
+    def delete_storage_permission(self, scope: str, *, principal_id: str | None = None, role_guid: str | None = None) -> None:
+        """Delete storage permissions
+
+        Parameters
+        ----------
+        scope : str
+            The scope of the role assignment.
+        principal_id : str | None, optional (default=None)
+            The principal id to delete the role assignment for. If given, the scope is filtered for role assignments for
+            the principal.
+        role_guid : str | None, optional (default=None)
+            The GUID of the role assignment to delete. If None, all role assignments for the scope are deleted.
+        """
+        if role_guid is None:
+            path = f"{scope}/providers/Microsoft.Authorization/roleAssignments"
+            if principal_id is not None:
+                path += f"?$filter=principalId%20eq%20{principal_id}"
+            response = self._mgmt.get(path, "2022-04-01")
+            role_guids = []
+            for role_assignment in response.get("value", []):
+                role_guid = role_assignment.get("name")
+                if role_guid:
+                    role_guids.append(role_guid)
+        else:
+            role_guids = [role_guid]
+        for guid in role_guids:
+            path = f"{scope}/providers/Microsoft.Authorization/roleAssignments/{guid}"
+            self._mgmt.delete(path, "2022-04-01")
+
     def tenant_id(self):
         token = self._mgmt.token()
         return token.jwt_claims().get("tid")
