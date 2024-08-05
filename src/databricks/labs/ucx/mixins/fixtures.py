@@ -1420,12 +1420,12 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
                 "layout": [
                     {
                         "widget": {
-                            "name": "count{make_random(4)}",
+                            "name": f"count{make_random(4)}",
                             "queries": [
                                 {
-                                    "name": "main_query{make_random(4)}",
+                                    "name": f"main_query{make_random(4)}",
                                     "query": {
-                                        "datasetName": "count",
+                                        "datasetName": f"count{make_random(4)}",
                                         "fields": [{"name": "count", "expression": "`count`"}],
                                         "disaggregated": True,
                                     },
