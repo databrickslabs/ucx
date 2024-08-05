@@ -122,7 +122,7 @@ class AccountAggregate:
         for failure, objects in failures.items():
             logger.info(f"{failure}: {len(objects)} objects")
 
-    def validate_table_locations(self) -> None:
+    def validate_table_locations(self) -> list[list[Table]]:
         """The table locations should not be overlapping."""
         logger.info("Validating migration readiness")
         tables = list(self._fetch_tables())
@@ -130,7 +130,7 @@ class AccountAggregate:
         for table in tables:
             if table.location is not None:
                 trie.insert(table)
-        seen_tables = set()
+        seen_tables, all_conflicts = set(), []
         for table in tables:
             if str(table) in seen_tables:
                 continue
@@ -143,6 +143,9 @@ class AccountAggregate:
             conflicts = []
             for sub_node in node:
                 for conflicting_table in sub_node.tables:
-                    conflicts.append(str(conflicting_table))
+                    conflicts.append(conflicting_table)
                     seen_tables.add(str(conflicting_table))
-            logger.warning(f"Overlapping table locations: {' and '.join(conflicts)}")
+            conflict_message = " and ".join(str(conflict) for conflict in conflicts)
+            logger.warning(f"Overlapping table locations: {conflict_message}")
+            all_conflicts.append(conflicts)
+        return all_conflicts
