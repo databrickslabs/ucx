@@ -125,13 +125,23 @@ class AccountAggregate:
     def validate_table_locations(self) -> None:
         """The table locations should not be overlapping."""
         logger.info("Validating migration readiness")
+        tables = list(self._fetch_tables())
         trie = LocationTrie()
-        for table in sorted(self._fetch_tables(), key=lambda table: table.location or "", reverse=True):
-            if table.location is None:
+        for table in tables:
+            if table.location is not None:
+                trie.insert(table)
+        seen_tables = set()
+        for table in tables:
+            if str(table) in seen_tables:
                 continue
+            seen_tables.add(str(table))
             node = trie.find(table)
-            if node is not None:
+            if node is None:
+                continue
+            if node.has_children() or len(node.tables) > 1:
+                conflicts = []
                 for sub_node in node:
                     for t in sub_node.tables:
-                        logger.warning(f"Overlapping table locations: {table} and {t}")
-            trie.insert(table)
+                        conflicts.append(str(t))
+                        seen_tables.add(str(t))
+                logger.warning(f"Overlapping table locations: {' and '.join(conflicts)}")
