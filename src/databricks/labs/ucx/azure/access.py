@@ -217,6 +217,7 @@ class AzureResourcePermissions:
     ):
 
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
+        self._installation.save(warehouse_config, filename="warehouse-config-backup.json")
         sql_dac = warehouse_config.data_access_config
         if sql_dac is None:
             sql_dac = []
