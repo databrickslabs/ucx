@@ -38,14 +38,14 @@ class Mount:
 
 
 # Union with string is invalid syntax: "LocationTrie" | None
-_OPTIONAL_LOCATION_TRIE = Optional["LocationTrie"]  # pylint: disable=consider-alternative-union-syntax
+OptionalLocationTrie = Optional["LocationTrie"]  # pylint: disable=consider-alternative-union-syntax
 
 
 @dataclass
 class LocationTrie:
     key: str = ""
-    parent: _OPTIONAL_LOCATION_TRIE = None
-    children: dict[str, _OPTIONAL_LOCATION_TRIE] = dataclasses.field(default_factory=dict)
+    parent: OptionalLocationTrie = None
+    children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
     tables: list[Table] = dataclasses.field(default_factory=list)
 
     @cached_property
@@ -71,7 +71,7 @@ class LocationTrie:
         return parts
 
     def insert(self, table: Table) -> None:
-        current: _OPTIONAL_LOCATION_TRIE = self
+        current = self
         for part in self._parse_location(table.location or ""):
             if part not in current.children:
                 parent = current
@@ -81,8 +81,8 @@ class LocationTrie:
                 current = current.children[part]
         current.tables.append(table)
 
-    def find(self, table: Table) -> _OPTIONAL_LOCATION_TRIE:
-        current: _OPTIONAL_LOCATION_TRIE = self
+    def find(self, table: Table) -> OptionalLocationTrie:
+        current = self
         for part in self._parse_location(table.location or ""):
             if part not in current.children:
                 return None
