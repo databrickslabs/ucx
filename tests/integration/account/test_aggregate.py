@@ -32,5 +32,5 @@ def test_account_aggregate_finds_overlapping_tables(caplog, acc, ws, sql_backend
         conflicts = account_aggregate.validate_table_locations()
     assert "Overlapping table locations" in caplog.text
     assert len(conflicts) == 0
-    assert str(conflicts[0][0]) == "hive_metastore.d1.t1"
-    assert str(conflicts[0][0]) == "hive_metastore.d1.t2"
+    assert "hive_metastore.d1.t1" in str(conflicts[0][0])
+    assert "hive_metastore.d1.t2" in str(conflicts[0][1])
