@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Callable, ClassVar, Optional
+from typing import ClassVar, Optional
 from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
@@ -60,7 +60,7 @@ class LocationTrie:
         return f"{scheme}://{netloc}/{'/'.join(path)}"
 
     @staticmethod
-    def _parse_location(location: str | None) -> list[str]:
+    def _parse_location(location: str) -> list[str]:
         parse_result = urlparse(location)
         parts = [parse_result.scheme, parse_result.netloc]
         parts.extend(parse_result.path.strip("/").split("/"))
@@ -68,7 +68,7 @@ class LocationTrie:
 
     def insert(self, table: Table) -> None:
         current = self
-        for part in self._parse_location(table.location):
+        for part in self._parse_location(table.location or ""):
             if part not in current.children:
                 parent = current
                 current = LocationTrie(part, parent)
@@ -79,7 +79,7 @@ class LocationTrie:
 
     def find(self, table: Table) -> Optional["LocationTrie"]:
         current = self
-        for part in self._parse_location(table.location):
+        for part in self._parse_location(table.location or ""):
             if part not in current.children:
                 return None
             current = current.children[part]

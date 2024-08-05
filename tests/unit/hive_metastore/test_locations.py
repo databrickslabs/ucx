@@ -26,7 +26,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
         "s3n://bucket-name/path-to-file-in-bucket",
         "gcs://test_location2/test2/table2",
         "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
-    ]
+    ],
 )
 def test_location_trie_valid_and_full_location(location):
     table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
@@ -40,12 +40,7 @@ def test_location_trie_valid_and_full_location(location):
 
 @pytest.mark.parametrize(
     "location",
-    [
-        "s3:/missing-slash",
-        "//missing-scheme",
-        "gcs:/missing-netloc/path",
-        "unsupported-file-scheme://bucket"
-    ]
+    ["s3:/missing-slash", "//missing-scheme", "gcs:/missing-netloc/path", "unsupported-file-scheme://bucket"],
 )
 def test_location_trie_invalid_location(location):
     table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
