@@ -58,20 +58,13 @@ class TablesMigrator:
         self._principal_grants = principal_grants
 
     def get_remaining_tables(self) -> list[Table]:
-        table_rows: list[Table] = []
+        self.index_full_refresh()
+        table_rows = []
         for crawled_table in self._tc.snapshot():
             if not self._is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
-                logger.info(f"remained-table-to-migrate: {crawled_table.key}")
+                logger.info(f"remained-hive-metastore-table: {crawled_table.key}")
         return table_rows
-
-    # def get_remaining_tables(self, workspace_name) -> list[Table]:
-    #     table_rows: list[Table] = []
-    #     for crawled_table in self._tc.snapshot():
-    #         if not self._is_migrated(crawled_table.database, crawled_table.name):
-    #             table_rows.append(crawled_table)
-    #             logger.info(f"remained-table-to-migrate: {crawled_table.key} in {workspace_name}")
-    #     return table_rows
 
     def index(self):
         return self._migration_status_refresher.index()

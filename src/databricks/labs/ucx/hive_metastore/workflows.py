@@ -69,12 +69,9 @@ class TableMigration(Workflow):
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
-        ctx.tables_migrator.get_remaining_tables(
-            # workspace_name=ctx.workspace_info.current()
-        )
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateHiveSerdeTablesInPlace(Workflow):

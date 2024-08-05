@@ -1349,3 +1349,63 @@ def test_revert_migrated_tables_failed(caplog):
     table_migrate = get_table_migrator(backend)
     table_migrate.revert_migrated_tables(schema="test_schema1")
     assert "Failed to revert table hive_metastore.test_schema1.test_table1: error" in caplog.text
+
+def test_refresh_migration_status_published_remained_tables(caplog):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    grant_crawler = create_autospec(GrantsCrawler)  # pylint: disable=mock-no-usage
+    client = mock_workspace_client()
+    table_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+            location="s3://some_location/table1",
+            upgraded_to="ucx_default.db1_dst.dst_table1",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table2",
+            location="s3://some_location/table2",
+            upgraded_to="ucx_default.db1_dst.dst_table2",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table3",
+            location="s3://some_location/table3",
+        ),
+    ]
+    group_manager = GroupManager(backend, client, "inventory_database")
+    table_mapping = mock_table_mapping()
+    migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_index = MigrationIndex(
+        [
+            MigrationStatus("schema1", "table1", "ucx_default", "db1_dst", "dst_table1"),
+            MigrationStatus("schema1", "table2", "ucx_default", "db1_dst", "dst_table2"),
+        ]
+    )
+    migration_status_refresher.index.return_value = migration_index
+    principal_grants = create_autospec(PrincipalACL)  # pylint: disable=mock-no-usage
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        client,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.hive_metastore"):
+        table_migrate.get_remaining_tables()
+        assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
