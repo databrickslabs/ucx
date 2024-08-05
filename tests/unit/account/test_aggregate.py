@@ -169,5 +169,4 @@ def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
         account_aggregate.validate_table_locations()
-    assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2" in caplog.text
-    assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t3" in caplog.text
+    assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2 and 123:c1.d1.t3" in caplog.text
