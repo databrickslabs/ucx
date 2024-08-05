@@ -136,7 +136,9 @@ class AccountAggregate:
                 continue
             seen_tables.add(str(table))
             node = trie.find(table)
-            if node is None or not node.has_children() or len(node.tables) == 1:
+            if node is None:
+                continue
+            if not node.has_children() and len(node.tables) == 1:
                 continue
             conflicts = []
             for sub_node in node:
