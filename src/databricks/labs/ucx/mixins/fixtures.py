@@ -1413,7 +1413,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     rand = make_random(5)
     serialized_dashboard = {
-        "datasets": [{"name": f"count_ds{rand}", f"displayName": f"count_dn{rand}", "query": "SELECT 42 AS count"}],
+        "datasets": [{"name": f"count_ds{rand}", "displayName": f"count_dn{rand}", "query": "SELECT 42 AS count"}],
         "pages": [
             {
                 "name": f"count_page{rand}",
