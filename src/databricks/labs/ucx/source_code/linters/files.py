@@ -179,9 +179,9 @@ class LocalCodeLinter:
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages_factory: Callable[[], LinterContext]):
+    def __init__(self, context_factory: Callable[[], LinterContext]):
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._languages_factory = languages_factory
+        self._context_factory = context_factory
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
@@ -204,8 +204,8 @@ class LocalFileMigrator:
             return False
         logger.info(f"Analysing {path}")
         # Get the linter for the language
-        languages = self._languages_factory()
-        linter = languages.linter(language)
+        context = self._context_factory()
+        linter = context.linter(language)
         # Open the file and read the code
         with path.open("r") as f:
             try:
@@ -217,7 +217,7 @@ class LocalFileMigrator:
             # Lint the code and apply fixes
             for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
-                fixer = languages.fixer(language, advice.code)
+                fixer = context.fixer(language, advice.code)
                 if not fixer:
                     continue
                 logger.info(f"Applying fix for {advice}")
