@@ -10,7 +10,8 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     Fixer,
     CurrentSessionState,
-    PythonLinter, DIRECT_FS_REFS,
+    PythonLinter,
+    DIRECT_FS_REFS,
 )
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTable
