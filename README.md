@@ -74,7 +74,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
     * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
-  * [`create-missing-pricipals` command (AWS Only)](#create-missing-pricipals-command-aws-only)
+  * [`create-missing-principals` command (AWS Only)](#create-missing-principals-command-aws-only)
   * [`create-uber-principal` command](#create-uber-principal-command)
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
@@ -487,7 +487,7 @@ The manual process is documented in the following links:
 [AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
 [Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
-For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-pricipals-command-aws-only)
+For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-principals-command-aws-only)
 
 For both AWS and Azure we can use the `migrate-credentials` [UCX command](#migrate-credentials-command) to upgrade the necessary cloud principals:
 
@@ -933,7 +933,7 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 
 [[back to top](#databricks-labs-ucx)]
 
-## `create-missing-pricipals` command (AWS Only)
+## `create-missing-principals` command (AWS Only)
 ```bash
 databricks labs ucx create-missing-principals --aws-profile <aws_profile> --single-role <single_role>
 ```
@@ -1480,7 +1480,7 @@ Admin privileges required for commands:
 | [<u>validate-groups-membership</u>](#validate-groups-membership-command) | Account Admin |
 | [<u>create-uber-principal</u>](#create-uber-principal-command) | Cloud Admin |
 | [<u>principal-prefix-access</u>](#principal-prefix-access-command) | Cloud Admin |
-| [<u>create-missing-principals</u>](#create-missing-pricipals-command-aws-only) | Cloud Admin |
+| [<u>create-missing-principals</u>](#create-missing-principals-command-aws-only) | Cloud Admin |
 | [<u>migrate-credentials</u>](#migrate-credentials-command) | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
 | [<u>migrate-location</u>](#migrate-locations-command) | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
 | [<u>create-catalogs-schemas</u>](#create-catalogs-schemas-command) | Metastore Admin / CREATE CATALOG privilege |
