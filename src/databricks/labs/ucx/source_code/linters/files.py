@@ -107,7 +107,7 @@ class LocalCodeLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         dependency_resolver: DependencyResolver,
-        languages_factory: Callable[[], LinterContext],
+        context_factory: Callable[[], LinterContext],
     ) -> None:
         self._file_loader = file_loader
         self._folder_loader = folder_loader
@@ -115,7 +115,7 @@ class LocalCodeLinter:
         self._session_state = session_state
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._new_linter_context = languages_factory
+        self._context_factory = context_factory
 
     def lint(
         self,
@@ -163,7 +163,7 @@ class LocalCodeLinter:
         linted_paths.add(dependency.path)
         if dependency.path.is_file():
             inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
-            ctx = self._new_linter_context()
+            ctx = self._context_factory()
             path_lookup = self._path_lookup.change_directory(dependency.path.parent)
             linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
             for advice in linter.lint():
