@@ -140,7 +140,7 @@ def test_skip_with_table(ws):
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER TABLE schema.table SET TBLPROPERTIES('databricks.labs.ucx.skip' = true)",
+        statement="SELECT * FROM hive_metastore.ucx.tables WHERE database='schema' AND name='table' LIMIT 1",
         byte_limit=None,
         catalog=None,
         schema=None,
