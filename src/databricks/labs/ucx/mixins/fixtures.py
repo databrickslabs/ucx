@@ -1409,7 +1409,7 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
 @pytest.fixture
 def make_lakeview_dashboard(ws, make_random, env_or_skip):
-    """Create a lakeview dashboard. We randomize the name to avoid conflicts with other tests."""
+    """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     serialized_dashboard = {
         "datasets": [{"name": "count", "displayName": "count", "query": "SELECT 42 AS count"}],
