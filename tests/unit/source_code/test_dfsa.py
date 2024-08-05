@@ -13,6 +13,7 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver):
 
 def test_dfsa_collects_sql_dfsas(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("dfsa/query.py"), CurrentSessionState())
+    assert not maybe.problems
     collector = DfsaCollector()
     dfsas = list(collector.collect(maybe.graph))
     assert set(dfsa.path for dfsa in dfsas) == {"s3a://db-gtm-industry-solutions/data/CME/telco/PCMD"}
