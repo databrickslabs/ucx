@@ -99,15 +99,16 @@ def test_readiness_report_ucx_installed(caplog, ws, account_client):
         ],
     ],
 )
-def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client, rows):
+def test_account_aggregate_finds_no_overlapping_tables(caplog, ws, account_client, rows):
     mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
 
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate_table_locations()
+        conflicts = account_aggregate.validate_table_locations()
     assert "Overlapping table locations" not in caplog.text
+    assert not conflicts
 
 
 @pytest.mark.parametrize(
@@ -144,15 +145,17 @@ def test_account_aggregate_logs_no_overlapping_tables(caplog, ws, account_client
         ],
     ],
 )
-def test_account_aggregate_logs_overlapping_tables(caplog, ws, account_client, rows):
+def test_account_aggregate_finds_overlapping_tables(caplog, ws, account_client, rows):
     mock_backend = MockBackend(rows={"SELECT \\* FROM hive_metastore.ucx.tables": UCX_TABLES[rows]})
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="ucx"), sql_backend=mock_backend)
 
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate_table_locations()
+        conflicts = account_aggregate.validate_table_locations()
     assert "Overlapping table locations" in caplog.text
+    assert len(conflicts) == 1
+    assert len(conflicts[0]) == 2
 
 
 def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_client):
@@ -168,5 +171,9 @@ def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_
     account_ws = AccountWorkspaces(account_client)
     account_aggregate = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        account_aggregate.validate_table_locations()
+        conflicts = account_aggregate.validate_table_locations()
     assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2 and 123:c1.d1.t3" in caplog.text
+    assert len(conflicts) == 1
+    assert str(conflicts[0][0]) == "123:c2.d1.t1"
+    assert str(conflicts[0][1]) == "123:c1.d1.t2"
+    assert str(conflicts[0][2]) == "123:c1.d1.t3"

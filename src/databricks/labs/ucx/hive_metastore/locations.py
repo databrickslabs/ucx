@@ -52,6 +52,7 @@ class LocationTrie:
     - [ ] : Include external locations pointing to SQL sources
         https://github.com/databrickslabs/ucx/issues/2355
     """
+
     key: str = ""
     parent: OptionalLocationTrie = None
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
