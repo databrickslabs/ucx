@@ -160,7 +160,7 @@ def test_account_aggregate_finds_overlapping_tables(caplog, ws, account_client, 
 
 def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_client):
     rows = UCX_TABLES[
-        # Maybe an impossible situation, but it's a good test case
+        # It happens that a table is a partition of another table
         ("c1", "d1", "t2", "TABLE", "DELTA", "s3://bucket/foo/bar/", None),
         ("c2", "d1", "t1", "TABLE", "DELTA", "s3://bucket/foo/", None),
         ("c1", "d1", "t3", "TABLE", "DELTA", "s3://bucket/foo/fizz/", None),
