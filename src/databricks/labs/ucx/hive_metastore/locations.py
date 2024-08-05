@@ -77,8 +77,8 @@ class LocationTrie:
                 parent = current
                 current = LocationTrie(part, parent)
                 parent.children[part] = current
-            else:
-                current = current.children[part]
+                continue
+            current = current.children[part]
         current.tables.append(table)
 
     def find(self, table: Table) -> OptionalLocationTrie:
