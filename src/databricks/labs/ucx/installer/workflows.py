@@ -42,7 +42,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
+from databricks.sdk.service.jobs import Run, RunLifeCycleState, RunResultState
 from databricks.sdk.service.workspace import ObjectType
 
 import databricks
@@ -119,24 +119,54 @@ class DeployedWorkflows:
         self._install_state = install_state
         self._verify_timeout = verify_timeout
 
-    def run_workflow(self, step: str, skip_job_wait: bool = False):
+    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
-        if job_initial_run.run_id and not skip_job_wait:
-            try:
-                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
-            except OperationFailed as err:
-                logger.info('---------- REMOTE LOGS --------------')
-                self._relay_logs(step, job_initial_run.run_id)
-                logger.info('---------- END REMOTE LOGS ----------')
-                job_run = self._ws.jobs.get_run(job_initial_run.run_id)
-                raise self._infer_error_from_job_run(job_run) from err
+        run_id = job_initial_run.run_id
+        if not run_id:
+            raise NotFound(f"job run not found for {step}")
+        run_url = f"{self._ws.config.host}#job/{job_id}/runs/{run_id}"
+        logger.info(f"Started {step} job: {run_url}")
+        if skip_job_wait:
+            return run_id
+        try:
+            logger.debug(f"Waiting for completion of {step} job: {run_url}")
+            job_run = self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run_id, timeout=max_wait)
+            self._log_completed_job(step, job_run)
+            return run_id
+        except TimeoutError:
+            logger.warning(f"Timeout while waiting for {step} job to complete: {run_url}")
+            logger.info('---------- REMOTE LOGS --------------')
+            self._relay_logs(step, run_id)
+            logger.info('------ END REMOTE LOGS (SO FAR) -----')
+            raise
+        except OperationFailed as err:
+            logger.info('---------- REMOTE LOGS --------------')
+            self._relay_logs(step, run_id)
+            logger.info('---------- END REMOTE LOGS ----------')
+            job_run = self._ws.jobs.get_run(run_id)
+            raise self._infer_error_from_job_run(job_run) from err
+
+    def _log_completed_job(self, step: str, job_run: Run) -> None:
+        if not logger.isEnabledFor(logging.INFO):
             return
-        raise NotFound(f"job run not found for {step}")
+        start_time = datetime.utcfromtimestamp(job_run.start_time / 1000) if job_run.start_time else None
+        end_time = datetime.utcfromtimestamp(job_run.end_time / 1000) if job_run.end_time else None
+        if job_run.run_duration:
+            duration = timedelta(milliseconds=job_run.run_duration)
+        elif start_time and end_time:
+            duration = end_time - start_time
+        else:
+            duration = None
+        result_state = job_run.state.result_state if job_run.state else None
+        state_message = job_run.state.state_message if job_run.state else None
+        logger.info(
+            f"Completed {step} job: {result_state or 'N/A'} ({state_message or 'N/A'}) {start_time or 'N/A'}-{end_time or 'N/A'} ({duration or 'N/A'})"
+        )
 
     def repair_run(self, workflow):
         try:
