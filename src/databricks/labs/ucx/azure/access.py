@@ -307,6 +307,13 @@ class AzureResourcePermissions:
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
         if config.uber_spn_id is not None:
+            used_storage_accounts = self._get_storage_accounts()
+            storage_accounts = []
+            for storage in self._azurerm.storage_accounts():
+                if storage.name in used_storage_accounts:
+                    storage_accounts.append(storage)
+            for storage_account in storage_accounts:
+                self._azurerm.delete_storage_permission(str(storage_account.id), principal_id=config.uber_spn_id)
             try:
                 self._azurerm.delete_service_principal(config.uber_spn_id)
             except PermissionDenied:
