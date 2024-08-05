@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
-from sqlglot.expressions import Literal, LocationProperty
+from sqlglot.expressions import Identifier, Literal
 
 from databricks.sdk.service.workspace import Language
 
@@ -89,20 +89,30 @@ class DfsaCollector:
             for sql in sqls:
                 if not sql:
                     continue
-                yield from cls._collect_from_sql_expression(sql)
+                yield from cls._collect_from_literals(sql)
+                yield from cls._collect_from_identifiers(sql)
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {source}", exc_info=e)
             yield FromTable.sql_parse_failure(source)
 
     @classmethod
-    def _collect_from_sql_expression(cls, expression: SqlExpression) -> Iterable[DFSA]:
-        for prop in expression.find_all(LocationProperty):
-            if not isinstance(prop.this, Literal):
-                logger.warning(f"Can't interpret {type(prop.this).__name__}")
-            literal: Literal = prop.this
+    def _collect_from_literals(cls, expression: SqlExpression) -> Iterable[DFSA]:
+        for literal in expression.find_all(Literal):
             if not isinstance(literal.this, str):
                 logger.warning(f"Can't interpret {type(literal.this).__name__}")
             fs_path: str = literal.this
+            for fs_ref in DIRECT_FS_REFS:
+                if not fs_path.startswith(fs_ref):
+                    continue
+                yield DFSA(path=fs_path)
+                break
+
+    @classmethod
+    def _collect_from_identifiers(cls, expression: SqlExpression) -> Iterable[DFSA]:
+        for identifier in expression.find_all(Identifier):
+            if not isinstance(identifier.this, str):
+                logger.warning(f"Can't interpret {type(identifier.this).__name__}")
+            fs_path: str = identifier.this
             for fs_ref in DIRECT_FS_REFS:
                 if not fs_path.startswith(fs_ref):
                     continue
