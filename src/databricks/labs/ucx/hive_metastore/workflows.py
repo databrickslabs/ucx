@@ -72,11 +72,6 @@ class TableMigration(Workflow):
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
-
-    @job_task(job_cluster="table_migration", depends_on=[migrate_external_tables_sync, migrate_dbfs_root_delta_tables,
-                                                         migrate_dbfs_root_non_delta_tables, migrate_views, refresh_migration_status])
-    def refresh_not_migrated_status(self, ctx: RuntimeContext):
-        """Refresh the not migrated tables status to present it in the dashboard."""
         ctx.tables_migrator.get_remaining_tables(
             # workspace_name=ctx.workspace_info.current()
         )
