@@ -89,7 +89,7 @@ class LocationTrie:
             current = current.children[part]
         return current
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         """A valid location has a scheme and netloc; the path is optional."""
         if len(self._path) < 3:
             return False
