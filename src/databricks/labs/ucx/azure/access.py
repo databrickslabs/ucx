@@ -389,6 +389,14 @@ class AzureResourcePermissions:
             logger.warning(f"Secret scope {inventory_database} already exists, using the same")
         self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
 
+    def _safe_delete_scope(self, scope: str) -> None:
+        try:
+            self._ws.secrets.delete_scope(scope)
+        except ResourceDoesNotExist:
+            logger.warning(f"Secret scope {scope} does not exist, skipping delete.")
+        except PermissionDenied:
+            logger.error(f"Missing permissions to delete secret scope: {scope}", exc_info=True)
+
     def load(self):
         return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
 
