@@ -1,11 +1,23 @@
 import pytest
-
+import logging
+from unittest.mock import create_autospec
 from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
     MigrateExternalTablesCTAS,
     MigrateHiveSerdeTablesInPlace,
     MigrateTablesInMounts,
     ScanTablesInMounts,
+)
+
+from databricks.labs.ucx.hive_metastore.tables import (
+    Table,
+    TablesCrawler,
+)
+
+from databricks.labs.ucx.hive_metastore.migration_status import (
+    MigrationStatusRefresher,
+    MigrationIndex,
+    MigrationStatus,
 )
 
 
@@ -71,7 +83,72 @@ def test_refresh_migration_status_is_refreshed(run_workflow, workflow):
     assert "SHOW DATABASES" in ctx.sql_backend.queries
     # No "SHOW TABLE FROM" query as table are not mocked
 
-#TODO: create a unit test for the new task in the workflow
-# def test_refresh_not_migrated_status_is_refreshed(run_workflow):
-#     ctx = run_workflow(TableMigration.refresh_not_migrated_status)
-#     # ctx.workspace_client.catalogs.list.assert_called()
+def test_refresh_migration_status_published_remained_tables(run_workflow):
+    # class LogCaptureHandler(logging.Handler):
+    #     def __init__(self):
+    #         super().__init__()
+    #         self.records = []
+    #
+    #     def emit(self, record):
+    #         self.records.append(record)
+
+
+    # # Setup custom log handler
+    # log_capture_handler = LogCaptureHandler()
+    # logger = logging.getLogger(__name__)
+    # logger.addHandler(log_capture_handler)
+    # logger.setLevel(logging.INFO)
+
+    # Setup mocks
+    custom_table_crawler = create_autospec(TablesCrawler)
+    custom_table_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+            location="s3://some_location/table1",
+            upgraded_to="ucx_default.db1_dst.dst_table1",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table2",
+            location="s3://some_location/table2",
+            upgraded_to="ucx_default.db1_dst.dst_table2",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table3",
+            location="s3://some_location/table3",
+        ),
+    ]
+    custom_migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_index = MigrationIndex(
+        [
+            MigrationStatus("schema1", "table1", "ucx_default", "db1_dst", "dst_table1"),
+            MigrationStatus("schema1", "table2", "ucx_default", "db1_dst", "dst_table2"),
+        ]
+    )
+    custom_migration_status_refresher.index.return_value = migration_index
+
+    # Call the method
+    ctx = run_workflow(
+        TableMigration.refresh_migration_status,
+        table_crawler=custom_table_crawler,
+        migration_status_refresher=custom_migration_status_refresher,
+    )
+
+    # # Assert the log message
+    # log_messages = [record.getMessage() for record in log_capture_handler.records]
+    # assert 'remained-table-to-migrate: schema1.table3' in log_messages
+    return ctx.task_run_warning_recorder.snapshot()
+
+    # # Remove the custom log handler
+    # logger.removeHandler(log_capture_handler)

@@ -76,6 +76,7 @@ class TableMigration(Workflow):
             # workspace_name=ctx.workspace_info.current()
         )
 
+
 class MigrateHiveSerdeTablesInPlace(Workflow):
     def __init__(self):
         super().__init__('migrate-external-hiveserde-tables-in-place-experimental')

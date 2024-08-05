@@ -65,7 +65,6 @@ class TablesMigrator:
                 logger.info(f"remained-table-to-migrate: {crawled_table.key}")
         return table_rows
 
-
     # def get_remaining_tables(self, workspace_name) -> list[Table]:
     #     table_rows: list[Table] = []
     #     for crawled_table in self._tc.snapshot():
@@ -506,6 +505,7 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
+
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()
         return index.is_migrated(schema, table)
