@@ -1412,7 +1412,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
     """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     serialized_dashboard = {
-        "datasets": [{"name": "count", "displayName": "count", "query": "SELECT 42 AS count"}],
+        "datasets": [{"name": "fourtytwo", "displayName": "count", "query": "SELECT 42 AS count"}],
         "pages": [
             {
                 "name": "count",
@@ -1420,12 +1420,12 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
                 "layout": [
                     {
                         "widget": {
-                            "name": "count",
+                            "name": "counter",
                             "queries": [
                                 {
                                     "name": "main_query",
                                     "query": {
-                                        "datasetName": "count",
+                                        "datasetName": "fourtytwo",
                                         "fields": [{"name": "count", "expression": "`count`"}],
                                         "disaggregated": True,
                                     },
