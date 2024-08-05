@@ -1411,21 +1411,22 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 def make_lakeview_dashboard(ws, make_random, env_or_skip):
     """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+    rand = make_random(5)
     serialized_dashboard = {
-        "datasets": [{"name": "count", "displayName": "count", "query": "SELECT 42 AS count"}],
+        "datasets": [{"name": f"count_ds{rand}", f"displayName": f"count_dn{rand}", "query": "SELECT 42 AS count"}],
         "pages": [
             {
-                "name": f"count{make_random(4)}",
+                "name": f"count_page{rand}",
                 "displayName": "Counter",
                 "layout": [
                     {
                         "widget": {
-                            "name": f"count{make_random(4)}",
+                            "name": f"count_widget{rand}",
                             "queries": [
                                 {
-                                    "name": f"main_query{make_random(4)}",
+                                    "name": f"main_query{rand}",
                                     "query": {
-                                        "datasetName": f"count{make_random(4)}",
+                                        "datasetName": f"count_ds{rand}",
                                         "fields": [{"name": "count", "expression": "`count`"}],
                                         "disaggregated": True,
                                     },
@@ -1446,9 +1447,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
 
     def create(display_name: str = "") -> SDKDashboard:
         if len(display_name) == 0:
-            display_name = f"created_by_ucx_{make_random()}"
-        else:
-            display_name = f"{display_name} ({make_random()})"
+            display_name = f"created_by_ucx_{rand}"
         dashboard = ws.lakeview.create(
             display_name,
             serialized_dashboard=json.dumps(serialized_dashboard),
