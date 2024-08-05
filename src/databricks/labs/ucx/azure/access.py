@@ -15,7 +15,7 @@ from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDen
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
-from databricks.sdk.service.sql import EndpointConfPair, SetWorkspaceWarehouseConfigRequestSecurityPolicy
+from databricks.sdk.service.sql import EndpointConfPair, GetWorkspaceWarehouseConfigResponse, SetWorkspaceWarehouseConfigRequestSecurityPolicy
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.resources import (
@@ -157,7 +157,7 @@ class AzureResourcePermissions:
         policy_definition: str,
         storage_accounts: list[StorageAccount],
         uber_principal: PrincipalSecret,
-        inventory_database: str,
+        uber_principal_secret_identifier: str,
     ) -> str:
         policy_dict = json.loads(policy_definition)
         tenant_id = self._azurerm.tenant_id()
@@ -176,7 +176,7 @@ class AzureResourcePermissions:
                 self._policy_config("OAuth")
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config("{{secrets/" + inventory_database + "/uber_principal_secret}}")
+                self._policy_config("{{" + uber_principal_secret_identifier + "}}")
             )
         return json.dumps(policy_dict)
 
@@ -189,7 +189,7 @@ class AzureResourcePermissions:
         policy_id: str,
         storage_accounts: list[StorageAccount],
         uber_principal: PrincipalSecret,
-        inventory_database: str,
+        uber_principal_secret_identifier: str,
     ):
         try:
             policy_definition = ""
@@ -199,7 +199,7 @@ class AzureResourcePermissions:
 
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
-                    cluster_policy.definition, storage_accounts, uber_principal, inventory_database
+                    cluster_policy.definition, storage_accounts, uber_principal, uber_principal_secret_identifier,
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
@@ -298,7 +298,8 @@ class AzureResourcePermissions:
                 storage_account_info.append(storage)
         logger.info("Creating service principal")
         uber_principal = self._azurerm.create_service_principal(uber_principal_name)
-        self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
+        secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
+        secret_identifier = f"secrets/{inventory_database}/{secret.key}"
         config.uber_spn_id = uber_principal.client.client_id
         logger.info(
             f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
@@ -308,7 +309,7 @@ class AzureResourcePermissions:
                 uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_account_info
             )
             self._installation.save(config)
-            self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
+            self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, secret_identifier)
             self._update_sql_dac_with_spn(storage_account_info, uber_principal, inventory_database)
         except PermissionError:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
