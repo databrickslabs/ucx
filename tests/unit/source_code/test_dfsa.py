@@ -1,19 +1,32 @@
 from pathlib import Path
 
+import pytest
+
+from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.dfsa import DfsaCollector
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 
-def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver):
+def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration_index, mock_path_lookup):
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("leaf4.py"), CurrentSessionState())
-    collector = DfsaCollector()
+    context = LinterContext(migration_index, CurrentSessionState())
+    collector = DfsaCollector(mock_path_lookup, CurrentSessionState(), lambda: context)
     dfsas = list(collector.collect(maybe.graph))
     assert not dfsas
 
 
-def test_dfsa_collects_sql_dfsas(simple_dependency_resolver):
-    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("dfsa/query.py"), CurrentSessionState())
+@pytest.mark.parametrize("source_path, dfsa_paths, skip", [
+    ("dfsa/create_cloud_files.sql", ["s3a://db-gtm-industry-solutions/data/CME/telco/PCMD"], False),
+    ("dfsa/create_location.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"], True)
+])
+def test_dfsa_collects_sql_dfsas(source_path, dfsa_paths, supported, simple_dependency_resolver, migration_index,
+                                 mock_path_lookup):
+    if not supported:
+        return
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path(source_path), CurrentSessionState())
     assert not maybe.problems
-    collector = DfsaCollector()
+    context = LinterContext(migration_index, CurrentSessionState())
+    collector = DfsaCollector(mock_path_lookup, CurrentSessionState(), lambda: context)
     dfsas = list(collector.collect(maybe.graph))
-    assert set(dfsa.path for dfsa in dfsas) == {"s3a://db-gtm-industry-solutions/data/CME/telco/PCMD"}
+    assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
