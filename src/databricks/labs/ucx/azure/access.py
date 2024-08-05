@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
+from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import EndpointConfPair, SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
 from databricks.labs.ucx.azure.resources import (
@@ -203,6 +204,11 @@ class AzureResourcePermissions:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
 
+    def _revert_cluster_policy(self, policy_id: str):
+        policy = self._installation.load(Policy, filename="policy-backup.json")
+        if policy.name is not None and policy.definition is not None:
+            self._ws.cluster_policies.edit(policy_id, policy.name, definition=policy.definition)
+
     def _update_sql_dac_with_spn(
         self,
         storage_account_info: list[StorageAccount],
@@ -306,7 +312,9 @@ class AzureResourcePermissions:
 
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
-        if config.uber_spn_id is not None:
+        if config.uber_spn_id is None:
+            logger.warning("No uber service principal found in config. Skipping service principal deletion.")
+        else:
             used_storage_accounts = self._get_storage_accounts()
             storage_accounts = []
             for storage in self._azurerm.storage_accounts():
@@ -318,8 +326,10 @@ class AzureResourcePermissions:
                 self._azurerm.delete_service_principal(config.uber_spn_id)
             except PermissionDenied:
                 logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+        if config.policy_id is None:
+            logger.warning("No UCX cluster policy found in config. Skipping policy revert.")
         else:
-            logger.warning("No uber service principal created for this workspace.")
+            self._revert_cluster_policy(config.policy_id)
         self._safe_delete_scope(config.inventory_database)
 
     def _create_access_connector_for_storage_account(
