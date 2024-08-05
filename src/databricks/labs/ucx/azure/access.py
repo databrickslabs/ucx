@@ -10,7 +10,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, ResourceAlreadyExists
+from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.sql import EndpointConfPair, SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
@@ -303,6 +303,17 @@ class AzureResourcePermissions:
         except PermissionError:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
+
+    def _delete_uber_principal(self):
+        config = self._installation.load(WorkspaceConfig)
+        if config.uber_spn_id is not None:
+            try:
+                self._azurerm.delete_service_principal(config.uber_spn_id)
+            except PermissionDenied:
+                logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+        else:
+            logger.warning("No uber service principal created for this workspace.")
+        self._safe_delete_scope(config.inventory_database)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
