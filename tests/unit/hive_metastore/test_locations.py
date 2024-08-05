@@ -51,22 +51,16 @@ def test_location_trie_invalid_location(location):
 
 
 def test_location_trie_has_children():
-    locations = [
-        "s3://bucket/a/b/c",
-        "s3://bucket/a/b/d",
-        "s3://bucket/a/b/d/g",
-    ]
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/d", "s3://bucket/a/b/d/g"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
     trie = LocationTrie()
-    for location in locations:
-        table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+    for table in tables:
         trie.insert(table)
 
-    table = Table("catalog", "database", "table", "TABLE", "DELTA", "s3://bucket/a/b/c")
-    c_node = trie.find(table)
+    c_node = trie.find(tables[0])
     assert not c_node.has_children()
 
-    table = Table("catalog", "database", "table", "TABLE", "DELTA", "s3://bucket/a/b/d")
-    d_node = trie.find(table)
+    d_node = trie.find(tables[1])
     assert d_node.has_children()
 
 
