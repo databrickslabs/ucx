@@ -655,7 +655,7 @@ def test_create_global_spn_cluster_policy_not_found():
     with pytest.raises(NotFound):
         azure_resource_permission.create_uber_principal(prompts)
     w.cluster_policies.get.assert_called_once()
-    w.secrets.get_secret.assert_not_called()
+    w.secrets.get_secret.asser_called_with("ucx", "uber_principal_secret")
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
     w.cluster_policies.edit.assert_not_called()
