@@ -13,9 +13,9 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     DIRECT_FS_REFS,
 )
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
 
 @dataclass

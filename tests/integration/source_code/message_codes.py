@@ -2,7 +2,7 @@ import astroid  # type: ignore[import-untyped]
 from databricks.labs.blueprint.wheels import ProductInfo
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 
 def main():

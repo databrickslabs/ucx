@@ -6,8 +6,8 @@ from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, PythonLinter
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTable
 
 logger = logging.getLogger(__name__)

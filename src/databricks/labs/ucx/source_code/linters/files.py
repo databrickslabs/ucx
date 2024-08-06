@@ -15,7 +15,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -28,6 +28,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     InheritedContext,
 )
+from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAnalyzer
 
 logger = logging.getLogger(__name__)
 
