@@ -467,3 +467,13 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
     installation_ctx.deployed_workflows.repair_run("failing")
     assert installation_ctx.deployed_workflows.validate_step("failing")
+
+
+def test_workflow_with_wheelhouse(ws, installation_ctx):
+    installation_ctx.workspace_installation.run()
+
+    with pytest.raises(ManyError):
+        installation_ctx.deployed_workflows.run_workflow("failing")
+    installation_ctx.deployed_workflows.repair_run("failing")
+
+    assert installation_ctx.deployed_workflows.validate_step("failing")
