@@ -587,8 +587,8 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _upload_wheel(self) -> list[str]:
         wheel_paths = []
-        if self._config.wheelhouse is not None and self._config.wheelhouse.is_file():
-            return self._upload_wheelhouse(self._config.wheelhouse)
+        if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
+            return self._upload_wheelhouse(Path(self._config.wheelhouse))
         with self._wheels:
             if self._config.upload_dependencies:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
