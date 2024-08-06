@@ -580,14 +580,14 @@ class WorkflowsDeployment(InstallationMixin):
             # Removing the .zip suffix is a HACK. We can not upload a .zip file to the workspace as the platform fails
             # when extracting all files inside the zip archive
             remote_path = self._installation.upload(path.name.removesuffix(".zip"), path.read_bytes())
-            return [remote_path]
+            return [f"/Workspace{remote_path}"]
         # Override clusters are used in testing, so we need to upload all wheels
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
             for wheel in Path(directory).glob("*.whl"):
                 remote_wheel = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
-                remote_paths.append(remote_wheel)
+                remote_paths.append(f"/Workspace{remote_wheel}")
             return remote_paths
 
     def _upload_installation_wheel(self) -> list[str]:
