@@ -623,6 +623,8 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
                 job_task.job_cluster_key = None
                 job_task.libraries = None
+            # TODO: Introduced in https://github.com/databrickslabs/ucx/pull/414 to isolate test runs. Verify if it
+            # is still needed.
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 widget_values = {"task": job_task.task_key, 'workflow': workflow_name} | EXTRA_TASK_PARAMS
