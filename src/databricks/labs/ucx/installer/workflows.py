@@ -136,7 +136,7 @@ class DeployedWorkflows:
         try:
             logger.debug(f"Waiting for completion of {step} job: {run_url}")
             job_run = self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run_id, timeout=max_wait)
-            self._log_completed_job(step, job_run)
+            self._log_completed_job(step, run_id, job_run)
             return run_id
         except TimeoutError:
             logger.warning(f"Timeout while waiting for {step} job to complete: {run_url}")
@@ -151,22 +151,29 @@ class DeployedWorkflows:
             job_run = self._ws.jobs.get_run(run_id)
             raise self._infer_error_from_job_run(job_run) from err
 
-    def _log_completed_job(self, step: str, job_run: Run) -> None:
+    @staticmethod
+    def _log_completed_job(step: str, run_id: int, job_run: Run) -> None:
         if not logger.isEnabledFor(logging.INFO):
             return
-        start_time = datetime.utcfromtimestamp(job_run.start_time / 1000) if job_run.start_time else None
-        end_time = datetime.utcfromtimestamp(job_run.end_time / 1000) if job_run.end_time else None
-        if job_run.run_duration:
-            duration = timedelta(milliseconds=job_run.run_duration)
-        elif start_time and end_time:
-            duration = end_time - start_time
+        if job_run.state:
+            result_state = job_run.state.result_state or "N/A"
+            state_message = job_run.state.state_message
+            state_description = f"{result_state} ({state_message})" if state_message else f"{result_state}"
+            logger.info(f"Completed {step} job run {run_id} with state: {state_description}")
         else:
-            duration = None
-        result_state = job_run.state.result_state if job_run.state else None
-        state_message = job_run.state.state_message if job_run.state else None
-        logger.info(
-            f"Completed {step} job: {result_state or 'N/A'} ({state_message or 'N/A'}) {start_time or 'N/A'}-{end_time or 'N/A'} ({duration or 'N/A'})"
-        )
+            logger.info(f"Completed {step} job run {run_id}, but end state unknown.")
+        if job_run.start_time or job_run.end_time:
+            start_time = datetime.utcfromtimestamp(job_run.start_time / 1000) if job_run.start_time else None
+            end_time = datetime.utcfromtimestamp(job_run.end_time / 1000) if job_run.end_time else None
+            if job_run.run_duration:
+                duration = timedelta(milliseconds=job_run.run_duration)
+            elif start_time and end_time:
+                duration = end_time - start_time
+            else:
+                duration = None
+            logger.info(
+                f"Completed {step} job run {run_id} duration: {duration or 'N/A'} ({start_time or 'N/A'} thru {end_time or 'N/A'})"
+            )
 
     def repair_run(self, workflow):
         try:
