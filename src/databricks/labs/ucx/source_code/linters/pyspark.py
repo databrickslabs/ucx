@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Callable
 from dataclasses import dataclass
+from typing import TypeVar
 
 from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -11,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DIRECT_FS_REFS,
+    DIRECT_FS_REFS, DFSA,
 )
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
@@ -46,7 +47,7 @@ class Matcher(ABC):
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         """applies recommendations"""
 
-    def _get_table_arg(self, node: Call):
+    def _get_table_arg(self, node: Call) -> NodeNG | None:
         node_argc = len(node.args)
         if self.min_args <= node_argc <= self.max_args and self.table_arg_index < node_argc:
             return node.args[self.table_arg_index]
@@ -175,6 +176,8 @@ class ReturnValueMatcher(Matcher):
         return
 
 
+T = TypeVar("T")
+
 @dataclass
 class DirectFilesystemAccessMatcher(Matcher):
 
@@ -184,32 +187,50 @@ class DirectFilesystemAccessMatcher(Matcher):
     def lint(
         self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
     ) -> Iterator[Advice]:
-        table_arg = self._get_table_arg(node)
-        if not isinstance(table_arg, Const):
-            return
-        if not table_arg.value:
-            return
-        if not isinstance(table_arg.value, str):
-            return
-        if any(table_arg.value.startswith(prefix) for prefix in DIRECT_FS_REFS):
-            yield Deprecation.from_node(
+
+        def advice_for_direct_filesystem_access(value: str, node: NodeNG) -> Advice:
+            return Deprecation.from_node(
                 code='direct-filesystem-access',
-                message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
+                message=f"The use of direct filesystem references is deprecated: {value}",
                 node=node,
             )
-            return
-        if table_arg.value.startswith("/") and self._check_call_context(node):
-            yield Deprecation.from_node(
+
+        def advice_for_implicit_filesystem_access(value: str, node: NodeNG) -> Advice:
+            return Deprecation.from_node(
                 code='implicit-dbfs-usage',
-                message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
-                node=node,
+                message=f"The use of default dbfs: references is deprecated: {value}",
             )
+
+        yield from self._for_table_arg(node, advice_for_direct_filesystem_access, advice_for_implicit_filesystem_access)
+
+    def _for_table_arg(self, node: NodeNG, on_direct_access: Callable[[str, NodeNG], T], on_implicit_access: Callable[[str, NodeNG], T]) -> Iterable[T]:
+        if not isinstance(node, Call):
+            return
+        table_arg_node = self._get_table_arg(node)
+        for inferred in InferredValue.infer_from_node(table_arg_node):
+            if not inferred.is_inferred():
+                continue
+            table_arg = inferred.as_string()
+            if not table_arg:
+                continue
+            if any(table_arg.startswith(prefix) for prefix in DIRECT_FS_REFS):
+                yield on_direct_access(table_arg, node)
+                continue
+            if table_arg.startswith("/") and self._check_call_context(node):
+                yield on_implicit_access(table_arg, node)
+                continue
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
     # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
+    def collect_dfsas(self, node: NodeNG) -> Iterable[DFSA]:
+
+        def make_dfsa(value: str, _node: NodeNG) -> DFSA:
+            return DFSA(path=value)
+
+        yield from self._for_table_arg(node, make_dfsa, make_dfsa)
 
 
 _SPARK_SESSION_MATCHERS = [QueryMatcher("sql", 1, 1000, 0, "sqlQuery"), TableNameMatcher("table", 1, 1, 0)]
@@ -307,7 +328,7 @@ def all_matchers():
     return matchers
 
 
-def dfsa_matchers():
+def dfsa_matchers() -> dict[str, DirectFilesystemAccessMatcher]:
     matchers = {}
     for matcher in _SPARK_DFSA_MATCHERS:
         matchers[matcher.method_name] = matcher
@@ -316,11 +337,11 @@ def dfsa_matchers():
 
 class SparkSql(PythonLinter, Fixer):
 
-    def __init__(self, from_table: FromTable, index: MigrationIndex, session_state, dfsa_matchers_only=False):
+    def __init__(self, from_table: FromTable, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
-        self._spark_matchers = dfsa_matchers() if dfsa_matchers_only else all_matchers()
+        self._spark_matchers = all_matchers()
 
     def name(self) -> str:
         # this is the same fixer, just in a different language context

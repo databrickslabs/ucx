@@ -6,7 +6,7 @@ from collections.abc import Iterable, Callable
 from pathlib import Path
 from typing import cast, TypeVar
 
-from astroid import AstroidSyntaxError, Call, Const, ImportFrom, NodeNG, Try, Name  # type: ignore
+from astroid import AstroidSyntaxError, Attribute, Call, Const, ImportFrom, NodeNG, Try, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.base import DFSA
 from databricks.labs.ucx.source_code.graph import (
@@ -22,6 +22,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     NotebookRunCall,
     UnresolvedPath,
 )
+from databricks.labs.ucx.source_code.linters.pyspark import dfsa_matchers, Matcher, DirectFilesystemAccessMatcher
 from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,34 @@ class PythonCodeAnalyzer:
         return context
 
     def collect_dfsas(self, inherited_context: Tree | None) -> Iterable[DFSA]:
-        yield from []
+        matchers = dfsa_matchers()
+        tree = self._build_full_tree(inherited_context)
+        for node in tree.walk():
+            if not Tree(node).is_from_module("spark"):
+                continue
+            matcher = self._find_dfsa_matcher(matchers, node)
+            if matcher is None:
+                continue
+            yield from matcher.collect_dfsas(node)
+
+    @classmethod
+    def _find_dfsa_matcher(cls, matchers: dict[str, DirectFilesystemAccessMatcher], node: NodeNG) -> DirectFilesystemAccessMatcher | None:
+        if not isinstance(node, Call):
+            return None
+        if not isinstance(node.func, Attribute):
+            return None
+        matcher = matchers.get(node.func.attrname, None)
+        if matcher is None:
+            return None
+        return matcher if matcher.matches(node) else None
+
+    def _build_full_tree(self, inherited_context: Tree | None) -> Tree:
+        full_tree = Tree.new_module()
+        if inherited_context is not None:
+            full_tree = full_tree.append_tree(inherited_context)
+            full_tree = full_tree.renumber(-1)
+        tree = Tree.normalize_and_parse(self._python_code)
+        return full_tree.append_tree(tree)
 
     def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
