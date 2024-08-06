@@ -45,7 +45,7 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
-from databricks.sdk.service.workspace import ObjectType
+from databricks.sdk.service.workspace import ImportFormat, ObjectType
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -576,7 +576,8 @@ class WorkflowsDeployment(InstallationMixin):
         ----
         Move this method into the WheelsV2 class.
         """
-        return [self._installation.upload(f"wheels/{path.name}", path.read_bytes())]
+        remote_path = self._installation.upload(f"wheels/{path.name}", path.read_bytes())
+        return [remote_path]
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
@@ -585,10 +586,7 @@ class WorkflowsDeployment(InstallationMixin):
                 remote_paths.append(remote_wheel)
             return remote_paths
 
-    def _upload_wheel(self) -> list[str]:
-        wheel_paths = []
-        if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
-            return self._upload_wheelhouse(Path(self._config.wheelhouse))
+    def _upload_installation_wheel(self) -> list[str]:
         with self._wheels:
             if self._config.upload_dependencies:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
@@ -596,6 +594,11 @@ class WorkflowsDeployment(InstallationMixin):
             wheel_paths.append(self._wheels.upload_to_wsfs())
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
             return wheel_paths
+
+    def _upload_wheel(self) -> list[str]:
+        if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
+            return self._upload_wheelhouse(Path(self._config.wheelhouse))
+        return self._upload_installation_wheel()
 
     def _upload_wheel_runner(self, remote_wheels: list[str]) -> str:
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
