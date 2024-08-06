@@ -159,7 +159,7 @@ class DeployedWorkflows:
             state_description = f"{result_state} ({state_message})" if state_message else f"{result_state}"
             logger.info(f"Completed {step} job run {run_id} with state: {state_description}")
         else:
-            logger.info(f"Completed {step} job run {run_id}, but end state unknown.")
+            logger.warning(f"Completed {step} job run {run_id} but end state is unknown.")
         if job_run.start_time or job_run.end_time:
             start_time = (
                 datetime.fromtimestamp(job_run.start_time / 1000, tz=timezone.utc) if job_run.start_time else None
