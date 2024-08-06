@@ -156,15 +156,15 @@ class AzureResourcePermissions:
         self,
         policy_definition: str,
         storage_accounts: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        uber_principal_secret_identifier: str,
+        principal: PrincipalSecret,
+        principal_secret_identifier: str,
     ) -> str:
         policy_dict = json.loads(policy_definition)
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         for storage in storage_accounts:
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config(uber_principal.client.client_id)
+                self._policy_config(principal.client.client_id)
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"] = (
                 self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
@@ -176,7 +176,7 @@ class AzureResourcePermissions:
                 self._policy_config("OAuth")
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config("{{" + uber_principal_secret_identifier + "}}")
+                self._policy_config("{{" + principal_secret_identifier + "}}")
             )
         return json.dumps(policy_dict)
 
@@ -188,8 +188,8 @@ class AzureResourcePermissions:
         self,
         policy_id: str,
         storage_accounts: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        uber_principal_secret_identifier: str,
+        principal: PrincipalSecret,
+        principal_secret_identifier: str,
     ):
         try:
             policy_definition = ""
@@ -199,7 +199,10 @@ class AzureResourcePermissions:
 
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
-                    cluster_policy.definition, storage_accounts, uber_principal, uber_principal_secret_identifier,
+                    cluster_policy.definition,
+                    storage_accounts,
+                    principal,
+                    principal_secret_identifier,
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
@@ -234,13 +237,11 @@ class AzureResourcePermissions:
                 f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
                 endpoint,
             ),
-            EndpointConfPair(
-                f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"
-            ),
+            EndpointConfPair(f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"),
             EndpointConfPair(
                 f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
                 "{{" + principal_secret_identifier + "}}",
-            )
+            ),
         ]
 
     def _update_sql_dac_with_spn(
@@ -283,7 +284,9 @@ class AzureResourcePermissions:
         principal: PrincipalSecret,
         principal_secret_identifier: str,
     ):
-        warehouse_config = self._installation.load(GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json")
+        warehouse_config = self._installation.load(
+            GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json"
+        )
         sql_dac = warehouse_config.data_access_config or []
 
         for storage_account in storage_accounts:
@@ -431,7 +434,11 @@ class AzureResourcePermissions:
             self._azurerm.apply_storage_permission(principal_id, storage, role_name, role_guid)
             logger.debug(f"{role_name} permission applied for spn {principal_id} to storage account {storage.name}")
 
-    def _create_and_get_secret_for_uber_principal(self, principal_secret: PrincipalSecret, scope: str) -> GetSecretResponse:
+    def _create_and_get_secret_for_uber_principal(
+        self,
+        principal_secret: PrincipalSecret,
+        scope: str,
+    ) -> GetSecretResponse:
         """Create and get a workspace secret for the principal.
 
         If the secret scope does not, it wil be recreated. If the secret already exists, it will be overwritten.
@@ -445,7 +452,7 @@ class AzureResourcePermissions:
         self._ws.secrets.put_secret(scope, key, string_value=principal_secret.secret)
         return self._get_secret(scope, key)
 
-    @retried(on=ResourceDoesNotExist, timeout=timedelta(minutes=2))
+    @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=2))
     def _get_secret(self, scope: str, secret: str) -> GetSecretResponse:
         return self._ws.secrets.get_secret(scope, secret)
 

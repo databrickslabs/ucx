@@ -360,7 +360,9 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
-    def delete_storage_permission(self, scope: str, *, principal_id: str | None = None, role_guid: str | None = None) -> None:
+    def delete_storage_permission(
+        self, scope: str, *, principal_id: str | None = None, role_guid: str | None = None
+    ) -> None:
         """Delete storage permissions
 
         Parameters
