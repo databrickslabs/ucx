@@ -8,11 +8,13 @@ from functools import cached_property
 from databricks.labs.lsql import Row
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.blueprint.installation import NotInstalled
 
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.locations import LocationTrie
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -26,6 +28,14 @@ class AssessmentObject:
     object_type: str
     object_id: str
     failures: list[str]
+
+
+@dataclass
+class TableFromWorkspace(Table):
+    workspace_id: int = 0
+
+    def __str__(self):
+        return f"{self.workspace_id}:{super().__str__()}"
 
 
 class AccountAggregate:
@@ -87,6 +97,11 @@ class AccountAggregate:
             objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
+    def _fetch_tables(self) -> Iterable[TableFromWorkspace]:
+        for workspace_id, row in self._federated_ucx_query("SELECT * FROM tables", table_name="tables"):
+            # Mypy complains about multiple values for `workspace_id`
+            yield TableFromWorkspace(*row, workspace_id=workspace_id)  # type: ignore
+
     def readiness_report(self):
         logger.info("Generating readiness report")
         all_objects = 0
@@ -106,3 +121,31 @@ class AccountAggregate:
 
         for failure, objects in failures.items():
             logger.info(f"{failure}: {len(objects)} objects")
+
+    def validate_table_locations(self) -> list[list[Table]]:
+        """The table locations should not be overlapping."""
+        logger.info("Validating migration readiness")
+        tables = list(self._fetch_tables())
+        trie = LocationTrie()
+        for table in tables:
+            if table.location is not None:
+                trie.insert(table)
+        seen_tables, all_conflicts = set(), []
+        for table in tables:
+            if str(table) in seen_tables:
+                continue
+            seen_tables.add(str(table))
+            node = trie.find(table)
+            if node is None:
+                continue
+            if not node.has_children() and len(node.tables) == 1:
+                continue
+            conflicts = []
+            for sub_node in node:
+                for conflicting_table in sub_node.tables:
+                    conflicts.append(conflicting_table)
+                    seen_tables.add(str(conflicting_table))
+            conflict_message = " and ".join(str(conflict) for conflict in conflicts)
+            logger.warning(f"Overlapping table locations: {conflict_message}")
+            all_conflicts.append(conflicts)
+        return all_conflicts

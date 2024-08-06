@@ -48,6 +48,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
         * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
         * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
       * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
+      * [Table migration workflows](#table-migration-workflows)
       * [Step 4: Odds and Ends](#step-4-odds-and-ends)
         * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
         * [Step 4.2: Moving objects](#step-42-moving-objects)
@@ -96,14 +97,15 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
   * [`validate-groups-membership` command](#validate-groups-membership-command)
+  * [`validate-table-locations` command](#validate-table-locations-command)
   * [`cluster-remap` command](#cluster-remap-command)
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
     * [Version Issues](#version-issues)
-    * [Multiple Profiles in Databricks CLI](#multiple-profiles-in-databricks-cli)
     * [Authentication Issues](#authentication-issues)
+    * [Multiple Profiles in Databricks CLI](#multiple-profiles-in-databricks-cli)
     * [Workspace has an external Hive Metastore (HMS)](#workspace-has-an-external-hive-metastore-hms)
     * [Verify the Installation](#verify-the-installation)
 * [Star History](#star-history)
@@ -282,6 +284,8 @@ flowchart TD
         create-table-mapping --> table-migration
         create-table-mapping --> code-migration
         validate-external-locations --> table-migration
+        assessment --> validate-table-locations
+        validate-table-locations --> table-migration
         table-migration --> revert-migrated-tables
         revert-migrated-tables --> table-migration
     end
@@ -1329,6 +1333,37 @@ used to debug issues related to group membership. See [group migration](docs/loc
 [group migration](#group-migration-workflow) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
+
+[[back to top](#databricks-labs-ucx)]
+
+## `validate-table-locations` command
+
+```text
+$ databricks labs ucx validate-table-locations [--workspace-ids 123,456,789]
+...
+11:39:36  WARN [d.l.u.account.aggregate] Workspace 99999999 does not have UCX installed
+11:39:37  WARN [d.l.u.account.aggregate] Overlapping table locations: 123456789:hive_metastore.database.table and 987654321:hive_metastore.database.table
+11:39:37  WARN [d.l.u.account.aggregate] Overlapping table locations: 123456789:hive_metastore.database.table and 123456789:hive_metastore.another_database.table
+```
+
+This command validates the table locations by checking for overlapping table locations in the workspace and across
+workspaces. Unity catalog does not allow overlapping table locations, also not between tables in different catalogs.
+Overlapping table locations need to be resolved by the user before running the table migration.
+
+Options to resolve tables with overlapping locations are:
+- Move one table and [skip](#skip-command) the other(s).
+- Duplicate the tables by copying the data into a managed table and [skip](#skip-command) the original tables.
+
+Considerations when resolving tables with overlapping locations are:
+- Migrate the tables one workspace at a time:
+  - Let later migrated workspaces read tables from the earlier migrated workspace catalogs.
+  - [Move](#move-command) tables between schemas and catalogs when it fits the data management model.
+- The tables might have different:
+  - Metadata, like:
+    - Column schema (names, types, order)
+    - Description
+    - Tags
+  - ACLs
 
 [[back to top](#databricks-labs-ucx)]
 

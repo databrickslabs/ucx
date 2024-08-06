@@ -51,6 +51,15 @@ commands:
       - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
+  - name: validate-table-locations
+    is_account_level: true
+    description: Validate if the table locations are overlapping in a workspace and across workspaces.
+    flags:
+      - name: workspace-ids
+        description: |
+          List of workspace IDs to include.
+          If --workspace-ids is not provided, it will use all workspaces present in the account.
+
   - name: manual-workspace-info
     description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
 
