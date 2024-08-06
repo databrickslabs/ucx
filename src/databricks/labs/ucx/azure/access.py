@@ -187,9 +187,9 @@ class AzureResourcePermissions:
     def _update_cluster_policy_with_spn(
         self,
         policy_id: str,
-        storage_accounts: list[StorageAccount],
         principal: PrincipalSecret,
         principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
     ):
         try:
             policy_definition = ""
@@ -246,14 +246,14 @@ class AzureResourcePermissions:
 
     def _update_sql_dac_with_spn(
         self,
-        storage_account_info: list[StorageAccount],
         principal: PrincipalSecret,
         principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
     ):
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
         self._installation.save(warehouse_config, filename="warehouse-config-backup.json")
         sql_dac = warehouse_config.data_access_config or []
-        for storage in storage_account_info:
+        for storage in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
                 storage, principal, principal_secret_identifier
             )
@@ -323,10 +323,10 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
-        storage_account_info = []
+        storage_accounts = []
         for storage in self._azurerm.storage_accounts():
             if storage.name in used_storage_accounts:
-                storage_account_info.append(storage)
+                storage_accounts.append(storage)
         logger.info("Creating service principal")
         uber_principal = self._azurerm.create_service_principal(uber_principal_name)
         secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
@@ -337,11 +337,11 @@ class AzureResourcePermissions:
         )
         try:
             self._apply_storage_permission(
-                uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_account_info
+                uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_accounts
             )
             self._installation.save(config)
-            self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, secret_identifier)
-            self._update_sql_dac_with_spn(storage_account_info, uber_principal, secret_identifier)
+            self._update_cluster_policy_with_spn(policy_id, uber_principal, secret_identifier, storage_accounts)
+            self._update_sql_dac_with_spn(uber_principal, secret_identifier, storage_accounts)
         except PermissionError:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
