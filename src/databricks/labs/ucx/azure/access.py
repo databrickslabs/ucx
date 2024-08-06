@@ -194,9 +194,7 @@ class AzureResourcePermissions:
         try:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
-
             self._installation.save(cluster_policy, filename="policy-backup.json")
-
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
                     cluster_policy.definition,
@@ -328,23 +326,23 @@ class AzureResourcePermissions:
             if storage.name in used_storage_accounts:
                 storage_accounts.append(storage)
         logger.info("Creating service principal")
-        uber_principal = self._azurerm.create_service_principal(uber_principal_name)
-        secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
-        secret_identifier = f"secrets/{inventory_database}/{secret.key}"
-        config.uber_spn_id = uber_principal.client.client_id
-        logger.info(
-            f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
-        )
         try:
+            uber_principal = self._azurerm.create_service_principal(uber_principal_name)
             self._apply_storage_permission(
                 uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_accounts
             )
-            self._installation.save(config)
+            secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
+            secret_identifier = f"secrets/{inventory_database}/{secret.key}"
             self._update_cluster_policy_with_spn(policy_id, uber_principal, secret_identifier, storage_accounts)
             self._update_sql_dac_with_spn(uber_principal, secret_identifier, storage_accounts)
-        except PermissionError:
-            self._azurerm.delete_service_principal(uber_principal.client.object_id)
-        logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
+        except (PermissionError, NotFound):
+            logger.error("Failed to create service principal", exc_info=True)
+            self._delete_uber_principal()  # Clean up dangling resources
+            return
+        config.uber_spn_id = uber_principal.client.client_id
+        self._installation.save(config)
+        logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
+        logger.info(f"Updated UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
