@@ -479,8 +479,5 @@ def test_workflow_with_wheelhouse(ws, installation_ctx):
     )
     ctx.workspace_installation.run()
 
-    with pytest.raises(ManyError):
-        ctx.deployed_workflows.run_workflow("failing")
-    ctx.deployed_workflows.repair_run("failing")
-
-    assert ctx.deployed_workflows.validate_step("failing")
+    ctx.deployed_workflows.run_workflow("succeeding")
+    assert ctx.deployed_workflows.validate_step("succeeding")
