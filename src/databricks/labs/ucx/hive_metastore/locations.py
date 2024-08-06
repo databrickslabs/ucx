@@ -74,7 +74,9 @@ class LocationTrie:
         return f"{scheme}://{netloc}/{'/'.join(path)}"
 
     @staticmethod
-    def _parse_location(location: str) -> list[str]:
+    def _parse_location(location: str | None) -> list[str]:
+        if not location:
+            return []
         parse_result = urlparse(location)
         parts = [parse_result.scheme, parse_result.netloc]
         parts.extend(parse_result.path.strip("/").split("/"))
@@ -82,7 +84,7 @@ class LocationTrie:
 
     def insert(self, table: Table) -> None:
         current = self
-        for part in self._parse_location(table.location or ""):
+        for part in self._parse_location(table.location):
             if part not in current.children:
                 parent = current
                 current = LocationTrie(part, parent)
@@ -93,7 +95,7 @@ class LocationTrie:
 
     def find(self, table: Table) -> OptionalLocationTrie:
         current = self
-        for part in self._parse_location(table.location or ""):
+        for part in self._parse_location(table.location):
             if part not in current.children:
                 return None
             current = current.children[part]
