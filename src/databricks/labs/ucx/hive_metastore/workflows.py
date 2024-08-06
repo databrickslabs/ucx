@@ -69,7 +69,7 @@ class TableMigration(Workflow):
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def update_migration_status(self, ctx: RuntimeContext):
+    def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.get_remaining_tables()
 

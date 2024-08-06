@@ -1,6 +1,4 @@
 import pytest
-import logging
-from unittest.mock import create_autospec
 from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
     MigrateExternalTablesCTAS,
@@ -9,21 +7,9 @@ from databricks.labs.ucx.hive_metastore.workflows import (
     ScanTablesInMounts,
 )
 
-from databricks.labs.ucx.hive_metastore.tables import (
-    Table,
-    TablesCrawler,
-)
 
-from databricks.labs.ucx.hive_metastore.migration_status import (
-    MigrationStatusRefresher,
-    MigrationIndex,
-    MigrationStatus,
-)
 
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.lsql.backends import MockBackend
 
 
 def test_migrate_external_tables_sync(run_workflow):
