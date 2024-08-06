@@ -49,7 +49,7 @@ dependencies = ["databricks-sdk~=0.29.0",
                 "databricks-labs-blueprint>=0.8,<0.9",
                 "PyYAML>=6.0.0,<7.0.0",
                 "sqlglot>=25.5.0,<25.9",
-                "astroid>=3.2.2"]
+                "astroid>=3.3.0"]
 
 [project.optional-dependencies]
 pylsp = [
@@ -208,7 +208,7 @@ fail-under = 10.0
 # ignore-list. The regex matches against paths and can be in Posix or Windows
 # format. Because '\\' represents the directory delimiter on Windows systems, it
 # can't be used as an escape character.
- ignore-paths='^tests/unit/source_code/samples/.*$'
+ignore-paths='^tests/unit/source_code/samples/.*$'
 
 # Files or directories matching the regular expression patterns are skipped. The
 # regex matches against base names, not paths. The default value ignores Emacs
