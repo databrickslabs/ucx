@@ -576,8 +576,10 @@ class WorkflowsDeployment(InstallationMixin):
         ----
         Move this method into the WheelsV2 class.
         """
-        remote_path = self._installation.upload(f"wheels/{path.name}", path.read_bytes())
-        return [remote_path]
+        if not self._config.override_clusters:
+            remote_path = self._installation.upload(f"wheels/{path.name}", path.read_bytes())
+            return [remote_path]
+        # Override clusters are used in testing, so we need to upload all wheels
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
