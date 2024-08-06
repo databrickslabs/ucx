@@ -111,7 +111,7 @@ wheelhouse   = [
     "mkdir -p wheels",
     "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
     "pip download -r requirements.txt --dest wheels/",
-    "zip -j -r wheelhouse.zip wheels/*.whl requirements.txt",
+    "zip -j -r ucx.wheelhouse.zip wheels/*.whl requirements.txt",
 ]
 
 [tool.pytest.ini_options]

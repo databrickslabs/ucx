@@ -34,7 +34,7 @@ MANIFEST
 # TODO: Do we want to keep (generated) requirements.txt in git?
 # Pro: it would allow us to update single requirements instead of all
 requirements.txt
-wheelhouse.zip
+ucx.wheelhouse.zip
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

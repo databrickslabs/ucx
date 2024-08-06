@@ -33,7 +33,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
-_WHEEL_HOUSE_PATH = Path(__file__).parent.parent.parent.parent / "wheelhouse.zip"
+_WHEEL_HOUSE_PATH = Path(__file__).parent.parent.parent.parent / "ucx.wheelhouse.zip"
 
 
 @pytest.fixture
