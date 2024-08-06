@@ -215,10 +215,7 @@ class AzureResourcePermissions:
             self._ws.cluster_policies.edit(policy_id, policy.name, definition=policy.definition)
 
     def _create_storage_account_data_access_configuration_pairs(
-        self,
-        storage: StorageAccount,
-        principal_client_id: str,
-        principal_secret_identifier: str,
+        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
     ) -> list[EndpointConfPair]:
         """Create the data access configuration pairs to access the storage"""
         tenant_id = self._azurerm.tenant_id()
@@ -254,7 +251,7 @@ class AzureResourcePermissions:
         sql_dac = warehouse_config.data_access_config or []
         for storage in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
-                storage, principal_client_id, principal_secret_identifier
+                principal_client_id, principal_secret_identifier, storage
             )
             sql_dac.extend(configuration_pairs)
         security_policy = (
@@ -293,7 +290,7 @@ class AzureResourcePermissions:
 
         for storage_account in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
-                storage_account, principal_client_id, principal_secret_identifier
+                principal_client_id, principal_secret_identifier, storage_account
             )
             for configuration_pair in configuration_pairs:
                 sql_dac.remove(configuration_pair)
