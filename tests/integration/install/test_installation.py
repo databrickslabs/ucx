@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
+from pathlib import Path
 from typing import NoReturn
 
 import pytest
@@ -470,10 +471,16 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
 
 def test_workflow_with_wheelhouse(ws, installation_ctx):
-    installation_ctx.workspace_installation.run()
+    ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            wheelhouse=Path(__file__).parent.parent.parent.parent / "wheelhouse.zip",
+        )
+    )
+    ctx.workspace_installation.run()
 
     with pytest.raises(ManyError):
-        installation_ctx.deployed_workflows.run_workflow("failing")
-    installation_ctx.deployed_workflows.repair_run("failing")
+        ctx.deployed_workflows.run_workflow("failing")
+    ctx.deployed_workflows.repair_run("failing")
 
-    assert installation_ctx.deployed_workflows.validate_step("failing")
+    assert ctx.deployed_workflows.validate_step("failing")
