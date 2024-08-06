@@ -220,7 +220,9 @@ class TablesMigrator:
                 self._sql_alter_from(src_view.src, src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
             )
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
+            self._set_error(src_view.src,
+                            f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}"
+                            , "upgrade")
             return False
         return self._migrate_acl(src_view.src, src_view.rule, grants)
 
@@ -239,10 +241,10 @@ class TablesMigrator:
         # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
         sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
         if sync_result.status_code != "SUCCESS":
-            logger.warning(
-                f"SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
-                f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
-            )
+            self._set_error(src_table,
+                            f"SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
+                            f"Status code: {sync_result.status_code}. Description: {sync_result.description}",
+                            "upgrade")
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
@@ -261,7 +263,7 @@ class TablesMigrator:
             HiveSerdeType.OTHER_HIVESERDE,
             HiveSerdeType.INVALID_HIVESERDE_INFO,
         ]:
-            logger.warning(f"{src_table.key} table can only be migrated using CTAS.")
+            self._set_error(src_table, f"{src_table.key} table can only be migrated using CTAS.", "upgrade")
             return False
 
         # if the src table location is using mount, resolve the mount location so it will be used in the updated DDL
@@ -273,9 +275,9 @@ class TablesMigrator:
             rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_type, dst_table_location
         )
         if not table_migrate_sql:
-            logger.error(
-                f"Failed to generate in-place migration DDL for {src_table.key}, skip the in-place migration. It can be migrated in CTAS workflow"
-            )
+            error = f"Failed to generate in-place migration DDL for {src_table.key}, skip the in-place migration. It can be migrated in CTAS workflow"
+            logger.error(error)
+            self._set_error(src_table, error, "upgrade")
             return False
 
         logger.debug(
@@ -286,7 +288,8 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            self._set_error(src_table, f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}",
+                            "upgrade")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -301,7 +304,8 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            self._set_error(src_table, f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}"
+                            , "upgrade")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -322,7 +326,8 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            self._set_error(src_table, f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}",
+                            "upgrade")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -337,7 +342,8 @@ class TablesMigrator:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            self._set_error(src_table, f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}",
+                            "upgrade")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -353,7 +359,7 @@ class TablesMigrator:
             try:
                 self._backend.execute(acl_migrate_sql)
             except DatabricksError as e:
-                logger.warning(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
+                self._set_error(src, f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}", "acl")
         return True
 
     def _table_already_migrated(self, target) -> bool:
@@ -489,3 +495,22 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
+
+    def _sql_set_error(self, table: Table, error: str, error_type):
+        if error_type == "acl":
+            tbl_property = TableMapping.UCX_ACL_ERROR_PROPERTY
+        else:
+            tbl_property = TableMapping.UCX_MIGRATE_ERROR_PROPERTY
+        return (f"ALTER {table.kind} {escape_sql_identifier(table.key)} SET TBLPROPERTIES "
+                f"({tbl_property} = '{error}');")
+
+    def _sql_unset_error(self, table: Table, error_type):
+        return (f"ALTER {table.kind} {escape_sql_identifier(table.key)} UNSET TBLPROPERTIES "
+                f"({TableMapping.UCX_MIGRATE_ERROR_PROPERTY});")
+
+    def _set_error(self, table: Table, error: str, error_type: str = "upgrade"):
+        logger.warning(error)
+        try:
+            self._backend.execute(self._sql_set_error(table, error, error_type))
+        except DatabricksError as e:
+            logger.warning(f"Failed to set error {error_type} property on {table.key}: {e}")
