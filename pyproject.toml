@@ -86,6 +86,7 @@ dependencies = [
     "ruff~=0.3.4",
     "types-PyYAML~=6.0.12",
     "types-requests~=2.31.0",
+    "pip-tools~=7.4.1",
 ]
 
 # store virtual env as the child of this folder. Helps VSCode (and PyCharm) to run better
@@ -105,6 +106,13 @@ verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 cmds         = "python tests/integration/cmds.py"
+wheelhouse   = [
+    "rm -rf wheels/",
+    "mkdir -p wheels",
+    "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
+    "pip download -r requirements.txt --dest wheels/",
+    "zip -r wheelhouse.zip wheels/ requirements.txt",
+]
 
 [tool.pytest.ini_options]
 # TODO: remove `-p no:warnings`
