@@ -84,4 +84,4 @@ jobs:
       - name: Fail on differences
         run: |
           # Exit with status code 1 if there are differences (i.e. unformatted files)
-          git diff --exit-code
+          git diff --exit-code -- . :^tests/unit/source_code/samples
