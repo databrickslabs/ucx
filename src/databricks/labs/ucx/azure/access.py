@@ -45,6 +45,7 @@ class StoragePermissionMapping:
 
 class AzureResourcePermissions:
     FILENAME = 'azure_storage_account_info.csv'
+    _UBER_PRINCIPAL_SECRET_KEY = "uber_principal_secret"
 
     def __init__(
         self,
@@ -216,7 +217,7 @@ class AzureResourcePermissions:
     def _create_storage_account_data_access_configuration_pairs(
         self,
         storage: StorageAccount,
-        principal: PrincipalSecret,
+        principal_client_id: str,
         principal_secret_identifier: str,
     ) -> list[EndpointConfPair]:
         """Create the data access configuration pairs to access the storage"""
@@ -225,7 +226,7 @@ class AzureResourcePermissions:
         return [
             EndpointConfPair(
                 f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
-                principal.client.client_id,
+                principal_client_id,
             ),
             EndpointConfPair(
                 f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
@@ -244,7 +245,7 @@ class AzureResourcePermissions:
 
     def _update_sql_dac_with_spn(
         self,
-        principal: PrincipalSecret,
+        principal_client_id: str,
         principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
     ):
@@ -253,7 +254,7 @@ class AzureResourcePermissions:
         sql_dac = warehouse_config.data_access_config or []
         for storage in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
-                storage, principal, principal_secret_identifier
+                storage, principal_client_id, principal_secret_identifier
             )
             sql_dac.extend(configuration_pairs)
         security_policy = (
@@ -278,7 +279,7 @@ class AzureResourcePermissions:
 
     def _revert_sql_dac_with_spn(
         self,
-        principal: PrincipalSecret,
+        principal_client_id: str,
         principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
     ):
@@ -292,7 +293,7 @@ class AzureResourcePermissions:
 
         for storage_account in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
-                storage_account, principal, principal_secret_identifier
+                storage_account, principal_client_id, principal_secret_identifier
             )
             for configuration_pair in configuration_pairs:
                 sql_dac.remove(configuration_pair)
@@ -337,7 +338,7 @@ class AzureResourcePermissions:
             secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
             secret_identifier = f"secrets/{inventory_database}/{secret.key}"
             self._update_cluster_policy_with_spn(policy_id, uber_principal, secret_identifier, storage_accounts)
-            self._update_sql_dac_with_spn(uber_principal, secret_identifier, storage_accounts)
+            self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
         except (PermissionError, NotFound):
             logger.error("Failed to create service principal", exc_info=True)
             self._delete_uber_principal()  # Clean up dangling resources
@@ -363,13 +364,17 @@ class AzureResourcePermissions:
                 except NotFound:
                     pass  # Already deleted
                 except PermissionDenied:
-                    logger.error(f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True)
+                    logger.error(
+                        f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True
+                    )
             try:
                 self._azurerm.delete_service_principal(config.uber_spn_id)
             except NotFound:
                 pass  # Already deleted
             except PermissionDenied:
                 logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+            secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+            self._revert_sql_dac_with_spn(config.uber_spn_id, secret_identifier, storage_accounts)
         if config.policy_id is None:
             logger.debug("No UCX cluster policy found in config. Skipping policy revert.")
         else:
@@ -451,14 +456,13 @@ class AzureResourcePermissions:
 
         If the secret scope does not, it wil be recreated. If the secret already exists, it will be overwritten.
         """
-        key = "uber_principal_secret"
         logger.info(f"Creating secret scope {scope}.")
         try:
             self._ws.secrets.create_scope(scope)
         except ResourceAlreadyExists:
             logger.warning(f"Secret scope {scope} already exists, using the same")
-        self._ws.secrets.put_secret(scope, key, string_value=principal_secret.secret)
-        return self._get_secret(scope, key)
+        self._ws.secrets.put_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY, string_value=principal_secret.secret)
+        return self._get_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY)
 
     @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=2))
     def _get_secret(self, scope: str, secret: str) -> GetSecretResponse:
