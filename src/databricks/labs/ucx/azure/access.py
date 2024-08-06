@@ -332,7 +332,7 @@ class AzureResourcePermissions:
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
         if config.uber_spn_id is None:
-            logger.warning("No uber service principal found in config. Skipping service principal deletion.")
+            logger.debug("No uber service principal found in config. Skipping service principal deletion.")
         else:
             used_storage_accounts = self._get_storage_accounts()
             storage_accounts = []
@@ -346,7 +346,7 @@ class AzureResourcePermissions:
             except PermissionDenied:
                 logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
         if config.policy_id is None:
-            logger.warning("No UCX cluster policy found in config. Skipping policy revert.")
+            logger.debug("No UCX cluster policy found in config. Skipping policy revert.")
         else:
             self._revert_cluster_policy(config.policy_id)
         self._safe_delete_scope(config.inventory_database)
