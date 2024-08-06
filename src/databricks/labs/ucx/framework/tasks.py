@@ -23,7 +23,7 @@ class Task:
     cloud: str | None = None
 
     def is_testing(self):
-        return self.workflow in {"failing"}
+        return self.workflow in {"succeeding", "failing"}
 
     def dependencies(self):
         if not self.depends_on:

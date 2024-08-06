@@ -177,6 +177,17 @@ class Assessment(Workflow):
         ctx.group_manager.snapshot()
 
 
+class Succeeding(Workflow):
+    def __init__(self):
+        super().__init__('succeeding')
+
+    @job_task
+    def succeeding_task(self, ctx: RuntimeContext):
+        """This task always succeeds. It is used to test workflow installation."""
+        _ = ctx
+        logger.info("This task always succeeds.")
+
+
 class Failing(Workflow):
     def __init__(self):
         super().__init__('failing')
