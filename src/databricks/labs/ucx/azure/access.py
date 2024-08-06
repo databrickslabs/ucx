@@ -212,44 +212,50 @@ class AzureResourcePermissions:
         if policy.name is not None and policy.definition is not None:
             self._ws.cluster_policies.edit(policy_id, policy.name, definition=policy.definition)
 
+    def _create_storage_account_data_access_configuration_pairs(
+        self,
+        storage: StorageAccount,
+        principal: PrincipalSecret,
+        principal_secret_identifier: str,
+    ) -> list[EndpointConfPair]:
+        """Create the data access configuration pairs to access the storage"""
+        tenant_id = self._azurerm.tenant_id()
+        endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+        return [
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                principal.client.client_id,
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                endpoint,
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                "{{" + principal_secret_identifier + "}}",
+        ]
+
     def _update_sql_dac_with_spn(
         self,
         storage_account_info: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        inventory_database: str,
+        principal: PrincipalSecret,
+        principal_secret_identifier: str,
     ):
-
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
         self._installation.save(warehouse_config, filename="warehouse-config-backup.json")
-        sql_dac = warehouse_config.data_access_config
-        if sql_dac is None:
-            sql_dac = []
-        tenant_id = self._azurerm.tenant_id()
-        endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+        sql_dac = warehouse_config.data_access_config or []
         for storage in storage_account_info:
-            sql_dac.extend(
-                [
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
-                        uber_principal.client.client_id,
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
-                        "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
-                        endpoint,
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
-                        "{{secrets/" + inventory_database + "/uber_principal_secret}}",
-                    ),
-                ]
+            configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
+                storage, principal, principal_secret_identifier
             )
+            sql_dac.extend(configuration_pairs)
         security_policy = (
             SetWorkspaceWarehouseConfigRequestSecurityPolicy(warehouse_config.security_policy.value)
             if warehouse_config.security_policy
