@@ -12,7 +12,8 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DIRECT_FS_REFS, DFSA,
+    DIRECT_FS_REFS,
+    DFSA,
 )
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
@@ -120,6 +121,8 @@ class TableNameMatcher(Matcher):
         self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
+        if table_arg is None:
+            return
         table_name = table_arg.as_string().strip("'").strip('"')
         for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
@@ -178,6 +181,7 @@ class ReturnValueMatcher(Matcher):
 
 T = TypeVar("T")
 
+
 @dataclass
 class DirectFilesystemAccessMatcher(Matcher):
 
@@ -199,11 +203,14 @@ class DirectFilesystemAccessMatcher(Matcher):
             return Deprecation.from_node(
                 code='implicit-dbfs-usage',
                 message=f"The use of default dbfs: references is deprecated: {value}",
+                node=node,
             )
 
         yield from self._for_table_arg(node, advice_for_direct_filesystem_access, advice_for_implicit_filesystem_access)
 
-    def _for_table_arg(self, node: NodeNG, on_direct_access: Callable[[str, NodeNG], T], on_implicit_access: Callable[[str, NodeNG], T]) -> Iterable[T]:
+    def _for_table_arg(
+        self, node: NodeNG, on_direct_access: Callable[[str, NodeNG], T], on_implicit_access: Callable[[str, NodeNG], T]
+    ) -> Iterable[T]:
         if not isinstance(node, Call):
             return
         table_arg_node = self._get_table_arg(node)

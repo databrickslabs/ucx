@@ -22,7 +22,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     NotebookRunCall,
     UnresolvedPath,
 )
-from databricks.labs.ucx.source_code.linters.pyspark import dfsa_matchers, Matcher, DirectFilesystemAccessMatcher
+from databricks.labs.ucx.source_code.linters.pyspark import dfsa_matchers, DirectFilesystemAccessMatcher
 from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,9 @@ class PythonCodeAnalyzer:
             yield from matcher.collect_dfsas(node)
 
     @classmethod
-    def _find_dfsa_matcher(cls, matchers: dict[str, DirectFilesystemAccessMatcher], node: NodeNG) -> DirectFilesystemAccessMatcher | None:
+    def _find_dfsa_matcher(
+        cls, matchers: dict[str, DirectFilesystemAccessMatcher], node: NodeNG
+    ) -> DirectFilesystemAccessMatcher | None:
         if not isinstance(node, Call):
             return None
         if not isinstance(node.func, Attribute):

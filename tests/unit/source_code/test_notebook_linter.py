@@ -195,6 +195,14 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                     end_col=40,
                 ),
                 Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of direct filesystem references is deprecated: dbfs:/...',
+                    start_line=19,
+                    start_col=0,
+                    end_line=19,
+                    end_col=24,
+                ),
+                Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path: dbfs:/...',
                     start_line=7,
