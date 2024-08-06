@@ -282,9 +282,12 @@ class AzureResourcePermissions:
         principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
     ):
-        warehouse_config = self._installation.load(
-            GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json"
-        )
+        try:
+            warehouse_config = self._installation.load(
+                GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json"
+            )
+        except NotFound:  # For legacy reasons we can not assume the backup to always be present
+            warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
         sql_dac = warehouse_config.data_access_config or []
 
         for storage_account in storage_accounts:
