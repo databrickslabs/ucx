@@ -33,6 +33,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
+_WHEEL_HOUSE_PATH = Path(__file__).parent.parent.parent.parent / "wheelhouse.zip"
 
 
 @pytest.fixture
@@ -470,11 +471,15 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
     assert installation_ctx.deployed_workflows.validate_step("failing")
 
 
+@pytest.mark.skipif(
+    not _WHEEL_HOUSE_PATH.is_file(),
+    reason="No wheelhouse available; run `make wheelhouse` in project root",
+)
 def test_workflow_with_wheelhouse(ws, installation_ctx):
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
-            wheelhouse=Path(__file__).parent.parent.parent.parent / "wheelhouse.zip",
+            wheelhouse=_WHEEL_HOUSE_PATH,
         )
     )
     ctx.workspace_installation.run()
