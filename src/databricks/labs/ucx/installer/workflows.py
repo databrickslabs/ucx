@@ -153,8 +153,6 @@ class DeployedWorkflows:
 
     @staticmethod
     def _log_completed_job(step: str, run_id: int, job_run: Run) -> None:
-        if not logger.isEnabledFor(logging.INFO):
-            return
         if job_run.state:
             result_state = job_run.state.result_state or "N/A"
             state_message = job_run.state.state_message
