@@ -4,7 +4,9 @@ import logging
 import os.path
 import re
 import sys
+import tempfile
 import webbrowser
+import zipfile
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -567,8 +569,25 @@ class WorkflowsDeployment(InstallationMixin):
             case _:
                 return 3
 
-    def _upload_wheel(self):
+    def _upload_wheelhouse(self, path: Path) -> list[str]:
+        """Upload a wheelhouse.
+
+        TODO
+        ----
+        Move this method into the WheelsV2 class.
+        """
+        remote_paths = []
+        with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
+            zip_ref.extractall(directory)
+            for wheel in Path(directory).glob("*.whl"):
+                remote_wheel = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
+                remote_paths.append(remote_wheel)
+            return remote_paths
+
+    def _upload_wheel(self) -> list[str]:
         wheel_paths = []
+        if self._config.wheelhouse is not None and self._config.wheelhouse.is_file():
+            return self._upload_wheelhouse(self._config.wheelhouse)
         with self._wheels:
             if self._config.upload_dependencies:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 from databricks.sdk.core import Config
 
@@ -66,6 +67,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # Whether to upload dependent libraries to the workspace
     upload_dependencies: bool = False
+    wheelhouse: Path | None = None
 
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
