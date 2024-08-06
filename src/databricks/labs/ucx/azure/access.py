@@ -278,9 +278,9 @@ class AzureResourcePermissions:
 
     def _revert_sql_dac_with_spn(
         self,
-        storage_accounts: list[StorageAccount],
         principal: PrincipalSecret,
         principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
     ):
         warehouse_config = self._installation.load(
             GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json"
