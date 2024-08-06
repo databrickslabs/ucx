@@ -576,6 +576,7 @@ class WorkflowsDeployment(InstallationMixin):
         ----
         Move this method into the WheelsV2 class.
         """
+        return [self._installation.upload(f"wheels/{path.name}", path.read_bytes())]
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
