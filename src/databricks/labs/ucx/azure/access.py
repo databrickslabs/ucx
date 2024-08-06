@@ -240,6 +240,7 @@ class AzureResourcePermissions:
             EndpointConfPair(
                 f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
                 "{{" + principal_secret_identifier + "}}",
+            )
         ]
 
     def _update_sql_dac_with_spn(
