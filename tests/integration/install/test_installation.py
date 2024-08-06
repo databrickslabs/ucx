@@ -476,6 +476,7 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
     reason="No wheelhouse available; run `make wheelhouse` in project root",
 )
 def test_workflow_with_wheelhouse(ws, installation_ctx):
+    # TODO: Test with `override_clusters` as None
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
