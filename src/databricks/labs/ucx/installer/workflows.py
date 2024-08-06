@@ -163,8 +163,10 @@ class DeployedWorkflows:
         else:
             logger.info(f"Completed {step} job run {run_id}, but end state unknown.")
         if job_run.start_time or job_run.end_time:
-            start_time = datetime.utcfromtimestamp(job_run.start_time / 1000) if job_run.start_time else None
-            end_time = datetime.utcfromtimestamp(job_run.end_time / 1000) if job_run.end_time else None
+            start_time = (
+                datetime.fromtimestamp(job_run.start_time / 1000, tz=timezone.utc) if job_run.start_time else None
+            )
+            end_time = datetime.fromtimestamp(job_run.end_time / 1000, tz=timezone.utc) if job_run.end_time else None
             if job_run.run_duration:
                 duration = timedelta(milliseconds=job_run.run_duration)
             elif start_time and end_time:
