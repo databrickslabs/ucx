@@ -358,6 +358,8 @@ class AzureResourcePermissions:
                 self._azurerm.delete_storage_permission(str(storage_account.id), principal_id=config.uber_spn_id)
             try:
                 self._azurerm.delete_service_principal(config.uber_spn_id)
+            except NotFound:
+                pass  # Already deleted
             except PermissionDenied:
                 logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
         if config.policy_id is None:
