@@ -276,6 +276,27 @@ class AzureResourcePermissions:
             )
             raise error
 
+    def _revert_sql_dac_with_spn(
+        self,
+        storage_accounts: list[StorageAccount],
+        principal: PrincipalSecret,
+        principal_secret_identifier: str,
+    ):
+        warehouse_config = self._installation.load(GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json")
+        sql_dac = warehouse_config.data_access_config or []
+
+        for storage_account in storage_accounts:
+            configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
+                storage_account, principal, principal_secret_identifier
+            )
+            for configuration_pair in configuration_pairs:
+                sql_dac.remove(configuration_pair)
+
+        self._ws.warehouses.set_workspace_warehouse_config(
+            data_access_config=sql_dac,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+        )
+
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
         inventory_database = config.inventory_database
@@ -316,7 +337,7 @@ class AzureResourcePermissions:
             )
             self._installation.save(config)
             self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, secret_identifier)
-            self._update_sql_dac_with_spn(storage_account_info, uber_principal, inventory_database)
+            self._update_sql_dac_with_spn(storage_account_info, uber_principal, secret_identifier)
         except PermissionError:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
