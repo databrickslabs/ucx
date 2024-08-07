@@ -1350,6 +1350,7 @@ def test_revert_migrated_tables_failed(caplog):
     table_migrate.revert_migrated_tables(schema="test_schema1")
     assert "Failed to revert table hive_metastore.test_schema1.test_table1: error" in caplog.text
 
+
 def test_refresh_migration_status_published_remained_tables(caplog):
     errors = {}
     rows = {}
@@ -1406,6 +1407,6 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         migration_status_refresher,
         principal_grants,
     )
-    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.hive_metastore"):
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore"):
         table_migrate.get_remaining_tables()
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages

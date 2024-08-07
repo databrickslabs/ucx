@@ -99,9 +99,8 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-# TODO: add an integration test for refresh_not_migrated_status task in migrate-tables workflow
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_refresh_not_migrated_status_job(ws, installation_ctx, prepare_tables_for_migration):
+def test_refresh_not_migrated_status_job(ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog):
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
@@ -109,14 +108,20 @@ def test_refresh_not_migrated_status_job(ws, installation_ctx, prepare_tables_fo
         },
     )
     ctx.workspace_installation.run()
+    second_table = list(tables.values())[1]
+    ctx.table_mapping.skip_table(dst_schema.name, second_table.name)
     ctx.deployed_workflows.run_workflow("migrate-tables")
-    # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-tables")
 
-
-#     # assert the tables are migrated
-#     for table in tables.values():
-#         try:
-#             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-#         except NotFound:
-#             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+    remained_tables = list(
+        sql_backend.fetch(
+            f"""
+        SELECT
+        SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)
+        AS message
+        FROM {ctx.inventory_database}.logs
+        WHERE message LIKE 'remained-hive-metastore-table: %'
+    """
+        )
+    )
+    assert remained_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'

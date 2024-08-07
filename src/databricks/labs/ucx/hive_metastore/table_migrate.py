@@ -63,7 +63,7 @@ class TablesMigrator:
         for crawled_table in self._tc.snapshot():
             if not self._is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
-                logger.info(f"remained-hive-metastore-table: {crawled_table.key}")
+                logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
         return table_rows
 
     def index(self):

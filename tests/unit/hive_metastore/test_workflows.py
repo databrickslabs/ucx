@@ -8,10 +8,6 @@ from databricks.labs.ucx.hive_metastore.workflows import (
 )
 
 
-
-
-
-
 def test_migrate_external_tables_sync(run_workflow):
     ctx = run_workflow(TableMigration.migrate_external_tables_sync)
     ctx.workspace_client.catalogs.list.assert_called_once()
@@ -60,16 +56,16 @@ def test_migrate_ctas_views(run_workflow):
 @pytest.mark.parametrize(
     "workflow",
     [
-        TableMigration,
-        MigrateHiveSerdeTablesInPlace,
-        MigrateExternalTablesCTAS,
-        ScanTablesInMounts,
-        MigrateTablesInMounts,
+        TableMigration.update_migration_status,
+        MigrateHiveSerdeTablesInPlace.refresh_migration_status,
+        MigrateExternalTablesCTAS.refresh_migration_status,
+        ScanTablesInMounts.refresh_migration_status,
+        MigrateTablesInMounts.refresh_migration_status,
     ],
 )
 def test_refresh_migration_status_is_refreshed(run_workflow, workflow):
     """Migration status is refreshed by deleting and showing new tables"""
-    ctx = run_workflow(getattr(workflow, "refresh_migration_status"))
+    ctx = run_workflow(workflow)
     assert "DELETE FROM hive_metastore.ucx.migration_status" in ctx.sql_backend.queries
     assert "SHOW DATABASES" in ctx.sql_backend.queries
     # No "SHOW TABLE FROM" query as table are not mocked
