@@ -590,7 +590,7 @@ class WorkflowsDeployment(InstallationMixin):
         wheel_paths = []
         with self._wheels:
             if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
-                wheel_paths = self._upload_wheelhouse(Path(self._config.wheelhouse))
+                wheel_paths.extend(self._upload_wheelhouse(Path(self._config.wheelhouse)))
             elif self._config.upload_dependencies:  # The wheelhouse contains the dependencies as well
                 wheel_paths.extend(self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"]))
             wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
