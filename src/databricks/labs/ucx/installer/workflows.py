@@ -588,6 +588,7 @@ class WorkflowsDeployment(InstallationMixin):
             for wheel in Path(directory).glob("*.whl"):
                 remote_wheel = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
                 remote_paths.append(f"/Workspace{remote_wheel}")
+            remote_paths.sort(key=WorkflowsDeployment._library_dep_order)
             return remote_paths
 
     def _upload_installation_wheel(self) -> list[str]:
