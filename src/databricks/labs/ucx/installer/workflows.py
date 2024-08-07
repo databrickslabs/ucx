@@ -153,18 +153,18 @@ class DeployedWorkflows:
 
     @staticmethod
     def _log_completed_job(step: str, run_id: int, job_run: Run) -> None:
-        if not logger.isEnabledFor(logging.INFO):
-            return
         if job_run.state:
             result_state = job_run.state.result_state or "N/A"
             state_message = job_run.state.state_message
             state_description = f"{result_state} ({state_message})" if state_message else f"{result_state}"
             logger.info(f"Completed {step} job run {run_id} with state: {state_description}")
         else:
-            logger.info(f"Completed {step} job run {run_id}, but end state unknown.")
+            logger.warning(f"Completed {step} job run {run_id} but end state is unknown.")
         if job_run.start_time or job_run.end_time:
-            start_time = datetime.utcfromtimestamp(job_run.start_time / 1000) if job_run.start_time else None
-            end_time = datetime.utcfromtimestamp(job_run.end_time / 1000) if job_run.end_time else None
+            start_time = (
+                datetime.fromtimestamp(job_run.start_time / 1000, tz=timezone.utc) if job_run.start_time else None
+            )
+            end_time = datetime.fromtimestamp(job_run.end_time / 1000, tz=timezone.utc) if job_run.end_time else None
             if job_run.run_duration:
                 duration = timedelta(milliseconds=job_run.run_duration)
             elif start_time and end_time:
