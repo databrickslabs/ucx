@@ -1204,7 +1204,7 @@ def make_udf(
 def make_query(ws, make_table, make_random) -> Generator[Query, None, None]:
     def create() -> Query:
         table = make_table()
-        query_name = f"ucx_query_Q{make_random(4)}-{get_purge_suffix()}"
+        query_name = f"ucx_query_Q{make_random(4)}_{get_purge_suffix()}"
         query = ws.queries.create(
             name=query_name,
             description="TEST QUERY FOR UCX",
