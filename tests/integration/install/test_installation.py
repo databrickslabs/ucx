@@ -480,7 +480,7 @@ def test_workflow_with_wheelhouse(ws, installation_ctx):
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
-            wheelhouse=_WHEEL_HOUSE_PATH,
+            wheelhouse=_WHEEL_HOUSE_PATH.as_posix(),
         )
     )
     ctx.workspace_installation.run()
