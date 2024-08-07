@@ -566,6 +566,8 @@ class WorkflowsDeployment(InstallationMixin):
                 return 1
             case library if 'sqlglot' in library:
                 return 2
+            case library if 'ucx' in library:
+                return 999
             case _:
                 return 3
 
@@ -588,23 +590,25 @@ class WorkflowsDeployment(InstallationMixin):
             for wheel in Path(directory).glob("*.whl"):
                 remote_wheel = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
                 remote_paths.append(f"/Workspace{remote_wheel}")
-            remote_paths.sort(key=WorkflowsDeployment._library_dep_order)
             return remote_paths
 
     def _upload_installation_wheel(self) -> list[str]:
         with self._wheels:
+            wheel_paths = []
             # TODO: `wheelhouse` is similar to `upload_dependencies`, merge logic
-            if self._config.upload_dependencies:
+            if self._config.upload_dependencies and self._config.wheelhouse is not None:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
-            wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
             wheel_paths.append(self._wheels.upload_to_wsfs())
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
             return wheel_paths
 
     def _upload_wheel(self) -> list[str]:
+        wheels = []
         if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
-            return self._upload_wheelhouse(Path(self._config.wheelhouse))
-        return self._upload_installation_wheel()
+            wheels = self._upload_wheelhouse(Path(self._config.wheelhouse))
+        wheels.extend(self._upload_installation_wheel())
+        wheels.sort(key=WorkflowsDeployment._library_dep_order)
+        return wheels
 
     def _upload_wheel_runner(self, remote_wheels: list[str]) -> str:
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
