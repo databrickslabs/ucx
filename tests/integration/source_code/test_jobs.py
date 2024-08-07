@@ -509,6 +509,81 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     allow_list.distribution_compatibility.assert_called_once()
 
 
+def test_job_spark_python_task_workspace_linter_happy_path(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_workspace_directory,
+) -> None:
+    pyspark_job_path = make_workspace_directory() / "spark_job.py"
+    pyspark_job_path.write_text("import greenlet\n")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=pyspark_job_path.as_posix()),
+        existing_cluster_id=new_cluster.cluster_id,
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
+def test_job_spark_python_task_dbfs_linter_happy_path(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_dbfs_directory,
+) -> None:
+    pyspark_job_path = make_dbfs_directory() / "spark_job.py"
+    pyspark_job_path.write_text("import greenlet\n")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=f"dbfs:{pyspark_job_path.as_posix()}"),
+        existing_cluster_id=new_cluster.cluster_id,
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
+def test_job_spark_python_task_linter_notebook_handling(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_dbfs_directory,
+) -> None:
+    """Spark Python tasks are simple python files; verify that we treat them as such and not as notebooks."""
+
+    # Use DBFS instead of Workspace paths because the Workspace modifies things if it detects files are notebooks.
+    job_dir = make_dbfs_directory()
+    local_notebook_path = Path(__file__).parent / "notebook_fake_python.py"
+    dbfs_notebook_path = job_dir / local_notebook_path.name
+    with local_notebook_path.open("rb") as src, dbfs_notebook_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=f"dbfs:{dbfs_notebook_path.as_posix()}"),
+        existing_cluster_id=new_cluster.cluster_id,
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    # The notebook being linted has 'import greenlet' in a cell that should be ignored, but will trigger this problem if processed.
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
 def test_job_dlt_task_linter_unhappy_path(
     simple_ctx,
     make_job,
@@ -560,27 +635,13 @@ def test_job_dlt_task_linter_happy_path(
 
 def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_notebook, make_random, simple_ctx, ws):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
-    task_spark_conf = None
     entrypoint = make_directory()
-    notebook_path = make_notebook()
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
     with egg_file.open("rb") as f:
         ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
     library = compute.Library(egg=remote_egg_file)
-    task = jobs.Task(
-        task_key=make_random(4),
-        description=make_random(4),
-        new_cluster=compute.ClusterSpec(
-            num_workers=1,
-            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-            spark_version=ws.clusters.select_spark_version(latest=True),
-            spark_conf=task_spark_conf,
-        ),
-        libraries=[library],
-        notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
-    )
 
-    j = make_job(tasks=[task])
+    j = make_job(libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert (

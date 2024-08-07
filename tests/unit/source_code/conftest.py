@@ -54,4 +54,4 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
     library_resolver = PythonLibraryResolver(allow_list)
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list)
-    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
+    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)

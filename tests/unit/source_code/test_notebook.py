@@ -134,7 +134,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_resolver = NotebookResolver(notebook_loader)
     library_resolver = PythonLibraryResolver(KnownList())
     import_resolver = ImportFileResolver(FileLoader(), KnownList())
-    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
+    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
 
 
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup) -> None:

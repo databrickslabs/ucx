@@ -285,7 +285,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         self._allow_list = allow_list
         self._file_loader = file_loader
 
-    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+    def resolve_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)
         if absolute_path:
             return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
