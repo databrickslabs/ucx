@@ -582,8 +582,8 @@ class WorkflowsDeployment(InstallationMixin):
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
             for wheel in Path(directory).glob("*.whl"):
-                remote_wheel = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
-                remote_paths.append(f"/Workspace{remote_wheel}")
+                remote_path = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
+                remote_paths.append(remote_path)
             return remote_paths
 
     def _upload_wheel(self) -> list[str]:
