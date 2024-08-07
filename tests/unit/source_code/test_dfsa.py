@@ -22,6 +22,9 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
         ("dfsa/select_read_files.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/file.csv"]),
         ("dfsa/select_format.sql", ["hdfs://examples/src/main/resources/users.parquet"]),
         ("dfsa/spark_read_format_load.py", ["s3a://prefix/some_file.csv"]),
+        ("dfsa/inferred_path.py", ["s3a://prefix/some_inferred_file.csv"]),
+        ("dfsa/spark_implicit_dbfs.py", ["/prefix/some_file.csv"]),
+        ("dfsa/spark_dbfs_mount.py", ["/mnt/some_file.csv"]),
     ],
 )
 def test_dfsa_collects_sql_dfsas(
