@@ -106,11 +106,12 @@ verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 cmds         = "python tests/integration/cmds.py"
+# TODO: Make wheelhouse for multiple python versions
 wheelhouse   = [
     "rm -rf dist/ ucx.wheelhouse.zip",
     "hatch build",
     "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
-    "pip download --platform any --no-deps -r requirements.txt --dest dist/",
+    "pip download --platform any --no-deps --python-version 311 -r requirements.txt --dest dist/",
     "zip -j -r ucx.wheelhouse.zip dist/*.whl requirements.txt",
 ]
 
