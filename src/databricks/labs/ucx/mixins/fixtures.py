@@ -976,7 +976,7 @@ def inventory_schema(make_schema):
 @pytest.fixture
 def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
-        name = f"ucx_c{make_random(4).lower()}-{get_purge_suffix()}"
+        name = f"ucx_c{make_random(4).lower()}_{get_purge_suffix()}"
         sql_backend.execute(f"CREATE CATALOG {name}")
         catalog_info = ws.catalogs.get(name)
         return catalog_info
