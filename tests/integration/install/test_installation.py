@@ -483,6 +483,7 @@ def test_workflow_with_wheelhouse(ws, installation_ctx, reset_override_clusters)
             # A test without this override is slower, however, it is closer to user installation
             config = dataclasses.replace(config, override_clusters=None)
         return dataclasses.replace(config, wheelhouse=_WHEEL_HOUSE_PATH.as_posix())
+
     ctx = installation_ctx.replace(config_transform=config_transform)
 
     ctx.workspace_installation.run()

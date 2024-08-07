@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 
 from databricks.sdk.core import Config
 

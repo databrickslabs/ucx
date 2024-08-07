@@ -45,7 +45,7 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
-from databricks.sdk.service.workspace import ImportFormat, ObjectType
+from databricks.sdk.service.workspace import ObjectType
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
