@@ -42,8 +42,6 @@ for table in spark.catalog.listTables(name):
 for table in spark.catalog.listTables(f"boop{stuff}"):
     do_stuff_with_table(table)
 
-## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
-# FIXME: This is a false positive; any method named 'listTables' is triggering the warning.
-# ucx[changed-result-format-in-uc:+1:0:+1:39] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## Some trivial references to the method or table in unrelated contexts that should not trigger warnings.
 something_else.listTables("old.things")
 a_function("old.things")
