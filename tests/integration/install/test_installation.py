@@ -481,6 +481,7 @@ def test_workflow_with_wheelhouse(ws, installation_ctx, reset_override_clusters)
         if reset_override_clusters:
             # Override clusters are set by a test fixture to speed up tests by attaching existing (running) clusters
             # A test without this override is slower, however, it is closer to user installation
+            # AND it tests with the zipped wheelhouse (instead of unzipped wheelhouse)
             config = dataclasses.replace(config, override_clusters=None)
         return dataclasses.replace(config, wheelhouse=_WHEEL_HOUSE_PATH.as_posix())
     ctx = installation_ctx.replace(config_transform=config_transform)
