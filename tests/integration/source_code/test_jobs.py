@@ -555,6 +555,35 @@ def test_job_spark_python_task_dbfs_linter_happy_path(
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
 
+def test_job_spark_python_task_linter_notebook_handling(
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_dbfs_directory,
+) -> None:
+    """Spark Python tasks are simple python files; verify that we treat them as such and not as notebooks."""
+
+    # Use DBFS instead of Workspace paths because the Workspace modifies things if it detects files are notebooks.
+    job_dir = make_dbfs_directory()
+    local_notebook_path = Path(__file__).parent / "notebook_fake_python.py"
+    dbfs_notebook_path = job_dir / local_notebook_path.name
+    with local_notebook_path.open("rb") as src, dbfs_notebook_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst)
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(python_file=f"dbfs:{dbfs_notebook_path.as_posix()}"),
+        existing_cluster_id=new_cluster.cluster_id,
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    # The notebook being linted has 'import greenlet' in a cell that should be ignored, but will trigger this problem if processed.
+    assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
+
+
 def test_job_dlt_task_linter_unhappy_path(
     simple_ctx,
     make_job,
