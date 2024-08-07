@@ -91,7 +91,9 @@ class DBFSUsageLinter(PythonLinter):
 
 class FromDbfsFolder(Linter):
     def __init__(self):
-        self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
+        # valid dbfs prefixes are ''dbfs:/', /dbfs/mnt', '/mnt/', '/dbfs/', '/'
+        # the latter covers all except the former so just check for those 2
+        self._dbfs_prefixes = ["dbfs:/", "/"]
 
     @staticmethod
     def name() -> str:
