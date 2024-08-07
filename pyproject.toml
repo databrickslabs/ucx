@@ -107,12 +107,11 @@ verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 cmds         = "python tests/integration/cmds.py"
 wheelhouse   = [
-    "rm -rf wheels/",
-    "rm -f ucx.wheelhouse.zip",
-    "mkdir -p wheels",
+    "rm -rf dist/ ucx.wheelhouse.zip",
+    "hatch build",
     "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
-    "pip download --platform any --no-deps -r requirements.txt --dest wheels/",
-    "zip -j -r ucx.wheelhouse.zip wheels/*.whl requirements.txt",
+    "pip download --platform any --no-deps -r requirements.txt --dest dist/",
+    "zip -j -r ucx.wheelhouse.zip dist/*.whl requirements.txt",
 ]
 
 [tool.pytest.ini_options]
