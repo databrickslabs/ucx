@@ -255,6 +255,7 @@ class DeployedWorkflows:
         """
         log_path = f"{self._install_state.install_folder()}/logs/{workflow}"
         try:
+            # Ensure any exception is triggered early.
             log_path_objects = list(self._ws.workspace.list(log_path))
         except ResourceDoesNotExist:
             logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
