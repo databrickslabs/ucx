@@ -566,8 +566,6 @@ class WorkflowsDeployment(InstallationMixin):
                 return 1
             case library if 'sqlglot' in library:
                 return 2
-            case library if 'ucx' in library:
-                return 999
             case _:
                 return 3
 
