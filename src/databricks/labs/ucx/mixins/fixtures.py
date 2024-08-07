@@ -1163,7 +1163,7 @@ def make_udf(
             schema_name = schema.name
 
         if name is None:
-            name = f"ucx_t{make_random(4).lower()}-{get_purge_suffix()}"
+            name = f"ucx_t{make_random(4).lower()}_{get_purge_suffix()}"
 
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         if hive_udf:
