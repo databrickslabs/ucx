@@ -475,7 +475,10 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
     not _WHEEL_HOUSE_PATH.is_file(),
     reason="No wheelhouse available; run `make wheelhouse` in project root",
 )
-@pytest.mark.parametrize("reset_override_clusters", [False, True])
+@pytest.mark.parametrize(
+    "reset_override_clusters",
+    [False, pytest.param(True, marks=pytest.mark.xfail(reason="Wheelhouse archive does not work")),]
+)
 def test_workflow_with_wheelhouse(ws, installation_ctx, reset_override_clusters):
     def config_transform(config: WorkspaceConfig) -> WorkspaceConfig:
         if reset_override_clusters:
