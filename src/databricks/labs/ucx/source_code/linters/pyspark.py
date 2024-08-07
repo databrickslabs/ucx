@@ -158,9 +158,7 @@ class ReturnValueMatcher(Matcher):
 
     def matches(self, node: NodeNG):
         return (
-            isinstance(node, Call)
-            and isinstance(node.func, Attribute)
-            and Tree(node.func.expr).is_from_module("spark")
+            isinstance(node, Call) and isinstance(node.func, Attribute) and Tree(node.func.expr).is_from_module("spark")
         )
 
     def lint(
