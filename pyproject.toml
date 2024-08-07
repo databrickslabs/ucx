@@ -107,7 +107,6 @@ verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 cmds         = "python tests/integration/cmds.py"
 # TODO: Make wheelhouse for multiple python versions
-# TODO: Should ucx be part of the wheelhouse?
 wheelhouse   = [
     "rm -rf wheels/ ucx.wheelhouse.zip",
     "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
