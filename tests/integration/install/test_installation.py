@@ -475,14 +475,16 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
     not _WHEEL_HOUSE_PATH.is_file(),
     reason="No wheelhouse available; run `make wheelhouse` in project root",
 )
-def test_workflow_with_wheelhouse(ws, installation_ctx):
-    # TODO: Test with `override_clusters` as None
-    ctx = installation_ctx.replace(
-        config_transform=lambda wc: dataclasses.replace(
-            wc,
-            wheelhouse=_WHEEL_HOUSE_PATH.as_posix(),
-        )
-    )
+@pytest.mark.parametrize("reset_override_clusters", [False, True])
+def test_workflow_with_wheelhouse(ws, installation_ctx, reset_override_clusters):
+    def config_transform(config: WorkspaceConfig) -> WorkspaceConfig:
+        if reset_override_clusters:
+            # Override clusters are set by a test fixture to speed up tests by attaching existing (running) clusters
+            # A test without this override is slower, however, it is closer to user installation
+            config = dataclasses.replace(config, override_clusters=None)
+        return dataclasses.replace(config, wheelhouse=_WHEEL_HOUSE_PATH.as_posix())
+    ctx = installation_ctx.replace(config_transform=config_transform)
+
     ctx.workspace_installation.run()
 
     ctx.deployed_workflows.run_workflow("succeeding")
