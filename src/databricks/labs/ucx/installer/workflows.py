@@ -593,6 +593,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _upload_installation_wheel(self) -> list[str]:
         with self._wheels:
+            # TODO: `wheelhouse` is similar to `upload_dependencies`, merge logic
             if self._config.upload_dependencies:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
             wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
