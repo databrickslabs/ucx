@@ -33,6 +33,7 @@ from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
+    DeadlineExceeded,
     InternalError,
     InvalidParameterValue,
     NotFound,
@@ -594,7 +595,7 @@ class WorkspaceInstallation(InstallationMixin):
     # TODO: @JCZuurmond: wait for dashboard team to fix the error below,
     # then update the retry decorator and document why this is needed
     # databricks.sdk.errors.platform.InternalError: A database error occurred during import-dashboard-new
-    @retried(on=[InternalError], timeout=timedelta(minutes=4))
+    @retried(on=[InternalError, DeadlineExceeded], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
