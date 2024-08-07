@@ -581,7 +581,7 @@ class WorkflowsDeployment(InstallationMixin):
             # when extracting all files inside the zip archive
             remote_path = self._installation.upload(path.name.removesuffix(".zip"), path.read_bytes())
             return [f"/Workspace{remote_path}"]
-        # Override clusters are used in testing, so we need to upload all wheels
+        # Override clusters are used in testing, so we need to upload all wheels separately
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
