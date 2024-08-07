@@ -635,27 +635,13 @@ def test_job_dlt_task_linter_happy_path(
 
 def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_notebook, make_random, simple_ctx, ws):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
-    task_spark_conf = None
     entrypoint = make_directory()
-    notebook_path = make_notebook()
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
     with egg_file.open("rb") as f:
         ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
     library = compute.Library(egg=remote_egg_file)
-    task = jobs.Task(
-        task_key=make_random(4),
-        description=make_random(4),
-        new_cluster=compute.ClusterSpec(
-            num_workers=1,
-            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-            spark_version=ws.clusters.select_spark_version(latest=True),
-            spark_conf=task_spark_conf,
-        ),
-        libraries=[library],
-        notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
-    )
 
-    j = make_job(tasks=[task])
+    j = make_job(libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert (
