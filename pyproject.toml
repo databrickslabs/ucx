@@ -108,6 +108,7 @@ lint         = ["pylint --output-format=colorized -j 0 src tests"]
 cmds         = "python tests/integration/cmds.py"
 wheelhouse   = [
     "rm -rf wheels/",
+    "rm -f ucx.wheelhouse.zip",
     "mkdir -p wheels",
     "pip-compile --all-build-deps --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
     "pip download --platform any --no-deps -r requirements.txt --dest wheels/",
