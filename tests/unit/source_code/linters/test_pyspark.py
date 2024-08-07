@@ -266,7 +266,8 @@ for i in range(10):
         ),
         # Test for option function
         (
-            """(df.write
+            """df=spark.sql('SELECT * FROm dual')
+(df.write
   .format("parquet")
   .option("path", "s3a://your_bucket_name/your_directory/")
   .option("spark.hadoop.fs.s3a.access.key", "your_access_key")
@@ -277,9 +278,9 @@ for i in range(10):
                     code='direct-filesystem-access',
                     message='The use of direct filesystem references is deprecated: '
                     "s3a://your_bucket_name/your_directory/",
-                    start_line=0,
+                    start_line=1,
                     start_col=1,
-                    end_line=2,
+                    end_line=3,
                     end_col=59,
                 )
             ],

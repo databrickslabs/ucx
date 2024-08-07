@@ -157,7 +157,9 @@ class TableNameMatcher(Matcher):
 class ReturnValueMatcher(Matcher):
 
     def matches(self, node: NodeNG):
-        return isinstance(node, Call) and isinstance(node.func, Attribute)
+        return (
+            isinstance(node, Call) and isinstance(node.func, Attribute) and Tree(node.func.expr).is_from_module("spark")
+        )
 
     def lint(
         self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
@@ -190,7 +192,12 @@ class DirectFilesystemAccessMatcher(Matcher):
     }
 
     def matches(self, node: NodeNG):
-        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
+        return (
+            isinstance(node, Call)
+            and self._get_table_arg(node) is not None
+            and isinstance(node.func, Attribute)
+            and (Tree(node.func.expr).is_from_module("spark") or Tree(node.func.expr).is_from_module("dbutils"))
+        )
 
     def lint(
         self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
