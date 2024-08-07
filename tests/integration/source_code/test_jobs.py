@@ -515,7 +515,7 @@ def test_job_spark_python_task_workspace_linter_happy_path(
     make_random,
     make_cluster,
     make_workspace_directory,
-):
+) -> None:
     pyspark_job_path = make_workspace_directory() / "spark_job.py"
     pyspark_job_path.write_text("import greenlet\n")
 
@@ -538,7 +538,7 @@ def test_job_spark_python_task_dbfs_linter_happy_path(
     make_random,
     make_cluster,
     make_dbfs_directory,
-):
+) -> None:
     pyspark_job_path = make_dbfs_directory() / "spark_job.py"
     pyspark_job_path.write_text("import greenlet\n")
 
