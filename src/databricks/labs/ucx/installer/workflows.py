@@ -576,12 +576,8 @@ class WorkflowsDeployment(InstallationMixin):
         ----
         Move this method into the WheelsV2 class.
         """
-        if not self._config.override_clusters:
-            # Removing the .zip suffix is a HACK. We can not upload a .zip file to the workspace as the platform fails
-            # when extracting all files inside the zip archive
-            remote_path = self._installation.upload(path.name.removesuffix(".zip"), path.read_bytes())
-            return [f"/Workspace{remote_path}"]
-        # Override clusters are used in testing, so we need to upload all wheels separately
+        # We can not upload a .zip file to the workspace as the platform fails when extracting all files inside the zip
+        # archive, therefore, we upload the wheels separately.
         remote_paths = []
         with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory)
