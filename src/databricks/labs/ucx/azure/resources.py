@@ -347,7 +347,22 @@ class AzureResources:
         *,
         timeout: timedelta = timedelta(seconds=1),
     ) -> AzureRoleAssignment | None:
-        """Get a storage permission."""
+        """Get a storage permission.
+
+        Parameters
+        ----------
+        storage_account : StorageAccount
+            The storage account to get the permission for.
+        role_guid : str
+            The role guid to get the permission for.
+        timeout : timedelta, optional (default: timedelta(seconds=1))
+            The timeout to wait for the permission to be found.
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
         retry = retried(on=[NotFound], timeout=timeout)
         path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
@@ -394,6 +409,11 @@ class AzureResources:
             The principal id to delete the role assignment(s) for.
         storage_account : StorageAccount
             The storage account to delete permission for.
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
         """
         path = (
             f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
