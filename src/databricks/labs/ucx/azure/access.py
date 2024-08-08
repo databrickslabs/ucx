@@ -157,7 +157,7 @@ class AzureResourcePermissions:
         self,
         policy_definition: str,
         storage_accounts: list[StorageAccount],
-        principal: PrincipalSecret,
+        principal_client_id: str,
         principal_secret_identifier: str,
     ) -> str:
         policy_dict = json.loads(policy_definition)
@@ -165,7 +165,7 @@ class AzureResourcePermissions:
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         for storage in storage_accounts:
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config(principal.client.client_id)
+                self._policy_config(principal_client_id)
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"] = (
                 self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
@@ -188,7 +188,7 @@ class AzureResourcePermissions:
     def _update_cluster_policy_with_spn(
         self,
         policy_id: str,
-        principal: PrincipalSecret,
+        principal_client_id: str,
         principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
     ):
@@ -200,7 +200,7 @@ class AzureResourcePermissions:
                 policy_definition = self._update_cluster_policy_definition(
                     cluster_policy.definition,
                     storage_accounts,
-                    principal,
+                    principal_client_id,
                     principal_secret_identifier,
                 )
             if cluster_policy.name is not None:
@@ -334,7 +334,7 @@ class AzureResourcePermissions:
             )
             secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
             secret_identifier = f"secrets/{inventory_database}/{secret.key}"
-            self._update_cluster_policy_with_spn(policy_id, uber_principal, secret_identifier, storage_accounts)
+            self._update_cluster_policy_with_spn(policy_id, uber_principal.client.client_id, secret_identifier, storage_accounts,)
             self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
         except (PermissionError, NotFound):
             logger.error("Failed to create service principal", exc_info=True)
