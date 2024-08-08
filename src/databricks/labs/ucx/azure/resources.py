@@ -339,17 +339,14 @@ class AzureResources:
         storage_account: StorageAccount,
         role_guid: str,
         *,
-        principal_types: list[str] | None = None,
         timeout: timedelta = timedelta(seconds=0),
     ) -> AzureRoleAssignment | None:
         """Get a storage permission."""
         retry = retried(on=[NotFound], timeout=timeout)
-        if not principal_types:
-            principal_types = ["ServicePrincipal"]
         path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
             response = retry(self._mgmt.get)(path, "2022-04-01")
-            assignment = self._role_assignment(response, str(storage_account.id), principal_types)
+            assignment = self._role_assignment(response, str(storage_account.id))
             return assignment
         except TimeoutError:
             logger.warning(f"Storage permission not found: {path}")
@@ -473,19 +470,17 @@ class AzureResources:
             principal_types = ["ServicePrincipal"]
         result = self._mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
-            assignment = self._role_assignment(role_assignment, resource_id, principal_types)
+            assignment = self._role_assignment(role_assignment, resource_id)
             if not assignment:
+                continue
+            if assignment.principal.type not in principal_types:
                 continue
             yield assignment
 
-    def _role_assignment(
-        self, role_assignment: dict, resource_id: str, principal_types: list[str]
-    ) -> AzureRoleAssignment | None:
+    def _role_assignment(self, role_assignment: dict, resource_id: str) -> AzureRoleAssignment | None:
         assignment_properties = role_assignment.get("properties", {})
         principal_type = assignment_properties.get("principalType")
         if not principal_type:
-            return None
-        if principal_type not in principal_types:
             return None
         principal_id = assignment_properties.get("principalId")
         if not principal_id:
