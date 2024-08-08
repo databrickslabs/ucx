@@ -156,9 +156,9 @@ class AzureResourcePermissions:
     def _update_cluster_policy_definition(
         self,
         policy_definition: str,
-        storage_accounts: list[StorageAccount],
         principal_client_id: str,
         principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
     ) -> str:
         policy_dict = json.loads(policy_definition)
         tenant_id = self._azurerm.tenant_id()
@@ -199,9 +199,9 @@ class AzureResourcePermissions:
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
                     cluster_policy.definition,
-                    storage_accounts,
                     principal_client_id,
                     principal_secret_identifier,
+                    storage_accounts,
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
