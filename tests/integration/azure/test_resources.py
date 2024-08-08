@@ -3,7 +3,7 @@ import datetime as dt
 from databricks.labs.ucx.azure.resources import AzureResource
 
 
-def test_azure_resource_storage_accounts_list_non_zero(az_cli_ctx, env_or_skip, make_random):
+def test_azure_resource_storage_accounts_list_non_zero(az_cli_ctx):
     """Expect at least one storage account."""
     storage_accounts = az_cli_ctx.azure_resources.storage_accounts()
     assert len(list(storage_accounts)) > 0
