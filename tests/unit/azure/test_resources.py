@@ -145,10 +145,15 @@ def test_get_storage_permission_gets_role_assignments_endpoint():
         default_network_action="Allow",
     )
 
-    azure_resource.get_storage_permission(storage_account, "12345")
+    permission = azure_resource.get_storage_permission(storage_account, "12345")
 
     path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
-    api_client.get.assert_called_with(path, "2022-04-01")
+    api_client.get.assert_any_call(path, "2022-04-01")
+    assert permission is not None
+    assert permission.principal.object_id == "id_system_assigned_mi-123"
+    assert permission.resource == storage_account.id
+    assert permission.scope == storage_account.id
+    assert permission.role_name == "Contributor"
 
 
 def test_get_storage_permission_logs_permission_denied(caplog):
