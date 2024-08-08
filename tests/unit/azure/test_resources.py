@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import create_autospec
 
 import pytest
@@ -148,6 +149,24 @@ def test_get_storage_permission_gets_role_assignments_endpoint():
 
     path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
     api_client.get.assert_called_with(path, "2022-04-01")
+
+
+def test_get_storage_permission_logs_permission_denied(caplog):
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    api_client.get.side_effect = PermissionDenied("Missing permission")
+
+    with pytest.raises(PermissionDenied), caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+        azure_resource.get_storage_permission(storage_account, "12345")
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
+    assert "Permission denied" in caplog.text
+    assert path in caplog.text
 
 
 def test_apply_storage_permission():

@@ -351,6 +351,13 @@ class AzureResources:
         except TimeoutError:  # TimeoutError is raised by retried
             logger.warning(f"Storage permission not found: {path}")  # not found because retry on NotFound
             return None
+        except PermissionDenied:
+            msg = (
+                "Permission denied. Please run this cmd under the identity of a user who has "
+                f"create service principal permission: {path}"
+            )
+            logger.error(msg)
+            raise
 
     def apply_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
