@@ -437,6 +437,8 @@ class AzureResources:
             except PermissionDenied:
                 self._log_permission_denied_error_for_storage_permission(guid)
                 permission_denied_guids.append(guid)
+            except NotFound:
+                continue  # Somehow deleted right in-between getting and deleting
         if permission_denied_guids:
             raise PermissionDenied(f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}")
 
