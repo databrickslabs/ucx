@@ -397,6 +397,7 @@ class AzureResources:
         response = self._mgmt.get(path, "2022-04-01")
         role_guids = []
         for role_assignment in response.get("value", []):
+            # Tech debt: Reuse AzureRoleAssignment, but requires a refactor to add the id
             role_guid = role_assignment.get("id")
             if role_guid:
                 role_guids.append(role_guid)
