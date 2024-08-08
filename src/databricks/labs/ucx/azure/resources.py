@@ -401,7 +401,15 @@ class AzureResources:
             f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
             f"?$filter=principalId%20eq%20'{principal_id}'"
         )
-        response = self._mgmt.get(path, "2022-04-01")
+        try:
+            response = self._mgmt.get(path, "2022-04-01")
+        except PermissionDenied:
+            msg = (
+                "Permission denied. Please run this cmd under the identity of a user who has "
+                f"create service principal permission: {path}"
+            )
+            logger.error(msg)
+            raise
         role_guids = []
         for role_assignment in response.get("value", []):
             # Tech debt: Reuse AzureRoleAssignment, but requires a refactor to add the id
