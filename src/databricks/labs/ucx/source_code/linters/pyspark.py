@@ -235,7 +235,7 @@ class DirectFilesystemAccessMatcher(Matcher):
     def collect_dfsas(self, node: NodeNG) -> Iterable[DFSA]:
 
         def make_dfsa(value: str, _node: NodeNG) -> DFSA:
-            return DFSA(path=value)
+            return DFSA(source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=value)
 
         yield from self._for_table_arg(node, make_dfsa, make_dfsa)
 

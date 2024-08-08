@@ -14,6 +14,7 @@ from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -320,5 +321,24 @@ DIRECT_FS_REFS = {
 @dataclass
 class DFSA:
     """A DFSA is a record describing a Direct File System Access"""
+    UNKNOWN = "unknown"
 
+    source_type: str
+    source_id: str
     path: str
+    # is_read: bool
+    # is_write: bool
+
+    @property
+    def key(self) -> str:
+        return f"{self.path}".lower()  # TODO for now
+
+    @property
+    def safe_sql_key(self) -> str:
+        return escape_sql_identifier(self.key)
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, DFSA) and self.key == other.key
