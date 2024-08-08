@@ -174,7 +174,7 @@ def test_get_storage_permission_logs_permission_denied(caplog):
     assert path in caplog.text
 
 
-def test_get_storage_permission_handles_not_found(caplog):
+def test_get_storage_permission_handles_not_found():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
