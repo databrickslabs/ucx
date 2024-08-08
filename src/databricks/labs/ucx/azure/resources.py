@@ -348,10 +348,10 @@ class AzureResources:
             principal_types = ["ServicePrincipal"]
         path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
-            raw = retry(self._mgmt.get)(path, "2022-04-01")
-            assignment = self._role_assignment(raw, str(storage_account.id), principal_types)
+            response = retry(self._mgmt.get)(path, "2022-04-01")
+            assignment = self._role_assignment(response, str(storage_account.id), principal_types)
             return assignment
-        except TimeoutError as e:
+        except TimeoutError:
             logger.warning(f"Storage permission not found: {path}")
             return None
 
