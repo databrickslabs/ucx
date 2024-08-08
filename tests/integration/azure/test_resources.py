@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from databricks.labs.ucx.azure.resources import AzureResource, StorageAccount
+from databricks.labs.ucx.azure.resources import AccessConnector, AzureResource, StorageAccount
 
 
 def test_azure_resource_storage_accounts_list_non_zero(az_cli_ctx):
@@ -69,11 +69,11 @@ def test_storage_account(az_cli_ctx, env_or_skip) -> StorageAccount:
     return storage_accounts[0]
 
 
-def test_azure_resource_gets_applies_and_deletes_storage_permissions(az_cli_ctx, test_storage_account, make_random):
+@pytest.fixture
+def access_connector(az_cli_ctx, make_random, test_storage_account: StorageAccount) -> AccessConnector:
     access_connector_name = f"test-{make_random()}"
     tomorrow = dt.datetime.now() + dt.timedelta(days=1)
     tags = {"RemoveAfter": str(tomorrow), "NoAutoRemove": "False"}
-    # TODO: Move this to a fixture that also deletes the access connector
     access_connector = az_cli_ctx.azure_resources.create_or_update_access_connector(
         test_storage_account.id.subscription_id,
         test_storage_account.id.resource_group,
@@ -81,7 +81,19 @@ def test_azure_resource_gets_applies_and_deletes_storage_permissions(az_cli_ctx,
         test_storage_account.location,
         tags,
     )
+    yield access_connector
+    az_cli_ctx.azure_resources.delete_access_connector(
+        access_connector.id.subscription_id,
+        access_connector.id.resource_group,
+        access_connector.name,
+    )
 
+
+def test_azure_resource_gets_applies_and_deletes_storage_permissions(
+    az_cli_ctx,
+    test_storage_account,
+    access_connector,
+):
     role_guid = str(uuid.uuid4())
     storage_permission = az_cli_ctx.azure_resources.get_storage_permission(test_storage_account, role_guid)
     assert storage_permission is None
