@@ -404,8 +404,7 @@ class AzureResources:
             if role_guid:
                 role_guids.append(role_guid)
         for guid in role_guids:
-            path = f"{account.id}/providers/Microsoft.Authorization/roleAssignments/{guid}"
-            self._mgmt.delete(path, "2022-04-01")
+            self._mgmt.delete(guid, "2022-04-01")
 
     def tenant_id(self):
         token = self._mgmt.token()
