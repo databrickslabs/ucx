@@ -643,7 +643,7 @@ def test_create_global_spn_cluster_policy_not_found():
     with pytest.raises(NotFound):
         azure_resource_permission.create_uber_principal(prompts)
     w.cluster_policies.get.assert_called_once()
-    w.secrets.get_secret.assert_not_called()
+    w.secrets.get_secret.asser_called_with("ucx", "uber_principal_secret")
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
     w.cluster_policies.edit.assert_not_called()
@@ -658,7 +658,7 @@ def test_create_global_spn():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")

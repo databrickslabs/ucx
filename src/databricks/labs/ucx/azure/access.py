@@ -5,14 +5,18 @@ import uuid
 from collections.abc import ValuesView
 from dataclasses import dataclass
 from functools import partial
+from datetime import timedelta
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceAlreadyExists
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceAlreadyExists, ResourceDoesNotExist
+from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
-from databricks.sdk.service.sql import EndpointConfPair
+from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.sql import EndpointConfPair, GetWorkspaceWarehouseConfigResponse
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
@@ -41,6 +45,7 @@ class StoragePermissionMapping:
 
 class AzureResourcePermissions:
     FILENAME = 'azure_storage_account_info.csv'
+    _UBER_PRINCIPAL_SECRET_KEY = "uber_principal_secret"
 
     def __init__(
         self,
@@ -151,16 +156,16 @@ class AzureResourcePermissions:
     def _update_cluster_policy_definition(
         self,
         policy_definition: str,
+        principal_client_id: str,
+        principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        inventory_database: str,
     ) -> str:
         policy_dict = json.loads(policy_definition)
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         for storage in storage_accounts:
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config(uber_principal.client.client_id)
+                self._policy_config(principal_client_id)
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"] = (
                 self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
@@ -172,7 +177,7 @@ class AzureResourcePermissions:
                 self._policy_config("OAuth")
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config("{{secrets/" + inventory_database + "/uber_principal_secret}}")
+                self._policy_config("{{" + principal_secret_identifier + "}}")
             )
         return json.dumps(policy_dict)
 
@@ -183,19 +188,20 @@ class AzureResourcePermissions:
     def _update_cluster_policy_with_spn(
         self,
         policy_id: str,
+        principal_client_id: str,
+        principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        inventory_database: str,
     ):
         try:
             policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
-
             self._installation.save(cluster_policy, filename="policy-backup.json")
-
             if cluster_policy.definition is not None:
                 policy_definition = self._update_cluster_policy_definition(
-                    cluster_policy.definition, storage_accounts, uber_principal, inventory_database
+                    cluster_policy.definition,
+                    principal_client_id,
+                    principal_secret_identifier,
+                    storage_accounts,
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
@@ -203,43 +209,77 @@ class AzureResourcePermissions:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
 
-    def _update_sql_dac_with_spn(
-        self,
-        storage_account_info: list[StorageAccount],
-        uber_principal: PrincipalSecret,
-        inventory_database: str,
-    ):
+    def _revert_cluster_policy(self, policy_id: str):
+        policy = self._installation.load(Policy, filename="policy-backup.json")
+        if policy.name is not None and policy.definition is not None:
+            self._ws.cluster_policies.edit(policy_id, policy.name, definition=policy.definition)
 
-        warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
-        sql_dac = warehouse_config.data_access_config
-        if sql_dac is None:
-            sql_dac = []
+    def _create_storage_account_data_access_configuration_pairs(
+        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
+    ) -> list[EndpointConfPair]:
+        """Create the data access configuration pairs to access the storage"""
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
-        for storage in storage_account_info:
-            sql_dac.extend(
-                [
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
-                        uber_principal.client.client_id,
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
-                        "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
-                        endpoint,
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"
-                    ),
-                    EndpointConfPair(
-                        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
-                        "{{secrets/" + inventory_database + "/uber_principal_secret}}",
-                    ),
-                ]
+        return [
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                principal_client_id,
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+            ),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                endpoint,
+            ),
+            EndpointConfPair(f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"),
+            EndpointConfPair(
+                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                "{{" + principal_secret_identifier + "}}",
+            ),
+        ]
+
+    def _update_sql_dac_with_spn(
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
+    ):
+        warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
+        self._installation.save(warehouse_config, filename="warehouse-config-backup.json")
+        sql_dac = warehouse_config.data_access_config or []
+        for storage in storage_accounts:
+            configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
+                principal_client_id, principal_secret_identifier, storage
             )
+            sql_dac.extend(configuration_pairs)
+        self._ws.warehouses.set_workspace_warehouse_config(
+            data_access_config=sql_dac,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+        )
+
+    def _revert_sql_dac_with_spn(
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage_accounts: list[StorageAccount],
+    ):
+        try:
+            warehouse_config = self._installation.load(
+                GetWorkspaceWarehouseConfigResponse, filename="warehouse-config-backup.json"
+            )
+        except NotFound:  # For legacy reasons we can not assume the backup to always be present
+            warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
+        sql_dac = warehouse_config.data_access_config or []
+
+        for storage_account in storage_accounts:
+            configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
+                principal_client_id, principal_secret_identifier, storage_account
+            )
+            for configuration_pair in configuration_pairs:
+                sql_dac.remove(configuration_pair)
+
         self._ws.warehouses.set_workspace_warehouse_config(
             data_access_config=sql_dac,
             sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
@@ -267,27 +307,62 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
-        storage_account_info = []
+        storage_accounts = []
         for storage in self._azurerm.storage_accounts():
             if storage.name in used_storage_accounts:
-                storage_account_info.append(storage)
+                storage_accounts.append(storage)
         logger.info("Creating service principal")
-        uber_principal = self._azurerm.create_service_principal(uber_principal_name)
-        self._create_scope(uber_principal, inventory_database)
-        config.uber_spn_id = uber_principal.client.client_id
-        logger.info(
-            f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
-        )
         try:
+            uber_principal = self._azurerm.create_service_principal(uber_principal_name)
             self._apply_storage_permission(
-                uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_account_info
+                uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_accounts
             )
-            self._installation.save(config)
-            self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
-            self._update_sql_dac_with_spn(storage_account_info, uber_principal, inventory_database)
-        except PermissionError:
-            self._azurerm.delete_service_principal(uber_principal.client.object_id)
-        logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
+            secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
+            secret_identifier = f"secrets/{inventory_database}/{secret.key}"
+            self._update_cluster_policy_with_spn(
+                policy_id,
+                uber_principal.client.client_id,
+                secret_identifier,
+                storage_accounts,
+            )
+            self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
+        except (PermissionError, NotFound):
+            logger.error("Failed to create service principal", exc_info=True)
+            self._delete_uber_principal()  # Clean up dangling resources
+            return
+        config.uber_spn_id = uber_principal.client.client_id
+        self._installation.save(config)
+        logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
+        logger.info(f"Updated UCX cluster policy {policy_id} with spn connection details for storage accounts")
+
+    def _delete_uber_principal(self):
+        config = self._installation.load(WorkspaceConfig)
+        if config.uber_spn_id is not None:
+            used_storage_accounts = self._get_storage_accounts()
+            storage_accounts = []
+            for storage in self._azurerm.storage_accounts():
+                if storage.name in used_storage_accounts:
+                    storage_accounts.append(storage)
+            for storage_account in storage_accounts:
+                try:
+                    self._azurerm.delete_storage_permission(str(storage_account.id), principal_id=config.uber_spn_id)
+                except NotFound:
+                    pass  # Already deleted
+                except PermissionDenied:
+                    logger.error(
+                        f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True
+                    )
+            try:
+                self._azurerm.delete_service_principal(config.uber_spn_id)
+            except NotFound:
+                pass  # Already deleted
+            except PermissionDenied:
+                logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+            secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+            self._revert_sql_dac_with_spn(config.uber_spn_id, secret_identifier, storage_accounts)
+        if config.policy_id is not None:
+            self._revert_cluster_policy(config.policy_id)
+        self._safe_delete_scope(config.inventory_database)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
@@ -355,13 +430,34 @@ class AzureResourcePermissions:
             self._azurerm.apply_storage_permission(principal_id, storage, role_name, role_guid)
             logger.debug(f"{role_name} permission applied for spn {principal_id} to storage account {storage.name}")
 
-    def _create_scope(self, uber_principal: PrincipalSecret, inventory_database: str):
-        logger.info(f"Creating secret scope {inventory_database}.")
+    def _create_and_get_secret_for_uber_principal(
+        self,
+        principal_secret: PrincipalSecret,
+        scope: str,
+    ) -> GetSecretResponse:
+        """Create and get a workspace secret for the principal.
+
+        If the secret scope does not, it wil be recreated. If the secret already exists, it will be overwritten.
+        """
+        logger.info(f"Creating secret scope {scope}.")
         try:
-            self._ws.secrets.create_scope(inventory_database)
+            self._ws.secrets.create_scope(scope)
         except ResourceAlreadyExists:
-            logger.warning(f"Secret scope {inventory_database} already exists, using the same")
-        self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
+            logger.warning(f"Secret scope {scope} already exists, using the same")
+        self._ws.secrets.put_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY, string_value=principal_secret.secret)
+        return self._get_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY)
+
+    @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=2))
+    def _get_secret(self, scope: str, secret: str) -> GetSecretResponse:
+        return self._ws.secrets.get_secret(scope, secret)
+
+    def _safe_delete_scope(self, scope: str) -> None:
+        try:
+            self._ws.secrets.delete_scope(scope)
+        except ResourceDoesNotExist:
+            logger.warning(f"Secret scope {scope} does not exist, skipping delete.")
+        except PermissionDenied:
+            logger.error(f"Missing permissions to delete secret scope: {scope}", exc_info=True)
 
     def load(self):
         return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
