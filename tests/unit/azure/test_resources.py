@@ -263,6 +263,21 @@ def test_apply_storage_permission_assignment_present():
     api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
+def test_delete_storage_permission():
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+
+    azure_resource.delete_storage_permission("principal_id_system_assigned_mi-123", storage_account)
+
+    api_client.delete.assert_any_call("rol1", "2022-04-01")
+
+
 def test_azure_client_api_put_graph():
     api_client = AzureAPIClient("foo", "bar")
     api_client.api_client.do = get_az_api_mapping
