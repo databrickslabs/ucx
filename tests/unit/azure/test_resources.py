@@ -272,10 +272,13 @@ def test_delete_storage_permission():
         location="eastus",
         default_network_action="Allow",
     )
+    principal_id = "principal_id_system_assigned_mi-123"
 
-    azure_resource.delete_storage_permission("principal_id_system_assigned_mi-123", storage_account)
+    azure_resource.delete_storage_permission(principal_id, storage_account)
 
-    api_client.delete.assert_any_call("rol1", "2022-04-01")
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'{principal_id}'"
+    api_client.get.assert_called_with(path, "2022-04-01")
+    api_client.delete.assert_called_with("rol1", "2022-04-01")
 
 
 def test_azure_client_api_put_graph():
