@@ -351,7 +351,7 @@ class AzureResources:
             raw = retry(self._mgmt.get)(path, "2022-04-01")
             assignment = self._role_assignment(raw, str(storage_account.id), principal_types)
             return assignment
-        except TimeoutError:
+        except TimeoutError as e:
             logger.warning(f"Storage permission not found: {path}")
             return None
 
@@ -394,7 +394,8 @@ class AzureResources:
             The storage account to delete permission for.
         """
         path = (
-            f"{account.id}/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20{principal_id}"
+            f"{account.id}/providers/Microsoft.Authorization/roleAssignments"
+            f"?$filter=principalId%20eq%20'{principal_id}'"
         )
         response = self._mgmt.get(path, "2022-04-01")
         role_guids = []
