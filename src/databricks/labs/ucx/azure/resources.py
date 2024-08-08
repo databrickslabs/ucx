@@ -332,6 +332,25 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
+    def get_storage_permission(
+        self,
+        storage_account: StorageAccount,
+        role_guid: str,
+        *,
+        principal_types: list[str] | None = None,
+    ) -> AzureRoleAssignment | None:
+        """Get a storage permission."""
+        if not principal_types:
+            principal_types = ["ServicePrincipal"]
+        path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
+        try:
+            raw = self._mgmt.get(path, "2022-04-01")
+            assignment = self._role_assignment(raw, str(storage_account.id), principal_types)
+            return assignment
+        except NotFound:
+            logger.warning(f"Storage permission not found: {path}")
+            return None
+
     def apply_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
     ):
