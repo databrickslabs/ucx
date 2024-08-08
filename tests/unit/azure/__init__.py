@@ -30,7 +30,10 @@ def azure_api_client():
     tok = Token(access_token=f"header.{str_token}.sig")
     api_client = create_autospec(AzureAPIClient)
     api_client.token.return_value = tok
-    api_client.get.side_effect = get_az_api_mapping
-    api_client.put.side_effect = get_az_api_mapping
-    api_client.post.side_effect = get_az_api_mapping
+    for method_name in "get", "put", "post":
+        method = getattr(api_client, method_name)
+        method.side_effect = get_az_api_mapping
+        # Set attributes required for `functools.wraps`
+        for attr in "__name__", "__qualname__", "__annotations__", "__type_params__":
+            setattr(method, attr, getattr(get_az_api_mapping, attr))
     return api_client

@@ -134,6 +134,22 @@ def test_create_service_principal_no_access():
         azure_resource.create_service_principal("disNameuser1")
 
 
+def test_get_storage_permission_gets_role_assignments_endpoint():
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+
+    azure_resource.get_storage_permission(storage_account, "12345")
+
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
+    api_client.get.assert_called_with(path, "2022-04-01")
+
+
 def test_apply_storage_permission():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
