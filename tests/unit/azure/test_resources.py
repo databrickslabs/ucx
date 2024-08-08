@@ -301,6 +301,26 @@ def test_delete_storage_permission_logs_permission_denied_on_get(caplog):
     assert principal_id in caplog.text
 
 
+def test_delete_storage_permission_logs_permission_denied_on_delete(caplog):
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.delete.side_effect = PermissionDenied("Permission denied")
+
+    with pytest.raises(PermissionDenied) as error, caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+        azure_resource.delete_storage_permission(principal_id, storage_account)
+    assert "Permission denied" in caplog.text
+    assert "rol1" in caplog.text
+    assert "rol1, rol2" in str(error.value)
+
+
+
 def test_azure_client_api_put_graph():
     api_client = AzureAPIClient("foo", "bar")
     api_client.api_client.do = get_az_api_mapping

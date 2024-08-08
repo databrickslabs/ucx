@@ -430,8 +430,15 @@ class AzureResources:
             role_guid = role_assignment.get("id")
             if role_guid:
                 role_guids.append(role_guid)
+        permission_denied_guids = []
         for guid in role_guids:
-            self._mgmt.delete(guid, "2022-04-01")
+            try:
+                self._mgmt.delete(guid, "2022-04-01")
+            except PermissionDenied:
+                self._log_permission_denied_error_for_storage_permission(guid)
+                permission_denied_guids.append(guid)
+        if permission_denied_guids:
+            raise PermissionDenied(f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}")
 
     def tenant_id(self):
         token = self._mgmt.token()
