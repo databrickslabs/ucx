@@ -400,7 +400,7 @@ class AzureResources:
         response = self._mgmt.get(path, "2022-04-01")
         role_guids = []
         for role_assignment in response.get("value", []):
-            role_guid = role_assignment.get("name")
+            role_guid = role_assignment.get("id")
             if role_guid:
                 role_guids.append(role_guid)
         for guid in role_guids:
