@@ -322,6 +322,15 @@
             "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
           },
           "id": "rol1"
+        },
+        {
+          "properties": {
+            "principalId": "principal_id_system_assigned_mi-123",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id002",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol2"
         }
       ]
     },
