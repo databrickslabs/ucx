@@ -6,17 +6,30 @@ List of all UCX objects and their respective metadata.
 
 Table Utilization:
 
-| Table              | Generate Assessment | Migrate Local Groups | Migrate External Tables | Migrate SQL Warehouses | Upgrade Jobs | Migrate managed tables |
-|--------------------|---------------------|----------------------|-------------------------|------------------------|--------------|------------------------|
-| tables             | RW                  |                      | RO                      |                        |              | RO                     |
-| grants             |                     |                      | RW                      |                        |              | RW                     |
-| mounts             | RW                  |                      | RO                      |                        | RO           | RO                     |
-| permissions        |                     | RW                   |                         |                        |              |                        |
-| jobs               | RW                  |                      |                         |                        | RO           |                        |
-| clusters           | RW                  |
-| external_locations | RW                  |                      | RO                      |
-| workspace          | RW                  | RO                   |                         |                        | RO           |
-| workspace_objects  |                     | RW                   |                         |                        |              |
+| Table                    | Generate Assessment | Migrate Local Groups | Migrate External Tables | Migrate SQL Warehouses | Upgrade Jobs | Migrate managed tables |
+|--------------------------|---------------------|----------------------|-------------------------|------------------------|--------------|------------------------|
+| tables                   | RW                  |                      | RO                      |                        |              | RO                     |
+| grants                   |                     |                      | RW                      |                        |              | RW                     |
+| mounts                   | RW                  |                      | RO                      |                        | RO           | RO                     |
+| permissions              |                     | RW                   |                         |                        |              |                        |
+| jobs                     | RW                  |                      |                         |                        | RO           |                        |
+| clusters                 | RW                  |
+| external_locations       | RW                  |                      | RO                      |
+| workspace                | RW                  | RO                   |                         |                        | RO           |
+| workspace_objects        |                     |                      |                         |                        |              |
+| azure_service_principals |                     |                      |                         |                        |              |
+| global_init_scripts      |                     |                      |                         |                        |              |
+| pipelines                |                     |                      |                         |                        |              |
+| groups                   |                     |                      |                         |                        |              |
+| table_size               |                     |                      |                         |                        |              |
+| table_failures           |                     |                      |                         |                        |              |
+| submit_runs              |                     |                      |                         |                        |              |
+| policies                 |                     |                      |                         |                        |              |
+| migration_status         |                     |                      |                         |                        |              |
+| workflow_problems        |                     |                      |                         |                        |              |
+| udfs                     |                     |                      |                         |                        |              |
+| logs                     |                     |                      |                         |                        |              |
+| recon_results            |                     |                      |                         |                        |              |
 
 **RW** - Read/Write the job that generates the table
 **RO** - Read Only
