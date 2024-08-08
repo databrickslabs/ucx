@@ -312,6 +312,19 @@
       },
       "id": "rol1"
     },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'principal_id_system_assigned_mi-123'": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "principal_id_system_assigned_mi-123",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol1"
+        }
+      ]
+    },
     "/v1.0/applications": {
       "appId": "appIduser1"
     },
