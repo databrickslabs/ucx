@@ -321,17 +321,18 @@ DIRECT_FS_REFS = {
 @dataclass
 class DFSA:
     """A DFSA is a record describing a Direct File System Access"""
+
     UNKNOWN = "unknown"
 
     source_type: str
     source_id: str
     path: str
-    # is_read: bool
-    # is_write: bool
+    is_read: bool
+    is_write: bool
 
     @property
     def key(self) -> str:
-        return f"{self.path}".lower()  # TODO for now
+        return f"{self.source_type}.{self.source_id}.{self.path}".lower()  # TODO for now
 
     @property
     def safe_sql_key(self) -> str:

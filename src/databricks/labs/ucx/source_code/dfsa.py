@@ -3,7 +3,7 @@ from collections.abc import Iterable, Callable
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
-from sqlglot.expressions import Identifier, Literal
+from sqlglot.expressions import AlterTable, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
 from databricks.sdk.service.workspace import Language
 
@@ -97,9 +97,15 @@ class DfsaCollector:
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(
-                    path, cell.original_code, cell.language.language, graph, inherited_tree
-                    ):
-                yield DFSA(source_type="NOTEBOOK", source_id=str(path), path=dfsa.path)
+                path, cell.original_code, cell.language.language, graph, inherited_tree
+            ):
+                yield DFSA(
+                    source_type="NOTEBOOK",
+                    source_id=str(path),
+                    path=dfsa.path,
+                    is_read=dfsa.is_read,
+                    is_write=dfsa.is_write,
+                )
             if cell.language.language is Language.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -119,7 +125,9 @@ class DfsaCollector:
             logger.warning(f"Language {language.name} not supported yet!")
             return
         for dfsa in iterable:
-            yield DFSA(source_type="FILE", source_id=str(path), path=dfsa.path)
+            yield DFSA(
+                source_type="FILE", source_id=str(path), path=dfsa.path, is_read=dfsa.is_read, is_write=dfsa.is_write
+            )
 
     @classmethod
     def _collect_from_python(
@@ -148,7 +156,11 @@ class DfsaCollector:
                 logger.warning(f"Can't interpret {type(literal.this).__name__}")
             fs_path: str = literal.this
             if any(fs_path.startswith(fs_ref) for fs_ref in DIRECT_FS_REFS):
-                yield DFSA(source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path)
+                is_read = cls._is_read(literal)
+                is_write = cls._is_write(literal)
+                yield DFSA(
+                    source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path, is_read=is_read, is_write=is_write
+                )
 
     @classmethod
     def _collect_from_sql_identifiers(cls, expression: SqlExpression) -> Iterable[DFSA]:
@@ -157,4 +169,26 @@ class DfsaCollector:
                 logger.warning(f"Can't interpret {type(identifier.this).__name__}")
             fs_path: str = identifier.this
             if any(fs_path.startswith(fs_ref) for fs_ref in DIRECT_FS_REFS):
-                yield DFSA(source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path)
+                is_read = cls._is_read(identifier)
+                is_write = cls._is_write(identifier)
+                yield DFSA(
+                    source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path, is_read=is_read, is_write=is_write
+                )
+
+    @classmethod
+    def _is_read(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, Select)
+
+    @classmethod
+    def _is_write(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, (Create, AlterTable, Drop, Insert, Delete))
+
+    @classmethod
+    def _walk_up(cls, expression: SqlExpression | None) -> SqlExpression | None:
+        if expression is None:
+            return None
+        if isinstance(expression, (Create, AlterTable, Drop, Insert, Delete, Select)):
+            return expression
+        return cls._walk_up(expression.parent)
