@@ -387,18 +387,18 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
-    def delete_storage_permission(self, principal_id: str, account: StorageAccount) -> None:
+    def delete_storage_permission(self, principal_id: str, storage_account: StorageAccount) -> None:
         """Delete storage permission(s) for a principal
 
         Parameters
         ----------
         principal_id : str
             The principal id to delete the role assignment(s) for.
-        account : StorageAccount
+        storage_account : StorageAccount
             The storage account to delete permission for.
         """
         path = (
-            f"{account.id}/providers/Microsoft.Authorization/roleAssignments"
+            f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
             f"?$filter=principalId%20eq%20'{principal_id}'"
         )
         response = self._mgmt.get(path, "2022-04-01")
