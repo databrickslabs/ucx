@@ -334,7 +334,12 @@ class AzureResourcePermissions:
             )
             secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
             secret_identifier = f"secrets/{inventory_database}/{secret.key}"
-            self._update_cluster_policy_with_spn(policy_id, uber_principal.client.client_id, secret_identifier, storage_accounts,)
+            self._update_cluster_policy_with_spn(
+                policy_id,
+                uber_principal.client.client_id,
+                secret_identifier,
+                storage_accounts,
+            )
             self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
         except (PermissionError, NotFound):
             logger.error("Failed to create service principal", exc_info=True)
