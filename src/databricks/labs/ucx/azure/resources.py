@@ -339,7 +339,7 @@ class AzureResources:
         storage_account: StorageAccount,
         role_guid: str,
         *,
-        timeout: timedelta = timedelta(seconds=0),
+        timeout: timedelta = timedelta(seconds=1),
     ) -> AzureRoleAssignment | None:
         """Get a storage permission."""
         try:
