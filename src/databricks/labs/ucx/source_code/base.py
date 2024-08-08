@@ -293,11 +293,13 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     language = file_language(path)
     if not language:
         return False
-    if content is None:
-        try:
-            content = path.read_text(guess_encoding(path))
-        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-            logger.warning(f"Could not read file {path}")
-            return False
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
-    return content.startswith(magic_header)
+    if content is not None:
+        return content.startswith(magic_header)
+    try:
+        with path.open('rt', encoding=guess_encoding(path)) as f:
+            file_header = f.read(len(magic_header))
+    except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+        logger.warning(f"Could not read file {path}")
+        return False
+    return file_header == magic_header
