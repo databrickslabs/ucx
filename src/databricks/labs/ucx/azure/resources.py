@@ -334,6 +334,12 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
+    def _log_permission_denied_error_for_storage_permission(self, path: str) -> None:
+        logger.error(
+            "Permission denied. Please run this cmd under the identity of a user who has "
+            f"create service principal permission: {path}"
+        )
+
     def get_storage_permission(
         self,
         storage_account: StorageAccount,
@@ -352,19 +358,15 @@ class AzureResources:
             logger.warning(f"Storage permission not found: {path}")  # not found because retry on NotFound
             return None
         except PermissionDenied:
-            msg = (
-                "Permission denied. Please run this cmd under the identity of a user who has "
-                f"create service principal permission: {path}"
-            )
-            logger.error(msg)
+            self._log_permission_denied_error_for_storage_permission(path)
             raise
 
     def apply_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
     ):
+        role_id = _ROLES[role_name]
+        path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
-            role_id = _ROLES[role_name]
-            path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             role_definition_id = f"/subscriptions/{storage_account.id.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
             body = {
                 "properties": {
@@ -380,12 +382,8 @@ class AzureResources:
                 f" for spn {principal_id}."
             )
         except PermissionDenied:
-            msg = (
-                "Permission denied. Please run this cmd under the identity of a user who has "
-                "create service principal permission."
-            )
-            logger.error(msg)
-            raise PermissionDenied(msg) from None
+            self._log_permission_denied_error_for_storage_permission(path)
+            raise
 
     def delete_storage_permission(self, principal_id: str, storage_account: StorageAccount) -> None:
         """Delete storage permission(s) for a principal
@@ -404,11 +402,7 @@ class AzureResources:
         try:
             response = self._mgmt.get(path, "2022-04-01")
         except PermissionDenied:
-            msg = (
-                "Permission denied. Please run this cmd under the identity of a user who has "
-                f"create service principal permission: {path}"
-            )
-            logger.error(msg)
+            self._log_permission_denied_error_for_storage_permission(path)
             raise
         role_guids = []
         for role_assignment in response.get("value", []):
