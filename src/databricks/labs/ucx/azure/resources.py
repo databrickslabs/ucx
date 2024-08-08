@@ -2,6 +2,7 @@ import urllib.parse
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 from databricks.sdk.core import (
@@ -13,6 +14,7 @@ from databricks.sdk.core import (
     credentials_strategy,
 )
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.assessment.crawlers import logger
 
@@ -338,16 +340,18 @@ class AzureResources:
         role_guid: str,
         *,
         principal_types: list[str] | None = None,
+        timeout: timedelta = timedelta(seconds=0),
     ) -> AzureRoleAssignment | None:
         """Get a storage permission."""
+        retry = retried(on=[NotFound], timeout=timeout)
         if not principal_types:
             principal_types = ["ServicePrincipal"]
         path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
-            raw = self._mgmt.get(path, "2022-04-01")
+            raw = retry(self._mgmt.get)(path, "2022-04-01")
             assignment = self._role_assignment(raw, str(storage_account.id), principal_types)
             return assignment
-        except NotFound:
+        except TimeoutError:
             logger.warning(f"Storage permission not found: {path}")
             return None
 
