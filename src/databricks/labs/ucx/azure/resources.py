@@ -342,14 +342,14 @@ class AzureResources:
         timeout: timedelta = timedelta(seconds=0),
     ) -> AzureRoleAssignment | None:
         """Get a storage permission."""
-        retry = retried(on=[NotFound], timeout=timeout)
-        path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
+            retry = retried(on=[NotFound], timeout=timeout)
+            path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             response = retry(self._mgmt.get)(path, "2022-04-01")
             assignment = self._role_assignment(response, str(storage_account.id))
             return assignment
-        except TimeoutError:
-            logger.warning(f"Storage permission not found: {path}")
+        except TimeoutError:  # TimeoutError is raised by retried
+            logger.warning(f"Storage permission not found: {path}")  # not found because retry on NotFound
             return None
 
     def apply_storage_permission(
