@@ -52,7 +52,7 @@ class CrawlerBase(Generic[Result]):
         Delete the content of the inventory table.
         The next call to `snapshot` will re-populate the table.
         """
-        self._exec(f"DELETE FROM {self.full_name}")
+        self._exec(f"TRUNCATE TABLE {self.full_name}")
 
     @staticmethod
     def _valid(name: str) -> str:

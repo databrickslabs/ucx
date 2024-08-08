@@ -921,7 +921,7 @@ def test_table_status_reset():
     table_status_crawler = MigrationStatusRefresher(client, backend, "ucx", table_crawler)
     table_status_crawler.reset()
     assert backend.queries == [
-        "DELETE FROM hive_metastore.ucx.migration_status",
+        "TRUNCATE TABLE hive_metastore.ucx.migration_status",
     ]
     table_crawler.snapshot.assert_not_called()
     client.catalogs.list.assert_not_called()
