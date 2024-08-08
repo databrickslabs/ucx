@@ -19,7 +19,7 @@ def test_azure_resource_applies_storage_permissions(az_cli_ctx, env_or_skip, mak
         if storage_account.name == storage_account_name:
             storage_accounts.append(storage_account)
     if len(storage_accounts) == 0:
-        pytest.skip("No storage account found in the test resource group.")
+        pytest.skip("Test storage account not found")
 
     storage_account = storage_accounts[0]
     access_connector_name = f"test-{make_random()}"
