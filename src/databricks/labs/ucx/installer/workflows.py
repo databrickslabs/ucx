@@ -4,7 +4,9 @@ import logging
 import os.path
 import re
 import sys
+import tempfile
 import webbrowser
+import zipfile
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -567,11 +569,30 @@ class WorkflowsDeployment(InstallationMixin):
             case _:
                 return 3
 
-    def _upload_wheel(self):
+    def _upload_wheelhouse(self, path: Path) -> list[str]:
+        """Upload a wheelhouse.
+
+        TODO
+        ----
+        Move this method into the WheelsV2 class.
+        """
+        # We can not upload a .zip file to the workspace as the platform fails when extracting all files inside the zip
+        # archive, therefore, we upload the wheels separately.
+        remote_paths = []
+        with tempfile.TemporaryDirectory() as directory, zipfile.ZipFile(path, "r") as zip_ref:
+            zip_ref.extractall(directory)
+            for wheel in Path(directory).glob("*.whl"):
+                remote_path = self._installation.upload(f"wheels/{wheel.name}", wheel.read_bytes())
+                remote_paths.append(remote_path)
+            return remote_paths
+
+    def _upload_wheel(self) -> list[str]:
         wheel_paths = []
         with self._wheels:
-            if self._config.upload_dependencies:
-                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"])
+            if self._config.wheelhouse is not None and Path(self._config.wheelhouse).is_file():
+                wheel_paths.extend(self._upload_wheelhouse(Path(self._config.wheelhouse)))
+            elif self._config.upload_dependencies:  # The wheelhouse contains the dependencies as well
+                wheel_paths.extend(self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "astroid"]))
             wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
             wheel_paths.append(self._wheels.upload_to_wsfs())
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]

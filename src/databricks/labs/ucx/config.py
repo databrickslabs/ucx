@@ -66,6 +66,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # Whether to upload dependent libraries to the workspace
     upload_dependencies: bool = False
+    wheelhouse: str | None = None
 
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None

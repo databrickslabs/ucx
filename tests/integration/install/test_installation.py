@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 from datetime import timedelta
+from pathlib import Path
 from typing import NoReturn
 
 import pytest
@@ -32,6 +33,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from ..conftest import MockInstallationContext
 
 logger = logging.getLogger(__name__)
+_WHEEL_HOUSE_PATH = Path(__file__).parent.parent.parent.parent / "ucx.wheelhouse.zip"
 
 
 @pytest.fixture
@@ -467,3 +469,24 @@ def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
 
     installation_ctx.deployed_workflows.repair_run("failing")
     assert installation_ctx.deployed_workflows.validate_step("failing")
+
+
+@pytest.mark.skipif(
+    not _WHEEL_HOUSE_PATH.is_file(),
+    reason="No wheelhouse available; run `make wheelhouse` in project root",
+)
+@pytest.mark.parametrize("reset_override_clusters", [False, True])
+def test_workflow_with_wheelhouse(ws, installation_ctx, reset_override_clusters):
+    def config_transform(config: WorkspaceConfig) -> WorkspaceConfig:
+        if reset_override_clusters:
+            # Override clusters are set by a test fixture to speed up tests by attaching existing (running) clusters
+            # A test without this override is slower, however, it is closer to user installation
+            config = dataclasses.replace(config, override_clusters=None)
+        return dataclasses.replace(config, wheelhouse=_WHEEL_HOUSE_PATH.as_posix())
+
+    ctx = installation_ctx.replace(config_transform=config_transform)
+
+    ctx.workspace_installation.run()
+
+    ctx.deployed_workflows.run_workflow("succeeding")
+    assert ctx.deployed_workflows.validate_step("succeeding")

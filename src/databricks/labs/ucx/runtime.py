@@ -7,7 +7,7 @@ from pathlib import Path
 from databricks.sdk.config import with_user_agent_extra
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.workflows import Assessment, Failing
+from databricks.labs.ucx.assessment.workflows import Assessment, Failing, Succeeding
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task, Workflow, parse_args
 from databricks.labs.ucx.installer.logs import TaskLogger
@@ -58,6 +58,7 @@ class Workflows:
                 PermissionsMigrationAPI(),
                 ExperimentalWorkflowLinter(),
                 MigrationRecon(),
+                Succeeding(),
                 Failing(),
             ]
         )

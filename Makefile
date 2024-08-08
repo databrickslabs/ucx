@@ -31,4 +31,7 @@ known:
 solacc:
 	hatch run python tests/integration/source_code/solacc.py
 
-.PHONY: all clean dev lint fmt test integration coverage known solacc
+wheelhouse:
+	CUSTOM_COMPILE_COMMAND="make wheelhouse" hatch run wheelhouse
+
+.PHONY: all clean dev lint fmt test integration coverage known solacc wheelhouse
