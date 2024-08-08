@@ -400,7 +400,7 @@ class AzureResources:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
 
-    def delete_storage_permission(self, principal_id: str, storage_account: StorageAccount) -> None:
+    def delete_storage_permission(self, principal_id: str, storage_account: StorageAccount, *, safe: bool = False) -> None:
         """Delete storage permission(s) for a principal
 
         Parameters
@@ -409,6 +409,8 @@ class AzureResources:
             The principal id to delete the role assignment(s) for.
         storage_account : StorageAccount
             The storage account to delete permission for.
+        safe : bool, optional (default: False)
+            If True, will not raise an exception if the no role assignment are found.
 
         Raises
         ------
@@ -424,6 +426,10 @@ class AzureResources:
         except PermissionDenied:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
+        except NotFound:
+            if not safe:
+                raise
+            return
         role_guids = []
         for role_assignment in response.get("value", []):
             # Tech debt: Reuse AzureRoleAssignment, but requires a refactor to add the id
