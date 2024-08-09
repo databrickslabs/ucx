@@ -26,7 +26,7 @@ def test_runtime_crawl_grants(run_workflow):
 
 def test_runtime_crawl_permissions(run_workflow):
     ctx = run_workflow(Assessment.crawl_permissions)
-    assert "DROP TABLE IF EXISTS hive_metastore.ucx.permissions" in ctx.sql_backend.queries
+    assert "DELETE FROM hive_metastore.ucx.permissions" in ctx.sql_backend.queries
 
 
 def test_runtime_crawl_groups(run_workflow):
