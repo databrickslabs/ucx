@@ -3,10 +3,12 @@ from collections.abc import Iterable, Callable
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
-from sqlglot.expressions import Identifier, Literal
+from sqlglot.expressions import AlterTable, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     CurrentSessionState,
@@ -27,12 +29,33 @@ from databricks.labs.ucx.source_code.queries import FromTable
 logger = logging.getLogger(__name__)
 
 
+class DfsaCrawler(CrawlerBase):
+
+    def __init__(self, backend: SqlBackend, schema: str):
+        """
+        Initializes a DFSACrawler instance.
+
+        Args:
+            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            schema: The schema name for the inventory persistence.
+        """
+        super().__init__(backend, "hive_metastore", schema, "direct_file_system_access", DFSA)
+
+    def append(self, dfsa: DFSA):
+        self._append_records([dfsa])
+
+
 class DfsaCollector:
     """DfsaCollector is responsible for collecting and storing DFSAs i.e. Direct File System Access records"""
 
     def __init__(
-        self, path_lookup: PathLookup, session_state: CurrentSessionState, context_factory: Callable[[], LinterContext]
+        self,
+        crawler: DfsaCrawler,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        context_factory: Callable[[], LinterContext],
     ):
+        self._crawler = crawler
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._context_factory = context_factory
@@ -41,7 +64,9 @@ class DfsaCollector:
         collected_paths: set[Path] = set()
         for dependency in graph.root_dependencies:
             root = dependency.path  # since it's a root
-            yield from self._collect_from_dependency(dependency, graph, root, collected_paths)
+            for dfsa in self._collect_from_dependency(dependency, graph, root, collected_paths):
+                self._crawler.append(dfsa)
+                yield dfsa
 
     def _collect_from_dependency(
         self, dependency: Dependency, graph: DependencyGraph, root_path: Path, collected_paths: set[Path]
@@ -71,9 +96,16 @@ class DfsaCollector:
     ) -> Iterable[DFSA]:
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
-            yield from self._collect_from_source(
+            for dfsa in self._collect_from_source(
                 path, cell.original_code, cell.language.language, graph, inherited_tree
-            )
+            ):
+                yield DFSA(
+                    source_type="NOTEBOOK",
+                    source_id=str(path),
+                    path=dfsa.path,
+                    is_read=dfsa.is_read,
+                    is_write=dfsa.is_write,
+                )
             if cell.language.language is Language.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -84,13 +116,18 @@ class DfsaCollector:
     def _collect_from_source(
         cls, path: Path, source: str, language: Language, graph: DependencyGraph, inherited_tree: Tree | None
     ) -> Iterable[DFSA]:
+        iterable: Iterable[DFSA] | None = None
         if language is Language.SQL:
-            yield from cls._collect_from_sql(path, source)
-            return
+            iterable = cls._collect_from_sql(path, source)
         if language is Language.PYTHON:
-            yield from cls._collect_from_python(path, source, graph, inherited_tree)
+            iterable = cls._collect_from_python(path, source, graph, inherited_tree)
+        if iterable is None:
+            logger.warning(f"Language {language.name} not supported yet!")
             return
-        logger.warning(f"Language {language.name} not supported yet!")
+        for dfsa in iterable:
+            yield DFSA(
+                source_type="FILE", source_id=str(path), path=dfsa.path, is_read=dfsa.is_read, is_write=dfsa.is_write
+            )
 
     @classmethod
     def _collect_from_python(
@@ -118,11 +155,12 @@ class DfsaCollector:
             if not isinstance(literal.this, str):
                 logger.warning(f"Can't interpret {type(literal.this).__name__}")
             fs_path: str = literal.this
-            for fs_ref in DIRECT_FS_REFS:
-                if not fs_path.startswith(fs_ref):
-                    continue
-                yield DFSA(path=fs_path)
-                break
+            if any(fs_path.startswith(fs_ref) for fs_ref in DIRECT_FS_REFS):
+                is_read = cls._is_read(literal)
+                is_write = cls._is_write(literal)
+                yield DFSA(
+                    source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path, is_read=is_read, is_write=is_write
+                )
 
     @classmethod
     def _collect_from_sql_identifiers(cls, expression: SqlExpression) -> Iterable[DFSA]:
@@ -130,8 +168,27 @@ class DfsaCollector:
             if not isinstance(identifier.this, str):
                 logger.warning(f"Can't interpret {type(identifier.this).__name__}")
             fs_path: str = identifier.this
-            for fs_ref in DIRECT_FS_REFS:
-                if not fs_path.startswith(fs_ref):
-                    continue
-                yield DFSA(path=fs_path)
-                break
+            if any(fs_path.startswith(fs_ref) for fs_ref in DIRECT_FS_REFS):
+                is_read = cls._is_read(identifier)
+                is_write = cls._is_write(identifier)
+                yield DFSA(
+                    source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=fs_path, is_read=is_read, is_write=is_write
+                )
+
+    @classmethod
+    def _is_read(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, Select)
+
+    @classmethod
+    def _is_write(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, (Create, AlterTable, Drop, Insert, Delete))
+
+    @classmethod
+    def _walk_up(cls, expression: SqlExpression | None) -> SqlExpression | None:
+        if expression is None:
+            return None
+        if isinstance(expression, (Create, AlterTable, Drop, Insert, Delete, Select)):
+            return expression
+        return cls._walk_up(expression.parent)
