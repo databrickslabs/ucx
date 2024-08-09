@@ -1,8 +1,8 @@
 from astroid import Assign  # type: ignore
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_infers_empty_list():

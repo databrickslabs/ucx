@@ -10,7 +10,7 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.Logger(__name__)

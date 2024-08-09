@@ -4,7 +4,7 @@ import pytest
 
 
 from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 from databricks.sdk.service.compute import DataSecurityMode
 

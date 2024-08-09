@@ -1,8 +1,8 @@
 import pytest
 from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Name  # type: ignore
 
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_extracts_root():

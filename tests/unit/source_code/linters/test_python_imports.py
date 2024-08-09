@@ -9,8 +9,8 @@ from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, D
 from databricks.labs.ucx.source_code.linters.files import FileLoader
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.cells import PythonCodeAnalyzer
+from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAnalyzer
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
