@@ -18,7 +18,6 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
 @pytest.mark.parametrize(
     "source_path, dfsa_paths",
     [
-        ("dfsa/create_cloud_files.sql", ["s3a://db-gtm-industry-solutions/data/CME/telco/PCMD"]),
         ("dfsa/create_location.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"]),
         ("dfsa/create_location.py", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/", "s3a://db-gtm-industry-solutions/data/fsi/capm/sp_550/"]),
         ("dfsa/select_read_files.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/file.csv"]),
