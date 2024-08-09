@@ -19,69 +19,45 @@ def mock_backend():
     return MockBackend()
 
 
-def test_inventory_table_manager_init(mock_backend):
+def test_inventory_permission_manager_init(mock_backend):
     permission_manager = PermissionManager(mock_backend, "test_database", [])
 
     assert permission_manager.full_name == "hive_metastore.test_database.permissions"
 
 
-def test_save(mock_backend):
-    permission_manager = PermissionManager(mock_backend, "test_database", [])
-
-    permission_manager._save([Permissions("object1", "clusters", "test acl")])  # pylint: disable=protected-access
-
-    assert [Row(object_id="object1", object_type="clusters", raw="test acl")] == mock_backend.rows_written_for(
-        "hive_metastore.test_database.permissions", "append"
-    )
-
-
 _PermissionsRow = Row.factory(["object_id", "object_type", "raw"])
 
 
-def test_load_all():
+def test_snapshot_fetch() -> None:
+    """Verify that the snapshot will load existing data from the inventory."""
     sql_backend = MockBackend(
         rows={
-            "SELECT object_id": [
+            "SELECT object_id, object_type, raw FROM ": [
                 _PermissionsRow("object1", "clusters", "test acl"),
             ],
-            "SELECT COUNT": [Row(cnt=12)],
         }
     )
     permission_manager = PermissionManager(sql_backend, "test_database", [])
 
-    output = permission_manager.load_all()
+    output = list(permission_manager.snapshot())
     assert output[0] == Permissions(object_id="object1", object_type="clusters", raw="test acl")
 
 
-def test_load_all_no_rows_present():
-    sql_backend = MockBackend(
-        rows={
-            "SELECT object_id": [
-                _PermissionsRow("object1", "clusters", "test acl"),
-            ],
-            "SELECT COUNT": [Row(cnt=0)],
-        }
-    )
-
-    permission_manager = PermissionManager(sql_backend, "test_database", [])
-
-    with pytest.raises(RuntimeError):
-        permission_manager.load_all()
-
-
-def test_manager_inventorize(mock_backend, mocker):
+def test_snapshot_crawl_fallback(mocker) -> None:
+    """Verify that the snapshot will first attempt to load the (empty) inventory and then crawl."""
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
-    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
+    sql_backend = MockBackend(rows={"SELECT object_id, object_type, raw FROM ": []})
+    permission_manager = PermissionManager(sql_backend, "test_database", [some_crawler])
 
-    permission_manager.inventorize_permissions()
+    permission_manager.snapshot()
 
-    assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
+    assert [Row(object_id="a", object_type="b", raw="c")] == sql_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
 
-def test_manager_inventorize_ignore_error(mock_backend, mocker):
+def test_manager_snapshot_crawl_ignore_disabled_features(mock_backend, mocker):
     def raise_error():
         raise DatabricksError(
             "Model serving is not enabled for your shard. "
@@ -93,14 +69,14 @@ def test_manager_inventorize_ignore_error(mock_backend, mocker):
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), raise_error]
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
 
-    permission_manager.inventorize_permissions()
+    permission_manager.snapshot()
 
     assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
 
-def test_manager_inventorize_fail_with_error(mock_backend, mocker):
+def test_manager_snapshot_crawl_with_error(mock_backend, mocker):
     def raise_error():
         raise DatabricksError(
             "Fail the job",
@@ -115,7 +91,7 @@ def test_manager_inventorize_fail_with_error(mock_backend, mocker):
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
 
     with pytest.raises(ManyError) as expected_err:
-        permission_manager.inventorize_permissions()
+        permission_manager.snapshot()
     assert len(expected_err.value.errs) == 2
 
 
@@ -227,7 +203,6 @@ def test_manager_verify():
                     ),
                 ),
             ],
-            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 
@@ -268,7 +243,6 @@ def test_manager_verify_not_supported_type():
                     ),
                 ),
             ],
-            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 
@@ -303,7 +277,6 @@ def test_manager_verify_no_tasks():
                     ),
                 ),
             ],
-            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 

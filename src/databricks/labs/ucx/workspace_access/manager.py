@@ -1,16 +1,12 @@
-import json
 import logging
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator
 from itertools import groupby
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.crawlers import (
-    CrawlerBase,
-    Dataclass,
-    DataclassInstance,
-)
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -24,8 +20,10 @@ class PermissionManager(CrawlerBase[Permissions]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
 
-    def inventorize_permissions(self):
-        # TODO: rename into snapshot()
+    def snapshot(self) -> Iterable[Permissions]:
+        return self._snapshot(self._fetcher, self._crawl)
+
+    def _crawl(self) -> Iterable[Permissions]:
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
@@ -37,18 +35,17 @@ class PermissionManager(CrawlerBase[Permissions]):
                 continue
             logger.error(f"Error while crawling permissions: {error}")
             acute_errors.append(error)
-        if len(acute_errors) > 0:
+        if acute_errors:
             raise ManyError(acute_errors)
         logger.info(f"Total crawled permissions: {len(items)}")
-        self._save(items)
-        logger.info(f"Saved {len(items)} to {self.full_name}")
+        return items
 
     def apply_group_permissions(self, migration_state: MigrationState) -> bool:
         # list shall be sorted prior to using group by
         if len(migration_state) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        items = sorted(self.load_all(), key=lambda i: i.object_type)
+        items = sorted(self.snapshot(), key=lambda i: i.object_type)
         logger.info(
             f"Applying the permissions to account groups. "
             f"Total groups to apply permissions: {len(migration_state)}. "
@@ -92,7 +89,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         return True
 
     def verify_group_permissions(self) -> bool:
-        items = sorted(self.load_all(), key=lambda i: i.object_type)
+        items = sorted(self.snapshot(), key=lambda i: i.object_type)
         logger.info(f"Total permissions found: {len(items)}")
         verifier_tasks: list[Callable[..., bool]] = []
         appliers = self.object_type_support()
@@ -129,29 +126,9 @@ class PermissionManager(CrawlerBase[Permissions]):
                 appliers[object_type] = support
         return appliers
 
-    def _save(self, items: Sequence[Permissions]):
-        # keep in mind, that object_type and object_id are not primary keys.
-        self._append_records(items)  # TODO: update instead of append
-        logger.info("Successfully saved the items to inventory table")
-
-    def load_all(self) -> list[Permissions]:
-        logger.info(f"Loading inventory table {self.full_name}")
-        if list(self._fetch(f"SELECT COUNT(*) as cnt FROM {self.full_name}"))[0][0] == 0:  # noqa: RUF015
-            msg = (
-                f"table {self.full_name} is empty for fetching permission info. "
-                f"Please ensure assessment job is run successfully and permissions populated"
-            )
-            raise RuntimeError(msg)
-        return [
-            Permissions(object_id, object_type, raw)
-            for object_id, object_type, raw in self._fetch(f"SELECT object_id, object_type, raw FROM {self.full_name}")
-        ]
-
-    def load_all_for(self, object_type: str, object_id: str, klass: Dataclass) -> Iterable[DataclassInstance]:
-        for perm in self.load_all():
-            if object_type == perm.object_type and object_id.lower() == perm.object_id.lower():
-                raw = json.loads(perm.raw)
-                yield klass(**raw)
+    def _fetcher(self) -> Iterable[Permissions]:
+        for row in self._fetch(f"SELECT object_id, object_type, raw FROM {escape_sql_identifier(self.full_name)}"):
+            yield Permissions(*row)
 
     def _get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         for support in self._acl_support:
