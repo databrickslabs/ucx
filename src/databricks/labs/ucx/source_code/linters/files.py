@@ -161,10 +161,11 @@ class LocalCodeLinter:
         if dependency.path in linted_paths:
             return
         linted_paths.add(dependency.path)
-        if dependency.path.is_file():
+        if dependency.path.is_file() or is_a_notebook(dependency.path):
             inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             ctx = self._new_linter_context()
             path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+            # FileLinter will determine which file/notebook linter to use
             linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
             for advice in linter.lint():
                 yield advice.for_path(dependency.path)
