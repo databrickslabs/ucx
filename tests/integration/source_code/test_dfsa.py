@@ -24,6 +24,17 @@ def make_query(ws, make_random):
     yield from factory("query", create, lambda query: ws.queries.delete(query.id))
 
 
+@pytest.fixture
+def crawler(make_schema, sql_backend):
+    schema = make_schema(catalog_name="hive_metastore")
+    return DfsaCrawler(sql_backend, schema.name)
+
+
+@pytest.fixture
+def collector(crawler, simple_ctx):
+    return DfsaCollector(crawler, simple_ctx.path_lookup, CurrentSessionState())
+
+
 @pytest.mark.parametrize(
     "name, sql, dfsa_paths, is_read, is_write",
     [
@@ -36,13 +47,10 @@ def make_query(ws, make_random):
         )
     ],
 )
-def test_dfsa_collector_collects_dfsas_from_query(  # pylint: disable=too-many-arguments
-    name, sql, dfsa_paths, is_read, is_write, ws, sql_backend, simple_ctx, make_query, make_schema
+def test_dfsa_collector_collects_dfsas_from_query(
+    name, sql, dfsa_paths, is_read, is_write, ws, crawler, collector, make_query
 ):
     query = make_query(name=name, sql=sql)
-    schema = make_schema(catalog_name="hive_metastore")
-    crawler = DfsaCrawler(sql_backend, schema.name)
-    collector = DfsaCollector(crawler, simple_ctx.path_lookup, CurrentSessionState())
     _ = list(collector.collect_from_workspace_queries(ws))
     for dfsa in crawler.snapshot():
         assert dfsa.path in set(dfsa_paths)

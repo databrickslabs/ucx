@@ -346,7 +346,7 @@ class DFSA:
         return isinstance(other, DFSA) and self.key == other.key
 
 
-def fix_field_types(klass: type[dataclasses.dataclass]):
+def fix_field_types(klass):
     """there is a (Python?) bug where calling dataclasses.fields(DFSA)
     returns fields where type is a type name instead of a type, for example 'str' instead of <class str>
     this prevents our ORM from working as expected, so we need a workaround
