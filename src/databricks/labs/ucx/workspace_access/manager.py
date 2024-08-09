@@ -129,11 +129,6 @@ class PermissionManager(CrawlerBase[Permissions]):
                 appliers[object_type] = support
         return appliers
 
-    def cleanup(self):
-        logger.info(f"Cleaning up inventory table {self.full_name}")
-        self._exec(f"DROP TABLE IF EXISTS {self.full_name}")
-        logger.info("Inventory table cleanup complete")
-
     def _save(self, items: Sequence[Permissions]):
         # keep in mind, that object_type and object_id are not primary keys.
         self._append_records(items)  # TODO: update instead of append

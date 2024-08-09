@@ -25,14 +25,6 @@ def test_inventory_table_manager_init(mock_backend):
     assert permission_manager.full_name == "hive_metastore.test_database.permissions"
 
 
-def test_cleanup(mock_backend):
-    permission_manager = PermissionManager(mock_backend, "test_database", [])
-
-    permission_manager.cleanup()
-
-    assert mock_backend.queries[0] == "DROP TABLE IF EXISTS hive_metastore.test_database.permissions"
-
-
 def test_save(mock_backend):
     permission_manager = PermissionManager(mock_backend, "test_database", [])
 
