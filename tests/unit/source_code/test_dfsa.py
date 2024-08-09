@@ -20,6 +20,7 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
     [
         ("dfsa/create_cloud_files.sql", ["s3a://db-gtm-industry-solutions/data/CME/telco/PCMD"], False),
         ("dfsa/create_location.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"], True),
+        ("dfsa/create_location.py", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/", "s3a://db-gtm-industry-solutions/data/fsi/capm/sp_550/"], True),
         ("dfsa/select_read_files.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/file.csv"], True),
         ("dfsa/select_format.sql", ["hdfs://examples/src/main/resources/users.parquet"], True),
     ],
