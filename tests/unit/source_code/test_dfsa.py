@@ -33,7 +33,15 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
     "source_path, dfsa_paths, is_read, is_write",
     [
         ("dfsa/create_location.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"], False, True),
-        ("dfsa/create_location.py", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/", "s3a://db-gtm-industry-solutions/data/fsi/capm/sp_550/"], False, True),
+        (
+            "dfsa/create_location.py",
+            [
+                "s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/",
+                "s3a://db-gtm-industry-solutions/data/fsi/capm/sp_550/",
+            ],
+            False,
+            True,
+        ),
         ("dfsa/select_read_files.sql", ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/file.csv"], True, False),
         ("dfsa/select_format.sql", ["hdfs://examples/src/main/resources/users.parquet"], True, False),
         ("dfsa/spark_read_format_load.py", ["s3a://prefix/some_file.csv"], True, False),
