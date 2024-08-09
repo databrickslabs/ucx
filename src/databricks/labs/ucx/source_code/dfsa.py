@@ -1,14 +1,17 @@
 import logging
 from collections.abc import Iterable
+from functools import partial
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import AlterTable, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
 from databricks.sdk.service.workspace import Language
+from databricks.sdk.service.sql import Query
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     CurrentSessionState,
@@ -43,6 +46,14 @@ class DfsaCrawler(CrawlerBase):
     def append(self, dfsa: DFSA):
         self._append_records([dfsa])
 
+    def snapshot(self) -> Iterable[DFSA]:
+        return self._snapshot(partial(self._try_load), lambda: [])
+
+    def _try_load(self) -> Iterable[DFSA]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield DFSA(*row)
+
 
 class DfsaCollector:
     """DfsaCollector is responsible for collecting and storing DFSAs i.e. Direct File System Access records"""
@@ -52,7 +63,27 @@ class DfsaCollector:
         self._path_lookup = path_lookup
         self._session_state = session_state
 
-    def collect(self, graph: DependencyGraph) -> Iterable[DFSA]:
+    def collect_from_workspace_queries(self, ws) -> Iterable[DFSA]:
+        for query in ws.queries.list():
+            yield from self.collect_from_query(query)
+
+    def collect_from_query(self, query: Query) -> Iterable[DFSA]:
+        if query.query is None:
+            return
+        name: str = query.name or "<anonymous>"
+        source_path = Path(name) if query.parent is None else Path(query.parent) / name
+        for dfsa in self._collect_from_sql(query.query):
+            dfsa = DFSA(
+                source_type="QUERY",
+                source_id=str(source_path),
+                path=dfsa.path,
+                is_read=dfsa.is_read,
+                is_write=dfsa.is_write,
+            )
+            self._crawler.append(dfsa)
+            yield dfsa
+
+    def collect_from_graph(self, graph: DependencyGraph) -> Iterable[DFSA]:
         collected_paths: set[Path] = set()
         for dependency in graph.root_dependencies:
             root = dependency.path  # since it's a root
@@ -110,9 +141,9 @@ class DfsaCollector:
     ) -> Iterable[DFSA]:
         iterable: Iterable[DFSA] | None = None
         if language is Language.SQL:
-            iterable = cls._collect_from_sql(path, source)
+            iterable = cls._collect_from_sql(source)
         if language is Language.PYTHON:
-            iterable = cls._collect_from_python(path, source, graph, inherited_tree)
+            iterable = cls._collect_from_python(source, graph, inherited_tree)
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
             return
@@ -122,14 +153,12 @@ class DfsaCollector:
             )
 
     @classmethod
-    def _collect_from_python(
-        cls, _path: Path, source: str, graph: DependencyGraph, inherited_tree: Tree | None
-    ) -> Iterable[DFSA]:
+    def _collect_from_python(cls, source: str, graph: DependencyGraph, inherited_tree: Tree | None) -> Iterable[DFSA]:
         analyzer = PythonCodeAnalyzer(graph.new_dependency_graph_context(), source)
         yield from analyzer.collect_dfsas(inherited_tree)
 
     @classmethod
-    def _collect_from_sql(cls, _path: Path, source: str) -> Iterable[DFSA]:
+    def _collect_from_sql(cls, source: str) -> Iterable[DFSA]:
         try:
             sqls = parse_sql(source, read='databricks')
             for sql in sqls:
