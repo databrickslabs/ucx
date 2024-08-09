@@ -42,7 +42,7 @@ def test_running_real_migrate_groups_job(
     ]
 
     installation_ctx.workspace_installation.run()
-    installation_ctx.permission_manager.inventorize_permissions()
+    installation_ctx.permission_manager.snapshot()
 
     installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
@@ -91,7 +91,7 @@ def test_running_real_validate_groups_permissions_job(
         f"secrets:{secret_scope}",
     ]
     installation_ctx.workspace_installation.run()
-    installation_ctx.permission_manager.inventorize_permissions()
+    installation_ctx.permission_manager.snapshot()
 
     # assert the job does not throw any exception
     installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
@@ -115,7 +115,7 @@ def test_running_real_validate_groups_permissions_job_fails(
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.__dict__['include_object_permissions'] = [f'cluster-policies:{cluster_policy.policy_id}']
     installation_ctx.workspace_installation.run()
-    installation_ctx.permission_manager.inventorize_permissions()
+    installation_ctx.permission_manager.snapshot()
 
     # remove permission so the validation fails
     ws.permissions.set(

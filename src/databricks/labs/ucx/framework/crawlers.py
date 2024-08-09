@@ -1,4 +1,5 @@
 import logging
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
 from typing import ClassVar, Generic, Protocol, TypeVar
 
@@ -17,7 +18,7 @@ Dataclass = type[DataclassInstance]
 ResultFn = Callable[[], Iterable[Result]]
 
 
-class CrawlerBase(Generic[Result]):
+class CrawlerBase(ABC, Generic[Result]):
     def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]):
         """
         Initializes a CrawlerBase instance.
@@ -87,6 +88,9 @@ class CrawlerBase(Generic[Result]):
         if name is None:
             return None
         return cls._valid(name)
+
+    @abstractmethod
+    def snapshot(self) -> Iterable[Result]: ...
 
     def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
         """

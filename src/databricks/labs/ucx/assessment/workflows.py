@@ -168,8 +168,8 @@ class Assessment(Workflow):
         This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
         This step includes preparing Legacy Table ACLs for local group migration."""
         permission_manager = ctx.permission_manager
-        permission_manager.cleanup()
-        permission_manager.inventorize_permissions()
+        permission_manager.reset()
+        permission_manager.snapshot()
 
     @job_task
     def crawl_groups(self, ctx: RuntimeContext):
