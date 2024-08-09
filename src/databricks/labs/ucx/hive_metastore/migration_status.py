@@ -74,9 +74,6 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         self._ws = ws
         self._table_crawler = table_crawler
 
-    def snapshot(self) -> Iterable[MigrationStatus]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def index(self) -> MigrationIndex:
         return MigrationIndex(list(self.snapshot()))
 

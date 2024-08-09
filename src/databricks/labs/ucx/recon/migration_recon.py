@@ -52,9 +52,6 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         self._data_comparator = data_comparator
         self._default_threshold = default_threshold
 
-    def snapshot(self) -> Iterable[ReconResult]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _crawl(self) -> Iterable[ReconResult]:
         self._migration_status_refresher.reset()
         migration_index = self._migration_status_refresher.index()

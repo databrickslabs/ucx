@@ -203,13 +203,13 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
     def snapshot(self) -> Iterable[Grant]:
         try:
-            return self._snapshot(partial(self._try_load), partial(self._crawl))
+            return super().snapshot()
         except Exception as e:  # pylint: disable=broad-exception-caught
             log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
             log_fn(f"Couldn't fetch grants snapshot: {e}")
             return []
 
-    def _try_load(self):
+    def _try_fetch(self):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Grant(*row)
 
@@ -580,7 +580,7 @@ class PrincipalACL:
         self._compute_locations = cluster_locations
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
-        tables = self._tables_crawler.snapshot()
+        tables = list(self._tables_crawler.snapshot())
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
