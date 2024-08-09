@@ -1,7 +1,10 @@
 from pathlib import Path
+from unittest.mock import create_autospec
 
 import pytest
 
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import Query
 
 from databricks.labs.lsql.backends import MockBackend
 
@@ -23,7 +26,7 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("leaf4.py"), CurrentSessionState())
     crawler = DfsaCrawler(MockBackend(), "schema")
     collector = DfsaCollector(crawler, mock_path_lookup, CurrentSessionState())
-    dfsas = list(collector.collect(maybe.graph))
+    dfsas = list(collector.collect_from_graph(maybe.graph))
     assert not dfsas
 
 
@@ -57,13 +60,34 @@ def test_dfsa_collects_file_dfsas(
     assert not maybe.problems
     crawler = DfsaCrawler(MockBackend(), "schema")
     collector = DfsaCollector(crawler, mock_path_lookup, CurrentSessionState())
-    dfsas = list(collector.collect(maybe.graph))
+    dfsas = list(collector.collect_from_graph(maybe.graph))
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
     assert not any(dfsa for dfsa in dfsas if dfsa.source_type == DFSA.UNKNOWN)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
 
 
-def test_dfsa_collects_query_dfsas(ws):
-    pass
-
+@pytest.mark.parametrize(
+    "name, query, dfsa_paths, is_read, is_write",
+    [
+        ("none", "SELECT * from dual", [], False, False),
+        (
+            "location",
+            "CREATE TABLE hive_metastore.indices_historical_data.sp_500 LOCATION 's3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/'",
+            ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"],
+            False,
+            True,
+        ),
+    ],
+)
+def test_dfsa_collects_query_dfsas(name, query, dfsa_paths, is_read, is_write, mock_path_lookup):
+    ws = create_autospec(WorkspaceClient)
+    query = Query.from_dict({"parent": "workspace", "name": name, "query": query})
+    ws.queries.list.return_value = iter([query])
+    crawler = DfsaCrawler(MockBackend(), "schema")
+    collector = DfsaCollector(crawler, mock_path_lookup, CurrentSessionState())
+    dfsas = list(collector.collect_from_workspace_queries(ws))
+    assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
+    assert not any(dfsa for dfsa in dfsas if dfsa.source_type != "QUERY")
+    assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
+    assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
