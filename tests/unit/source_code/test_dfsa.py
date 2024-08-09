@@ -50,7 +50,7 @@ def test_dfsa_does_not_collect_erroneously(simple_dependency_resolver, migration
         ("dfsa/spark_dbfs_mount.py", ["/mnt/some_file.csv"], True, False),
     ],
 )
-def test_dfsa_collects_sql_dfsas(
+def test_dfsa_collects_file_dfsas(
     source_path, dfsa_paths, is_read, is_write, simple_dependency_resolver, migration_index, mock_path_lookup
 ):
     """SQL expression not supported by sqlglot for Databricks, restore the test data below for once we drop sqlglot
@@ -65,3 +65,8 @@ def test_dfsa_collects_sql_dfsas(
     assert not any(dfsa for dfsa in dfsas if dfsa.source_type == DFSA.UNKNOWN)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
+
+
+def test_dfsa_collects_query_dfsas(ws):
+    pass
+
