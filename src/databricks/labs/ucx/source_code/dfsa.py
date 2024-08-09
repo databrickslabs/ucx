@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Callable
+from collections.abc import Iterable
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
@@ -16,7 +16,6 @@ from databricks.labs.ucx.source_code.base import (
     DFSA,
 )
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
-from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAnalyzer
@@ -30,12 +29,9 @@ logger = logging.getLogger(__name__)
 class DfsaCollector:
     """DfsaCollector is responsible for collecting and storing DFSAs i.e. Direct File System Access records"""
 
-    def __init__(
-        self, path_lookup: PathLookup, session_state: CurrentSessionState, context_factory: Callable[[], LinterContext]
-    ):
+    def __init__(self, path_lookup: PathLookup, session_state: CurrentSessionState):
         self._path_lookup = path_lookup
         self._session_state = session_state
-        self._context_factory = context_factory
 
     def collect(self, graph: DependencyGraph) -> Iterable[DFSA]:
         collected_paths: set[Path] = set()
