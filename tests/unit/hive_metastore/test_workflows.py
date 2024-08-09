@@ -56,16 +56,15 @@ def test_migrate_ctas_views(run_workflow):
 @pytest.mark.parametrize(
     "workflow",
     [
-        TableMigration.update_migration_status,
-        MigrateHiveSerdeTablesInPlace.refresh_migration_status,
-        MigrateExternalTablesCTAS.refresh_migration_status,
-        ScanTablesInMounts.refresh_migration_status,
-        MigrateTablesInMounts.refresh_migration_status,
+        TableMigration,
+        MigrateHiveSerdeTablesInPlace,
+        MigrateExternalTablesCTAS,
+        ScanTablesInMounts,
+        MigrateTablesInMounts,
     ],
 )
 def test_refresh_migration_status_is_refreshed(run_workflow, workflow):
     """Migration status is refreshed by deleting and showing new tables"""
-    ctx = run_workflow(workflow)
+    ctx = run_workflow(getattr(workflow, "update_migration_status"))
     assert "DELETE FROM hive_metastore.ucx.migration_status" in ctx.sql_backend.queries
     assert "SHOW DATABASES" in ctx.sql_backend.queries
-    # No "SHOW TABLE FROM" query as table are not mocked

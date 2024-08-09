@@ -1352,11 +1352,9 @@ def test_revert_migrated_tables_failed(caplog):
 
 
 def test_refresh_migration_status_published_remained_tables(caplog):
-    errors = {}
-    rows = {}
-    backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend = MockBackend()
     table_crawler = create_autospec(TablesCrawler)
-    grant_crawler = create_autospec(GrantsCrawler)  # pylint: disable=mock-no-usage
+    grant_crawler = create_autospec(GrantsCrawler)
     client = mock_workspace_client()
     table_crawler.snapshot.return_value = [
         Table(
@@ -1396,7 +1394,7 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         ]
     )
     migration_status_refresher.index.return_value = migration_index
-    principal_grants = create_autospec(PrincipalACL)  # pylint: disable=mock-no-usage
+    principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -1408,5 +1406,8 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         principal_grants,
     )
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore"):
-        table_migrate.get_remaining_tables()
+        tables = table_migrate.get_remaining_tables()
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
+        assert len(tables) == 1 and tables[0].key == "hive_metastore.schema1.table3"
+    grant_crawler.assert_not_called()
+    principal_grants.assert_not_called()

@@ -109,9 +109,9 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateExternalTablesCTAS(Workflow):
@@ -159,9 +159,9 @@ class MigrateExternalTablesCTAS(Workflow):
         )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class ScanTablesInMounts(Workflow):
@@ -176,9 +176,9 @@ class ScanTablesInMounts(Workflow):
         ctx.tables_in_mounts.snapshot()
 
     @job_task(job_cluster="table_migration", depends_on=[scan_tables_in_mounts_experimental])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateTablesInMounts(Workflow):
@@ -191,6 +191,6 @@ class MigrateTablesInMounts(Workflow):
         ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_tables_in_mounts_experimental])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()

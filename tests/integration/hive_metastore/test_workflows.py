@@ -102,26 +102,21 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
 def test_refresh_not_migrated_status_job(ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog):
     tables, dst_schema = prepare_tables_for_migration
-    ctx = installation_ctx.replace(
-        extend_prompts={
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    ctx.workspace_installation.run()
+    installation_ctx.workspace_installation.run()
     second_table = list(tables.values())[1]
-    ctx.table_mapping.skip_table(dst_schema.name, second_table.name)
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
+    installation_ctx.table_mapping.skip_table(dst_schema.name, second_table.name)
+    installation_ctx.deployed_workflows.run_workflow("migrate-tables")
+    assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
     remained_tables = list(
         sql_backend.fetch(
             f"""
-        SELECT
-        SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)
-        AS message
-        FROM {ctx.inventory_database}.logs
-        WHERE message LIKE 'remained-hive-metastore-table: %'
-    """
+                SELECT
+                SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)
+                AS message
+                FROM {installation_ctx.inventory_database}.logs
+                WHERE message LIKE 'remained-hive-metastore-table: %'
+            """
         )
     )
     assert remained_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'
