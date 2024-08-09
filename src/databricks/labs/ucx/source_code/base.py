@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import codecs
+import dataclasses
 import locale
 import logging
 from abc import abstractmethod
@@ -343,3 +344,20 @@ class DFSA:
 
     def __eq__(self, other) -> bool:
         return isinstance(other, DFSA) and self.key == other.key
+
+
+def fix_field_types(klass: type[dataclasses.dataclass]):
+    """there is a (Python?) bug where calling dataclasses.fields(DFSA)
+    returns fields where type is a type name instead of a type, for example 'str' instead of <class str>
+    this prevents our ORM from working as expected, so we need a workaround
+    Hacking this locally for now because I can't submit PRs to lsql where the workaround belongs
+    """
+    for field in dataclasses.fields(klass):
+        if isinstance(field.type, str):
+            try:
+                field.type = __builtins__[field.type]
+            except KeyError:
+                logger.warning(f"Can't infer type of {field.type}")
+
+
+fix_field_types(DFSA)

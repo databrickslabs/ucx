@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterable
+from functools import partial
 from pathlib import Path
 
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
@@ -10,6 +11,7 @@ from databricks.sdk.service.sql import Query
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     CurrentSessionState,
@@ -43,6 +45,14 @@ class DfsaCrawler(CrawlerBase):
 
     def append(self, dfsa: DFSA):
         self._append_records([dfsa])
+
+    def snapshot(self) -> Iterable[DFSA]:
+        return self._snapshot(partial(self._try_load), lambda: [])
+
+    def _try_load(self) -> Iterable[DFSA]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield DFSA(*row)
 
 
 class DfsaCollector:
