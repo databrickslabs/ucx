@@ -44,9 +44,6 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
         self._ws = ws
 
-    def snapshot(self) -> Iterable[AzureServicePrincipalInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield AzureServicePrincipalInfo(*row)

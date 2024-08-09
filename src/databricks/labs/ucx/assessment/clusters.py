@@ -170,9 +170,6 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                 cluster_info.failures = json.dumps(failures)
             yield cluster_info
 
-    def snapshot(self) -> Iterable[ClusterInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield ClusterInfo(*row)
@@ -224,9 +221,6 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
                 policy_info.success = 0
                 policy_info.failures = json.dumps(failures)
             yield policy_info
-
-    def snapshot(self) -> Iterable[PolicyInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[PolicyInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):

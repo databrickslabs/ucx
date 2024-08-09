@@ -127,9 +127,6 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             )
         return job_assessment, job_details
 
-    def snapshot(self) -> Iterable[JobInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
@@ -164,9 +161,6 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         super().__init__(sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
         self._ws = ws
         self._num_days_history = num_days_history
-
-    def snapshot(self) -> Iterable[SubmitRunInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
 
     @staticmethod
     def _dt_to_ms(date_time: datetime):

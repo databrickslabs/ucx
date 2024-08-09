@@ -20,9 +20,6 @@ class PermissionManager(CrawlerBase[Permissions]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
 
-    def snapshot(self) -> Iterable[Permissions]:
-        return self._snapshot(self._fetcher, self._crawl)
-
     def _crawl(self) -> Iterable[Permissions]:
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
@@ -126,7 +123,7 @@ class PermissionManager(CrawlerBase[Permissions]):
                 appliers[object_type] = support
         return appliers
 
-    def _fetcher(self) -> Iterable[Permissions]:
+    def _try_fetch(self) -> Iterable[Permissions]:
         for row in self._fetch(f"SELECT object_id, object_type, raw FROM {escape_sql_identifier(self.full_name)}"):
             yield Permissions(*row)
 

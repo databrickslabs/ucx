@@ -44,8 +44,11 @@ class _CrawlerFixture(CrawlerBase[Result]):
         self._fetcher = fetcher
         self._loader = loader
 
-    def snapshot(self) -> Iterable[Result]:
-        return self._snapshot(self._fetcher, self._loader)
+    def _try_fetch(self) -> Iterable[Result]:
+        return self._fetcher()
+
+    def _crawl(self) -> Iterable[Result]:
+        return self._loader()
 
 
 def test_invalid():

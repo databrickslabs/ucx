@@ -119,7 +119,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not dupe:
             external_locations.append(ExternalLocation(jdbc_location, 1))
 
-    def _external_location_list(self) -> Iterable[ExternalLocation]:
+    def _crawl(self) -> Iterable[ExternalLocation]:
         tables = list(
             self._backend.fetch(
                 f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
@@ -127,9 +127,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
-
-    def snapshot(self) -> Iterable[ExternalLocation]:
-        return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(
@@ -240,16 +237,14 @@ class Mounts(CrawlerBase[Mount]):
         return deduplicated_mounts
 
     def inventorize_mounts(self):
-        self._append_records(self._list_mounts())
+        # TODO: Remove this? Everything should just use .snapshot().
+        self._append_records(self._crawl())
 
-    def _list_mounts(self) -> Iterable[Mount]:
+    def _crawl(self) -> Iterable[Mount]:
         mounts = []
         for mount_point, source, _ in self._dbutils.fs.mounts():
             mounts.append(Mount(mount_point, source))
         return self._deduplicate_mounts(mounts)
-
-    def snapshot(self) -> Iterable[Mount]:
-        return self._snapshot(self._try_fetch, self._list_mounts)
 
     def _try_fetch(self) -> Iterable[Mount]:
         for row in self._fetch(
@@ -290,21 +285,25 @@ class TablesInMounts(CrawlerBase[Table]):
         self._fiter_paths = irrelevant_patterns
 
     def snapshot(self) -> list[Table]:
+        updated_records = self._crawl()
+        self._overwrite_records(updated_records)
+        return updated_records
+
+    def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         cached_results = []
         try:
-            cached_results = list(self._try_load())
+            cached_results = list(self._try_fetch())
         except NotFound:
             pass
         table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
-        loaded_records = list(self._crawl(table_paths))
-        if len(cached_results) > 0:
-            loaded_records = loaded_records + cached_results
-        self._overwrite_records(loaded_records)
+        loaded_records = list(self._crawl_tables(table_paths))
+        if cached_results:
+            loaded_records = [*loaded_records, *cached_results]
         return loaded_records
 
-    def _try_load(self) -> Iterable[Table]:
+    def _try_fetch(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
             f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
@@ -323,7 +322,7 @@ class TablesInMounts(CrawlerBase[Table]):
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self.full_name, items, Table, mode="overwrite")
 
-    def _crawl(self, table_paths_from_assessment: dict[str, str]):
+    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]):
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
