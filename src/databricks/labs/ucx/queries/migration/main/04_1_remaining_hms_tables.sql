@@ -3,4 +3,4 @@ SELECT
   SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1) AS message
 FROM inventory.logs
 WHERE
-  message LIKE 'remained-hive-metastore-table: %';
+  message LIKE 'remained-hive-metastore-table: %'

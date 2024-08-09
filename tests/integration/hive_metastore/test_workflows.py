@@ -100,7 +100,9 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
 
 
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_table_migration_job_publishes_remianed_tables(ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog):
+def test_table_migration_job_publishes_remianed_tables(
+    ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog
+):
     tables, dst_schema = prepare_tables_for_migration
     installation_ctx.workspace_installation.run()
     second_table = list(tables.values())[1]
