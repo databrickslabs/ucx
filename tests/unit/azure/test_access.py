@@ -821,7 +821,12 @@ def test_create_global_service_principal_cleans_up_resource_after_failure():
     with pytest.raises(PermissionDenied):
         azure_resource_permission.create_uber_principal(prompts)
 
-    api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    api_client.delete.assert_has_calls(calls)
     w.secrets.delete_scope.assert_called_with("ucx")
     w.cluster_policies.edit.assert_called_with(
         'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'

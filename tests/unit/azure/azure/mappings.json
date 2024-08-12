@@ -334,6 +334,28 @@
         }
       ]
     },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'appIduser1'": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "appIduser1",
+            "principalType": "User",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol1"
+        },
+        {
+          "properties": {
+            "principalId": "appIduser1",
+            "principalType": "User",
+            "roleDefinitionId": "id001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          },
+          "id": "rol2"
+        }
+      ]
+    },
     "/v1.0/applications": {
       "appId": "appIduser1"
     },
