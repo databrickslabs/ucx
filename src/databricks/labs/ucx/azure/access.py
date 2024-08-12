@@ -329,6 +329,8 @@ class AzureResourcePermissions:
         logger.info("Creating service principal")
         try:
             uber_principal = self._azurerm.create_service_principal(uber_principal_name)
+            config.uber_spn_id = uber_principal.client.client_id
+            self._installation.save(config)
             self._apply_storage_permission(
                 uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_accounts
             )
@@ -344,8 +346,6 @@ class AzureResourcePermissions:
         except (PermissionError, PermissionDenied, NotFound, BadRequest):
             self._delete_uber_principal()  # Clean up dangling resources
             raise
-        config.uber_spn_id = uber_principal.client.client_id
-        self._installation.save(config)
         logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
         logger.info(f"Updated UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
