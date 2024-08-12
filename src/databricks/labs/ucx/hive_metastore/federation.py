@@ -1,10 +1,10 @@
 import collections
 import logging
+from enum import Enum
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import AlreadyExists, NotFound, BadRequest
 from databricks.sdk.service.catalog import (
-    ConnectionType,
     ConnectionInfo,
     SecurableType,
     Privilege,
@@ -16,6 +16,19 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 logger = logging.getLogger(__name__)
+
+class ConnectionType(Enum):
+    """The type of connection."""
+
+    BIGQUERY = 'BIGQUERY'
+    DATABRICKS = 'DATABRICKS'
+    MYSQL = 'MYSQL'
+    POSTGRESQL = 'POSTGRESQL'
+    REDSHIFT = 'REDSHIFT'
+    SNOWFLAKE = 'SNOWFLAKE'
+    SQLDW = 'SQLDW'
+    SQLSERVER = 'SQLSERVER'
+    HIVE_METASTORE = 'HIVE_METASTORE'
 
 
 class HiveMetastoreFederation:
