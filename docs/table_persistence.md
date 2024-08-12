@@ -27,7 +27,7 @@ Table Utilization:
 | policies                 | RW                  |                |                         |              |                |                             |                 |
 | migration_status         |                     |                | RW                      |              | RW             |                             |                 |
 | workflow_problems        |                     |                |                         |              |                |                             | RW              |
-| udfs                     |                     |                |                         |              |                |                             |                 |
+| udfs                     | RW                  | RO             |                         |              |                |                             |                 |
 | logs                     | RW                  | RW             | RW                      |              | RW             | RW                          |                 |
 | recon_results            |                     |                |                         |              |                | RW                          |                 |
 
