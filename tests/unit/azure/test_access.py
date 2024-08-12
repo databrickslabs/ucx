@@ -670,7 +670,7 @@ def test_create_global_spn():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
     rows = {
         "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]

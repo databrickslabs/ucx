@@ -11,7 +11,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists, ResourceDoesNotExist
+from databricks.sdk.errors import BadRequest, InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists, ResourceDoesNotExist
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
@@ -341,7 +341,7 @@ class AzureResourcePermissions:
                 storage_accounts,
             )
             self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
-        except (PermissionError, NotFound):
+        except (PermissionError, NotFound, BadRequest):
             logger.error("Failed to create service principal", exc_info=True)
             self._delete_uber_principal()  # Clean up dangling resources
             return
