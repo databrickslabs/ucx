@@ -694,7 +694,7 @@ def migrated_group(acc, ws, make_group, make_acc_group):
 def make_cluster_policy(ws, make_random):
     def create(*, name: str | None = None, **kwargs):
         if name is None:
-            name = f"sdk-{make_random(4)}"
+            name = f"sdk-{make_random(4)}-{get_purge_suffix()}"
         if "definition" not in kwargs:
             kwargs["definition"] = json.dumps(
                 {
