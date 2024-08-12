@@ -7,7 +7,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponse,
@@ -816,9 +816,9 @@ def test_create_global_service_principal_cleans_up_resource_after_failure():
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    w.warehouses.set_workspace_warehouse_config.side_effect = PermissionError
+    w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(PermissionDenied):
         azure_resource_permission.create_uber_principal(prompts)
 
     api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")

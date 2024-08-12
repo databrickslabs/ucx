@@ -344,7 +344,7 @@ class AzureResourcePermissions:
                 storage_accounts,
             )
             self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
-        except (PermissionError, PermissionDenied, NotFound, BadRequest):
+        except (PermissionDenied, NotFound, BadRequest):
             self._delete_uber_principal()  # Clean up dangling resources
             raise
         logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
