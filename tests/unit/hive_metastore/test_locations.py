@@ -1,5 +1,6 @@
 from unittest.mock import Mock, call, create_autospec
 
+import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
@@ -10,10 +11,68 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
+    LocationTrie,
     Mounts,
     TablesInMounts,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://databricks-e2demofieldengwest/b169/b50"
+        "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
+        "s3n://bucket-name/path-to-file-in-bucket",
+        "gcs://test_location2/test2/table2",
+        "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
+    ],
+)
+def test_location_trie_valid_and_full_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+    trie = LocationTrie()
+    trie.insert(table)
+    node = trie.find(table)
+    assert node is not None
+    assert node.is_valid()
+    assert node.location == location
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["s3:/missing-slash", "//missing-scheme", "gcs:/missing-netloc/path", "unsupported-file-scheme://bucket"],
+)
+def test_location_trie_invalid_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+    trie = LocationTrie()
+    trie.insert(table)
+    node = trie.find(table)
+    assert not node.is_valid()
+
+
+def test_location_trie_has_children():
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/d", "s3://bucket/a/b/d/g"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
+    trie = LocationTrie()
+    for table in tables:
+        trie.insert(table)
+
+    c_node = trie.find(tables[0])
+    assert not c_node.has_children()
+
+    d_node = trie.find(tables[1])
+    assert d_node.has_children()
+
+
+def test_location_trie_tables():
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/c"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
+    trie = LocationTrie()
+    for table in tables:
+        trie.insert(table)
+
+    c_node = trie.find(tables[0])
+    assert c_node.tables == tables
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
