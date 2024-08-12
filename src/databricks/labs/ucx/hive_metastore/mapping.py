@@ -171,19 +171,13 @@ class TableMapping:
 
         return Threads.strict("checking all database properties", tasks)
 
-    def get_tables_to_set_acls(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
+    def get_tables_to_acl(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
         tables_to_set = []
         rules = self.load()
         crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in tables_crawler.snapshot()}
         # Getting all the source tables from the rules
-        databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})
         for rule in rules:
-            if rule.src_schema not in databases_in_scope:
-                logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
-                continue
-            tables_to_set.append(
-                TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule)
-            )
+            tables_to_set.append(TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
         return tables_to_set
 
     def _get_databases_in_scope(self, databases: set[str]):

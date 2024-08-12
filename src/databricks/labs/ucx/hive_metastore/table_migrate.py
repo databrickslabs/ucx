@@ -6,6 +6,8 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
@@ -507,7 +509,7 @@ class ACLMigrator:
         table_crawler: TablesCrawler,
         grant_crawler: GrantsCrawler,
         ws: WorkspaceClient,
-        workspace_name: str,
+        workspace_info: WorkspaceInfo,
         backend: SqlBackend,
         group_manager: GroupManager,
         migration_status_refresher: MigrationStatusRefresher,
@@ -516,31 +518,47 @@ class ACLMigrator:
         self._tc = table_crawler
         self._gc = grant_crawler
         self._backend = backend
-        self._workspace_name = workspace_name
+        self._workspace_info = workspace_info
+        self._workspace_name = workspace_info.current()
         self._ws = ws
         self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
-    def migrate_acls(self, acl_strategy: list[AclMigrationWhat] | None = None):
+    def migrate_acls(
+        self, target_catalog: str | None = None, legacy_table_acl: bool = True, principal: bool = True
+    ) -> None:
+        acl_strategy = []
+        if legacy_table_acl:
+            acl_strategy.append(AclMigrationWhat.LEGACY_TACL)
+        if principal:
+            acl_strategy.append(AclMigrationWhat.PRINCIPAL)
         if acl_strategy is None:
-            return
+            return []
         all_grants_to_migrate = self._gc.snapshot()
         all_migrated_groups = self._group.snapshot()
         all_principal_grants = self._principal_grants.get_interactive_cluster_grants()
         tables = self._tc.snapshot()
         tables_to_migrate = []
+        if not tables:
+            logger.info("No tables found to migrate")
+            return None
         for table in tables:
-            rule = Rule(self._workspace_name, self._workspace_name, table.database, table.database, table.name, table.name)
+            rule = Rule(
+                self._workspace_name,
+                target_catalog if target_catalog else self._workspace_name,
+                table.database,
+                table.database,
+                table.name,
+                table.name,
+            )
             table_to_migrate = TableToMigrate(table, rule)
             tables_to_migrate.append(table_to_migrate)
 
-        return self._migrate_acls(
-            acl_strategy,
-            all_grants_to_migrate,
-            all_migrated_groups,
-            all_principal_grants, tables_to_migrate)
+        self._migrate_acls(
+            acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants, tables_to_migrate
+        )
 
     def _migrate_acls(
         self,
@@ -549,18 +567,14 @@ class ACLMigrator:
         all_migrated_groups,
         all_principal_grants,
         tables_in_scope,
-    ):
+    ) -> None:
         tasks = []
         for table in tables_in_scope:
             grants = self._compute_grants(
                 table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
             )
             tasks.append(partial(self._migrate_acl, table.src, table.rule, grants))
-        Threads.strict("migrate tables", tasks)
-        if not tasks:
-            logger.info(f"No acls to migrate")
-        # the below is useful for testing
-        return tasks
+        Threads.strict("migrate grants", tasks)
 
     def _compute_grants(
         self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
@@ -585,7 +599,7 @@ class ACLMigrator:
             matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
             if len(matched_group) > 0:
                 grant = dataclasses.replace(grant, principal=matched_group[0])
-            matched_grants.append(grant)
+                matched_grants.append(grant)
         return matched_grants
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
