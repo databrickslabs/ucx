@@ -818,7 +818,8 @@ def test_create_global_service_principal_cleans_up_resource_after_failure():
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionError
 
-    azure_resource_permission.create_uber_principal(prompts)
+    with pytest.raises(PermissionError):
+        azure_resource_permission.create_uber_principal(prompts)
 
     api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
     w.secrets.delete_scope.assert_called_with("ucx")
