@@ -791,15 +791,10 @@ def make_instance_pool(ws, make_random):
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
     def create(notebook_path: str | Path | None = None, **kwargs):
-        task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
-        if "spark_conf" in kwargs:
-            task_spark_conf = kwargs["spark_conf"]
-            kwargs.pop("spark_conf")
-        libraries = None
-        if "libraries" in kwargs:
-            libraries = kwargs.pop("libraries")
+        task_spark_conf = kwargs.pop("spark_conf", None)
+        libraries = kwargs.pop("libraries", None)
         if isinstance(notebook_path, pathlib.Path):
             notebook_path = str(notebook_path)
         if not notebook_path:
