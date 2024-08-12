@@ -1,4 +1,5 @@
 import dataclasses
+import datetime as dt
 
 from databricks.labs.lsql.backends import CommandExecutionBackend
 from databricks.sdk.service.iam import PermissionLevel
@@ -36,7 +37,9 @@ def test_running_real_assessment_job_ext_hms(
     ext_hms_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     ext_hms_ctx.workspace_installation.run()
 
-    ext_hms_ctx.deployed_workflows.run_workflow("assessment")
+    # Under ideal circumstances this can take 10-16 minutes (depending on whether there are compute instances available
+    # via the integration pool). Allow some margin to reduce spurious failures.
+    ext_hms_ctx.deployed_workflows.run_workflow("assessment", max_wait=dt.timedelta(minutes=25))
 
     # assert the workflow is successful. the tasks on sql warehouse will fail so skip checking them
     assert ext_hms_ctx.deployed_workflows.validate_step("assessment")
