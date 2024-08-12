@@ -8,7 +8,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
@@ -126,3 +126,76 @@ def test_create_global_spn(
         ]
         == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
     )
+
+
+def test_create_global_service_principal_clean_up_after_failure(
+    ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip, clean_up_spn
+):
+    # skip this test if not in local mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        return
+    storage_account_resource = AzureResource(env_or_skip("TEST_STORAGE_RESOURCE"))
+    tables = [
+        ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
+    ]
+    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
+    installation = Installation(ws, make_random(4))
+    policy = make_cluster_policy()
+    installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
+    az_res_perm = AzureResourcePermissions(
+        installation, ws, azure_resources, ExternalLocations(ws, sql_backend, inventory_schema)
+    )
+
+    def do(method: str, path: str, *args, **kwargs):
+        if method == "PUT" and path == "/api/2.0/sql/config/warehouses":
+            raise PermissionDenied("Cannot set warehouse configuration")
+        return ws.api_client.do_original(method, path, *args, **kwargs)
+    ws.api_client.do_original = ws.api_client.do
+    ws.api_client.do = do  # Force a permission denied error
+
+    with pytest.raises(PermissionDenied):  # Raises the error again after cleaning up resources
+        az_res_perm.create_uber_principal(
+            MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+        )
+
+    config = installation.load(WorkspaceConfig)
+    assert config.uber_spn_id is None
+
+    scopes = ws.secrets.list_scopes()
+    ucx_scope = None
+    for scope in scopes:
+        if scope.name == config.inventory_database:
+            ucx_scope = scope
+            break
+    assert ucx_scope is None
+
+    policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
+    storage_account_name = storage_account_resource.storage_account
+    missing_policy_keys = (
+        f"spark_conf.fs.azure.account.oauth2.client.id.{storage_account_name}.dfs.core.windows.net",
+        f"spark_conf.fs.azure.account.oauth.provider.type.{storage_account_name}.dfs.core.windows.net",
+        f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage_account_name}.dfs.core.windows.net",
+        f"spark_conf.fs.azure.account.auth.type.{storage_account_name}.dfs.core.windows.net",
+        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage_account_name}.dfs.core.windows.net"
+    )
+    for key in missing_policy_keys:
+        assert key not in policy_definition
+
+    warehouse_config = ws.warehouses.get_workspace_warehouse_config()
+    has_missing_policy_key = False
+    if warehouse_config.data_access_config is not None:
+        for config_pair in warehouse_config.data_access_config:
+            for key in missing_policy_keys:
+                if key == config_pair.key:
+                    has_missing_policy_key = True
+                    break
+    assert not has_missing_policy_key, f"Warehouse config still contains policy key: {key}"
+
+    # TODO: Test Azure resources, service principal and its role assignments
+    # REASON: Missing permissions to test Azure resources
