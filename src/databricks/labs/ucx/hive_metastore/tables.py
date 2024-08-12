@@ -102,9 +102,6 @@ class Table:
     def __eq__(self, other):
         return isinstance(other, Table) and self.key == other.key
 
-    def __str__(self):
-        return f"{self.catalog}.{self.database}.{self.name}"
-
     @property
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"

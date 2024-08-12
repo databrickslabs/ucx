@@ -132,7 +132,7 @@ class AccountAggregate:
                 trie.insert(table)
         seen_tables, all_conflicts = set(), []
         for table in tables:
-            if str(table) in seen_tables:
+            if table.key in seen_tables:
                 continue
             seen_tables.add(str(table))
             node = trie.find(table)
@@ -144,7 +144,7 @@ class AccountAggregate:
             for sub_node in node:
                 for conflicting_table in sub_node.tables:
                     conflicts.append(conflicting_table)
-                    seen_tables.add(str(conflicting_table))
+                    seen_tables.add(table.key)
             conflict_message = " and ".join(str(conflict) for conflict in conflicts)
             logger.warning(f"Overlapping table locations: {conflict_message}")
             all_conflicts.append(conflicts)
