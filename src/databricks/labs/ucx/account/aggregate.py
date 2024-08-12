@@ -34,8 +34,9 @@ class AssessmentObject:
 class TableFromWorkspace(Table):
     workspace_id: int = 0
 
-    def __str__(self):
-        return f"{self.workspace_id}:{super().__str__()}"
+    @property
+    def key(self) -> str:
+        return f"{self.workspace_id}:{super().key}"
 
 
 class AccountAggregate:
@@ -145,7 +146,7 @@ class AccountAggregate:
                 for conflicting_table in sub_node.tables:
                     conflicts.append(conflicting_table)
                     seen_tables.add(table.key)
-            conflict_message = " and ".join(str(conflict) for conflict in conflicts)
+            conflict_message = " and ".join(conflict.key for conflict in conflicts)
             logger.warning(f"Overlapping table locations: {conflict_message}")
             all_conflicts.append(conflicts)
         return all_conflicts
