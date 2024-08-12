@@ -293,7 +293,8 @@ class AzureResourcePermissions:
                 principal_client_id, principal_secret_identifier, storage_account
             )
             for configuration_pair in configuration_pairs:
-                sql_dac.remove(configuration_pair)
+                if configuration_pair in sql_dac:
+                    sql_dac.remove(configuration_pair)
 
         self._ws.warehouses.set_workspace_warehouse_config(
             data_access_config=sql_dac,
