@@ -235,7 +235,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         upload_dependencies = self.prompts.confirm(
-            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+            f"Does given workspace {self.workspace_client.get_workspace_id()} block Internet access?"
         )
         wheelhouse: str | None = None
         if upload_dependencies:
