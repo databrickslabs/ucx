@@ -1,7 +1,6 @@
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from functools import partial
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -53,20 +52,10 @@ class TableSizeCrawler(CrawlerBase):
                 catalog=table.catalog, database=table.database, name=table.name, size_in_bytes=size_in_bytes
             )
 
-    def _try_load(self) -> Iterable[TableSize]:
+    def _try_fetch(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {self.full_name}"):
             yield TableSize(*row)
-
-    def snapshot(self) -> list[TableSize]:
-        """
-        Takes a snapshot of tables in the specified catalog and database.
-        Return None if the table cannot be found anymore.
-
-        Returns:
-            list[Table]: A list of Table objects representing the snapshot of tables.
-        """
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _safe_get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")

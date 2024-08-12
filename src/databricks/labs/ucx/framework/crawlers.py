@@ -89,8 +89,24 @@ class CrawlerBase(ABC, Generic[Result]):
             return None
         return cls._valid(name)
 
+    def snapshot(self) -> Iterable[Result]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
     @abstractmethod
-    def snapshot(self) -> Iterable[Result]: ...
+    def _try_fetch(self) -> Iterable[Result]:
+        """Fetch existing data that has (previously) been crawled by this crawler.
+
+        Returns:
+            Iterable[Result]: The data that has already been crawled.
+        """
+
+    @abstractmethod
+    def _crawl(self) -> Iterable[Result]:
+        """Perform the (potentially slow) crawling necessary to capture the current state of the environment.
+
+        Returns:
+            Iterable[Result]: Records that capture the results of crawling the environment.
+        """
 
     def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
         """
@@ -107,7 +123,7 @@ class CrawlerBase(ABC, Generic[Result]):
           re-raised.
 
         Returns:
-        list[any]: A list of data records, either fetched or loaded.
+        list[Result]: A list of data records, either fetched or loaded.
         """
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         try:
