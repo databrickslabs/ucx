@@ -798,7 +798,17 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
     assert w.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
-def test_create_global_service_principal_cleans_up_resource_after_failure():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.api_client.post.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
