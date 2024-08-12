@@ -824,7 +824,7 @@ def test_create_global_service_principal_cleans_up_resource_after_failure():
     api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
     w.secrets.delete_scope.assert_called_with("ucx")
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition="{'foo': 'bar'}"
+        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
     )
 
 
