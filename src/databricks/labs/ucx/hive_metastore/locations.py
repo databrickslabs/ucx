@@ -46,11 +46,6 @@ class LocationTrie:
     """A trie datastructure to search locations.
 
     Used to find overlapping locations.
-
-    TODO
-    ----
-    - [ ] : Include external locations pointing to SQL sources
-        https://github.com/databrickslabs/ucx/issues/2355
     """
 
     key: str = ""
