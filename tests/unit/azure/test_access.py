@@ -663,7 +663,7 @@ def test_create_global_spn_cluster_policy_not_found():
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
-def test_create_global_spn():
+def setup_create_uber_principal():
     w = create_autospec(WorkspaceClient)
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
@@ -692,20 +692,29 @@ def test_create_global_spn():
         }
     )
     api_client = azure_api_client()
+    w.api_client = api_client
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    return w, installation, prompts, azure_resource_permission
+
+
+def test_create_global_spn():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     azure_resource_permission.create_uber_principal(prompts)
+
     installation.assert_file_written(
         'policy-backup.json',
         {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
     )
-    installation.assert_file_written('warehouse-config-backup.json', warehouse_config.as_dict())
-    call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
-    call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
-    call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
-    api_client.post.assert_has_calls([call_1, call_2, call_3], any_order=True)
-    api_client.put.assert_called_once()
+    installation.assert_file_written('warehouse-config-backup.json', GetWorkspaceWarehouseConfigResponse().as_dict())
+    calls = [
+        call("/v1.0/applications", {"displayName": "UCXServicePrincipal"}),
+        call("/v1.0/servicePrincipals", {"appId": "appIduser1"}),
+        call("/v1.0/servicePrincipals/Iduser1/addPassword")
+    ]
+    w.api_client.post.assert_has_calls(calls, any_order=True)
+    w.api_client.put.assert_called_once()
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {
@@ -790,32 +799,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
 
 
 def test_create_global_service_principal_cleans_up_resource_after_failure():
-    w = create_autospec(WorkspaceClient)
-    cluster_policy = Policy(
-        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
-    )
-    w.cluster_policies.get.return_value = cluster_policy
-    w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
-    installation = MockInstallation(
-        {
-            'config.yml': {
-                'inventory_database': 'ucx',
-                'policy_id': 'foo1',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            }
-        }
-    )
-    api_client = azure_api_client()
-    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -826,7 +810,7 @@ def test_create_global_service_principal_cleans_up_resource_after_failure():
         call("rol2", "2022-04-01"),
         call("/v1.0/applications(appId='appIduser1')"),
     ]
-    api_client.delete.assert_has_calls(calls)
+    w.api_client.delete.assert_has_calls(calls)
     w.secrets.delete_scope.assert_called_with("ucx")
     w.cluster_policies.edit.assert_called_with(
         'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
