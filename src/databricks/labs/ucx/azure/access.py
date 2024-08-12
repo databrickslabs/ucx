@@ -342,9 +342,8 @@ class AzureResourcePermissions:
             )
             self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
         except (PermissionError, NotFound, BadRequest):
-            logger.error("Failed to create service principal", exc_info=True)
             self._delete_uber_principal()  # Clean up dangling resources
-            return
+            raise
         config.uber_spn_id = uber_principal.client.client_id
         self._installation.save(config)
         logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
