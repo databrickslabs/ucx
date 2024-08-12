@@ -14,10 +14,16 @@ from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
 
 
+class ResourceDoesNotExistIter:
+    def __iter__(self):
+        raise ResourceDoesNotExist("logs")
+
+
 def test_deployed_workflows_handles_log_folder_does_not_exists(mock_installation):
     ws = create_autospec(WorkspaceClient)
     ws.jobs.list_runs.return_value = [BaseRun(run_id=456)]
-    ws.workspace.list.side_effect = ResourceDoesNotExist("logs")
+    # Raise the error when the result is iterated over, NOT when the method is called.
+    ws.workspace.list.return_value = ResourceDoesNotExistIter()
     install_state = InstallState.from_installation(mock_installation)
     deployed_workflows = DeployedWorkflows(ws, install_state, timedelta(minutes=2))
 
