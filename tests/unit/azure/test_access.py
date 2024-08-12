@@ -670,7 +670,8 @@ def test_create_global_spn():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
+    warehouse_config = GetWorkspaceWarehouseConfigResponse()
+    w.warehouses.get_workspace_warehouse_config.return_value = warehouse_config
     rows = {
         "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
@@ -699,6 +700,7 @@ def test_create_global_spn():
         'policy-backup.json',
         {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
     )
+    installation.assert_file_written('warehouse-config-backup.json', warehouse_config.as_dict())
     call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
     call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
     call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
