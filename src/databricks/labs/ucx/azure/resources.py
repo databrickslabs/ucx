@@ -427,9 +427,9 @@ class AzureResources:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
         except NotFound:
-            if not safe:
-                raise
-            return
+            if safe:
+                return
+            raise
         role_guids = []
         for role_assignment in response.get("value", []):
             # Tech debt: Reuse AzureRoleAssignment, but requires a refactor to add the id
