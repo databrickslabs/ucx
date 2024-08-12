@@ -174,6 +174,6 @@ def test_account_aggregate_logs_multiple_overlapping_tables(caplog, ws, account_
         conflicts = account_aggregate.validate_table_locations()
     assert "Overlapping table locations: 123:c2.d1.t1 and 123:c1.d1.t2 and 123:c1.d1.t3" in caplog.text
     assert len(conflicts) == 1
-    assert str(conflicts[0][0]) == "123:c2.d1.t1"
-    assert str(conflicts[0][1]) == "123:c1.d1.t2"
-    assert str(conflicts[0][2]) == "123:c1.d1.t3"
+    assert conflicts[0][0].key == "123:c2.d1.t1"
+    assert conflicts[0][1].key == "123:c1.d1.t2"
+    assert conflicts[0][2].key == "123:c1.d1.t3"

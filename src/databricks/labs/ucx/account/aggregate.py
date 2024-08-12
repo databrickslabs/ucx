@@ -135,7 +135,9 @@ class AccountAggregate:
         for table in tables:
             if table.key in seen_tables:
                 continue
-            seen_tables.add(str(table))
+            if table.location is None:
+                continue
+            seen_tables.add(table.key)
             node = trie.find(table)
             if node is None:
                 continue
@@ -145,7 +147,7 @@ class AccountAggregate:
             for sub_node in node:
                 for conflicting_table in sub_node.tables:
                     conflicts.append(conflicting_table)
-                    seen_tables.add(table.key)
+                    seen_tables.add(conflicting_table.key)
             conflict_message = " and ".join(conflict.key for conflict in conflicts)
             logger.warning(f"Overlapping table locations: {conflict_message}")
             all_conflicts.append(conflicts)
