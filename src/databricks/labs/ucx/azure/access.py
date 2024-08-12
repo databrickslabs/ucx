@@ -374,7 +374,12 @@ class AzureResourcePermissions:
             except PermissionDenied:
                 logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
             secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
-            self._revert_sql_dac_with_spn(config.uber_spn_id, secret_identifier, storage_accounts)
+            try:
+                self._revert_sql_dac_with_spn(config.uber_spn_id, secret_identifier, storage_accounts)
+            except NotFound:
+                pass
+            except PermissionDenied:
+                logger.error(f"Missing permissions to rever SQL warehouse config", exc_info=True)
         if config.policy_id is not None:
             self._revert_cluster_policy(config.policy_id)
         self._safe_delete_scope(config.inventory_database)
