@@ -432,7 +432,7 @@ class AzureResources:
             raise
         role_guids = []
         for role_assignment in response.get("value", []):
-            # Tech debt: Reuse AzureRoleAssignment, but requires a refactor to add the id
+            # TODO: Reuse AzureRoleAssignment, but requires a refactor to add the id
             role_guid = role_assignment.get("id")
             if role_guid:
                 role_guids.append(role_guid)
