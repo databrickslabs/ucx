@@ -419,11 +419,14 @@ class AzureResourcePermissions:
         for storage in self._azurerm.storage_accounts():
             if storage.name in used_storage_accounts:
                 storage_accounts.append(storage)
-        self._azurerm.delete_storage_permission(config.uber_spn_id, *storage_accounts, safe=True)
         try:
+            self._azurerm.delete_storage_permission(config.uber_spn_id, *storage_accounts, safe=True)
             self._azurerm.delete_service_principal(config.uber_spn_id, safe=True)
         except PermissionDenied:
-            logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+            logger.error(
+                f"Missing permissions to delete service principal and its permissions: {config.uber_spn_id}",
+                exc_info=True,
+            )
         secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
         if config.policy_id is not None:
             try:
