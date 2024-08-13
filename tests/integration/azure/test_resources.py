@@ -75,18 +75,18 @@ def access_connector(az_cli_ctx, make_random, test_storage_account: StorageAccou
     access_connector_name = f"test-{make_random()}"
     tomorrow = dt.datetime.now() + dt.timedelta(days=1)
     tags = {"RemoveAfter": str(tomorrow), "NoAutoRemove": "False"}
-    access_connector = az_cli_ctx.azure_resources.create_or_update_access_connector(
+    ac = az_cli_ctx.azure_resources.create_or_update_access_connector(
         test_storage_account.id.subscription_id,
         test_storage_account.id.resource_group,
         access_connector_name,
         test_storage_account.location,
         tags,
     )
-    yield access_connector
+    yield ac
     az_cli_ctx.azure_resources.delete_access_connector(
-        access_connector.id.subscription_id,
-        access_connector.id.resource_group,
-        access_connector.name,
+        ac.id.subscription_id,
+        ac.id.resource_group,
+        ac.name,
     )
 
 
