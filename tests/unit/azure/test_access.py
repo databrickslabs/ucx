@@ -815,6 +815,40 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_ap
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.secrets.create_scope.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.secrets.put_secret.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
