@@ -175,7 +175,7 @@ def test_policy_try_fetch():
     ws = mock_workspace_client(policy_ids=['single-user-with-spn-policyid'])
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM ucx.policies": [
+            r"SELECT \* FROM hive_metastore.ucx.policies": [
                 (
                     "single-user-with-spn-policyid",
                     "test_policy",

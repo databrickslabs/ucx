@@ -83,5 +83,5 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScript
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[GlobalInitScriptInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield GlobalInitScriptInfo(*row)
