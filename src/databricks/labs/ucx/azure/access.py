@@ -12,7 +12,14 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, InvalidParameterValue, NotFound, PermissionDenied, ResourceAlreadyExists, ResourceDoesNotExist
+from databricks.sdk.errors import (
+    BadRequest,
+    InvalidParameterValue,
+    NotFound,
+    PermissionDenied,
+    ResourceAlreadyExists,
+    ResourceDoesNotExist,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
@@ -259,7 +266,7 @@ class AzureResourcePermissions:
         except NotFound:
             try:
                 policy = self._ws.cluster_policies.get(policy_id)
-            except NotFound:
+            except (InvalidParameterValue, NotFound):
                 return  # No policy to revert
         policy_definition = policy.definition
         if policy_definition is not None:
