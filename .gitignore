@@ -31,8 +31,6 @@ share/python-wheels/
 *.egg
 !tests/integration/source_code/samples/library-egg/*.egg
 MANIFEST
-# TODO: Do we want to keep (generated) requirements.txt in git?
-# Pro: it would allow us to update single requirements instead of all
 requirements.txt
 ucx.wheelhouse.zip
 
