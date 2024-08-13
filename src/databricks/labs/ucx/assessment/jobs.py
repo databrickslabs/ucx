@@ -131,7 +131,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[JobInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield JobInfo(*row)
 
     def _check_jar_task(self, all_task: list[RunTask]) -> list[str]:
@@ -190,7 +190,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         return self._assess_job_runs(submit_runs, all_clusters)
 
     def _try_fetch(self) -> Iterable[SubmitRunInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield SubmitRunInfo(*row)
 
     def _check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:

@@ -45,10 +45,10 @@ classifiers = [
 ]
 
 dependencies = ["databricks-sdk~=0.29.0",
-                "databricks-labs-lsql>=0.5,<0.8",
+                "databricks-labs-lsql>=0.5,<0.9",
                 "databricks-labs-blueprint>=0.8,<0.9",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=25.5.0,<25.11",
+                "sqlglot>=25.5.0,<25.12",
                 "astroid>=3.2.2"]
 
 [project.optional-dependencies]

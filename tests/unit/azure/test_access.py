@@ -28,7 +28,7 @@ from . import azure_api_client
 
 def test_save_spn_permissions_no_external_table(caplog):
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": []}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": []}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
@@ -48,7 +48,7 @@ def test_save_spn_permissions_no_external_table(caplog):
 
 def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
@@ -67,7 +67,9 @@ def test_save_spn_permissions_no_external_tables():
 def test_save_spn_permissions_no_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
@@ -87,7 +89,7 @@ def test_save_spn_permissions_no_azure_storage_account():
 def test_save_spn_permissions_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -170,7 +172,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
 def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -586,7 +588,7 @@ def test_create_global_spn_spn_present():
 
 def test_create_global_spn_no_storage():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
     installation = MockInstallation(
         {
@@ -621,7 +623,11 @@ def test_create_global_spn_no_storage():
 def test_create_global_spn_cluster_policy_not_found():
     w = create_autospec(WorkspaceClient)
     w.cluster_policies.get.side_effect = NotFound()
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    rows = {
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
+        ]
+    }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation(
@@ -659,7 +665,11 @@ def test_create_global_spn():
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    rows = {
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
+        ]
+    }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation(
@@ -766,7 +776,9 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
 
@@ -824,7 +836,9 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
 

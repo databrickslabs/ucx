@@ -143,7 +143,7 @@ def test_external_locations():
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
     sql_backend = MockBackend(
         rows={
-            'SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL': [
+            'SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL': [
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
@@ -190,7 +190,7 @@ def test_external_locations():
                     ]
                 ),
             ],
-            r"SELECT \* FROM test.mounts": [
+            r"SELECT \* FROM hive_metastore.test.mounts": [
                 ("/mnt/ucx", "s3://us-east-1-ucx-container"),
             ],
         }
@@ -219,7 +219,7 @@ def test_save_external_location_mapping_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
                 ("gcs://test_location2/test2/table2", ""),
                 ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
@@ -270,7 +270,7 @@ def test_save_external_location_mapping_no_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
             ],
         }
@@ -285,7 +285,7 @@ def test_match_table_external_locations():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/a/b/c/table1", ""),
                 ("s3://test_location/a/b/table1", ""),
                 ("gcs://test_location2/a/b/table2", ""),
