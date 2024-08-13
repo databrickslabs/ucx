@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
@@ -277,8 +277,9 @@ def test_delete_storage_permission():
     azure_resource.delete_storage_permission(principal_id, storage_account)
 
     path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'{principal_id}'"
-    api_client.get.assert_called_with(path, "2022-04-01")
-    api_client.delete.assert_called_with("rol1", "2022-04-01")
+    api_client.get.assert_any_call(path, "2022-04-01")
+    calls = [call("rol1", "2022-04-01"), call("rol2", "2022-04-01")]
+    api_client.delete.assert_has_calls(calls)
 
 
 def test_delete_storage_permission_logs_permission_denied_on_get(caplog):
