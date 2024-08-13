@@ -2,10 +2,11 @@ import json
 import logging
 import re
 import uuid
-from collections.abc import ValuesView
+from collections.abc import Callable, ValuesView
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from datetime import timedelta
+from typing import Any, ParamSpec, TypeVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -29,6 +30,8 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 logger = logging.getLogger(__name__)
+P = ParamSpec('P')
+R = TypeVar('R')
 
 
 @dataclass
@@ -408,32 +411,41 @@ class AzureResourcePermissions:
         config = self._installation.load(WorkspaceConfig)
         if config.uber_spn_id is None:
             return
-        storage_accounts = self._get_storage_accounts()
-        try:
-            self._azurerm.delete_storage_permission(config.uber_spn_id, *storage_accounts, safe=True)
-            self._azurerm.delete_service_principal(config.uber_spn_id, safe=True)
-        except PermissionDenied:
-            logger.error(
-                f"Missing permissions to delete service principal and its permissions: {config.uber_spn_id}",
-                exc_info=True,
-            )
         secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+        storage_accounts = self._get_storage_accounts()
+
+        def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
+            @wraps(function)
+            def wrapper(*args: Any, **kwargs: Any) -> R | None:
+                try:
+                    return function(*args, **kwargs)
+                except PermissionDenied:
+                    logger.error(message, exc_info=True)
+                    return None
+
+            return wrapper
+
+        storage_account_ids = ' '.join(str(st.id) for st in storage_accounts)
+        message = f"Missing permissions to delete storage permissions for: {storage_account_ids}"
+        log_permission_denied(self._azurerm.delete_storage_permission, message=message)(
+            config.uber_spn_id, *storage_accounts, safe=True
+        )
+        message = f"Missing permissions to delete service principal: {config.uber_spn_id}"
+        log_permission_denied(self._azurerm.delete_service_principal, message=message)(config.uber_spn_id, safe=True)
         if config.policy_id is not None:
-            try:
-                self._remove_service_principal_configuration_from_cluster_policy(
-                    config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
-                )
-            except PermissionDenied:
-                logger.error("Missing permissions to revert cluster policy", exc_info=True)
-        try:
-            self._remove_service_principal_configuration_from_workspace_warehouse_config(
-                config.uber_spn_id, secret_identifier, storage_accounts
+            message = "Missing permissions to revert cluster policy"
+            log_permission_denied(self._remove_service_principal_configuration_from_cluster_policy, message=message)(
+                config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
             )
-        except PermissionDenied:
-            logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
-        self._safe_delete_scope(config.inventory_database)
+        message = "Missing permissions to revert SQL warehouse config"
+        log_permission_denied(
+            self._remove_service_principal_configuration_from_workspace_warehouse_config, message=message
+        )(config.uber_spn_id, secret_identifier, storage_accounts)
+        message = "Missing permissions to delete secret scope"
+        log_permission_denied(self._safe_delete_scope, message=message)(config.inventory_database)
+        message = "Missing permissions to save the configuration"
         config.uber_spn_id = None
-        self._installation.save(config)
+        log_permission_denied(self._installation.save, message=message)(config)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
