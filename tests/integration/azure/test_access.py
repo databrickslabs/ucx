@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import os
@@ -78,51 +79,36 @@ def clean_up_spn(env_or_skip):
             continue
 
 
-def test_create_global_spn(
-    skip_if_not_in_debug,
-    ws,
-    sql_backend,
-    inventory_schema,
-    make_random,
-    make_cluster_policy,
-    env_or_skip,
-    clean_up_spn,
-):
-    tables = [
-        ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
-    ]
-    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
-    installation = Installation(ws, make_random(4))
+def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy) -> None:
     policy = make_cluster_policy()
-    installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
+    ctx = az_cli_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            policy_id=policy,
+        ),
     )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(azure_mgmt_client, graph_client)
-    az_res_perm = AzureResourcePermissions(
-        installation, ws, azure_resources, ExternalLocations(ws, sql_backend, inventory_schema)
-    )
-    az_res_perm.create_uber_principal(
-        MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    )
-    config = installation.load(WorkspaceConfig)
-    assert config.uber_spn_id is not None
-    policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
-    role_assignments = azure_resources.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
+    tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
+    ctx.sql_backend.save_table(f"{ctx.inventory_database}.external_locations", tables, ExternalLocation)
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+    ctx.installation.save(ctx.config)
+
+    ctx.azure_resource_permissions.create_uber_principal(prompts)
+
+    assert ctx.config.uber_spn_id is not None
+    policy_definition = json.loads(ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition)
+    role_assignments = ctx.azure_resource_permissions.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
     global_spn_assignment = None
     for assignment in role_assignments:
-        if assignment.principal.client_id == config.uber_spn_id:
+        if assignment.principal.client_id == ctx.config.uber_spn_id:
             global_spn_assignment = assignment
             break
     assert global_spn_assignment
-    assert global_spn_assignment.principal.client_id == config.uber_spn_id
+    assert global_spn_assignment.principal.client_id == ctx.config.uber_spn_id
     assert global_spn_assignment.role_name == "Storage Blob Data Contributor"
     assert str(global_spn_assignment.scope) == env_or_skip("TEST_STORAGE_RESOURCE")
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
-        == config.uber_spn_id
+        == ctx.config.uber_spn_id
     )
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net"][
