@@ -849,6 +849,23 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_pu
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.cluster_policies.edit.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
