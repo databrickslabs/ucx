@@ -416,11 +416,6 @@ class AzureResourcePermissions:
             raise
 
     def _delete_uber_principal(self) -> None:
-        config = self._installation.load(WorkspaceConfig)
-        if config.uber_spn_id is None:
-            return
-        secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
-        storage_accounts = self._get_storage_accounts()
 
         def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
             @wraps(function)
@@ -432,6 +427,14 @@ class AzureResourcePermissions:
                     return None
 
             return wrapper
+
+        message = "Missing permissions to load the configuration"
+        config = log_permission_denied(self._installation.load, message=message)(WorkspaceConfig)
+        if config.uber_spn_id is None:
+            return
+
+        secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+        storage_accounts = self._get_storage_accounts()
 
         storage_account_ids = ' '.join(str(st.id) for st in storage_accounts)
         message = f"Missing permissions to delete storage permissions for: {storage_account_ids}"
