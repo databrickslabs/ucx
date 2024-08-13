@@ -630,7 +630,7 @@ def test_create_global_spn_no_storage():
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_uber_principal(prompts)
-    azure_resources.storage_accounts.assert_not_called()
+    azure_resources.storage_accounts.assert_called_once()
     azure_resources.create_or_update_access_connector.assert_not_called()
     azure_resources.role_assignments.assert_not_called()
     azure_resources.containers.assert_not_called()
