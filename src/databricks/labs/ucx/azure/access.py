@@ -423,16 +423,12 @@ class AzureResourcePermissions:
                 self._remove_service_principal_configuration_from_cluster_policy(
                     config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
                 )
-            except NotFound:
-                pass
             except PermissionDenied:
                 logger.error("Missing permissions to revert cluster policy", exc_info=True)
         try:
             self._remove_service_principal_configuration_from_workspace_warehouse_config(
                 config.uber_spn_id, secret_identifier, storage_accounts
             )
-        except NotFound:
-            pass
         except PermissionDenied:
             logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
         self._safe_delete_scope(config.inventory_database)
