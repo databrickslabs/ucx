@@ -1,4 +1,3 @@
-import dataclasses
 import json
 import logging
 from unittest.mock import call, create_autospec
@@ -8,7 +7,6 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.config import Config
 from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
