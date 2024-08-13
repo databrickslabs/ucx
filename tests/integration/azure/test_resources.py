@@ -94,7 +94,7 @@ def test_azure_resource_gets_applies_and_deletes_storage_permissions(
     az_cli_ctx,
     test_storage_account,
     access_connector,
-):
+) -> None:
     role_guid = str(uuid.uuid4())
     storage_permission = az_cli_ctx.azure_resources.get_storage_permission(test_storage_account, role_guid)
     assert storage_permission is None
