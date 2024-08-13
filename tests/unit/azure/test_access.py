@@ -663,7 +663,7 @@ def setup_create_uber_principal():
 
 
 def test_create_global_spn_cluster_policy_not_found() -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w, _, prompts, azure_resource_permission = setup_create_uber_principal()
     w.cluster_policies.get.side_effect = NotFound()
 
     with pytest.raises(NotFound):
@@ -788,7 +788,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config() -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    _, installation, prompts, azure_resource_permission = setup_create_uber_principal()
 
     def raise_permission_denied(*_, **__):
         raise PermissionDenied()
@@ -865,7 +865,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cl
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config() -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w, _, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
