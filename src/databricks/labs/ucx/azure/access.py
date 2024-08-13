@@ -412,45 +412,46 @@ class AzureResourcePermissions:
 
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)
-        if config.uber_spn_id is not None:
-            used_storage_accounts = self._get_storage_accounts()
-            storage_accounts = []
-            for storage in self._azurerm.storage_accounts():
-                if storage.name in used_storage_accounts:
-                    storage_accounts.append(storage)
-            for storage_account in storage_accounts:
-                try:
-                    self._azurerm.delete_storage_permission(config.uber_spn_id, storage_account)
-                except NotFound:
-                    pass  # Already deleted
-                except PermissionDenied:
-                    logger.error(
-                        f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True
-                    )
+        if config.uber_spn_id is None:
+            return
+        used_storage_accounts = self._get_storage_accounts()
+        storage_accounts = []
+        for storage in self._azurerm.storage_accounts():
+            if storage.name in used_storage_accounts:
+                storage_accounts.append(storage)
+        for storage_account in storage_accounts:
             try:
-                self._azurerm.delete_service_principal(config.uber_spn_id)
+                self._azurerm.delete_storage_permission(config.uber_spn_id, storage_account)
             except NotFound:
                 pass  # Already deleted
             except PermissionDenied:
-                logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
-            secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
-            if config.policy_id is not None:
-                try:
-                    self._remove_service_principal_configuration_from_cluster_policy(
-                        config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
-                    )
-                except NotFound:
-                    pass
-                except PermissionDenied:
-                    logger.error("Missing permissions to revert cluster policy", exc_info=True)
+                logger.error(
+                    f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True
+                )
+        try:
+            self._azurerm.delete_service_principal(config.uber_spn_id)
+        except NotFound:
+            pass  # Already deleted
+        except PermissionDenied:
+            logger.error(f"Missing permissions to delete service principal: {config.uber_spn_id}", exc_info=True)
+        secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+        if config.policy_id is not None:
             try:
-                self._remove_service_principal_configuration_from_workspace_warehouse_config(
-                    config.uber_spn_id, secret_identifier, storage_accounts
+                self._remove_service_principal_configuration_from_cluster_policy(
+                    config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
                 )
             except NotFound:
                 pass
             except PermissionDenied:
-                logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
+                logger.error("Missing permissions to revert cluster policy", exc_info=True)
+        try:
+            self._remove_service_principal_configuration_from_workspace_warehouse_config(
+                config.uber_spn_id, secret_identifier, storage_accounts
+            )
+        except NotFound:
+            pass
+        except PermissionDenied:
+            logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
         self._safe_delete_scope(config.inventory_database)
 
     def _create_access_connector_for_storage_account(
