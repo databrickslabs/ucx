@@ -35,5 +35,5 @@ def azure_api_client():
         method.side_effect = get_az_api_mapping
         # Set attributes required for `functools.wraps`
         for attr in "__name__", "__qualname__", "__annotations__", "__type_params__":
-            setattr(method, attr, getattr(get_az_api_mapping, attr))
+            setattr(method, attr, getattr(get_az_api_mapping, attr, None))
     return api_client
