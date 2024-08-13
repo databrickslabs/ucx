@@ -536,7 +536,7 @@ class AzureResourcePermissions:
         self._ws.secrets.put_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY, string_value=principal_secret.secret)
         return self._get_secret(scope, self._UBER_PRINCIPAL_SECRET_KEY)
 
-    @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=2))
+    @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=1))
     def _get_secret(self, scope: str, secret: str) -> GetSecretResponse:
         return self._ws.secrets.get_secret(scope, secret)
 
