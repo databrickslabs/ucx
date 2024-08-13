@@ -153,7 +153,9 @@ def test_create_global_service_principal_clean_up_after_failure(
             break
     assert ucx_scope is None
 
-    policy_definition = json.loads(az_cli_ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition)
+    policy_definition = json.loads(
+        az_cli_ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition
+    )
     storage_account_name = storage_account_resource.storage_account
     missing_policy_keys = (
         f"spark_conf.fs.azure.account.oauth2.client.id.{storage_account_name}.dfs.core.windows.net",
