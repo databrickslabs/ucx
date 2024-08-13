@@ -135,17 +135,15 @@ class AzureResourcePermissions:
         return principal_spm_mapping.values()
 
     def save_spn_permissions(self) -> str | None:
-        used_storage_accounts = self._get_storage_accounts()
-        if len(used_storage_accounts) == 0:
+        storage_accounts = self._get_storage_accounts()
+        if len(storage_accounts) == 0:
             logger.warning(
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
             )
             return None
         storage_account_infos = []
-        for storage in self._azurerm.storage_accounts():
-            if storage.name not in used_storage_accounts:
-                continue
+        for storage in storage_accounts:
             for mapping in self._map_storage(storage):
                 storage_account_infos.append(mapping)
         if len(storage_account_infos) == 0:
@@ -376,17 +374,13 @@ class AzureResourcePermissions:
         if config.uber_spn_id is not None:
             logger.warning("Uber service principal already created for this workspace.")
             return
-        used_storage_accounts = self._get_storage_accounts()
-        if len(used_storage_accounts) == 0:
+        storage_accounts = self._get_storage_accounts()
+        if len(storage_accounts) == 0:
             logger.warning(
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
             )
             return
-        storage_accounts = []
-        for storage in self._azurerm.storage_accounts():
-            if storage.name in used_storage_accounts:
-                storage_accounts.append(storage)
         logger.info("Creating service principal")
         try:
             uber_principal = self._azurerm.create_service_principal(uber_principal_name)
@@ -414,11 +408,7 @@ class AzureResourcePermissions:
         config = self._installation.load(WorkspaceConfig)
         if config.uber_spn_id is None:
             return
-        used_storage_accounts = self._get_storage_accounts()
-        storage_accounts = []
-        for storage in self._azurerm.storage_accounts():
-            if storage.name in used_storage_accounts:
-                storage_accounts.append(storage)
+        storage_accounts = self._get_storage_accounts()
         try:
             self._azurerm.delete_storage_permission(config.uber_spn_id, *storage_accounts, safe=True)
             self._azurerm.delete_service_principal(config.uber_spn_id, safe=True)
@@ -476,10 +466,10 @@ class AzureResourcePermissions:
         Returns:
             list[AccessConnector, str] : The access connectors with a storage url to which it has access.
         """
-        used_storage_accounts = self._get_storage_accounts()
-        if len(used_storage_accounts) > 200:
+        storage_accounts = self._get_storage_accounts()
+        if len(storage_accounts) > 200:
             raise RuntimeWarning('Migration will breach UC limits (Storage Credentials > 200).')
-        if len(used_storage_accounts) == 0:
+        if len(storage_accounts) == 0:
             logger.warning(
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
@@ -487,9 +477,7 @@ class AzureResourcePermissions:
             return []
 
         tasks = []
-        for storage_account in self._azurerm.storage_accounts():
-            if storage_account.name not in used_storage_accounts:
-                continue
+        for storage_account in storage_accounts:
             task = partial(
                 self._create_access_connector_for_storage_account,
                 storage_account=storage_account,
@@ -547,14 +535,18 @@ class AzureResourcePermissions:
     def load(self):
         return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
 
-    def _get_storage_accounts(self) -> list[str]:
+    def _get_storage_accounts(self) -> list[StorageAccount]:
         external_locations = self._locations.snapshot()
-        storage_accounts = []
+        used_storage_accounts = []
         for location in external_locations:
             if location.location.startswith("abfss://"):
                 start = location.location.index("@")
                 end = location.location.index(".dfs.core.windows.net")
                 storage_acct = location.location[start + 1 : end]
-                if storage_acct not in storage_accounts:
-                    storage_accounts.append(storage_acct)
+                if storage_acct not in used_storage_accounts:
+                    used_storage_accounts.append(storage_acct)
+        storage_accounts = []
+        for storage_account in self._azurerm.storage_accounts():
+            if storage_account.name in used_storage_accounts:
+                storage_accounts.append(storage_account)
         return storage_accounts
