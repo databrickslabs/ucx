@@ -283,27 +283,12 @@ class AzureResourcePermissions:
         self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
     ) -> list[EndpointConfPair]:
         """Create the data access configuration pairs to access the storage"""
-        tenant_id = self._azurerm.tenant_id()
-        endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
-        return [
-            EndpointConfPair(
-                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
-                principal_client_id,
-            ),
-            EndpointConfPair(
-                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
-                "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
-            ),
-            EndpointConfPair(
-                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
-                endpoint,
-            ),
-            EndpointConfPair(f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"),
-            EndpointConfPair(
-                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
-                "{{" + principal_secret_identifier + "}}",
-            ),
-        ]
+        configuration_pairs = []
+        for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
+            principal_client_id, principal_secret_identifier, storage
+        ):
+            configuration_pairs.append(EndpointConfPair(key, value["value"]))
+        return configuration_pairs
 
     def _add_service_principal_configuration_to_workspace_warehouse_config(
         self,
