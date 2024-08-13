@@ -420,14 +420,7 @@ class AzureResourcePermissions:
             if storage.name in used_storage_accounts:
                 storage_accounts.append(storage)
         for storage_account in storage_accounts:
-            try:
-                self._azurerm.delete_storage_permission(config.uber_spn_id, storage_account)
-            except NotFound:
-                pass  # Already deleted
-            except PermissionDenied:
-                logger.error(
-                    f"Missing permissions to delete storage permission for {storage_account.id}", exc_info=True
-                )
+            self._azurerm.delete_storage_permission(config.uber_spn_id, storage_account, safe=True)
         try:
             self._azurerm.delete_service_principal(config.uber_spn_id)
         except NotFound:
