@@ -792,7 +792,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config():
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
 
-    def raise_permission_denied(*args, **kwargs):
+    def raise_permission_denied(*_, **__):
         raise PermissionDenied()
 
     installation.save = raise_permission_denied
