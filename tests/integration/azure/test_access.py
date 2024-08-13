@@ -20,10 +20,13 @@ from databricks.sdk.errors.platform import PermissionDenied
 logger = logging.getLogger(__name__)
 
 
-def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
-    # skip this test if not in local mode
+@pytest.fixture
+def skip_if_not_in_debug() -> None:
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        return
+        pytest.skip("This test can only be run in debug mode")
+
+
+def test_azure_storage_accounts(skip_if_not_in_debug, ws, sql_backend, inventory_schema, make_random):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
@@ -42,10 +45,7 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
 
 
-def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_random):
-    # skip this test if not in local mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        return
+def test_save_spn_permissions_local(skip_if_not_in_debug, ws, sql_backend, inventory_schema, make_random):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
@@ -79,11 +79,15 @@ def clean_up_spn(env_or_skip):
 
 
 def test_create_global_spn(
-    ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip, clean_up_spn
+    skip_if_not_in_debug,
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_random,
+    make_cluster_policy,
+    env_or_skip,
+    clean_up_spn,
 ):
-    # skip this test if not in local mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        return
     tables = [
         ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
     ]
@@ -129,11 +133,15 @@ def test_create_global_spn(
 
 
 def test_create_global_service_principal_clean_up_after_failure(
-    ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip, clean_up_spn
+    skip_if_not_in_debug,
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_random,
+    make_cluster_policy,
+    env_or_skip,
+    clean_up_spn,
 ):
-    # skip this test if not in local mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        return
     storage_account_resource = AzureResource(env_or_skip("TEST_STORAGE_RESOURCE"))
     tables = [
         ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
