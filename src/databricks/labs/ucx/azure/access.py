@@ -415,7 +415,7 @@ class AzureResourcePermissions:
 
         message = "Missing permissions to load the configuration"
         config = log_permission_denied(self._installation.load, message=message)(WorkspaceConfig)
-        if config.uber_spn_id is None:
+        if config is None or config.uber_spn_id is None:
             return
 
         secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
