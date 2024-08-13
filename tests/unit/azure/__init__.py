@@ -17,9 +17,11 @@ def _load_fixture(filename: str):
 
 def get_az_api_mapping(*args, **_):
     mapping = _load_fixture("azure/mappings.json")[0]
+    if len(args) == 0:
+        return {}
     if args[0] in mapping:
         return mapping[args[0]]
-    if args[1] in mapping:
+    if len(args) >= 2 and args[1] in mapping:
         return mapping[args[1]]
     return {}
 
