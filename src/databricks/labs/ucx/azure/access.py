@@ -222,6 +222,9 @@ class AzureResourcePermissions:
                 )
             if cluster_policy.name is not None:
                 self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
+            logger.info(
+                f"Updated UCX cluster policy {policy_id} with service principal connection details for accesing storage accounts"
+            )
         except NotFound:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
@@ -319,6 +322,9 @@ class AzureResourcePermissions:
                 sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
                 security_policy=security_policy,
             )
+            logger.info(
+                "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
+            )
         # TODO: Remove following try except once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed
         except InvalidParameterValue as error:
             sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
@@ -403,8 +409,6 @@ class AzureResourcePermissions:
         except (PermissionDenied, NotFound, BadRequest):
             self._delete_uber_principal()  # Clean up dangling resources
             raise
-        logger.info(f"Created service principal ({config.uber_spn_id}) with access to used storage accounts.")
-        logger.info(f"Updated UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
     def _delete_uber_principal(self):
         config = self._installation.load(WorkspaceConfig)

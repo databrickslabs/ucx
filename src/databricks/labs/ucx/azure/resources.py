@@ -324,7 +324,13 @@ class AzureResources:
         assert principal_type is not None
         assert directory_id is not None
         assert secret is not None
-        return PrincipalSecret(Principal(client_id, display_name, object_id, principal_type, directory_id), secret)
+        principal_secret = PrincipalSecret(
+            Principal(client_id, display_name, object_id, principal_type, directory_id), secret
+        )
+        logger.info(
+            f"Created service principal ({principal_secret.client.client_id}) with access to used storage accounts."
+        )
+        return principal_secret
 
     def delete_service_principal(self, principal_id: str):
         try:
