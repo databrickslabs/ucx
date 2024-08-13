@@ -79,7 +79,7 @@ def clean_up_spn(env_or_skip):
             continue
 
 
-def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy) -> None:
+def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy, clean_up_spn) -> None:
     policy = make_cluster_policy()
     ctx = az_cli_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
