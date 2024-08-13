@@ -143,6 +143,7 @@ class PrincipalSecret:
 
 @dataclass
 class AzureRoleAssignment:
+    id: str
     resource: AzureResource
     scope: AzureResource
     principal: Principal
@@ -476,19 +477,18 @@ class AzureResources:
             if safe:
                 return
             raise
-        permission_denied_guids = []
+        permission_denied_ids = []
         for permission in storage_permissions:
-            guid = str(permission.resource)
             try:
-                self._mgmt.delete(guid, "2022-04-01")
+                self._mgmt.delete(permission.id, "2022-04-01")
             except PermissionDenied:
-                self._log_permission_denied_error_for_storage_permission(guid)
-                permission_denied_guids.append(guid)
+                self._log_permission_denied_error_for_storage_permission(permission.id)
+                permission_denied_ids.append(permission.id)
             except NotFound:
                 continue  # Somehow deleted right in-between getting and deleting
-        if permission_denied_guids:
+        if permission_denied_ids:
             raise PermissionDenied(
-                f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}"
+                f"Permission denied for deleting role assignments: {', '.join(permission_denied_ids)}"
             )
 
     def delete_storage_permission(
@@ -589,6 +589,9 @@ class AzureResources:
             yield assignment
 
     def _role_assignment(self, role_assignment: dict, resource_id: str) -> AzureRoleAssignment | None:
+        id_ = role_assignment.get("id")
+        if not id_:
+            return None
         assignment_properties = role_assignment.get("properties", {})
         principal_type = assignment_properties.get("principalType")
         if not principal_type:
@@ -612,6 +615,7 @@ class AzureResources:
         if scope == "/":
             scope = resource_id
         return AzureRoleAssignment(
+            id=id_,
             resource=AzureResource(resource_id),
             scope=AzureResource(scope),
             principal=principal,

@@ -127,6 +127,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
     ]
     azure_resources.role_assignments.return_value = [
         AzureRoleAssignment(
+            id="rol1",
             resource=AzureResource(f'{containers}/container1'),
             scope=AzureResource(f'{containers}/container1'),
             principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
@@ -135,6 +136,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
             role_permissions=[],
         ),
         AzureRoleAssignment(
+            id="rol2",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -210,6 +212,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     ]
     azure_resources.role_assignments.return_value = [
         AzureRoleAssignment(
+            id="rol1",
             resource=AzureResource(f'{containers}/container1'),
             scope=AzureResource(f'{containers}/container1'),
             principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
@@ -224,6 +227,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol2",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -235,6 +239,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol3",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -243,6 +248,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             role_permissions=["Microsoft.Authorization/*"],
         ),
         AzureRoleAssignment(
+            id="rol4",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('g', 'h', 'i', 'Application', '0000-0000'),
@@ -253,6 +259,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol5",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('j', 'k', 'l', 'Application', '0000-0000'),
@@ -263,6 +270,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol6",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('j', 'k', 'l', 'Application', '0000-0000'),
@@ -273,6 +281,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol7",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('m', 'n', 'o', 'Application', '0000-0000'),
@@ -283,6 +292,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol8",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('v', 'w', 'x', 'Application', '0000-0000'),
@@ -293,6 +303,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol9",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('p', 'q', 'r', 'Application', '0000-0000'),
@@ -303,6 +314,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol10",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('s', 't', 'u', 'Application', '0000-0000'),
@@ -316,6 +328,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol11",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a1', 'b1', 'c1', 'Application', '0000-0000'),
@@ -324,6 +337,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             role_permissions=[],
         ),
         AzureRoleAssignment(
+            id="rol12",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a1', 'b1', 'c1', 'Application', '0000-0000'),
@@ -334,6 +348,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol13",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a2', 'b2', 'c2', 'Application', '0000-0000'),
@@ -344,6 +359,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol14",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a2', 'b2', 'c2', 'Application', '0000-0000'),
