@@ -340,7 +340,7 @@ class AzureResources:
         principal_id : str
             The principal id to delete.
         safe : bool, optional (default: True)
-            If True, do not raise a NotFound error when the principal is not found.
+            If True, will not raise an error if the service principal does not exists.
 
         Raises
         ------
@@ -502,7 +502,7 @@ class AzureResources:
         storage_accounts : StorageAccount
             The storage account(s) to delete permission for.
         safe : bool, optional (default: False)
-            If True, will not raise an exception if the no role assignment are found.
+            If True, will not raise an exception if no role assignment are found.
 
         Raises
         ------
