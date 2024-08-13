@@ -662,7 +662,7 @@ def setup_create_uber_principal():
     return w, installation, prompts, azure_resource_permission
 
 
-def test_create_global_spn_cluster_policy_not_found():
+def test_create_global_spn_cluster_policy_not_found() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.cluster_policies.get.side_effect = NotFound()
 
@@ -678,7 +678,7 @@ def test_create_global_spn_cluster_policy_not_found():
     w.warehouses.set_workspace_warehouse_config.assert_called_once()
 
 
-def test_create_global_spn():
+def test_create_global_spn() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     azure_resource_permission.create_uber_principal(prompts)
 
@@ -777,7 +777,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
     assert w.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.api_client.post.side_effect = PermissionDenied
 
@@ -787,7 +787,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
     assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
 
     def raise_permission_denied(*_, **__):
@@ -801,7 +801,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_sa
     assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.api_client.put.side_effect = PermissionDenied
 
@@ -813,7 +813,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_ap
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.secrets.create_scope.side_effect = PermissionDenied
 
@@ -830,7 +830,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.secrets.put_secret.side_effect = PermissionDenied
 
@@ -847,7 +847,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_pu
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.cluster_policies.edit.side_effect = PermissionDenied
 
@@ -864,7 +864,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cl
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config() -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
