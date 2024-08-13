@@ -240,7 +240,7 @@ class TablesMigrator:
         sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
         if sync_result.status_code != "SUCCESS":
             logger.warning(
-                f"SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
+                f"failed-to-migrate: SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
                 f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
             )
             return False
@@ -286,7 +286,7 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -301,7 +301,7 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -322,7 +322,7 @@ class TablesMigrator:
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -337,7 +337,7 @@ class TablesMigrator:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
-            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
         return self._migrate_acl(src_table, rule, grants)
 
@@ -353,7 +353,7 @@ class TablesMigrator:
             try:
                 self._backend.execute(acl_migrate_sql)
             except DatabricksError as e:
-                logger.warning(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
+                logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
         return True
 
     def _table_already_migrated(self, target) -> bool:
