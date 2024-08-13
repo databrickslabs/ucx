@@ -109,7 +109,7 @@ cmds         = "python tests/integration/cmds.py"
 wheelhouse   = ["rm -rf wheels/ ucx.wheelhouse.zip",
                 "pip-compile --all-extras --output-file=requirements.txt --strip-extras pyproject.toml",
                 "pip download --platform any --no-deps -r requirements.txt --dest wheels/",
-                "zip -j -r ucx.wheelhouse.zip wheels/*.whl requirements.txt"]
+                "zip -j -r ucx.wheelhouse.zip wheels/*.whl requirements.txt labs.yml"]
 
 [tool.pytest.ini_options]
 # TODO: remove `-p no:warnings`
