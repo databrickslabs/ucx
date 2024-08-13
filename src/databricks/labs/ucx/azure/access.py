@@ -410,7 +410,7 @@ class AzureResourcePermissions:
             self._delete_uber_principal()  # Clean up dangling resources
             raise
 
-    def _delete_uber_principal(self):
+    def _delete_uber_principal(self) -> None:
         config = self._installation.load(WorkspaceConfig)
         if config.uber_spn_id is None:
             return
