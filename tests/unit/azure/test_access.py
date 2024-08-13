@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 from unittest.mock import call, create_autospec
@@ -7,6 +8,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.config import Config
 from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
@@ -26,6 +28,7 @@ from databricks.labs.ucx.azure.resources import (
     Principal,
     StorageAccount,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from . import azure_api_client
@@ -799,6 +802,17 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_sa
 
     w.api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
     w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.api_client.put.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    w.api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
