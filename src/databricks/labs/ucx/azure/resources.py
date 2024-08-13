@@ -465,25 +465,10 @@ class AzureResources:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
 
-    def delete_storage_permission(
+    def _delete_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, *, safe: bool = False
     ) -> None:
-        """Delete storage permission(s) for a principal
-
-        Parameters
-        ----------
-        principal_id : str
-            The principal id to delete the role assignment(s) for.
-        storage_account : StorageAccount
-            The storage account to delete permission for.
-        safe : bool, optional (default: False)
-            If True, will not raise an exception if the no role assignment are found.
-
-        Raises
-        ------
-        PermissionDenied :
-            If user is missing permission to get the storage permission.
-        """
+        """See meth:delete_storage_permission"""
         try:
             storage_permissions = self._get_storage_permissions(principal_id, storage_account)
         except NotFound:
@@ -504,6 +489,28 @@ class AzureResources:
             raise PermissionDenied(
                 f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}"
             )
+
+    def delete_storage_permission(
+        self, principal_id: str, *storage_accounts: StorageAccount, safe: bool = False
+    ) -> None:
+        """Delete storage permission(s) for a principal
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to delete the role assignment(s) for.
+        storage_accounts : StorageAccount
+            The storage account(s) to delete permission for.
+        safe : bool, optional (default: False)
+            If True, will not raise an exception if the no role assignment are found.
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
+        for storage_account in storage_accounts:
+            self._delete_storage_permission(principal_id, storage_account, safe=safe)
 
     def tenant_id(self):
         token = self._mgmt.token()
