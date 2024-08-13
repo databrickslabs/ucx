@@ -313,7 +313,10 @@ def test_delete_storage_permission_logs_permission_denied_on_delete(caplog):
     principal_id = "principal_id_system_assigned_mi-123"
     api_client.delete.side_effect = PermissionDenied("Permission denied")
 
-    with pytest.raises(PermissionDenied) as error, caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+    with (
+        pytest.raises(PermissionDenied) as error,
+        caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"),
+    ):
         azure_resource.delete_storage_permission(principal_id, storage_account)
     assert "Permission denied" in caplog.text
     assert "rol1" in caplog.text

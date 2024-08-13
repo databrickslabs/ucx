@@ -400,7 +400,9 @@ class AzureResources:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
 
-    def delete_storage_permission(self, principal_id: str, storage_account: StorageAccount, *, safe: bool = False) -> None:
+    def delete_storage_permission(
+        self, principal_id: str, storage_account: StorageAccount, *, safe: bool = False
+    ) -> None:
         """Delete storage permission(s) for a principal
 
         Parameters
@@ -446,7 +448,9 @@ class AzureResources:
             except NotFound:
                 continue  # Somehow deleted right in-between getting and deleting
         if permission_denied_guids:
-            raise PermissionDenied(f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}")
+            raise PermissionDenied(
+                f"Permission denied for deleting role assignments: {', '.join(permission_denied_guids)}"
+            )
 
     def tenant_id(self):
         token = self._mgmt.token()

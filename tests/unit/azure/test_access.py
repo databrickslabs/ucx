@@ -711,7 +711,7 @@ def test_create_global_spn():
     calls = [
         call("/v1.0/applications", {"displayName": "UCXServicePrincipal"}),
         call("/v1.0/servicePrincipals", {"appId": "appIduser1"}),
-        call("/v1.0/servicePrincipals/Iduser1/addPassword")
+        call("/v1.0/servicePrincipals/Iduser1/addPassword"),
     ]
     w.api_client.post.assert_has_calls(calls, any_order=True)
     w.api_client.put.assert_called_once()
@@ -813,6 +813,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_sa
 
     def raise_permission_denied(*args, **kwargs):
         raise PermissionDenied()
+
     installation.save = raise_permission_denied
 
     with pytest.raises(PermissionDenied):

@@ -156,6 +156,7 @@ def test_create_global_service_principal_clean_up_after_failure(
         if method == "PUT" and path == "/api/2.0/sql/config/warehouses":
             raise PermissionDenied("Cannot set warehouse configuration")
         return ws.api_client.do_original(method, path, *args, **kwargs)
+
     ws.api_client.do_original = ws.api_client.do
     ws.api_client.do = do  # Force a permission denied error
 
@@ -182,7 +183,7 @@ def test_create_global_service_principal_clean_up_after_failure(
         f"spark_conf.fs.azure.account.oauth.provider.type.{storage_account_name}.dfs.core.windows.net",
         f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage_account_name}.dfs.core.windows.net",
         f"spark_conf.fs.azure.account.auth.type.{storage_account_name}.dfs.core.windows.net",
-        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage_account_name}.dfs.core.windows.net"
+        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage_account_name}.dfs.core.windows.net",
     )
     for key in missing_policy_keys:
         assert key not in policy_definition
