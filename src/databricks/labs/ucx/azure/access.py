@@ -210,8 +210,8 @@ class AzureResourcePermissions:
         principal_secret_identifier: str,
         storage_accounts: list[StorageAccount],
     ):
+        policy_definition = ""
         try:
-            policy_definition = ""
             cluster_policy = self._ws.cluster_policies.get(policy_id)
             self._installation.save(cluster_policy, filename="policy-backup.json")
             if cluster_policy.definition is not None:
