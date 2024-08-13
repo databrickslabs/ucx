@@ -17,6 +17,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 logger = logging.getLogger(__name__)
 
+
 class ConnectionType(Enum):
     """The type of connection."""
 
