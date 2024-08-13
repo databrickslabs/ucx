@@ -241,7 +241,7 @@ class AzureResourcePermissions:
             for key, _ in self._create_service_principal_cluster_policy_configuration_pairs(
                 principal_client_id, principal_secret_identifier, storage
             ):
-                if key in key:
+                if key in policy_dict:
                     del policy_dict[key]
         return json.dumps(policy_dict)
 
@@ -453,6 +453,8 @@ class AzureResourcePermissions:
         except PermissionDenied:
             logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
         self._safe_delete_scope(config.inventory_database)
+        config.uber_spn_id = None
+        self._installation.save(config)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
