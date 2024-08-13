@@ -328,7 +328,8 @@ class AzureResources:
             Principal(client_id, display_name, object_id, principal_type, directory_id), secret
         )
         logger.info(
-            f"Created service principal ({principal_secret.client.client_id}) with access to used storage accounts."
+            f"Created service principal ({principal_secret.client.client_id}) with access to used storage accounts: "
+            + principal_secret.client.display_name
         )
         return principal_secret
 
