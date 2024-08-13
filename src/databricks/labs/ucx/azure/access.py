@@ -263,7 +263,7 @@ class AzureResourcePermissions:
         policy_definition = policy.definition
         if policy_definition is not None:
             policy_definition = self._remove_service_principal_configuration_from_cluster_policy_definition(
-                policy.definition,
+                policy_definition,
                 principal_client_id,
                 principal_secret_identifier,
                 storage_accounts,

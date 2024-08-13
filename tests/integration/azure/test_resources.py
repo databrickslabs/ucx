@@ -1,5 +1,6 @@
 import datetime as dt
 import uuid
+from collections.abc import Iterator
 
 import pytest
 
@@ -70,7 +71,7 @@ def test_storage_account(az_cli_ctx, env_or_skip) -> StorageAccount:
 
 
 @pytest.fixture
-def access_connector(az_cli_ctx, make_random, test_storage_account: StorageAccount) -> AccessConnector:
+def access_connector(az_cli_ctx, make_random, test_storage_account: StorageAccount) -> Iterator[AccessConnector]:
     access_connector_name = f"test-{make_random()}"
     tomorrow = dt.datetime.now() + dt.timedelta(days=1)
     tags = {"RemoveAfter": str(tomorrow), "NoAutoRemove": "False"}
