@@ -419,8 +419,23 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     table_mapping = runtime_ctx.table_mapping
-    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[2].name, is_view=False)
-    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[5].name, is_view=True)
+    table = Table(
+        "hive_metastore",
+        src_schemas[0].name,
+        src_tables[2].name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+    )
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[2].name, load_table=lambda *_: table)
+    table = Table(
+        "hive_metastore",
+        src_schemas[0].name,
+        src_tables[5].name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+        view_text="SELECT 1",
+    )
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[5].name, load_table=lambda *_: table)
     table_mapping.skip_schema(src_schemas[1].name)
     tables_to_migrate = table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)
     full_names = set(tm.src.full_name for tm in tables_to_migrate)
