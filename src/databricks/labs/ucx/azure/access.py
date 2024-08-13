@@ -157,22 +157,37 @@ class AzureResourcePermissions:
     def _policy_config(value: str) -> dict[str, str]:
         return {"type": "fixed", "value": value}
 
-    def _create_cluster_policy_configuration_pairs(
+    def _create_service_principal_cluster_policy_configuration_pairs(
         self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
     ) -> list[tuple[str, dict[str, str]]]:
         """Create the cluster policy configuration pairs to access the storage"""
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         configuration_pairs = [
-            (f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net", self._policy_config(principal_client_id)),
-            (f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net", self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")),
-            (f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net", self._policy_config(endpoint)),
-            (f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", self._policy_config("OAuth")),
-            (f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net", self._policy_config("{{" + principal_secret_identifier + "}}")),
+            (
+                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                self._policy_config(principal_client_id),
+            ),
+            (
+                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"),
+            ),
+            (
+                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                self._policy_config(endpoint),
+            ),
+            (
+                f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net",
+                self._policy_config("OAuth"),
+            ),
+            (
+                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                self._policy_config("{{" + principal_secret_identifier + "}}"),
+            ),
         ]
         return configuration_pairs
 
-    def _update_cluster_policy_definition(
+    def _add_service_principal_configuration_to_cluster_policy_definition(
         self,
         policy_definition: str,
         principal_client_id: str,
@@ -181,11 +196,13 @@ class AzureResourcePermissions:
     ) -> str:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
-            for key, value in self._create_cluster_policy_configuration_pairs(principal_client_id, principal_secret_identifier, storage):
+            for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
+                principal_client_id, principal_secret_identifier, storage
+            ):
                 policy_dict[key] = value
         return json.dumps(policy_dict)
 
-    def _update_cluster_policy_with_spn(
+    def _add_service_principal_configuration_to_cluster_policy(
         self,
         policy_id: str,
         principal_client_id: str,
@@ -197,7 +214,7 @@ class AzureResourcePermissions:
             cluster_policy = self._ws.cluster_policies.get(policy_id)
             self._installation.save(cluster_policy, filename="policy-backup.json")
             if cluster_policy.definition is not None:
-                policy_definition = self._update_cluster_policy_definition(
+                policy_definition = self._add_service_principal_configuration_to_cluster_policy_definition(
                     cluster_policy.definition,
                     principal_client_id,
                     principal_secret_identifier,
@@ -209,7 +226,7 @@ class AzureResourcePermissions:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
 
-    def _revert_cluster_policy_definition(
+    def _remove_service_principal_configuration_from_cluster_policy_definition(
         self,
         policy_definition: str,
         principal_client_id: str,
@@ -218,12 +235,14 @@ class AzureResourcePermissions:
     ) -> str:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
-            for key, _ in self._create_cluster_policy_configuration_pairs(principal_client_id, principal_secret_identifier, storage):
+            for key, _ in self._create_service_principal_cluster_policy_configuration_pairs(
+                principal_client_id, principal_secret_identifier, storage
+            ):
                 if key in key:
                     del policy_dict[key]
         return json.dumps(policy_dict)
 
-    def _revert_cluster_policy(
+    def _remove_service_principal_configuration_from_cluster_policy(
         self,
         policy_id: str,
         principal_client_id: str,
@@ -240,7 +259,7 @@ class AzureResourcePermissions:
                 return  # No policy to revert
         policy_definition = policy.definition
         if policy_definition is not None:
-            policy_definition = self._revert_cluster_policy_definition(
+            policy_definition = self._remove_service_principal_configuration_from_cluster_policy_definition(
                 policy.definition,
                 principal_client_id,
                 principal_secret_identifier,
@@ -275,7 +294,7 @@ class AzureResourcePermissions:
             ),
         ]
 
-    def _update_sql_dac_with_spn(
+    def _add_service_principal_configuration_to_workspace_warehouse_config(
         self,
         principal_client_id: str,
         principal_secret_identifier: str,
@@ -309,7 +328,7 @@ class AzureResourcePermissions:
             )
             raise error
 
-    def _revert_sql_dac_with_spn(
+    def _remove_service_principal_configuration_from_workspace_warehouse_config(
         self,
         principal_client_id: str,
         principal_secret_identifier: str,
@@ -372,13 +391,15 @@ class AzureResourcePermissions:
             )
             secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
             secret_identifier = f"secrets/{inventory_database}/{secret.key}"
-            self._update_cluster_policy_with_spn(
+            self._add_service_principal_configuration_to_cluster_policy(
                 policy_id,
                 uber_principal.client.client_id,
                 secret_identifier,
                 storage_accounts,
             )
-            self._update_sql_dac_with_spn(uber_principal.client.client_id, secret_identifier, storage_accounts)
+            self._add_service_principal_configuration_to_workspace_warehouse_config(
+                uber_principal.client.client_id, secret_identifier, storage_accounts
+            )
         except (PermissionDenied, NotFound, BadRequest):
             self._delete_uber_principal()  # Clean up dangling resources
             raise
@@ -411,17 +432,21 @@ class AzureResourcePermissions:
             secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
             if config.policy_id is not None:
                 try:
-                    self._revert_cluster_policy(config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts)
+                    self._remove_service_principal_configuration_from_cluster_policy(
+                        config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
+                    )
                 except NotFound:
                     pass
                 except PermissionDenied:
-                    logger.error(f"Missing permissions to revert cluster policy", exc_info=True)
+                    logger.error("Missing permissions to revert cluster policy", exc_info=True)
             try:
-                self._revert_sql_dac_with_spn(config.uber_spn_id, secret_identifier, storage_accounts)
+                self._remove_service_principal_configuration_from_workspace_warehouse_config(
+                    config.uber_spn_id, secret_identifier, storage_accounts
+                )
             except NotFound:
                 pass
             except PermissionDenied:
-                logger.error(f"Missing permissions to revert SQL warehouse config", exc_info=True)
+                logger.error("Missing permissions to revert SQL warehouse config", exc_info=True)
         self._safe_delete_scope(config.inventory_database)
 
     def _create_access_connector_for_storage_account(
