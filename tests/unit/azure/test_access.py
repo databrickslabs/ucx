@@ -812,6 +812,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_ap
 
     assert installation.load(WorkspaceConfig).uber_spn_id is None
     w.api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
+    w.secrets.delete_scope.assert_called_with("ucx")
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config():
