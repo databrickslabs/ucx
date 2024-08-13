@@ -382,6 +382,45 @@ class AzureResources:
             self._log_permission_denied_error_for_storage_permission(path)
             raise
 
+    def _get_storage_permissions(
+        self,
+        principal_id: str,
+        storage_account: StorageAccount,
+    ) -> Iterable[AzureRoleAssignment]:
+        """Get storage permissions for a principal.
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to get the storage permissions for.
+        storage_account : StorageAccount
+            The storage account to get the permission for.
+
+        Yields
+        ------
+        AzureRoleAssignment :
+            The role assignment
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
+        path = (
+            f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
+            f"?$filter=principalId%20eq%20'{principal_id}'"
+        )
+        try:
+            response = self._mgmt.get(path, "2022-04-01")
+        except PermissionDenied:
+            self._log_permission_denied_error_for_storage_permission(path)
+            raise
+
+        for role_assignment in response.get("value", []):
+            assignment = self._role_assignment(role_assignment, str(storage_account.id))
+            if assignment:
+                yield assignment
+
     def apply_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
     ):
@@ -425,27 +464,15 @@ class AzureResources:
         PermissionDenied :
             If user is missing permission to get the storage permission.
         """
-        path = (
-            f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
-            f"?$filter=principalId%20eq%20'{principal_id}'"
-        )
         try:
-            response = self._mgmt.get(path, "2022-04-01")
-        except PermissionDenied:
-            self._log_permission_denied_error_for_storage_permission(path)
-            raise
+            storage_permissions = self._get_storage_permissions(principal_id, storage_account)
         except NotFound:
             if safe:
                 return
             raise
-        role_guids = []
-        for role_assignment in response.get("value", []):
-            # TODO: Reuse AzureRoleAssignment, but requires a refactor to add the id
-            role_guid = role_assignment.get("id")
-            if role_guid:
-                role_guids.append(role_guid)
         permission_denied_guids = []
-        for guid in role_guids:
+        for permission in storage_permissions:
+            guid = str(permission.resource)
             try:
                 self._mgmt.delete(guid, "2022-04-01")
             except PermissionDenied:
