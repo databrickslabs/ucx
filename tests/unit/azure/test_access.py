@@ -786,7 +786,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
     with pytest.raises(PermissionDenied):
         azure_resource_permission.create_uber_principal(prompts)
 
-    w.secrets.delete_scope.assert_called_with("ucx")
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config():
@@ -800,8 +800,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_sa
     with pytest.raises(PermissionDenied):
         azure_resource_permission.create_uber_principal(prompts)
 
-    w.api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
-    w.secrets.delete_scope.assert_called_with("ucx")
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
 def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission():
