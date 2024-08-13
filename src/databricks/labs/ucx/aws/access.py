@@ -12,6 +12,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
@@ -266,10 +267,15 @@ class AWSResourcePermissions:
                 f"workspace warehouse config. Do you want UCX to to update it with the uber instance profile?"
             ):
                 return
+        if warehouse_config.security_policy:
+            security_policy = SetWorkspaceWarehouseConfigRequestSecurityPolicy(warehouse_config.security_policy.value)
+        else:
+            security_policy = SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
         self._ws.warehouses.set_workspace_warehouse_config(
             data_access_config=warehouse_config.data_access_config,
             sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
             instance_profile_arn=iam_instance_profile.instance_profile_arn,
+            security_policy=security_policy,
         )
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
