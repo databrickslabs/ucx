@@ -1,5 +1,11 @@
 [
   {
+    "/v1.0/directoryObjects/appIduser1": {
+      "appId": "appIduser1",
+      "displayName": "disNameuser1",
+      "id": "Iduser1",
+      "servicePrincipalType": "ManagedIdentity"
+    },
     "/v1.0/directoryObjects/user1": {
       "appId": "appIduser1",
       "displayName": "disNameuser1",
