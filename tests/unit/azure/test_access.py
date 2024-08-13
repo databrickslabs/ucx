@@ -626,43 +626,6 @@ def test_create_global_spn_no_storage():
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
-def test_create_global_spn_cluster_policy_not_found():
-    w = create_autospec(WorkspaceClient)
-    w.cluster_policies.get.side_effect = NotFound()
-    rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
-            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
-    installation = MockInstallation(
-        {
-            'config.yml': {
-                'inventory_database': 'ucx',
-                'policy_id': 'foo1',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            }
-        }
-    )
-    api_client = azure_api_client()
-    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    with pytest.raises(NotFound):
-        azure_resource_permission.create_uber_principal(prompts)
-    w.cluster_policies.get.assert_has_calls([call("foo1"), call("foo1")])
-    w.secrets.get_secret.asser_called_with("ucx", "uber_principal_secret")
-    w.secrets.create_scope.assert_called_with("ucx")
-    w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
-    w.cluster_policies.edit.assert_not_called()
-    w.get_workspace_id.assert_called_once()
-    w.warehouses.set_workspace_warehouse_config.assert_called_once()
-
-
 def setup_create_uber_principal():
     w = create_autospec(WorkspaceClient)
     cluster_policy = Policy(
@@ -670,8 +633,7 @@ def setup_create_uber_principal():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    warehouse_config = GetWorkspaceWarehouseConfigResponse()
-    w.warehouses.get_workspace_warehouse_config.return_value = warehouse_config
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
     rows = {
         "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
@@ -697,6 +659,22 @@ def setup_create_uber_principal():
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     return w, installation, prompts, azure_resource_permission
+
+
+def test_create_global_spn_cluster_policy_not_found():
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.cluster_policies.get.side_effect = NotFound()
+
+    with pytest.raises(NotFound):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    w.cluster_policies.get.assert_has_calls([call("foo1"), call("foo1")])
+    w.secrets.get_secret.asser_called_with("ucx", "uber_principal_secret")
+    w.secrets.create_scope.assert_called_with("ucx")
+    w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_called_once()
 
 
 def test_create_global_spn():
