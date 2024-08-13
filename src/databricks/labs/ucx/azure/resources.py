@@ -332,13 +332,33 @@ class AzureResources:
         )
         return principal_secret
 
-    def delete_service_principal(self, principal_id: str):
+    def delete_service_principal(self, principal_id: str, *, safe: bool = False):
+        """Delete the service principal.
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to delete.
+        safe : bool, optional (default: True)
+            If True, do not raise a NotFound error when the principal is not found.
+
+        Raises
+        ------
+        NotFound :
+            If the principal is not found.
+        PermissionDenied :
+            If missing permission to delete the service principal
+        """
         try:
             self._graph.delete(f"/v1.0/applications(appId='{principal_id}')")
         except PermissionDenied:
             msg = f"User doesnt have permission to delete application {principal_id}"
             logger.error(msg)
             raise PermissionDenied(msg) from None
+        except NotFound:
+            if safe:
+                return
+            raise
 
     def _log_permission_denied_error_for_storage_permission(self, path: str) -> None:
         logger.error(
