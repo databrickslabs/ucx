@@ -385,6 +385,8 @@ class AzureResourcePermissions:
             )
             return
         logger.info("Creating service principal")
+
+        secret_identifier = f"secrets/{inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
         try:
             uber_principal = self._azurerm.create_service_principal(uber_principal_name)
             config.uber_spn_id = uber_principal.client.client_id
@@ -392,8 +394,7 @@ class AzureResourcePermissions:
             self._apply_storage_permission(
                 uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_accounts
             )
-            secret = self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
-            secret_identifier = f"secrets/{inventory_database}/{secret.key}"
+            self._create_and_get_secret_for_uber_principal(uber_principal, inventory_database)
             self._add_service_principal_configuration_to_cluster_policy(
                 policy_id,
                 uber_principal.client.client_id,
