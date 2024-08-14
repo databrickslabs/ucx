@@ -65,6 +65,6 @@ def test_migrate_ctas_views(run_workflow):
 )
 def test_update_migration_status(run_workflow, workflow):
     """Migration status is refreshed by deleting and showing new tables"""
-    ctx = run_workflow(getattr(workflow, "refresh_migration_status"))
+    ctx = run_workflow(getattr(workflow, "update_migration_status"))
     assert "TRUNCATE TABLE hive_metastore.ucx.migration_status" in ctx.sql_backend.queries
     assert "SHOW DATABASES" in ctx.sql_backend.queries
