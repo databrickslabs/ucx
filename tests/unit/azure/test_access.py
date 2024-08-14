@@ -650,9 +650,8 @@ def setup_create_uber_principal():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    data_access_config_mock = [EndpointConfPair(key="foo", value="bar")]
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
-        data_access_config=data_access_config_mock
+        data_access_config=[EndpointConfPair(key="foo", value="bar")]
     )
 
     def set_workspace_warehouse_config(data_access_config: list[EndpointConfPair], *_, **__) -> None:
@@ -712,7 +711,7 @@ def test_create_global_spn() -> None:
     )
     installation.assert_file_written(
         'warehouse-config-backup.json',
-        GetWorkspaceWarehouseConfigResponse(data_access_config=[EndpointConfPair(key="foo", value="bar")]).as_dict()
+        GetWorkspaceWarehouseConfigResponse(data_access_config=[EndpointConfPair(key="foo", value="bar")]).as_dict(),
     )
     calls = [
         call("/v1.0/applications", {"displayName": "UCXServicePrincipal"}),
