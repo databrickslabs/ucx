@@ -560,13 +560,14 @@ class ACLMigrator:
                 tables_to_migrate.append(table_to_migrate)
         else:
             seen_tables = self._migration_status_refresher.get_seen_tables()
+            reverse_seen_tables = {v: k for k, v in seen_tables.items()}
             for table in tables:
-                if table.key not in seen_tables:
+                if table.key not in reverse_seen_tables:
                     logger.warning(f"Table {table.key} not found in migration status. Skipping.")
                     continue
-                dst_table_parts = seen_tables[table.key].split(".")
+                dst_table_parts = reverse_seen_tables[table.key].split(".")
                 if len(dst_table_parts) != 3:
-                    logger.warning(f"Invalid table name {seen_tables[table.key]} found in migration status. Skipping.")
+                    logger.warning(f"Invalid table name {reverse_seen_tables[table.key]} found in migration status. Skipping.")
                     continue
                 rule = Rule(
                     self._workspace_name,
@@ -622,7 +623,7 @@ class ACLMigrator:
             matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
             if len(matched_group) > 0:
                 grant = dataclasses.replace(grant, principal=matched_group[0])
-                matched_grants.append(grant)
+            matched_grants.append(grant)
         return matched_grants
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
