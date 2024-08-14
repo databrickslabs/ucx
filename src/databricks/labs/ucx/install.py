@@ -41,7 +41,7 @@ from databricks.sdk.errors import (
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
-    OperationFailed
+    OperationFailed,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
