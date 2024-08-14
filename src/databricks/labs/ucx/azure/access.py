@@ -369,7 +369,7 @@ class AzureResourcePermissions:
             sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
             logger.error(
                 f'Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error "{error}". '
-                f'Please try applying the following configs manually in the worksapce admin UI:\n{sql_dac_log_msg}'
+                f'Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}'
             )
             raise error
 
