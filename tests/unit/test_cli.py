@@ -20,7 +20,7 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
 from databricks.labs.ucx.cli import (
     alias,
     assign_metastore,
@@ -357,9 +357,16 @@ def test_save_storage_and_principal_gcp(ws):
 def test_migrate_credentials_azure(ws):
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azure_resources = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azure_resources,
+    )
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
+    azure_resources.storage_accounts.assert_called()
 
 
 def test_migrate_credentials_aws(ws):
@@ -371,16 +378,28 @@ def test_migrate_credentials_aws(ws):
     ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_limit_azure(ws):
+def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws):
+    """The storage credential limit is 200, so we should raise a warning when we hit that limit."""
     azure_resources = create_autospec(AzureResources)
     external_locations = create_autospec(ExternalLocations)
-    external_locations_mock = []
+    storage_accounts_mock, external_locations_mock = [], []
     for i in range(200):
-        external_locations_mock.append(
-            ExternalLocation(
-                location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}", table_count=i % 20
-            )
+        storage_account_id = AzureResource(
+            f"/subscriptions/test/resourceGroups/test/providers/Microsoft.Storage/storageAccounts/storage{i}"
         )
+        storage_account = StorageAccount(
+            id=storage_account_id,
+            name=f"storage{i}",
+            location="eastus",
+            default_network_action="Allow",
+        )
+        external_location = ExternalLocation(
+            location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}",
+            table_count=i % 20,
+        )
+        storage_accounts_mock.append(storage_account)
+        external_locations_mock.append(external_location)
+    azure_resources.storage_accounts.return_value = storage_accounts_mock
     external_locations.snapshot.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(
@@ -394,11 +413,20 @@ def test_migrate_credentials_limit_azure(ws):
     ws.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
-    external_locations_mock.append(
-        ExternalLocation(
-            location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25
-        )
+    storage_account_id = AzureResource(
+        "/subscriptions/test/resourceGroups/test/providers/Microsoft.Storage/storageAccounts/storage201"
     )
+    storage_account = StorageAccount(
+        id=storage_account_id,
+        name="storage201",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    external_location = ExternalLocation(
+        location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25
+    )
+    storage_accounts_mock.append(storage_account)
+    external_locations_mock.append(external_location)
     with pytest.raises(RuntimeWarning):
         migrate_credentials(ws, prompts, ctx=ctx)
 
