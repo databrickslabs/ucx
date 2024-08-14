@@ -88,7 +88,9 @@ def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_c
     az_cli_ctx.azure_resource_permissions.create_uber_principal(prompts)
 
     assert az_cli_ctx.config.uber_spn_id is not None
-    policy_definition = json.loads(az_cli_ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition)
+    policy_definition = json.loads(
+        az_cli_ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition
+    )
     role_assignments = az_cli_ctx.azure_resource_permissions.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
     global_spn_assignment = None
     for assignment in role_assignments:
@@ -117,7 +119,7 @@ def test_create_global_service_principal_clean_up_after_failure(
     az_cli_ctx,
     make_cluster_policy,
     clean_up_spn,
-):
+) -> None:
     storage_account_resource = AzureResource(env_or_skip("TEST_STORAGE_RESOURCE"))
 
     az_cli_ctx.workspace_client.api_client.do_original = az_cli_ctx.workspace_client.api_client.do
@@ -161,8 +163,8 @@ def test_create_global_service_principal_clean_up_after_failure(
     for key in missing_policy_keys:
         assert key not in policy_definition
 
-    warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config() or []
-    for config_pair in warehouse_config.data_access_config:
+    warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
+    for config_pair in warehouse_config.data_access_config or []:
         for key in missing_policy_keys:
             assert key != config_pair.key, f"Warehouse config still contains policy key: {key}"
 
