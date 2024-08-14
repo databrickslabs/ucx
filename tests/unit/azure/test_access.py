@@ -9,7 +9,12 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
-from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
+from databricks.sdk.service.sql import (
+    GetWorkspaceWarehouseConfigResponse,
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponseSecurityPolicy,
+    SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+)
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -24,6 +29,7 @@ from databricks.labs.ucx.azure.resources import (
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from . import azure_api_client
+from .. import DEFAULT_CONFIG
 
 
 def test_save_spn_permissions_no_external_table(caplog):
@@ -744,7 +750,41 @@ def test_create_global_spn():
             ),
         ],
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
+
+
+@pytest.mark.parametrize(
+    "get_security_policy, set_security_policy",
+    [
+        (
+            GetWorkspaceWarehouseConfigResponseSecurityPolicy.DATA_ACCESS_CONTROL,
+            SetWorkspaceWarehouseConfigRequestSecurityPolicy.DATA_ACCESS_CONTROL,
+        ),
+        (GetWorkspaceWarehouseConfigResponseSecurityPolicy.NONE, SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE),
+    ],
+)
+def test_create_global_spn_set_warehouse_config_security_policy(get_security_policy, set_security_policy):
+    w = create_autospec(WorkspaceClient)
+    w.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        security_policy=get_security_policy
+    )
+    rows = {
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
+        ]
+    }
+    location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
+    installation = MockInstallation(DEFAULT_CONFIG.copy())
+    api_client = azure_api_client()
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission.create_uber_principal(
+        MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+    )
+
+    assert w.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
 def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):
