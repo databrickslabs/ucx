@@ -5,14 +5,11 @@ import os
 import sys
 
 import pytest
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResource, AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResource
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
-    ExternalLocations,
 )
 
 from databricks.sdk.errors.platform import PermissionDenied
