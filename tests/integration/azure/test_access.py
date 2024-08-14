@@ -80,34 +80,28 @@ def clean_up_spn(env_or_skip):
 
 def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy, clean_up_spn) -> None:
     policy = make_cluster_policy()
-    ctx = az_cli_ctx.replace(
-        config_transform=lambda wc: dataclasses.replace(
-            wc,
-            policy_id=policy,
-        ),
-    )
+    az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy))
     tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
-    ctx.sql_backend.save_table(f"{ctx.inventory_database}.external_locations", tables, ExternalLocation)
+    az_cli_ctx.sql_backend.save_table(f"{az_cli_ctx.inventory_database}.external_locations", tables, ExternalLocation)
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    ctx.installation.save(ctx.config)
 
-    ctx.azure_resource_permissions.create_uber_principal(prompts)
+    az_cli_ctx.azure_resource_permissions.create_uber_principal(prompts)
 
-    assert ctx.config.uber_spn_id is not None
-    policy_definition = json.loads(ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition)
-    role_assignments = ctx.azure_resource_permissions.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
+    assert az_cli_ctx.config.uber_spn_id is not None
+    policy_definition = json.loads(az_cli_ctx.workspace_client.cluster_policies.get(policy_id=policy.policy_id).definition)
+    role_assignments = az_cli_ctx.azure_resource_permissions.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
     global_spn_assignment = None
     for assignment in role_assignments:
-        if assignment.principal.client_id == ctx.config.uber_spn_id:
+        if assignment.principal.client_id == az_cli_ctx.config.uber_spn_id:
             global_spn_assignment = assignment
             break
     assert global_spn_assignment
-    assert global_spn_assignment.principal.client_id == ctx.config.uber_spn_id
+    assert global_spn_assignment.principal.client_id == az_cli_ctx.config.uber_spn_id
     assert global_spn_assignment.role_name == "Storage Blob Data Contributor"
     assert str(global_spn_assignment.scope) == env_or_skip("TEST_STORAGE_RESOURCE")
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
-        == ctx.config.uber_spn_id
+        == az_cli_ctx.config.uber_spn_id
     )
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net"][
