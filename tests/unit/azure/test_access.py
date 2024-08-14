@@ -930,6 +930,7 @@ def test_delete_global_service_principal_after_creation(use_backup) -> None:
     w.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[EndpointConfPair(key="foo", value="bar")],
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
 
 
