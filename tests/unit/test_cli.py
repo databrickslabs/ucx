@@ -13,6 +13,7 @@ from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
@@ -140,7 +141,7 @@ def test_skip_with_table(ws):
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER TABLE schema.table SET TBLPROPERTIES('databricks.labs.ucx.skip' = true)",
+        statement="SELECT * FROM hive_metastore.ucx.tables WHERE database='schema' AND name='table' LIMIT 1",
         byte_limit=None,
         catalog=None,
         schema=None,
@@ -216,9 +217,14 @@ def test_validate_external_locations(ws):
 
 
 def test_ensure_assessment_run(ws):
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
+
     ensure_assessment_run(ws)
 
     ws.jobs.list_runs.assert_called_once()
+    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
 def test_ensure_assessment_run_collection(ws, acc_client):
@@ -601,9 +607,13 @@ def test_assign_metastore(acc_client, caplog):
 
 
 def test_migrate_tables(ws):
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
     prompts = MockPrompts({})
     migrate_tables(ws, prompts)
     ws.jobs.run_now.assert_called_with(456)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
 def test_migrate_external_hiveserde_tables_in_place(ws):
@@ -613,6 +623,9 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
 
     prompt = (
         "Found 1 (.*) hiveserde tables, do you want to run the "
@@ -623,6 +636,7 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(789)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
 def test_migrate_external_tables_ctas(ws):
@@ -632,6 +646,9 @@ def test_migrate_external_tables_ctas(ws):
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
 
     prompt = (
         "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
@@ -643,6 +660,7 @@ def test_migrate_external_tables_ctas(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(987)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
 def test_create_missing_principal_aws(ws):

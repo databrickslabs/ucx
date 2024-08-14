@@ -36,10 +36,12 @@ def test_job_problem_as_message():
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     allow_list = KnownList()
+    import_file_resolver = ImportFileResolver(file_loader, allow_list)
     resolver = DependencyResolver(
         PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
+        import_file_resolver,
+        import_file_resolver,
         mock_path_lookup,
     )
     return resolver
@@ -222,7 +224,7 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
     expected_path_instance = expected_cls(ws, expected_path)
 
     registered_notebooks = []
-    for call in dep_graph.register_notebook.call_args_list:
+    for call in dep_graph.register_file.call_args_list:
         registered_notebooks.append(call.args[0])
     assert registered_notebooks == [expected_path_instance]
 
