@@ -650,7 +650,9 @@ def setup_create_uber_principal():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse()
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=[EndpointConfPair(key="foo", value="bar")]
+    )
     rows = {
         "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
@@ -702,7 +704,10 @@ def test_create_global_spn() -> None:
         'policy-backup.json',
         {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
     )
-    installation.assert_file_written('warehouse-config-backup.json', GetWorkspaceWarehouseConfigResponse().as_dict())
+    installation.assert_file_written(
+        'warehouse-config-backup.json',
+        GetWorkspaceWarehouseConfigResponse(data_access_config=[EndpointConfPair(key="foo", value="bar")]).as_dict()
+    )
     calls = [
         call("/v1.0/applications", {"displayName": "UCXServicePrincipal"}),
         call("/v1.0/servicePrincipals", {"appId": "appIduser1"}),
@@ -738,6 +743,7 @@ def test_create_global_spn() -> None:
     w.warehouses.get_workspace_warehouse_config.assert_called_once()
     w.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[
+            EndpointConfPair(key='foo', value='bar'),
             EndpointConfPair(
                 key='spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net', value='appIduser1'
             ),
@@ -918,7 +924,7 @@ def test_delete_global_service_principal_after_creation() -> None:
         'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
     )
     w.warehouses.set_workspace_warehouse_config.assert_called_with(
-        data_access_config=[],
+        data_access_config=[EndpointConfPair(key="foo", value="bar")],
         sql_configuration_parameters=None,
     )
 
