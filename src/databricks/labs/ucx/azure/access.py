@@ -198,7 +198,7 @@ class AzureResourcePermissions:
                     cluster_policy.definition, storage_accounts, uber_principal, inventory_database
                 )
             if cluster_policy.name is not None:
-                self._ws.cluster_policies.edit(policy_id, cluster_policy.name, definition=policy_definition)
+                self._ws.cluster_policies.edit(policy_id, name=cluster_policy.name, definition=policy_definition)
         except NotFound:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
