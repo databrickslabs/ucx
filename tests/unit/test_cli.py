@@ -110,7 +110,7 @@ def ws():
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me().user_name = "foo"
     workspace_client.workspace.download = download
-    workspace_client.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
+    workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
         statement_id='123',
