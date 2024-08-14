@@ -770,7 +770,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
         security_policy=get_security_policy
     )
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
     installation = MockInstallation(DEFAULT_CONFIG.copy())
     api_client = azure_api_client()
