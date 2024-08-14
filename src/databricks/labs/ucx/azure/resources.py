@@ -248,7 +248,7 @@ class AzureAPIClient:
         _query: dict[str, str] = query or {}
         if api_version is not None:
             _query["api-version"] = api_version
-        return self.api_client.do("GET", path, _query, headers)
+        return self.api_client.do("GET", path, query=_query, headers=headers)
 
     def put(self, path: str, api_version: str | None = None, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
@@ -256,15 +256,15 @@ class AzureAPIClient:
         if api_version is not None:
             query["api-version"] = api_version
         if body is not None:
-            return self.api_client.do("PUT", path, query, headers, body)
+            return self.api_client.do("PUT", path, query=query, headers=headers, body=body)
         return None
 
     def post(self, path: str, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if body is not None:
-            return self.api_client.do("POST", path, query, headers, body)
-        return self.api_client.do("POST", path, query, headers)
+            return self.api_client.do("POST", path, query=query, headers=headers, body=body)
+        return self.api_client.do("POST", path, query=query, headers=headers)
 
     def delete(self, path: str, api_version: str | None = None):
         # this method is added only to be used in int test to delete the application once tests pass
@@ -272,7 +272,7 @@ class AzureAPIClient:
         query: dict[str, str] = {}
         if api_version is not None:
             query["api-version"] = api_version
-        return self.api_client.do("DELETE", path, query, headers)
+        return self.api_client.do("DELETE", path, query=query, headers=headers)
 
     def token(self):
         return self._token_source.token()
