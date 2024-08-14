@@ -26,41 +26,25 @@ def skip_if_not_in_debug() -> None:
         pytest.skip("This test can only be run in debug mode")
 
 
-def test_azure_storage_accounts(skip_if_not_in_debug, ws, sql_backend, inventory_schema, make_random):
-    tables = [
-        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
-    ]
-    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
-    location = ExternalLocations(ws, sql_backend, inventory_schema)
-    installation = Installation(ws, make_random(4))
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(azure_mgmt_client, graph_client)
-    az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
-    az_res_perm.save_spn_permissions()
-    mapping = az_res_perm.load()
-    assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
+def test_azure_storage_accounts(skip_if_not_in_debug, env_or_skip, az_cli_ctx) -> None:
+    mount_container = env_or_skip("TEST_MOUNT_CONTAINER")
+    tables = [ExternalLocation(f"{mount_container}/folder1", 1)]
+    az_cli_ctx.sql_backend.save_table(f"{az_cli_ctx.inventory_database}.external_locations", tables, ExternalLocation)
+
+    az_cli_ctx.azure_resource_permissions.save_spn_permissions()
+
+    mapping = az_cli_ctx.azure_resource_permissions.load()
+    assert mapping[0].prefix == mount_container
 
 
-def test_save_spn_permissions_local(skip_if_not_in_debug, ws, sql_backend, inventory_schema, make_random):
-    tables = [
-        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
-    ]
-    sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
-    location = ExternalLocations(ws, sql_backend, inventory_schema)
-    installation = Installation(ws, make_random(4))
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(azure_mgmt_client, graph_client)
-    az_res_perm = AzureResourcePermissions(installation, ws, azure_resources, location)
-    path = az_res_perm.save_spn_permissions()
-    assert ws.workspace.get_status(path)
+def test_save_spn_permissions_local(skip_if_not_in_debug, env_or_skip, az_cli_ctx) -> None:
+    tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
+    az_cli_ctx.sql_backend.save_table(f"{az_cli_ctx.inventory_database}.external_locations", tables, ExternalLocation)
+
+    path = az_cli_ctx.azure_resource_permissions.save_spn_permissions()
+
+    assert path is not None
+    assert az_cli_ctx.workspace_client.workspace.get_status(path)
 
 
 @pytest.fixture
