@@ -41,14 +41,15 @@ from databricks.sdk.service.serving import (
 )
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
+    Dashboard,
+    EndpointTagPair,
+    EndpointTags,
     GetResponse,
     ObjectTypePlural,
     Query,
-    Dashboard,
+    UpdateVisualizationRequestVisualization,
     WidgetOptions,
     WidgetPosition,
-    EndpointTagPair,
-    EndpointTags,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -1358,7 +1359,7 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
     def create() -> Dashboard:
         query = make_query()
-        viz = ws.query_visualizations.create(
+        viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,
             options={
