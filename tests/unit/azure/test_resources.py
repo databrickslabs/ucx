@@ -135,7 +135,7 @@ def test_create_service_principal_no_access():
         azure_resource.create_service_principal("disNameuser1")
 
 
-def test_get_storage_permission_gets_role_assignments_endpoint():
+def test_get_storage_permission_gets_role_assignments_endpoint() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -156,7 +156,7 @@ def test_get_storage_permission_gets_role_assignments_endpoint():
     assert permission.role_name == "Contributor"
 
 
-def test_get_storage_permission_logs_permission_denied(caplog):
+def test_get_storage_permission_logs_permission_denied(caplog) -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -174,7 +174,7 @@ def test_get_storage_permission_logs_permission_denied(caplog):
     assert path in caplog.text
 
 
-def test_get_storage_permission_handles_not_found():
+def test_get_storage_permission_handles_not_found() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -263,7 +263,7 @@ def test_apply_storage_permission_assignment_present():
     api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
-def test_delete_storage_permission():
+def test_delete_storage_permission() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -282,7 +282,7 @@ def test_delete_storage_permission():
     api_client.delete.assert_has_calls(calls)
 
 
-def test_delete_storage_permission_logs_permission_denied_on_get(caplog):
+def test_delete_storage_permission_logs_permission_denied_on_get(caplog) -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -302,7 +302,7 @@ def test_delete_storage_permission_logs_permission_denied_on_get(caplog):
     assert principal_id in caplog.text
 
 
-def test_delete_storage_permission_logs_permission_denied_on_delete(caplog):
+def test_delete_storage_permission_logs_permission_denied_on_delete(caplog) -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -324,7 +324,7 @@ def test_delete_storage_permission_logs_permission_denied_on_delete(caplog):
     assert "rol1, rol2" in str(error.value)
 
 
-def test_delete_storage_permission_raises_not_found_on_get():
+def test_delete_storage_permission_raises_not_found_on_get() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -340,7 +340,7 @@ def test_delete_storage_permission_raises_not_found_on_get():
         azure_resource.delete_storage_permission(principal_id, storage_account)
 
 
-def test_delete_storage_permission_safe_handles_not_found_on_get():
+def test_delete_storage_permission_safe_handles_not_found_on_get() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
@@ -360,7 +360,7 @@ def test_delete_storage_permission_safe_handles_not_found_on_get():
         assert True, "Safe handles NotFound"
 
 
-def test_delete_storage_permission_handles_not_found_on_delete(caplog):
+def test_delete_storage_permission_handles_not_found_on_delete(caplog) -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     storage_account = StorageAccount(
