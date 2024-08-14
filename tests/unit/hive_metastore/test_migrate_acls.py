@@ -1,42 +1,26 @@
-import datetime
 import logging
-from itertools import cycle
 from unittest.mock import create_autospec
 import pytest
-from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import Mount
-from databricks.labs.ucx.hive_metastore.mapping import (
-    Rule,
-    TableMapping,
-    TableToMigrate,
-)
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    TablesMigrator, ACLMigrator,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatusRefresher,
     MigrationIndex,
     MigrationStatus,
-    TableView,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
-    AclMigrationWhat,
-    Table,
     TablesCrawler,
-    What,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
-from .. import GROUPS, mock_table_mapping, mock_workspace_client
+from .. import GROUPS
 from ..workspace_access.test_tacl import UCX_TABLES
 
 logger = logging.getLogger(__name__)
@@ -111,7 +95,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
         "ucx_default.db1_dst.managed_mnt": "hive_metastore.db1_src.managed_mnt",
         "ucx_default.db1_dst.managed_other": "hive_metastore.db1_src.managed_other",
-        "ucx_default.db1_dst.dst_view": "hive_metastore.db1_src.src_view"
+        "ucx_default.db1_dst.dst_view": "hive_metastore.db1_src.src_view",
     }
     acl_migrate.migrate_acls()
     migration_index = create_autospec(MigrationIndex)
@@ -252,8 +236,7 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     }
     acl_migrate.migrate_acls(hms_fed=True)
     migration_index = create_autospec(MigrationIndex)
-    migration_index._index = {
-    }
+    migration_index._index = {}
     migration_index.is_migrated.return_value = True
     migration_status_refresher.index.return_value = migration_index
 
@@ -261,4 +244,3 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
 
     assert "GRANT SELECT ON TABLE hms_fed.db1_src.managed_dbfs TO `account group`" in backend.queries
     assert "GRANT MODIFY ON TABLE hms_fed.db1_src.managed_dbfs TO `account group`" not in backend.queries
-

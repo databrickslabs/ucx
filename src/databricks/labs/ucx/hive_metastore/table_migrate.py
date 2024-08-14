@@ -525,11 +525,14 @@ class ACLMigrator:
         self._migration_status_refresher = migration_status_refresher
         self._principal_grants = principal_grants
 
-    def migrate_acls(self, *,
-                     target_catalog: str | None = None,
-                     legacy_table_acl: bool = True,
-                     principal: bool = True,
-                     hms_fed: bool = False) -> None:
+    def migrate_acls(
+        self,
+        *,
+        target_catalog: str | None = None,
+        legacy_table_acl: bool = True,
+        principal: bool = True,
+        hms_fed: bool = False,
+    ) -> None:
         acl_strategy = []
         if legacy_table_acl:
             acl_strategy.append(AclMigrationWhat.LEGACY_TACL)
@@ -567,7 +570,9 @@ class ACLMigrator:
                     continue
                 dst_table_parts = reverse_seen_tables[table.key].split(".")
                 if len(dst_table_parts) != 3:
-                    logger.warning(f"Invalid table name {reverse_seen_tables[table.key]} found in migration status. Skipping.")
+                    logger.warning(
+                        f"Invalid table name {reverse_seen_tables[table.key]} found in migration status. Skipping."
+                    )
                     continue
                 rule = Rule(
                     self._workspace_name,

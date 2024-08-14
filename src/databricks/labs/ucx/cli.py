@@ -488,8 +488,10 @@ def migrate_acls(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext 
     if ctx is None:
         ctx = WorkspaceContext(w)
     ctx.acl_migrator.migrate_acls(
-        target_catalog=named_parameters.get("targe_catalog"), legacy_table_acl=True, principal=True,
-        hms_fed=named_parameters.get("hms_fed", False)
+        target_catalog=named_parameters.get("targe_catalog"),
+        legacy_table_acl=True,
+        principal=True,
+        hms_fed=named_parameters.get("hms_fed", False),
     )
 
 
