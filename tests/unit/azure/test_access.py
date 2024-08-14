@@ -917,9 +917,9 @@ def test_delete_global_service_principal_after_creation(use_backup) -> None:
 
     azure_resource_permission.create_uber_principal(prompts)
     if not use_backup:
-        installation._overwrites.pop("policy-backup.json")
-        installation._overwrites.pop("warehouse-config-backup.json")
-    azure_resource_permission._delete_uber_principal()
+        installation._overwrites.pop("policy-backup.json")  # pylint: disable=protected-access
+        installation._overwrites.pop("warehouse-config-backup.json")  # pylint: disable=protected-access
+    azure_resource_permission._delete_uber_principal()  # pylint: disable=protected-access
 
     assert installation.load(WorkspaceConfig).uber_spn_id is None
     calls = [
