@@ -650,9 +650,15 @@ def setup_create_uber_principal():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
+    data_access_config_mock = [EndpointConfPair(key="foo", value="bar")]
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
-        data_access_config=[EndpointConfPair(key="foo", value="bar")]
+        data_access_config=data_access_config_mock
     )
+
+    def set_workspace_warehouse_config(data_access_config: list[EndpointConfPair], *_, **__) -> None:
+        global data_access_config_mock
+        data_access_config_mock = data_access_config
+    w.warehouses.set_workspace_warehouse_config.side_effect = set_workspace_warehouse_config
     rows = {
         "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
@@ -906,10 +912,14 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_se
     )
 
 
-def test_delete_global_service_principal_after_creation() -> None:
+@pytest.mark.parametrize("use_backup", [True, False])
+def test_delete_global_service_principal_after_creation(use_backup) -> None:
     w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
 
     azure_resource_permission.create_uber_principal(prompts)
+    if not use_backup:
+        installation._overwrites.pop("policy-backup.json")
+        installation._overwrites.pop("warehouse-config-backup.json")
     azure_resource_permission._delete_uber_principal()
 
     assert installation.load(WorkspaceConfig).uber_spn_id is None
