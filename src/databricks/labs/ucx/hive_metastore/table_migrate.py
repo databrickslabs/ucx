@@ -523,19 +523,20 @@ class ACLMigrator:
         self._ws = ws
         self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
-        self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
-    def migrate_acls(
-        self, target_catalog: str | None = None, legacy_table_acl: bool = True, principal: bool = True
-    ) -> None:
+    def migrate_acls(self, *,
+                     target_catalog: str | None = None,
+                     legacy_table_acl: bool = True,
+                     principal: bool = True,
+                     hms_fed: bool = False) -> None:
         acl_strategy = []
         if legacy_table_acl:
             acl_strategy.append(AclMigrationWhat.LEGACY_TACL)
         if principal:
             acl_strategy.append(AclMigrationWhat.PRINCIPAL)
         if acl_strategy is None:
-            return []
+            return None
         all_grants_to_migrate = self._gc.snapshot()
         all_migrated_groups = self._group.snapshot()
         all_principal_grants = self._principal_grants.get_interactive_cluster_grants()
@@ -544,17 +545,39 @@ class ACLMigrator:
         if not tables:
             logger.info("No tables found to migrate")
             return None
-        for table in tables:
-            rule = Rule(
-                self._workspace_name,
-                target_catalog if target_catalog else self._workspace_name,
-                table.database,
-                table.database,
-                table.name,
-                table.name,
-            )
-            table_to_migrate = TableToMigrate(table, rule)
-            tables_to_migrate.append(table_to_migrate)
+        if hms_fed:
+            # if it is hms_fed acl migration, migrate all the acls for tables in the provided catalog
+            for table in tables:
+                rule = Rule(
+                    self._workspace_name,
+                    target_catalog if target_catalog else self._workspace_name,
+                    table.database,
+                    table.database,
+                    table.name,
+                    table.name,
+                )
+                table_to_migrate = TableToMigrate(table, rule)
+                tables_to_migrate.append(table_to_migrate)
+        else:
+            seen_tables = self._migration_status_refresher.get_seen_tables()
+            for table in tables:
+                if table.key not in seen_tables:
+                    logger.warning(f"Table {table.key} not found in migration status. Skipping.")
+                    continue
+                dst_table_parts = seen_tables[table.key].split(".")
+                if len(dst_table_parts) != 3:
+                    logger.warning(f"Invalid table name {seen_tables[table.key]} found in migration status. Skipping.")
+                    continue
+                rule = Rule(
+                    self._workspace_name,
+                    dst_table_parts[0],
+                    table.database,
+                    dst_table_parts[1],
+                    table.name,
+                    dst_table_parts[2],
+                )
+                table_to_migrate = TableToMigrate(table, rule)
+                tables_to_migrate.append(table_to_migrate)
 
         self._migrate_acls(
             acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants, tables_to_migrate

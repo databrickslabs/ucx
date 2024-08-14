@@ -236,6 +236,10 @@ commands:
   - name: migrate-acls
     description: |
       Migrate ACLs from legacy metastore to UC metastore.
+      - name: target-catalog
+        description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
+      - name: hms-fed
+        description: (Optional) Migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
 
   - name: migrate-dbsql-dashboards
     description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
