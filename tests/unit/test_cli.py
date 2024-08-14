@@ -357,9 +357,16 @@ def test_save_storage_and_principal_gcp(ws):
 def test_migrate_credentials_azure(ws):
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azure_resources = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azure_resources,
+    )
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
+    azure_resources.storage_accounts.assert_called()
 
 
 def test_migrate_credentials_aws(ws):
