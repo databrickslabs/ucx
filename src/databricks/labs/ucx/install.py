@@ -41,6 +41,7 @@ from databricks.sdk.errors import (
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
+    OperationFailed
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
@@ -538,7 +539,7 @@ class WorkspaceInstallation(InstallationMixin):
                     "UCX Uninstall: databricks labs uninstall ucx.\n"
                     "UCX Install: databricks labs install ucx"
                 )
-                raise BadRequest(msg) from err
+                raise OperationFailed(msg) from err
             raise err
 
     def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
