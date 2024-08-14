@@ -256,7 +256,9 @@ class AWSResourcePermissions:
             "value": iam_instance_profile.instance_profile_arn,
         }
 
-        self._ws.cluster_policies.edit(str(policy.policy_id), str(policy.name), definition=json.dumps(definition_dict))
+        self._ws.cluster_policies.edit(
+            str(policy.policy_id), name=str(policy.name), definition=json.dumps(definition_dict)
+        )
 
     def _update_sql_dac_with_instance_profile(self, iam_instance_profile: AWSInstanceProfile, prompts: Prompts):
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
