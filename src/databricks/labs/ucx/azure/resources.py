@@ -472,7 +472,7 @@ class AzureResources:
     ) -> None:
         """See meth:delete_storage_permission"""
         try:
-            storage_permissions = self._get_storage_permissions(principal_id, storage_account)
+            storage_permissions = list(self._get_storage_permissions(principal_id, storage_account))
         except NotFound:
             if safe:
                 return
