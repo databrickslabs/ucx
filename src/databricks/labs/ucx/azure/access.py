@@ -23,7 +23,11 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
-from databricks.sdk.service.sql import EndpointConfPair, GetWorkspaceWarehouseConfigResponse, SetWorkspaceWarehouseConfigRequestSecurityPolicy
+from databricks.sdk.service.sql import (
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponse,
+    SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+)
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.resources import (
