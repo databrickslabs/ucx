@@ -5,7 +5,7 @@ from dataclasses import replace
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import Query, Dashboard, UpdateQueryRequestQuery
+from databricks.sdk.service.sql import Dashboard, LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -52,9 +52,9 @@ class Redash:
             logger.error(f"Cannot list dashboards: {e}")
             return []
 
-    def _fix_query(self, query: Query):
+    def _fix_query(self, query: LegacyQuery):
         assert query.id is not None
-        assert query.query_text is not None
+        assert query.query is not None
         # query already migrated
         if query.tags is not None and self.MIGRATED_TAG in query.tags:
             return
@@ -62,7 +62,7 @@ class Redash:
         self._installation.save(query, filename=f'backup/queries/{query.id}.json')
         from_table = FromTable(self._index, self._get_session_state(query))
         new_query = UpdateQueryRequestQuery(
-            query_text=from_table.apply(query.query_text),
+            query_text=from_table.apply(query.query),
             tags=self._get_migrated_tags(query.tags),
         )
         try:
@@ -72,21 +72,23 @@ class Redash:
                 query=new_query,
             )
         except DatabricksError:
-            logger.warning(f"Cannot upgrade {query.display_name}")
+            logger.warning(f"Cannot upgrade {query.name}")
             return
 
     @staticmethod
-    def _get_session_state(query: Query) -> CurrentSessionState:
+    def _get_session_state(query: LegacyQuery) -> CurrentSessionState:
         session_state = CurrentSessionState()
-        if query.catalog:
-            session_state = replace(session_state, catalog=query.catalog)
-        if query.schema:
-            session_state = replace(session_state, schema=query.schema)
+        if query.options is None:
+            return session_state
+        if query.options.catalog:
+            session_state = replace(session_state, catalog=query.options.catalog)
+        if query.options.schema:
+            session_state = replace(session_state, schema=query.options.schema)
         return session_state
 
-    def _revert_query(self, query: Query):
+    def _revert_query(self, query: LegacyQuery):
         assert query.id is not None
-        assert query.query_text is not None
+        assert query.query is not None
         if query.tags is None:
             return
         # find the backup query
@@ -96,15 +98,17 @@ class Redash:
                 is_migrated = True
 
         if not is_migrated:
-            logger.debug(f"Query {query.display_name} was not migrated by UCX")
+            logger.debug(f"Query {query.name} was not migrated by UCX")
             return
 
-        backup_query = self._installation.load(UpdateQueryRequestQuery, filename=f'backup/queries/{query.id}.json')
-        backup_query.tags = self._get_original_tags(backup_query.tags)
+        backup_query = self._installation.load(LegacyQuery, filename=f'backup/queries/{query.id}.json')
+        update_query = UpdateQueryRequestQuery(
+            query_text=backup_query.query, tags=self._get_original_tags(backup_query.tags)
+        )
         try:
-            self._ws.queries.update(query.id, update_mask="query_text,tags", query=backup_query)
+            self._ws.queries.update(query.id, update_mask="query_text,tags", query=update_query)
         except DatabricksError:
-            logger.warning(f"Cannot restore {query.display_name} from backup")
+            logger.warning(f"Cannot restore {query.name} from backup")
             return
 
     def _get_migrated_tags(self, tags: list[str] | None) -> list[str]:
@@ -119,13 +123,14 @@ class Redash:
         return [tag for tag in tags if tag != self.MIGRATED_TAG]
 
     @staticmethod
-    def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[Query]:
+    def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[LegacyQuery]:
         if dashboard.widgets is None:
             return
         for widget in dashboard.widgets:
+            if widget is None:
+                continue
             if widget.visualization is None:
                 continue
             if widget.visualization.query is None:
                 continue
-            query = Query.from_dict(widget.visualization.query.as_dict())
-            yield query
+            yield widget.visualization.query
