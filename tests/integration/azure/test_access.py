@@ -80,7 +80,7 @@ def clean_up_spn(env_or_skip):
 
 def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy, clean_up_spn) -> None:
     policy = make_cluster_policy()
-    az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy))
+    az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy.policy_id))
     tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
     az_cli_ctx.sql_backend.save_table(f"{az_cli_ctx.inventory_database}.external_locations", tables, ExternalLocation)
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
@@ -132,7 +132,7 @@ def test_create_global_service_principal_clean_up_after_failure(
     az_cli_ctx.workspace_client.api_client.do = do_raise_permission_denied_on_put_warehouse_configuration
 
     policy = make_cluster_policy()
-    az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy))
+    az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy.policy_id))
     tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
     az_cli_ctx.sql_backend.save_table(f"{az_cli_ctx.inventory_database}.external_locations", tables, ExternalLocation)
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
