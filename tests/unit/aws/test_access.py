@@ -281,7 +281,7 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws_resource_permissions.create_uber_principal(prompts)
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
     mock_ws.cluster_policies.edit.assert_called_with(
-        'foo', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     mock_ws.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")],

@@ -709,7 +709,7 @@ def test_create_global_spn():
         },
     }
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
