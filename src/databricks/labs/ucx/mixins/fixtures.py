@@ -47,7 +47,6 @@ from databricks.sdk.service.sql import (
     GetResponse,
     ObjectTypePlural,
     Query,
-    UpdateVisualizationRequestVisualization,
     WidgetOptions,
     WidgetPosition,
 )
