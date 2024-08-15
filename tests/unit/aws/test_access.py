@@ -11,7 +11,12 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import AwsIamRoleResponse, ExternalLocationInfo, StorageCredentialInfo
 from databricks.sdk.service.compute import InstanceProfile, Policy
-from databricks.sdk.service.sql import EndpointConfPair, GetWorkspaceWarehouseConfigResponse
+from databricks.sdk.service.sql import (
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponse,
+    SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+    GetWorkspaceWarehouseConfigResponseSecurityPolicy,
+)
 
 from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -252,6 +257,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
         data_access_config=None,
         instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
 
 
@@ -287,7 +293,41 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
         data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")],
         instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
+
+
+@pytest.mark.parametrize(
+    "get_security_policy, set_security_policy",
+    [
+        (
+            GetWorkspaceWarehouseConfigResponseSecurityPolicy.DATA_ACCESS_CONTROL,
+            SetWorkspaceWarehouseConfigRequestSecurityPolicy.DATA_ACCESS_CONTROL,
+        ),
+        (GetWorkspaceWarehouseConfigResponseSecurityPolicy.NONE, SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE),
+    ],
+)
+def test_create_uber_principal_set_warehouse_config_security_policy(
+    mock_ws, mock_installation, backend, get_security_policy, set_security_policy
+):
+    mock_ws.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        security_policy=get_security_policy
+    )
+
+    instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
+    aws = create_autospec(AWSResources)
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
+
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        aws,
+        ExternalLocations(mock_ws, backend, "ucx"),
+    )
+    aws_resource_permissions.create_uber_principal(MockPrompts({".*": "yes"}))
+
+    assert mock_ws.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
 def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations):
