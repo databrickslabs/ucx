@@ -114,7 +114,7 @@ def test_table_migration_job_publishes_remianed_tables(
         object_type="UNKNOWN",
         table_format="UNKNOWN",
     )
-    installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name,  load_table=lambda *_: table)
+    installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
     installation_ctx.deployed_workflows.run_workflow("migrate-tables")
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
