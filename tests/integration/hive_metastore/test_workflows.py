@@ -1,5 +1,6 @@
 import pytest
 from databricks.sdk.errors import NotFound
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.mark.parametrize(
@@ -106,7 +107,14 @@ def test_table_migration_job_publishes_remianed_tables(
     tables, dst_schema = prepare_tables_for_migration
     installation_ctx.workspace_installation.run()
     second_table = list(tables.values())[1]
-    installation_ctx.table_mapping.skip_table(dst_schema.name, second_table.name)
+    table = Table(
+        "hive_metastore",
+        dst_schema.name,
+        second_table.name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+    )
+    installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name,  load_table=lambda *_: table)
     installation_ctx.deployed_workflows.run_workflow("migrate-tables")
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
