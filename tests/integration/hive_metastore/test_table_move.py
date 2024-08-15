@@ -203,7 +203,7 @@ def test_alias_tables(
 
 def test_move_tables_table_properties_mismatch_preserves_original(
     ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group, make_random, env_or_skip
-):  # pylint: disable=too-many-locals
+):
     table_move = TableMove(ws, sql_backend)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
