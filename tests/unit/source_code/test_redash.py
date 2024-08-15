@@ -3,7 +3,14 @@ from unittest.mock import create_autospec, call
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 
-from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization, QueryOptions
+from databricks.sdk.service.sql import (
+    Query,
+    Dashboard,
+    Widget,
+    QueryOptions,
+    LegacyQuery,
+    LegacyVisualization,
+)
 
 from databricks.labs.ucx.source_code.redash import Redash
 
@@ -21,8 +28,8 @@ def redash_ws():
             id="1",
             widgets=[
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -32,8 +39,8 @@ def redash_ws():
                     )
                 ),
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -49,8 +56,8 @@ def redash_ws():
             tags=[Redash.MIGRATED_TAG],
             widgets=[
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -58,8 +65,12 @@ def redash_ws():
                         )
                     )
                 ),
-                Widget(visualization=Visualization(query=Query(id="2", query="SELECT"))),
-                Widget(visualization=Visualization(query=Query(id="3", query="SELECT", tags=[Redash.MIGRATED_TAG]))),
+                Widget(visualization=LegacyVisualization(query=LegacyQuery(id="2", query="SELECT"))),
+                Widget(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(id="3", query="SELECT", tags=[Redash.MIGRATED_TAG])
+                    )
+                ),
             ],
         ),
         Dashboard(id="3", tags=[]),
@@ -69,8 +80,8 @@ def redash_ws():
         tags=[Redash.MIGRATED_TAG],
         widgets=[
             Widget(
-                visualization=Visualization(
-                    query=Query(
+                visualization=LegacyVisualization(
+                    query=LegacyQuery(
                         id="1",
                         name="test_query",
                         query="SELECT * FROM old.things",
@@ -123,7 +134,7 @@ def test_migrate_all_dashboards_error(redash_ws, empty_index, redash_installatio
 
 
 def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, caplog):
-    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
+    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards("2")
     redash_ws.queries.update.assert_called_with("1", query="original_query", tags=None)
@@ -133,7 +144,7 @@ def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, ca
 
 
 def test_revert_dashboards(redash_ws, empty_index, redash_installation):
-    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
+    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards()
     redash_ws.queries.update.assert_has_calls(
@@ -153,10 +164,10 @@ def test_get_queries_from_dashboard(redash_ws):
         id="1",
         widgets=[
             Widget(),
-            Widget(visualization=Visualization()),
+            Widget(visualization=LegacyVisualization()),
             Widget(
-                visualization=Visualization(
-                    query=Query(
+                visualization=LegacyVisualization(
+                    query=LegacyQuery(
                         id="1",
                         name="test_query",
                         query="SELECT * FROM old.things",

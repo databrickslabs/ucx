@@ -49,6 +49,7 @@ from databricks.sdk.service.sql import (
     WidgetPosition,
     EndpointTagPair,
     EndpointTags,
+    CreateVisualizationRequestVisualization,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -1358,19 +1359,22 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
     def create() -> Dashboard:
         query = make_query()
-        viz = ws.query_visualizations.create(
+        vis_request = CreateVisualizationRequestVisualization(
             type="table",
             query_id=query.id,
-            options={
-                "itemsPerPage": 1,
-                "condensed": True,
-                "withRowNumber": False,
-                "version": 2,
-                "columns": [
-                    {"name": "id", "title": "id", "allowSearch": True},
-                ],
-            },
+            serialized_options=json.dumps(
+                {
+                    "itemsPerPage": 1,
+                    "condensed": True,
+                    "withRowNumber": False,
+                    "version": 2,
+                    "columns": [
+                        {"name": "id", "title": "id", "allowSearch": True},
+                    ],
+                }
+            ),
         )
+        viz = ws.query_visualizations.create(visualization=vis_request)
 
         dashboard_name = f"ucx_D{make_random(4)}"
         dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])

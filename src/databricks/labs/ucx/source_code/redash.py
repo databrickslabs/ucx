@@ -5,7 +5,7 @@ from dataclasses import replace
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import Query, Dashboard
+from databricks.sdk.service.sql import Dashboard, LegacyQuery
 from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -52,7 +52,7 @@ class Redash:
             logger.error(f"Cannot list dashboards: {e}")
             return []
 
-    def _fix_query(self, query: Query):
+    def _fix_query(self, query: LegacyQuery):
         assert query.id is not None
         assert query.query is not None
         # query already migrated
@@ -63,7 +63,7 @@ class Redash:
         from_table = FromTable(self._index, self._get_session_state(query))
         new_query = from_table.apply(query.query)
         try:
-            self._ws.queries.update(
+            self._ws.queries_legacy.update(
                 query.id,
                 query=new_query,
                 tags=self._get_migrated_tags(query.tags),
@@ -73,7 +73,7 @@ class Redash:
             return
 
     @staticmethod
-    def _get_session_state(query: Query) -> CurrentSessionState:
+    def _get_session_state(query: LegacyQuery) -> CurrentSessionState:
         session_state = CurrentSessionState()
         if query.options is None:
             return session_state
@@ -83,7 +83,7 @@ class Redash:
             session_state = replace(session_state, schema=query.options.schema)
         return session_state
 
-    def _revert_query(self, query: Query):
+    def _revert_query(self, query: LegacyQuery):
         assert query.id is not None
         assert query.query is not None
         if query.tags is None:
@@ -98,9 +98,11 @@ class Redash:
             logger.debug(f"Query {query.name} was not migrated by UCX")
             return
 
-        backup_query = self._installation.load(Query, filename=f'backup/queries/{query.id}.json')
+        backup_query = self._installation.load(LegacyQuery, filename=f'backup/queries/{query.id}.json')
         try:
-            self._ws.queries.update(query.id, query=backup_query.query, tags=self._get_original_tags(backup_query.tags))
+            self._ws.queries_legacy.update(
+                query.id, query=backup_query.query, tags=self._get_original_tags(backup_query.tags)
+            )
         except DatabricksError:
             logger.warning(f"Cannot restore {query.name} from backup")
             return
@@ -117,7 +119,7 @@ class Redash:
         return [tag for tag in tags if tag != self.MIGRATED_TAG]
 
     @staticmethod
-    def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[Query]:
+    def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[LegacyQuery]:
         if dashboard.widgets is None:
             return
         for widget in dashboard.widgets:

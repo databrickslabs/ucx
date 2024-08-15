@@ -6,7 +6,7 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
-from databricks.sdk.service.iam import PermissionMigrationResponse
+from databricks.sdk.service.iam import MigratePermissionsResponse
 
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.workflows import (
@@ -48,7 +48,7 @@ def test_migrate_permissions_experimental(run_workflow) -> None:
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
-    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(0)
+    ws.permission_migration.migrate_permissions.return_value = MigratePermissionsResponse(0)
     sql_backend = MockBackend(rows=rows)
 
     run_workflow(PermissionsMigrationAPI.apply_permissions, sql_backend=sql_backend, workspace_client=ws)
@@ -73,7 +73,7 @@ def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
     ws.permission_migration.migrate_permissions.side_effect = [
-        PermissionMigrationResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
+        MigratePermissionsResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
     ]
     sql_backend = MockBackend(rows=rows)
 
@@ -115,15 +115,16 @@ def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
     sql_backend = MockBackend(rows=rows)
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
+
     ws.permission_migration.migrate_permissions.side_effect = [
         # First group: fails immediately.
         DatabricksError("simulate group failure: immediately"),
         # Second group; fails mid-migration.
-        PermissionMigrationResponse(permissions_migrated=10),
+        MigratePermissionsResponse(permissions_migrated=10),
         DatabricksError("simulate group failure: midway"),
         # Third group.
-        PermissionMigrationResponse(permissions_migrated=50),
-        PermissionMigrationResponse(permissions_migrated=0),
+        MigratePermissionsResponse(permissions_migrated=50),
+        MigratePermissionsResponse(permissions_migrated=0),
     ]
 
     with pytest.raises(ManyError) as exc_info, caplog.at_level(logging.INFO):
