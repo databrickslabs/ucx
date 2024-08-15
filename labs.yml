@@ -263,5 +263,3 @@ commands:
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
 
-  - name: create-federated-catalog
-    description: (EXPERIMENTAL) Create a federated catalog in the workspace

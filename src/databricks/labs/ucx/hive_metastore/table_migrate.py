@@ -6,7 +6,6 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -160,7 +159,7 @@ class TablesMigrator:
         acl_strategies: list[AclMigrationWhat],
         all_grants_to_migrate: list[Grant] | None,
         all_migrated_groups: list[MigratedGroup],
-        all_principal_grants: list[Grant]
+        all_principal_grants: list[Grant],
     ):
         if acl_strategies is None:
             acl_strategies = []
