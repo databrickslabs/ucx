@@ -236,6 +236,7 @@ commands:
   - name: migrate-acls
     description: |
       Migrate ACLs from legacy metastore to UC metastore.
+    flags:
       - name: target-catalog
         description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
       - name: hms-fed

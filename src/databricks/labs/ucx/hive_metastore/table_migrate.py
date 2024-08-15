@@ -506,24 +506,21 @@ class TablesMigrator:
 class ACLMigrator:
     def __init__(
         self,
-        table_crawler: TablesCrawler,
+        tables_crawler: TablesCrawler,
         grant_crawler: GrantsCrawler,
-        ws: WorkspaceClient,
         workspace_info: WorkspaceInfo,
         backend: SqlBackend,
         group_manager: GroupManager,
         migration_status_refresher: MigrationStatusRefresher,
-        principal_grants: PrincipalACL,
+        principal_acl: PrincipalACL,
     ):
-        self._tc = table_crawler
+        self._tc = tables_crawler
         self._gc = grant_crawler
         self._backend = backend
         self._workspace_info = workspace_info
-        self._workspace_name = workspace_info.current()
-        self._ws = ws
         self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
-        self._principal_grants = principal_grants
+        self._principal_acl = principal_acl
 
     def migrate_acls(
         self,
@@ -533,16 +530,17 @@ class ACLMigrator:
         principal: bool = True,
         hms_fed: bool = False,
     ) -> None:
-        acl_strategy = []
+        acl_strategies = []
+        workspace_name = self._workspace_info.current()
         if legacy_table_acl:
-            acl_strategy.append(AclMigrationWhat.LEGACY_TACL)
+            acl_strategies.append(AclMigrationWhat.LEGACY_TACL)
         if principal:
-            acl_strategy.append(AclMigrationWhat.PRINCIPAL)
-        if acl_strategy is None:
+            acl_strategies.append(AclMigrationWhat.PRINCIPAL)
+        if acl_strategies is None:
             return None
         all_grants_to_migrate = self._gc.snapshot()
         all_migrated_groups = self._group.snapshot()
-        all_principal_grants = self._principal_grants.get_interactive_cluster_grants()
+        all_principal_grants = self._principal_acl.get_interactive_cluster_grants()
         tables = self._tc.snapshot()
         tables_to_migrate = []
         if not tables:
@@ -552,8 +550,8 @@ class ACLMigrator:
             # if it is hms_fed acl migration, migrate all the acls for tables in the provided catalog
             for table in tables:
                 rule = Rule(
-                    self._workspace_name,
-                    target_catalog if target_catalog else self._workspace_name,
+                    workspace_name,
+                    target_catalog if target_catalog else workspace_name,
                     table.database,
                     table.database,
                     table.name,
@@ -575,7 +573,7 @@ class ACLMigrator:
                     )
                     continue
                 rule = Rule(
-                    self._workspace_name,
+                    workspace_name,
                     dst_table_parts[0],
                     table.database,
                     dst_table_parts[1],
@@ -586,7 +584,11 @@ class ACLMigrator:
                 tables_to_migrate.append(table_to_migrate)
 
         self._migrate_acls(
-            acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants, tables_to_migrate
+            acl_strategies,
+            all_grants_to_migrate,
+            all_migrated_groups,
+            all_principal_grants,
+            tables_to_migrate,
         )
 
     def _migrate_acls(
@@ -600,13 +602,22 @@ class ACLMigrator:
         tasks = []
         for table in tables_in_scope:
             grants = self._compute_grants(
-                table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+                table.src,
+                acl_strategy,
+                all_grants_to_migrate,
+                all_migrated_groups,
+                all_principal_grants,
             )
             tasks.append(partial(self._migrate_acl, table.src, table.rule, grants))
         Threads.strict("migrate grants", tasks)
 
     def _compute_grants(
-        self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+        self,
+        table: Table,
+        acl_strategy,
+        all_grants_to_migrate,
+        all_migrated_groups,
+        all_principal_grants,
     ):
         if acl_strategy is None:
             acl_strategy = []

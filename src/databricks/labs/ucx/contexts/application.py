@@ -256,7 +256,6 @@ class GlobalContext(abc.ABC):
         return ACLMigrator(
             self.tables_crawler,
             self.grants_crawler,
-            self.workspace_client,
             self.workspace_info,
             self.sql_backend,
             self.group_manager,

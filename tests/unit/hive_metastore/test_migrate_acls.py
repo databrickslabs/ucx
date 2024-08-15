@@ -43,7 +43,7 @@ def ws_info():
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
 
-def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
+def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
     # all grants succeed except for one
     errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
     rows = {
@@ -84,7 +84,6 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     acl_migrate = ACLMigrator(
         table_crawler,
         grant_crawler,
-        ws,
         workspace_info,
         backend,
         group_manager,
@@ -186,7 +185,6 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws, ws_info):
     acl_migrate = ACLMigrator(
         table_crawler,
         grant_crawler,
-        ws,
         ws_info,
         backend,
         group_manager,
@@ -224,7 +222,6 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     acl_migrate = ACLMigrator(
         table_crawler,
         grant_crawler,
-        ws,
         workspace_info,
         backend,
         group_manager,

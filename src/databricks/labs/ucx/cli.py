@@ -482,8 +482,7 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 @ucx.command
 def migrate_acls(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None, **named_parameters):
     """
-    Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
-    workflow and migrate-external-tables-ctas.
+    Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
     """
     if ctx is None:
         ctx = WorkspaceContext(w)
