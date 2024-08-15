@@ -434,8 +434,14 @@ class TablesMigrator:
     def is_migrated(self, schema: str, table: str) -> bool:
         return self._migration_status_refresher.is_migrated(schema, table)
 
-    def print_revert_report(self, *, delete_managed: bool) -> bool | None:
-        migrated_count = self._get_revert_count()
+    def print_revert_report(
+        self,
+        *,
+        schema: str | None = None,
+        table: str | None = None,
+        delete_managed: bool,
+    ) -> bool | None:
+        migrated_count = self._get_revert_count(schema=schema, table=table)
         if not migrated_count:
             logger.info("No migrated tables were found.")
             return False
