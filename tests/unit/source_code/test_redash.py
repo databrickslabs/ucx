@@ -119,7 +119,7 @@ def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation):
             'tags': ['test_tag'],
         },
     )
-    redash_ws.queries.update.assert_called_with(
+    redash_ws.queries_legacy.update.assert_called_with(
         "1",
         query='SELECT * FROM old.things',
         tags=[Redash.MIGRATED_TAG, 'test_tag'],
@@ -137,8 +137,8 @@ def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, ca
     redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards("2")
-    redash_ws.queries.update.assert_called_with("1", query="original_query", tags=None)
-    redash_ws.queries.update.side_effect = PermissionDenied("error")
+    redash_ws.queries_legacy.update.assert_called_with("1", query="original_query", tags=None)
+    redash_ws.queries_legacy.update.side_effect = PermissionDenied("error")
     redash.revert_dashboards("2")
     assert "Cannot restore" in caplog.text
 
@@ -147,7 +147,7 @@ def test_revert_dashboards(redash_ws, empty_index, redash_installation):
     redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards()
-    redash_ws.queries.update.assert_has_calls(
+    redash_ws.queries_legacy.update.assert_has_calls(
         [
             call("1", query="original_query", tags=None),
             call("3", query="original_query", tags=["test_tag"]),
