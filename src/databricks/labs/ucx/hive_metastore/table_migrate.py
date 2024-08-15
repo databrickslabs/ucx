@@ -139,6 +139,7 @@ class TablesMigrator:
                 )
             Threads.strict("migrate views", tasks)
             all_tasks.extend(tasks)
+            self.index_full_refresh()
         return all_tasks
 
     def _compute_grants(
@@ -205,7 +206,7 @@ class TablesMigrator:
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
         for table in view.dependencies:
-            if not self.index_full_refresh().get(table.schema, table.name):
+            if not self.index().get(table.schema, table.name):
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True

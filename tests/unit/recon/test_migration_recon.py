@@ -47,7 +47,7 @@ def test_migrate_recon_should_produce_proper_queries(
     tgt_3 = TableIdentifier("catalog3", "schema3", "table3")
     errors = {}
     rows = {
-        'SELECT \\* FROM inventory_database.migration_status': MIGRATION_STATUS[
+        'SELECT \\* FROM hive_metastore.inventory_database.migration_status': MIGRATION_STATUS[
             (src.schema, src.table, tgt.catalog, tgt.schema, tgt.table, "2021-01-01T00:00:00Z"),
             (src_2.schema, src_2.table, tgt_2.catalog, tgt_2.schema, tgt_2.table, "2021-01-01T00:00:00Z"),
             (src_3.schema, src_3.table, tgt_3.catalog, tgt_3.schema, tgt_3.table, "2021-01-01T00:00:00Z"),

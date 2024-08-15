@@ -81,7 +81,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     ctx = WorkspaceContext(w)
     if table:
-        return ctx.table_mapping.skip_table(schema, table)
+        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
 
@@ -99,6 +99,14 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
+def validate_table_locations(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """Validate if the table locations are overlapping in a workspace and across workspaces"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.validate_table_locations()
 
 
 @ucx.command(is_account=True)
