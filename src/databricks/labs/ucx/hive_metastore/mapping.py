@@ -171,15 +171,6 @@ class TableMapping:
 
         return Threads.strict("checking all database properties", tasks)
 
-    def get_tables_to_acl(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
-        tables_to_set = []
-        rules = self.load()
-        crawled_tables_keys = {crawled_table.key: crawled_table for crawled_table in tables_crawler.snapshot()}
-        # Getting all the source tables from the rules
-        for rule in rules:
-            tables_to_set.append(TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
-        return tables_to_set
-
     def _get_databases_in_scope(self, databases: set[str]):
         tasks = []
         for database in databases:
