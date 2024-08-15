@@ -480,7 +480,7 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 
 
 @ucx.command
-def migrate_acls(w: WorkspaceClient,  *, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **named_parameters):
     """
     Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
     """
