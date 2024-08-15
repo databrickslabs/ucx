@@ -63,7 +63,7 @@ class TablesMigrator:
         self.index_full_refresh()
         table_rows = []
         for crawled_table in self._tc.snapshot():
-            if not self.is_migrated(crawled_table.database, crawled_table.name):
+            if not self._is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
         return table_rows
@@ -439,8 +439,7 @@ class TablesMigrator:
         return migration_list
 
     def is_migrated(self, schema: str, table: str) -> bool:
-        index = self._migration_status_refresher.index()
-        return index.is_migrated(schema, table)
+        return self._migration_status_refresher.is_migrated(schema, table)
 
     def print_revert_report(self, *, delete_managed: bool) -> bool | None:
         migrated_count = self._get_revert_count()
@@ -507,6 +506,10 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
+
+    def _is_migrated(self, schema: str, table: str) -> bool:
+        index = self._migration_status_refresher.index()
+        return index.is_migrated(schema, table)
 
 
 class ACLMigrator:
