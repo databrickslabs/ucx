@@ -6,6 +6,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -154,14 +155,19 @@ class TablesMigrator:
         return all_tasks
 
     def _compute_grants(
-        self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+        self,
+        table: Table,
+        acl_strategies: list[AclMigrationWhat],
+        all_grants_to_migrate: list[Grant] | None,
+        all_migrated_groups: list[MigratedGroup],
+        all_principal_grants: list[Grant]
     ):
-        if acl_strategy is None:
-            acl_strategy = []
+        if acl_strategies is None:
+            acl_strategies = []
         grants = []
-        if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+        if AclMigrationWhat.LEGACY_TACL in acl_strategies:
             grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
-        if AclMigrationWhat.PRINCIPAL in acl_strategy:
+        if AclMigrationWhat.PRINCIPAL in acl_strategies:
             grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
         return grants
 
