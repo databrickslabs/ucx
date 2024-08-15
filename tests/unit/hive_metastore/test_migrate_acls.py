@@ -12,7 +12,6 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatusRefresher,
     MigrationIndex,
-    MigrationStatus,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
@@ -97,40 +96,6 @@ def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
         "ucx_default.db1_dst.dst_view": "hive_metastore.db1_src.src_view",
     }
     acl_migrate.migrate_acls()
-    migration_index = create_autospec(MigrationIndex)
-    migration_index._index = {
-        ("db1_src", "managed_dbfs"): MigrationStatus(
-            src_schema="db1_src",
-            src_table="managed_dbfs",
-            dst_catalog="ucx_default",
-            dst_schema="db1_dst",
-            dst_table="managed_dbfs",
-        ),
-        ("db1_src", "managed_mnt"): MigrationStatus(
-            src_schema="db1_src",
-            src_table="managed_mnt",
-            dst_catalog="ucx_default",
-            dst_schema="db1_dst",
-            dst_table="managed_mnt",
-        ),
-        ("db1_src", "view_src"): MigrationStatus(
-            src_schema="db1_src",
-            src_table="src_view",
-            dst_catalog="ucx_default",
-            dst_schema="db1_dst",
-            dst_table="dst_view",
-        ),
-        ("db1_src", "managed_other"): MigrationStatus(
-            src_schema="db1_src",
-            src_table="managed_other",
-            dst_catalog="ucx_default",
-            dst_schema="db1_dst",
-            dst_table="managed_other",
-        ),
-    }
-    migration_index.is_migrated.return_value = True
-    migration_status_refresher.index.return_value = migration_index
-
     principal_grants.get_interactive_cluster_grants.assert_called()
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
@@ -163,15 +128,6 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws, ws_info):
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
-    }
-    migration_index._index = {
-        ("db1_src", "managed_dbfs"): MigrationStatus(
-            src_schema="db1_src",
-            src_table="managed_dbfs",
-            dst_catalog="ucx_default",
-            dst_schema="db1_dst",
-            dst_table="managed_dbfs",
-        ),
     }
     migration_index.is_migrated.return_value = True
     migration_status_refresher.index.return_value = migration_index
@@ -233,7 +189,6 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     }
     acl_migrate.migrate_acls(hms_fed=True)
     migration_index = create_autospec(MigrationIndex)
-    migration_index._index = {}
     migration_index.is_migrated.return_value = True
     migration_status_refresher.index.return_value = migration_index
 
