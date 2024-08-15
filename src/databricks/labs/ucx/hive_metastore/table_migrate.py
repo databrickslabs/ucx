@@ -57,6 +57,15 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
+    def get_remaining_tables(self) -> list[Table]:
+        self.index_full_refresh()
+        table_rows = []
+        for crawled_table in self._tc.snapshot():
+            if not self._is_migrated(crawled_table.database, crawled_table.name):
+                table_rows.append(crawled_table)
+                logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
+        return table_rows
+
     def index(self):
         return self._migration_status_refresher.index()
 
@@ -490,3 +499,7 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
+
+    def _is_migrated(self, schema: str, table: str) -> bool:
+        index = self._migration_status_refresher.index()
+        return index.is_migrated(schema, table)
