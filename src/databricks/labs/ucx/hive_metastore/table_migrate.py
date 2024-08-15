@@ -542,8 +542,6 @@ class ACLMigrator:
             acl_strategies.append(AclMigrationWhat.LEGACY_TACL)
         if principal:
             acl_strategies.append(AclMigrationWhat.PRINCIPAL)
-        if acl_strategies is None:
-            return None
         all_grants_to_migrate = self._gc.snapshot()
         all_migrated_groups = self._group.snapshot()
         all_principal_grants = self._principal_acl.get_interactive_cluster_grants()
