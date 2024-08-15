@@ -480,7 +480,7 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 
 
 @ucx.command
-def migrate_acls(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_acls(w: WorkspaceClient,  *, ctx: WorkspaceContext | None = None, **named_parameters):
     """
     Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
     """
@@ -525,7 +525,6 @@ def lint_local_code(
         ctx = LocalCheckoutContext(w)
     linter: LocalCodeLinter = ctx.local_code_linter
     linter.lint(prompts, None if path is None else Path(path))
-
 
 
 if __name__ == "__main__":
