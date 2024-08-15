@@ -439,7 +439,8 @@ class TablesMigrator:
         return migration_list
 
     def is_migrated(self, schema: str, table: str) -> bool:
-        return self._migration_status_refresher.is_migrated(schema, table)
+        index = self._migration_status_refresher.index()
+        return index.is_migrated(schema, table)
 
     def print_revert_report(self, *, delete_managed: bool) -> bool | None:
         migrated_count = self._get_revert_count()

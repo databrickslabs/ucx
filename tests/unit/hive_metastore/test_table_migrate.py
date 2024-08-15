@@ -1394,6 +1394,7 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         ]
     )
     migration_status_refresher.index.return_value = migration_index
+    migration_status_refresher.is_migrated.side_effect = [True, True, False]
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
