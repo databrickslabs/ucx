@@ -1,4 +1,5 @@
-from unittest.mock import create_autospec
+import logging
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
@@ -134,6 +135,61 @@ def test_create_service_principal_no_access():
         azure_resource.create_service_principal("disNameuser1")
 
 
+def test_get_storage_permission_gets_role_assignments_endpoint() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+
+    permission = azure_resource.get_storage_permission(storage_account, "12345")
+
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
+    api_client.get.assert_any_call(path, "2022-04-01")
+    assert permission is not None
+    assert permission.principal.object_id == "id_system_assigned_mi-123"
+    assert permission.resource == storage_account.id
+    assert permission.scope == storage_account.id
+    assert permission.role_name == "Contributor"
+
+
+def test_get_storage_permission_logs_permission_denied(caplog) -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    api_client.get.side_effect = PermissionDenied("Missing permission")
+
+    with pytest.raises(PermissionDenied), caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+        azure_resource.get_storage_permission(storage_account, "12345")
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
+    assert "Permission denied" in caplog.text
+    assert path in caplog.text
+
+
+def test_get_storage_permission_handles_not_found() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    api_client.get.side_effect = NotFound("Not found")
+
+    permission = azure_resource.get_storage_permission(storage_account, "12345")
+
+    assert permission is None
+
+
 def test_apply_storage_permission():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
@@ -205,6 +261,120 @@ def test_apply_storage_permission_assignment_present():
         }
     }
     api_client.put.assert_called_with(path, "2022-04-01", body)
+
+
+def test_delete_storage_permission() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+
+    azure_resource.delete_storage_permission(principal_id, storage_account)
+
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'{principal_id}'"
+    api_client.get.assert_any_call(path, "2022-04-01")
+    calls = [call("rol1", "2022-04-01"), call("rol2", "2022-04-01")]
+    api_client.delete.assert_has_calls(calls)
+
+
+def test_delete_storage_permission_logs_permission_denied_on_get(caplog) -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.get.side_effect = PermissionDenied("Permission denied")
+
+    with pytest.raises(PermissionDenied), caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+        azure_resource.delete_storage_permission(principal_id, storage_account)
+    path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
+    assert "Permission denied" in caplog.text
+    assert path in caplog.text
+    assert principal_id in caplog.text
+
+
+def test_delete_storage_permission_logs_permission_denied_on_delete(caplog) -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.delete.side_effect = PermissionDenied("Permission denied")
+
+    with (
+        pytest.raises(PermissionDenied) as error,
+        caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"),
+    ):
+        azure_resource.delete_storage_permission(principal_id, storage_account)
+    assert "Permission denied" in caplog.text
+    assert "rol1" in caplog.text
+    assert "rol1, rol2" in str(error.value)
+
+
+def test_delete_storage_permission_raises_not_found_on_get() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.get.side_effect = NotFound("Not found")
+
+    with pytest.raises(NotFound):
+        azure_resource.delete_storage_permission(principal_id, storage_account)
+
+
+def test_delete_storage_permission_safe_handles_not_found_on_get() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.get.side_effect = NotFound("Not found")
+
+    try:
+        azure_resource.delete_storage_permission(principal_id, storage_account, safe=True)
+    except NotFound:
+        assert False, "Should not raise NotFound"
+    else:
+        assert True, "Safe handles NotFound"
+
+
+def test_delete_storage_permission_handles_not_found_on_delete(caplog) -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    storage_account = StorageAccount(
+        id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    principal_id = "principal_id_system_assigned_mi-123"
+    api_client.delete.side_effect = NotFound("Not found")
+
+    with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
+        azure_resource.delete_storage_permission(principal_id, storage_account)
+    assert "Permission denied" not in caplog.text
 
 
 def test_azure_client_api_put_graph():

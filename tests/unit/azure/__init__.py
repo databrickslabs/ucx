@@ -17,9 +17,11 @@ def _load_fixture(filename: str):
 
 def get_az_api_mapping(*args, **_):
     mapping = _load_fixture("azure/mappings.json")[0]
+    if len(args) == 0:
+        return {}
     if args[0] in mapping:
         return mapping[args[0]]
-    if args[1] in mapping:
+    if len(args) >= 2 and args[1] in mapping:
         return mapping[args[1]]
     return {}
 
@@ -30,7 +32,10 @@ def azure_api_client():
     tok = Token(access_token=f"header.{str_token}.sig")
     api_client = create_autospec(AzureAPIClient)
     api_client.token.return_value = tok
-    api_client.get.side_effect = get_az_api_mapping
-    api_client.put.side_effect = get_az_api_mapping
-    api_client.post.side_effect = get_az_api_mapping
+    for method_name in "get", "put", "post":
+        method = getattr(api_client, method_name)
+        method.side_effect = get_az_api_mapping
+        # Set attributes required for `functools.wraps`
+        for attr in "__name__", "__qualname__", "__annotations__", "__type_params__":
+            setattr(method, attr, getattr(get_az_api_mapping, attr, None))
     return api_client

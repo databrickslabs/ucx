@@ -174,7 +174,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[ClusterInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield ClusterInfo(*row)
 
 
@@ -229,5 +229,5 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[PolicyInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield PolicyInfo(*row)

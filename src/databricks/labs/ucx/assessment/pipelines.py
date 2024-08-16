@@ -73,5 +73,5 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[PipelineInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield PipelineInfo(*row)
