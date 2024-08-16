@@ -41,14 +41,14 @@ def ws_info():
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
-expected_grants = [
+expected_statements = [
     "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
     "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
     "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`",
     "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`",
 ]
 
-unexpected_grants = [
+unexpected_statements = [
     "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
     "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`",
     "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
@@ -64,11 +64,7 @@ def assert_grant_statements(backend_queries, check_in, check_not_in):
     for statement in check_not_in:
         assert statement not in backend_queries
 
-
-def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
-    # all grants succeed except for one
-    errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
-    rows = {
+test_produce_proper_queries_rows = {
         'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
             ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
             ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
@@ -94,6 +90,12 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
             ("hive_metastore", "db1_src", "view_src", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
         ],
     }
+
+
+def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
+    # all grants succeed except for one
+    errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
+    rows = test_produce_proper_queries_rows
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
@@ -121,7 +123,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     acl_migrate.migrate_acls()
     principal_grants.get_interactive_cluster_grants.assert_called()
 
-    assert_grant_statements(backend.queries, expected_grants, unexpected_grants)
+    assert_grant_statements(backend.queries, expected_statements, unexpected_statements)
 
     assert "Cannot identify UC grant" in caplog.text
 
