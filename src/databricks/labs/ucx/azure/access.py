@@ -281,7 +281,7 @@ class AzureResourcePermissions:
                 storage_accounts,
             )
         if policy.name is not None:
-            self._ws.cluster_policies.edit(policy_id, policy.name, definition=policy_definition)
+            self._ws.cluster_policies.edit(policy_id, name=policy.name, definition=policy_definition)
 
     def _create_storage_account_data_access_configuration_pairs(
         self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
