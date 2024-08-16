@@ -342,6 +342,15 @@ class AWSResources:
         account_id: str,
         kms_key=None,
     ) -> bool:
+        """
+        Create a policy for the given role with the given S3 prefixes, account ID, and KMS key.
+        Args:
+            role_name: the name of the role
+            policy_name: the name of the policy
+            s3_prefixes: s3 prefixes to allow access to
+            account_id: AWS account ID
+            kms_key: (optional) KMS key to be used
+        """
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
             f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"

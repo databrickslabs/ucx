@@ -361,6 +361,32 @@ class AWSResourcePermissions:
         except PermissionError:
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
 
+    def delete_uber_principal(self, prompts: Prompts, *, principal_name:str|None = None):
+        config = self._installation.load(WorkspaceConfig)
+        cluster_policy = self._get_cluster_policy(config.policy_id)
+        iam_role_name_in_cluster_policy = self.get_iam_role_from_cluster_policy(str(cluster_policy.definition))
+
+        if not iam_role_name_in_cluster_policy:
+            logger.info("No UCX migration role found in cluster policy")
+            return
+
+        if not prompts.confirm(
+            f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
+            f"in cluster policy \"{cluster_policy.name}\". "
+            f"Do you want to delete the role and update the cluster policy?"
+        ):
+            return
+
+        self._aws_resources.delete_role(iam_role_name_in_cluster_policy)
+        self._aws_resources.delete_instance_profile(iam_role_name_in_cluster_policy, iam_role_name_in_cluster_policy)
+        self._update_cluster_policy_with_instance_profile(cluster_policy, None)
+        self._update_sql_dac_with_instance_profile(None, prompts)
+        config.uber_instance_profile = None
+        self._installation.save(config)
+        logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
+        return
+
+
     def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
         if single_role:
             metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
