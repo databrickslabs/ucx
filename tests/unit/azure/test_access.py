@@ -736,7 +736,7 @@ def test_create_global_spn() -> None:
         },
     }
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
@@ -902,7 +902,7 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_se
     w.api_client.delete.assert_has_calls(calls)
     w.secrets.delete_scope.assert_called_with("ucx")
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
     )
 
 
@@ -925,7 +925,7 @@ def test_delete_global_service_principal_after_creation(use_backup) -> None:
     w.api_client.delete.assert_has_calls(calls)
     w.secrets.delete_scope.assert_called_with("ucx")
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
     )
     w.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[EndpointConfPair(key="foo", value="bar")],

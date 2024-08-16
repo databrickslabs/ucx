@@ -379,17 +379,18 @@ class TablesMigrator:
     def _get_tables_to_revert(self, schema: str | None = None, table: str | None = None) -> list[Table]:
         schema = schema.lower() if schema else None
         table = table.lower() if table else None
+        reverse_seen = {v: k for (k, v) in self._seen_tables.items()}
         migrated_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
-
         for cur_table in self._tc.snapshot():
             if schema and cur_table.database != schema:
                 continue
             if table and cur_table.name != table:
                 continue
-            if cur_table.key in self._seen_tables.values():
-                migrated_tables.append(cur_table)
+            if cur_table.key in reverse_seen:
+                updated_table = dataclasses.replace(cur_table, upgraded_to=reverse_seen[cur_table.key])
+                migrated_tables.append(updated_table)
         return migrated_tables
 
     def revert_migrated_tables(
@@ -423,7 +424,6 @@ class TablesMigrator:
     def _get_revert_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
         self._init_seen_tables()
         migrated_tables = self._get_tables_to_revert(schema=schema, table=table)
-
         table_by_database = defaultdict(list)
         for cur_table in migrated_tables:
             table_by_database[cur_table.database].append(cur_table)
@@ -441,8 +441,14 @@ class TablesMigrator:
     def is_migrated(self, schema: str, table: str) -> bool:
         return self._migration_status_refresher.is_migrated(schema, table)
 
-    def print_revert_report(self, *, delete_managed: bool) -> bool | None:
-        migrated_count = self._get_revert_count()
+    def print_revert_report(
+        self,
+        *,
+        schema: str | None = None,
+        table: str | None = None,
+        delete_managed: bool,
+    ) -> bool | None:
+        migrated_count = self._get_revert_count(schema=schema, table=table)
         if not migrated_count:
             logger.info("No migrated tables were found.")
             return False

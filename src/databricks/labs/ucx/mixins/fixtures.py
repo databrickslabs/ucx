@@ -41,14 +41,14 @@ from databricks.sdk.service.serving import (
 )
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
-    GetResponse,
-    ObjectTypePlural,
-    Query,
     Dashboard,
-    WidgetOptions,
-    WidgetPosition,
     EndpointTagPair,
     EndpointTags,
+    GetResponse,
+    ObjectTypePlural,
+    WidgetOptions,
+    WidgetPosition,
+    LegacyQuery,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -686,7 +686,7 @@ def migrated_group(acc, ws, make_group, make_acc_group):
     """Create a pair of groups in workspace and account. Assign account group to workspace."""
     ws_group = make_group()
     acc_group = make_acc_group()
-    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
     return MigratedGroup.partial_info(ws_group, acc_group)
 
 
@@ -701,7 +701,7 @@ def make_cluster_policy(ws, make_random):
                     "spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"},
                 }
             )
-        cluster_policy = ws.cluster_policies.create(name, **kwargs)
+        cluster_policy = ws.cluster_policies.create(name=name, **kwargs)
         logger.info(
             f"Cluster policy: {ws.config.host}#setting/clusters/cluster-policies/view/{cluster_policy.policy_id}"
         )
@@ -1189,11 +1189,11 @@ def make_udf(
 
 
 @pytest.fixture
-def make_query(ws, make_table, make_random) -> Generator[Query, None, None]:
-    def create() -> Query:
+def make_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
+    def create() -> LegacyQuery:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
-        query = ws.queries.create(
+        query = ws.queries_legacy.create(
             name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
@@ -1202,9 +1202,9 @@ def make_query(ws, make_table, make_random) -> Generator[Query, None, None]:
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
 
-    def remove(query: Query):
+    def remove(query: LegacyQuery):
         try:
-            ws.queries.delete(query_id=query.id)
+            ws.queries_legacy.delete(query_id=query.id)
         except RuntimeError as e:
             logger.info(f"Can't drop query {e}")
 
@@ -1358,7 +1358,7 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
     def create() -> Dashboard:
         query = make_query()
-        viz = ws.query_visualizations.create(
+        viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,
             options={

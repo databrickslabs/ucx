@@ -198,8 +198,8 @@ def validate_groups_membership(w: WorkspaceClient):
 def revert_migrated_tables(
     w: WorkspaceClient,
     prompts: Prompts,
-    schema: str,
-    table: str,
+    schema: str | None = None,
+    table: str | None = None,
     *,
     delete_managed: bool = False,
     ctx: WorkspaceContext | None = None,
@@ -211,9 +211,9 @@ def revert_migrated_tables(
             return
     if not ctx:
         ctx = WorkspaceContext(w)
-    revert = ctx.tables_migrator.print_revert_report(delete_managed=delete_managed)
+    revert = ctx.tables_migrator.print_revert_report(schema=schema, table=table, delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        ctx.tables_migrator.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        ctx.tables_migrator.revert_migrated_tables(schema=schema, table=table, delete_managed=delete_managed)
 
 
 @ucx.command
