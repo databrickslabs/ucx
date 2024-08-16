@@ -523,11 +523,11 @@ class ACLMigrator:
         migration_status_refresher: MigrationStatusRefresher,
         principal_acl: PrincipalACL,
     ):
-        self._tc = tables_crawler
-        self._gc = grant_crawler
+        self._table_crawler = tables_crawler
+        self._grant_crawler = grant_crawler
         self._backend = backend
         self._workspace_info = workspace_info
-        self._group = group_manager
+        self._group_manager = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._principal_acl = principal_acl
 
@@ -545,10 +545,10 @@ class ACLMigrator:
             acl_strategies.append(AclMigrationWhat.LEGACY_TACL)
         if principal:
             acl_strategies.append(AclMigrationWhat.PRINCIPAL)
-        all_grants_to_migrate = self._gc.snapshot()
-        all_migrated_groups = self._group.snapshot()
+        all_grants_to_migrate = self._grant_crawler.snapshot()
+        all_migrated_groups = self._group_manager.snapshot()
         all_principal_grants = self._principal_acl.get_interactive_cluster_grants()
-        tables = self._tc.snapshot()
+        tables = self._table_crawler.snapshot()
 
         if not tables:
             logger.info("No tables found to acl")
@@ -566,10 +566,7 @@ class ACLMigrator:
             tables_to_migrate,
         )
 
-    def _get_migrated_tables(
-        self,
-        tables: list[Table],
-    ):
+    def _get_migrated_tables(self, tables: list[Table]) -> list[TableToMigrate]:
         # gets all the migrated table to apply ACLs to
         tables_to_migrate = []
         seen_tables = self._migration_status_refresher.get_seen_tables()
@@ -596,7 +593,7 @@ class ACLMigrator:
             tables_to_migrate.append(table_to_migrate)
         return tables_to_migrate
 
-    def _get_hms_fed_tables(self, tables: list[Table], target_catalog):
+    def _get_hms_fed_tables(self, tables: list[Table], target_catalog) -> list[TableToMigrate]:
         # if it is hms_fed acl migration, migrate all the acls for tables in the provided catalog
         tables_to_migrate = []
         for table in tables:

@@ -34,6 +34,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.workspace_access.groups import GroupManager
+from .test_migrate_acls import assert_grant_statements, expected_grants, unexpected_grants
 
 from .. import GROUPS, mock_table_mapping, mock_workspace_client
 
@@ -1053,16 +1054,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
 
     principal_grants.get_interactive_cluster_grants.assert_called()
 
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
-    assert "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`" not in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" not in backend.queries
-    assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`" in backend.queries
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
-    assert "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`" in backend.queries
-    assert "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`" not in backend.queries
+    assert_grant_statements(backend.queries, expected_grants, unexpected_grants)
 
     assert "Cannot identify UC grant" in caplog.text
     assert (
@@ -1394,7 +1386,6 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         ]
     )
     migration_status_refresher.index.return_value = migration_index
-    migration_status_refresher.is_migrated.side_effect = [True, True, False]
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,

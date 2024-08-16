@@ -34,15 +34,38 @@ def ws():
 
 @pytest.fixture
 def ws_info():
-    client = create_autospec(WorkspaceInfo)
-    client.current.return_value = "hms_fed"
-    return client
+    info = create_autospec(WorkspaceInfo)
+    info.current.return_value = "hms_fed"
+    return info
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
+expected_grants = [
+    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
+    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
+    "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`",
+    "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`",
+]
 
-def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
+unexpected_grants = [
+    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
+    "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`",
+    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
+    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_other TO `account group`",
+    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_other TO `account group`",
+    "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`",
+]
+
+
+def assert_grant_statements(backend_queries, check_in, check_not_in):
+    for statement in check_in:
+        assert statement in backend_queries
+    for statement in check_not_in:
+        assert statement not in backend_queries
+
+
+def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     # all grants succeed except for one
     errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
     rows = {
@@ -51,8 +74,8 @@ def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
             ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
             ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
             ("workspace_group", "INVALID", "", "db1_src", "managed_other", ""),
-            ("workspace_group", "SELECT", "", "db1_src", "src_view", ""),
-            ("workspace_group", "SELECT", "", "db1_random", "src_view", ""),
+            ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
+            ("workspace_group", "SELECT", "", "db1_random", "view_src", ""),
         ],
         r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
         'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
@@ -68,7 +91,7 @@ def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
             ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
             ("hive_metastore", "db1_src", "managed_mnt", "table", "DELTA", "/foo/bar/test", None),
             ("hive_metastore", "db1_src", "managed_other", "table", "DELTA", "/foo/bar/test", None),
-            ("hive_metastore", "db1_src", "src_view", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
+            ("hive_metastore", "db1_src", "view_src", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -93,21 +116,12 @@ def test_migrate_acls_should_produce_proper_queries(ws_info, caplog):
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
         "ucx_default.db1_dst.managed_mnt": "hive_metastore.db1_src.managed_mnt",
         "ucx_default.db1_dst.managed_other": "hive_metastore.db1_src.managed_other",
-        "ucx_default.db1_dst.dst_view": "hive_metastore.db1_src.src_view",
+        "ucx_default.db1_dst.view_dst": "hive_metastore.db1_src.view_src",
     }
     acl_migrate.migrate_acls()
     principal_grants.get_interactive_cluster_grants.assert_called()
 
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
-    assert "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`" not in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" not in backend.queries
-    assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`" in backend.queries
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
-    assert "GRANT SELECT ON VIEW ucx_default.db1_dst.dst_view TO `account group`" in backend.queries
-    assert "GRANT MODIFY ON VIEW ucx_default.db1_dst.dst_view TO `account group`" not in backend.queries
+    assert_grant_statements(backend.queries, expected_grants, unexpected_grants)
 
     assert "Cannot identify UC grant" in caplog.text
 
