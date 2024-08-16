@@ -64,32 +64,33 @@ def assert_grant_statements(backend_queries, check_in, check_not_in):
     for statement in check_not_in:
         assert statement not in backend_queries
 
+
 test_produce_proper_queries_rows = {
-        'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
-            ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
-            ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
-            ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
-            ("workspace_group", "INVALID", "", "db1_src", "managed_other", ""),
-            ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
-            ("workspace_group", "SELECT", "", "db1_random", "view_src", ""),
-        ],
-        r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
-        'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
-            ("11", "workspace_group", "account group", "temp", "", "", "", ""),
-        ],
-        "SHOW CREATE TABLE": [
-            {
-                "createtab_stmt": "CREATE OR REPLACE VIEW "
-                "hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
-            }
-        ],
-        'SELECT \\* FROM hive_metastore.inventory_database.tables': UCX_TABLES[
-            ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
-            ("hive_metastore", "db1_src", "managed_mnt", "table", "DELTA", "/foo/bar/test", None),
-            ("hive_metastore", "db1_src", "managed_other", "table", "DELTA", "/foo/bar/test", None),
-            ("hive_metastore", "db1_src", "view_src", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
-        ],
-    }
+    'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
+        ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
+        ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
+        ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
+        ("workspace_group", "INVALID", "", "db1_src", "managed_other", ""),
+        ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
+        ("workspace_group", "SELECT", "", "db1_random", "view_src", ""),
+    ],
+    r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
+    'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
+        ("11", "workspace_group", "account group", "temp", "", "", "", ""),
+    ],
+    "SHOW CREATE TABLE": [
+        {
+            "createtab_stmt": "CREATE OR REPLACE VIEW "
+            "hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
+        }
+    ],
+    'SELECT \\* FROM hive_metastore.inventory_database.tables': UCX_TABLES[
+        ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
+        ("hive_metastore", "db1_src", "managed_mnt", "table", "DELTA", "/foo/bar/test", None),
+        ("hive_metastore", "db1_src", "managed_other", "table", "DELTA", "/foo/bar/test", None),
+        ("hive_metastore", "db1_src", "view_src", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
+    ],
+}
 
 
 def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):

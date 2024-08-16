@@ -34,10 +34,14 @@ from databricks.labs.ucx.hive_metastore.tables import (
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.workspace_access.groups import GroupManager
-from .test_migrate_acls import assert_grant_statements, expected_statements, unexpected_statements, \
-    test_produce_proper_queries_rows
+from .test_migrate_acls import (
+    assert_grant_statements,
+    expected_statements,
+    unexpected_statements,
+    test_produce_proper_queries_rows,
+)
 
-from .. import GROUPS, mock_table_mapping, mock_workspace_client
+from .. import mock_table_mapping, mock_workspace_client
 
 
 logger = logging.getLogger(__name__)
