@@ -1,7 +1,8 @@
 import logging
 from datetime import timedelta
 
-from databricks.sdk.errors import NotFound
+import pytest
+from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
@@ -198,3 +199,31 @@ def test_alias_tables(
     assert table_2_grant.privilege_assignments == expected_table_2_grant
     assert table_3_grant.privilege_assignments == expected_table_3_grant
     assert view_1_grant.privilege_assignments == expected_view_1_grant
+
+
+def test_move_tables_table_properties_mismatch_preserves_original(
+    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group, make_random, env_or_skip
+):
+    table_move = TableMove(ws, sql_backend)
+    from_catalog = make_catalog()
+    from_schema = make_schema(catalog_name=from_catalog.name)
+    tbl_path = make_random(4).lower()
+    tbl_properties = {"delta.enableDeletionVectors": "true"}
+    from_table_1 = make_table(
+        catalog_name=from_catalog.name,
+        schema_name=from_schema.name,
+        external_delta=f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}",
+        tbl_properties=tbl_properties,
+    )
+    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
+    from_table_1.storage_location = table_in_mount_location
+
+    to_catalog = make_catalog()
+    to_schema = make_schema(catalog_name=to_catalog.name)
+
+    with pytest.raises(BadRequest):
+        table_move.move(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, del_table=False)
+
+    fetch_original_table = ws.tables.list(catalog_name=from_catalog.name, schema_name=from_schema.name)
+    for table in fetch_original_table:
+        assert table.name == from_table_1.name
