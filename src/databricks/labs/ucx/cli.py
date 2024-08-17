@@ -310,12 +310,14 @@ def principal_prefix_access(
     if w.config.is_azure:
         for workspace_ctx in workspaces_context:
             workspace_ctx.azure_resource_permissions.save_spn_permissions()
+        return
     if w.config.is_aws:
         for workspace_ctx in workspaces_context:
             instance_role_path = workspace_ctx.aws_resource_permissions.save_instance_profile_permissions()
             logger.info(f"Instance profile and bucket info saved {instance_role_path}")
             logger.info("Generating UC roles and bucket permission info")
             workspace_ctx.aws_resource_permissions.save_uc_compatible_roles()
+        return
     raise ValueError("Unsupported cloud provider")
 
 
