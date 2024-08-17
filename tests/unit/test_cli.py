@@ -331,7 +331,7 @@ def test_save_storage_and_principal_azure(ws, caplog, acc_client):
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
     ws.config.is_azure = True
     ws.config.is_aws = False
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_resource_permissions=azure_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(azure_resource_permissions=azure_resource_permissions)
     principal_prefix_access(ws, ctx, False, a=acc_client)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
@@ -341,10 +341,12 @@ def test_validate_groups_membership(ws):
     ws.groups.list.assert_called()
 
 
-def test_save_storage_and_principal_aws(ws):
+def test_save_storage_and_principal_aws(ws, acc_client):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
-    principal_prefix_access(ws, ctx=ctx)
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ctx = WorkspaceContext(ws).replace(aws_resource_permissions=aws_resource_permissions)
+    principal_prefix_access(ws, ctx=ctx, a=acc_client)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
