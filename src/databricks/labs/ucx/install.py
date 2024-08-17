@@ -41,6 +41,7 @@ from databricks.sdk.errors import (
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
+    OperationFailed,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
@@ -529,6 +530,16 @@ class WorkspaceInstallation(InstallationMixin):
                     "UCX Install: databricks labs install ucx"
                 )
                 raise BadRequest(msg) from err
+            if "Unable to load AWS credentials from any provider in the chain" in str(err):
+                msg = (
+                    "The UCX installation is configured to use external metastore. There is issue with the external metastore connectivity.\n"
+                    "Please check the UCX installation instruction https://github.com/databrickslabs/ucx?tab=readme-ov-file#prerequisites"
+                    "and re-run installation.\n"
+                    "Please Follow the Below Command to uninstall and Install UCX\n"
+                    "UCX Uninstall: databricks labs uninstall ucx.\n"
+                    "UCX Install: databricks labs install ucx"
+                )
+                raise OperationFailed(msg) from err
             raise err
 
     def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
