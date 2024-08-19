@@ -480,6 +480,21 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 
 
 @ucx.command
+def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **named_parameters):
+    """
+    Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
+    """
+    if ctx is None:
+        ctx = WorkspaceContext(w)
+    ctx.acl_migrator.migrate_acls(
+        target_catalog=named_parameters.get("target_catalog"),
+        legacy_table_acl=True,
+        principal=True,
+        hms_fed=named_parameters.get("hms_fed", False),
+    )
+
+
+@ucx.command
 def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Migrate table references in DBSQL Dashboard queries"""
     ctx = WorkspaceContext(w)
