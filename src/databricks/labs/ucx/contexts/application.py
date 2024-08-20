@@ -37,6 +37,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -245,6 +246,18 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.sql_backend,
             self.table_mapping,
+            self.group_manager,
+            self.migration_status_refresher,
+            self.principal_acl,
+        )
+
+    @cached_property
+    def acl_migrator(self):
+        return ACLMigrator(
+            self.tables_crawler,
+            self.grants_crawler,
+            self.workspace_info,
+            self.sql_backend,
             self.group_manager,
             self.migration_status_refresher,
             self.principal_acl,

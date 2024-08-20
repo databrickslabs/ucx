@@ -233,6 +233,15 @@ commands:
       Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental
       workflow and migrate-external-tables-ctas workflow.
 
+  - name: migrate-acls
+    description: |
+      Migrate ACLs from legacy metastore to UC metastore.
+    flags:
+      - name: target-catalog
+        description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
+      - name: hms-fed
+        description: (Optional) Migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
+
   - name: migrate-dbsql-dashboards
     description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
     flags:
@@ -253,3 +262,4 @@ commands:
         description: workspace_ids which should join a collection. provide a comma separated list of workspace ids.
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
+
