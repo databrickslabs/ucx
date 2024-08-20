@@ -162,10 +162,10 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
     if not a:
         a = AccountClient(product='ucx', product_version=__version__)
     account_installer = AccountInstaller(a)
-    workspaces_context = account_installer.get_workspace_contexts(w, run_as_collection)
+    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection)
     # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
     skip_job_status = bool(run_as_collection)
-    for ctx in workspaces_context:
+    for ctx in workspace_contexts:
         logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
         deployed_workflows = ctx.deployed_workflows
         if not deployed_workflows.validate_step("assessment"):
@@ -304,15 +304,15 @@ def principal_prefix_access(
     if not a:
         a = AccountClient(product='ucx', product_version=__version__)
     account_installer = AccountInstaller(a)
-    workspaces_context = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
+    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
     if ctx:
-        workspaces_context = [ctx]
+        workspace_contexts = [ctx]
     if w.config.is_azure:
-        for workspace_ctx in workspaces_context:
+        for workspace_ctx in workspace_contexts:
             workspace_ctx.azure_resource_permissions.save_spn_permissions()
         return
     if w.config.is_aws:
-        for workspace_ctx in workspaces_context:
+        for workspace_ctx in workspace_contexts:
             instance_role_path = workspace_ctx.aws_resource_permissions.save_instance_profile_permissions()
             logger.info(f"Instance profile and bucket info saved {instance_role_path}")
             logger.info("Generating UC roles and bucket permission info")
