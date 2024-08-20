@@ -309,10 +309,12 @@ def principal_prefix_access(
         workspace_contexts = [ctx]
     if w.config.is_azure:
         for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
             workspace_ctx.azure_resource_permissions.save_spn_permissions()
         return
     if w.config.is_aws:
         for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
             instance_role_path = workspace_ctx.aws_resource_permissions.save_instance_profile_permissions()
             logger.info(f"Instance profile and bucket info saved {instance_role_path}")
             logger.info("Generating UC roles and bucket permission info")
