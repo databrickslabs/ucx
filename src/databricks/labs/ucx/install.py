@@ -775,13 +775,18 @@ class AccountInstaller(AccountContext):
     def get_workspace_contexts(
         self, ws: WorkspaceClient, run_as_collection: bool, **named_parameters
     ) -> list[WorkspaceContext]:
+
         if not run_as_collection:
             return [WorkspaceContext(ws, named_parameters)]
         other_workspace_id = ws.get_workspace_id()
         workspace_contexts = []
+        print(other_workspace_id)
         account_client = self._get_safe_account_client()
         acct_ctx = AccountContext(account_client)
-        collection_workspace = account_client.workspaces.get(other_workspace_id)
+        print("test")
+        print("sdsd")
+        collection_workspace = account_client.workspaces.get(workspace_id=other_workspace_id)
+        print('enter')
         if not acct_ctx.account_workspaces.can_administer(collection_workspace):
             logger.error(f"User is not workspace admin of collection workspace {other_workspace_id}")
             return []
