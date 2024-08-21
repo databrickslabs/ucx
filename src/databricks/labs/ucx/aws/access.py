@@ -61,6 +61,8 @@ class AWSResourcePermissions:
         """
         roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
+        if len(missing_paths) == 0:
+            return []
         s3_buckets = set()
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_BUCKET, missing_path)
@@ -192,10 +194,9 @@ class AWSResourcePermissions:
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
-            path = PurePath(external_location.location)
             matching_role = False
             for role in compatible_roles:
-                if path.match(role.resource_path):
+                if external_location.location.startswith(role.resource_path):
                     matching_role = True
                     continue
             if matching_role:
