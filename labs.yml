@@ -132,6 +132,8 @@ commands:
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: create-missing-principals
     description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and
