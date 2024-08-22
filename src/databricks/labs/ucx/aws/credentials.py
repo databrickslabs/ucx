@@ -212,6 +212,7 @@ class IamRoleCreation:
 
     def run(self, prompts: Prompts, *, single_role=False, role_name="UC_ROLE", policy_name="UC_POLICY"):
 
+        role_name = self._generate_role_name(role_name)
         iam_list = self._resource_permissions.list_uc_roles(
             single_role=single_role,
             role_name=role_name,
@@ -230,3 +231,7 @@ class IamRoleCreation:
 
         self._resource_permissions.create_uc_roles(iam_list)
         self._resource_permissions.save_uc_compatible_roles()
+
+    def _generate_role_name(self, role_name: str, rand: str) -> str:
+        return f"{role_name}_{self._ws.metastore['metastore_id']}"
+
