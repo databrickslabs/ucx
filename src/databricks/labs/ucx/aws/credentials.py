@@ -233,5 +233,5 @@ class IamRoleCreation:
         self._resource_permissions.save_uc_compatible_roles()
 
     def _generate_role_name(self, role_name: str) -> str:
-        metastore_id = self._ws.metastores.current().metastore_id
-        return f"{role_name}_{self._ws.metastores.get(metastore_id).name}"
+        metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
+        return f"{role_name}_{metastore_id}"
