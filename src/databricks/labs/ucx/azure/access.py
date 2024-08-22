@@ -419,6 +419,49 @@ class AzureResourcePermissions:
             self._delete_uber_principal()  # Clean up dangling resources
             raise
 
+    def _delete_access_connectors(self) -> None:
+
+        def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
+            @wraps(function)
+            def wrapper(*args: Any, **kwargs: Any) -> R | None:
+                try:
+                    return function(*args, **kwargs)
+                except PermissionDenied:
+                    logger.error(message, exc_info=True)
+                    return None
+
+            return wrapper
+
+        message = "Missing permissions to load the configuration"
+        config = log_permission_denied(self._installation.load, message=message)(WorkspaceConfig)
+        if config is None or config.uber_spn_id is None:
+            return
+
+        secret_identifier = f"secrets/{config.inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
+        storage_accounts = self._get_storage_accounts()
+
+        storage_account_ids = ' '.join(str(st.id) for st in storage_accounts)
+        message = f"Missing permissions to delete storage permissions for: {storage_account_ids}"
+        log_permission_denied(self._azurerm.delete_storage_permission, message=message)(
+            config.uber_spn_id, *storage_accounts, safe=True
+        )
+        message = f"Missing permissions to delete service principal: {config.uber_spn_id}"
+        log_permission_denied(self._azurerm.delete_service_principal, message=message)(config.uber_spn_id, safe=True)
+        if config.policy_id is not None:
+            message = "Missing permissions to revert cluster policy"
+            log_permission_denied(self._remove_service_principal_configuration_from_cluster_policy, message=message)(
+                config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
+            )
+        message = "Missing permissions to revert SQL warehouse config"
+        log_permission_denied(
+            self._remove_service_principal_configuration_from_workspace_warehouse_config, message=message
+        )(config.uber_spn_id, secret_identifier, storage_accounts)
+        message = "Missing permissions to delete secret scope"
+        log_permission_denied(self._safe_delete_scope, message=message)(config.inventory_database)
+        message = "Missing permissions to save the configuration"
+        config.uber_spn_id = None
+        log_permission_denied(self._installation.save, message=message)(config)
+
     def _delete_uber_principal(self) -> None:
 
         def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
@@ -512,6 +555,7 @@ class AzureResourcePermissions:
         thread_name = "Creating access connectors for storage accounts"
         results, errors = Threads.gather(thread_name, tasks)
         if len(errors) > 0:
+
             raise ManyError(errors)
         return list(results)
 
