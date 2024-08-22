@@ -21,12 +21,13 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     sql_backend.save_table(
         f"{inventory_schema}.external_locations",
         [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1), ExternalLocation(f"s3://bucket{rand}/FOLDER2", 1)],
+        ExternalLocation
     )
     aws = AWSResources(profile)
     role_name = f"UCX_ROLE_{rand}"
     policy_name = f"UCX_POLICY_{rand}"
     account_id = aws.validate_connection().get("Account")
-    s3_prefixes = {f"bucket{rand}"}
+    s3_prefixes = {f"s3://bucket{rand}"}
     aws.create_uc_role(role_name)
     aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
     ws.storage_credentials.create(
@@ -87,6 +88,7 @@ def test_create_uber_instance_profile(
             {
                 "Do you want to create new migration role*": "yes",
                 "We have identified existing UCX migration role*": "yes",
+                ".*": "no"
             }
         )
     )
