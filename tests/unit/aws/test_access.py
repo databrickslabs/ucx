@@ -54,7 +54,7 @@ def installation_single_role():
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
                     "privilege": "WRITE_FILES",
-                    "resource_path": "s3://BUCKETX/*",
+                    "resource_path": "s3://BUCKETX",
                 }
             ]
         }
