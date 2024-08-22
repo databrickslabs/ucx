@@ -112,7 +112,7 @@ class LocatedAdvice:
         if default is not None:
             path = default
         path = path.relative_to(base)
-        return f"[{path.as_posix()}]:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
+        return f"./{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
 
 
 class Advisory(Advice):
