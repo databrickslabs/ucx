@@ -807,7 +807,7 @@ def make_job(ws, make_random, make_notebook):
                     description=make_random(4),
                     new_cluster=compute.ClusterSpec(
                         num_workers=1,
-                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=32),
                         spark_version=ws.clusters.select_spark_version(latest=True),
                         spark_conf=task_spark_conf,
                     ),
