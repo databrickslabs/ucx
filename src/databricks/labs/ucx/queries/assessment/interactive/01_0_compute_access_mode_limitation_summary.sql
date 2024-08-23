@@ -2,8 +2,8 @@
 WITH iteractive_cluster_commands AS (
   SELECT
     a.event_id,
-    a.request_params.notebookid AS notebook_id,
-    a.request_params.clusterid AS cluster_id,
+    a.request_params.notebookId AS notebook_id,
+    a.request_params.clusterId AS cluster_id,
     a.workspace_id,
     a.user_identity.email,
     TRY_CAST(SPLIT(c.spark_version, '[\\.-]')[0] AS INT) AS dbr_version_major,
@@ -14,7 +14,7 @@ WITH iteractive_cluster_commands AS (
     MD5(a.request_params.commandtext) AS commandhash
   FROM system.access.audit AS a
   LEFT OUTER JOIN inventory.clusters AS c
-    ON a.request_params.clusterid = c.cluster_id AND a.action_name = 'runCommand'
+    ON a.request_params.clusterId = c.cluster_id AND a.action_name = 'runCommand'
   WHERE
     a.event_date >= DATEADD(DAY, 90 * -1, CURRENT_DATE)
 ), misc_patterns AS (
