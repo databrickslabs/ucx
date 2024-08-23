@@ -69,12 +69,16 @@ class AWSResourcePermissions:
             if match:
                 s3_buckets.add(match.group(1))
         if single_role:
-            roles.append(AWSUCRoleCandidate(self._generate_role_name(single_role, role_name, ""),
-                                            policy_name, list(s3_buckets)))
+            roles.append(
+                AWSUCRoleCandidate(self._generate_role_name(single_role, role_name, ""), policy_name, list(s3_buckets))
+            )
         else:
             for s3_prefix in list(s3_buckets):
-                roles.append(AWSUCRoleCandidate(self._generate_role_name(single_role, role_name, s3_prefix),
-                                                policy_name, [s3_prefix]))
+                roles.append(
+                    AWSUCRoleCandidate(
+                        self._generate_role_name(single_role, role_name, s3_prefix), policy_name, [s3_prefix]
+                    )
+                )
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
