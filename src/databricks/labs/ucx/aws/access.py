@@ -69,10 +69,12 @@ class AWSResourcePermissions:
             if match:
                 s3_buckets.add(match.group(1))
         if single_role:
+            role_name = self._generate_role_name(single_role, role_name, "")
             roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_buckets)))
         else:
-            for idx, s3_prefix in enumerate(sorted(list(s3_buckets))):
-                roles.append(AWSUCRoleCandidate(f"{role_name}_{idx+1}", policy_name, [s3_prefix]))
+            for s3_prefix in list(s3_buckets):
+                role_name = self._generate_role_name(single_role, role_name, s3_prefix)
+                roles.append(AWSUCRoleCandidate(role_name, policy_name, [s3_prefix]))
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
@@ -354,3 +356,9 @@ class AWSResourcePermissions:
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
         except PermissionError:
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
+
+    def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
+        if single_role:
+            metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
+            return f"{role_name}_{metastore_id}"
+        return f"{role_name}_{location[5:]}"

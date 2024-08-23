@@ -350,6 +350,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
+    mock_ws.metastores.current.as_dict.return_value = {"metastore_id": "12345"}
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
