@@ -58,6 +58,16 @@ def runtime_version_tuple(spark_version: str | None) -> tuple[int, int] | None:
         return None
 
 
+def is_mlr(spark_version: str | None) -> bool:
+    if not spark_version:
+        return False
+    if runtime_version_tuple(spark_version) is None:
+        return False
+    if 'ml' in spark_version:
+        return True
+    return False
+
+
 def spark_version_compatibility(spark_version: str | None) -> str:
     if not spark_version:
         return "unreported version"
