@@ -1,5 +1,7 @@
 import json
+import logging
 
+import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.service.catalog import AwsIamRoleRequest
@@ -64,6 +66,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
 def test_create_uber_instance_profile(
     ws, env_or_skip, make_random, inventory_schema, sql_backend, make_cluster_policy, aws_cli_ctx
 ):
+    logging.getLogger().setLevel(logging.DEBUG)
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     aws = AWSResources(profile)
     sql_backend.save_table(
@@ -104,6 +107,42 @@ def test_create_uber_instance_profile(
 
     role_name = AWSInstanceProfile(instance_profile_arn).role_name
     aws.delete_instance_profile(role_name, role_name)
+
+
+def test_fail_create_uber_instance_profile(
+    ws, env_or_skip, make_random, sql_backend, make_cluster_policy,
+    aws_cli_ctx
+):
+    env_or_skip("AWS_PROFILE")
+    aws_cli_ctx.sql_backend.save_table(
+        f"{aws_cli_ctx.inventory_database}.external_locations",
+        [ExternalLocation("s3://bucket1/FOLDER1", 1)],
+        ExternalLocation,
+    )
+    aws_cli_ctx.installation.save([AWSInstanceProfile("role1", "role1")],
+                                  filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+    # create a new policy
+
+    policy = make_cluster_policy()
+    aws_cli_ctx.installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
+    aws_cli_ctx.save_tables()
+
+    # create a new uber instance profile
+    aws_resource_permission = aws_cli_ctx.aws_resource_permissions()
+    with pytest.raises(PermissionError):
+        aws_resource_permission.create_uber_principal(
+            MockPrompts(
+                {
+                    "Do you want to create new migration role*": "yes",
+                    "We have identified existing UCX migration role*": "yes",
+                }
+            )
+        )
+
+    policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
+
+    config = aws_cli_ctx.installation.load(WorkspaceConfig)
+    assert config.uber_instance_profile is None  # check that the uber instance profile was not created
 
 
 def test_create_external_location_validate_acl(

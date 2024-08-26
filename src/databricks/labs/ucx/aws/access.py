@@ -297,10 +297,16 @@ class AWSResourcePermissions:
         return AWSInstanceProfile(instance_profile_arn)
 
     def _create_uber_instance_profile(self, iam_role_name):
-        self._aws_resources.create_migration_role(iam_role_name)
-        self._aws_resources.create_instance_profile(iam_role_name)
-        # Add role to instance profile - they have the same name
-        self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name)
+        if (
+            not (self._aws_resources.create_migration_role(iam_role_name))
+            or not (self._aws_resources.create_instance_profile(iam_role_name))
+            or not (
+                # Add role to instance profile - they have the same name
+                self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name)
+            )
+        ):
+            self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
+            raise PermissionError(f"Failed to create migration role and instance profile {iam_role_name}")
 
     def create_uber_principal(self, prompts: Prompts):
 
@@ -351,6 +357,7 @@ class AWSResourcePermissions:
             self._create_uber_instance_profile(iam_role_name)
         iam_instance_profile = self.get_instance_profile(iam_role_name)
         if not iam_instance_profile:
+            logger.error(f"Failed to create migration role and instance profile {iam_role_name}")
             return
         try:
             config.uber_instance_profile = iam_instance_profile.instance_profile_arn
@@ -359,33 +366,11 @@ class AWSResourcePermissions:
             self._update_sql_dac_with_instance_profile(iam_instance_profile, prompts)
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
         except PermissionError:
+            logger.error(f"Failed to assign instance profile to cluster policy {iam_role_name}")
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
 
-    def delete_uber_principal(self, prompts: Prompts, *, principal_name:str|None = None):
-        config = self._installation.load(WorkspaceConfig)
-        cluster_policy = self._get_cluster_policy(config.policy_id)
-        iam_role_name_in_cluster_policy = self.get_iam_role_from_cluster_policy(str(cluster_policy.definition))
-
-        if not iam_role_name_in_cluster_policy:
-            logger.info("No UCX migration role found in cluster policy")
-            return
-
-        if not prompts.confirm(
-            f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
-            f"in cluster policy \"{cluster_policy.name}\". "
-            f"Do you want to delete the role and update the cluster policy?"
-        ):
-            return
-
-        self._aws_resources.delete_role(iam_role_name_in_cluster_policy)
-        self._aws_resources.delete_instance_profile(iam_role_name_in_cluster_policy, iam_role_name_in_cluster_policy)
-        self._update_cluster_policy_with_instance_profile(cluster_policy, None)
-        self._update_sql_dac_with_instance_profile(None, prompts)
-        config.uber_instance_profile = None
-        self._installation.save(config)
-        logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
-        return
-
+    def _delete_iam_role(self, role_name):
+        self._aws_resources.delete_role(role_name)
 
     def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
         if single_role:

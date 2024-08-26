@@ -340,7 +340,7 @@ class AWSResources:
         policy_name: str,
         s3_prefixes: set[str],
         account_id: str,
-        kms_key=None,
+        kms_key: str | None = None,
     ) -> bool:
         """
         Create a policy for the given role with the given S3 prefixes, account ID, and KMS key.

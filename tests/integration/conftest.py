@@ -22,7 +22,7 @@ from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command, AWSResources
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
@@ -34,7 +34,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
@@ -556,9 +556,25 @@ class MockLocalAwsCli(MockWorkspaceContext):
 
 
 @pytest.fixture
-def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAwsCli(make_schema, env_or_skip, ws)
-    return ctx.replace(sql_backend=sql_backend)
+def aws_cli_ctx(installation_ctx, env_or_skip):
+    def aws_cli_run_command():
+        if not installation_ctx.is_aws:
+            pytest.skip("Aws only")
+        if not shutil.which("aws"):
+            pytest.skip("Local test only")
+        return run_command
+
+    def aws_profile():
+        return env_or_skip("AWS_PROFILE")
+
+    def aws_resource_permissions():
+        return AWSResourcePermissions(
+            installation_ctx.installation,
+            installation_ctx.workspace_client,
+            AWSResources(aws_profile()),
+            ExternalLocations(installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database),
+        )
+    return installation_ctx.replace(aws_profile=aws_profile, aws_cli_run_command=aws_cli_run_command, aws_resource_permissions=aws_resource_permissions)
 
 
 class MockInstallationContext(MockRuntimeContext):
@@ -671,6 +687,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
             include_object_permissions=self.include_object_permissions,
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
         )
         workspace_config = self.config_transform(workspace_config)
         self.installation.save(workspace_config)

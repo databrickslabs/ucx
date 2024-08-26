@@ -302,6 +302,45 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     )
 
 
+def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locations):
+    cluster_policy = Policy(
+        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
+    )
+    mock_ws.cluster_policies.get.return_value = cluster_policy
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")]
+    )
+
+    command_calls = []
+    instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        if "iam create-role" in cmd:
+            return 0, f'{{"Role":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "iam create-instance-profile" in cmd:
+            return 0, f'{{"InstanceProfile":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "sts get-caller-identity" in cmd:
+            return 0, '{"Account":"123"}', ""
+        return 0, '{"Foo":"Bar"}', ""
+
+    aws = AWSResources("profile", command_call)
+
+    locations = ExternalLocations(mock_ws, backend, "ucx")
+    prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        aws,
+        locations,
+    )
+
+    with pytest.raises(PermissionError):
+        aws_resource_permissions.create_uber_principal(prompts)
+
+    assert len([cmd for cmd in command_calls if "delete-instance-profile" in cmd]) == 1
+
+
 @pytest.mark.parametrize(
     "get_security_policy, set_security_policy",
     [
