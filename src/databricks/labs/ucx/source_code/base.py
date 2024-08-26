@@ -302,16 +302,3 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
     return content.startswith(magic_header)
 
-
-DIRECT_FS_REFS = {
-    "s3a://",
-    "s3n://",
-    "s3://",
-    "wasb://",
-    "wasbs://",
-    "abfs://",
-    "abfss://",
-    "dbfs:/",
-    "hdfs://",
-    "file:/",
-}

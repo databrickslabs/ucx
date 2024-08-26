@@ -13,9 +13,9 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     file_language,
     guess_encoding,
-    DIRECT_FS_REFS,
 )
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.linters.pyspark import DirectFilesystemAccessMatcher
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.queries import FromTable
@@ -96,7 +96,7 @@ class DfsaCollector:
             if not isinstance(literal.this, str):
                 logger.warning(f"Can't interpret {type(literal.this).__name__}")
             fs_path: str = literal.this
-            for fs_ref in DIRECT_FS_REFS:
+            for fs_ref in DirectFilesystemAccessMatcher.DIRECT_FS_REFS:
                 if not fs_path.startswith(fs_ref):
                     continue
                 yield DFSA(path=fs_path)
@@ -108,7 +108,7 @@ class DfsaCollector:
             if not isinstance(identifier.this, str):
                 logger.warning(f"Can't interpret {type(identifier.this).__name__}")
             fs_path: str = identifier.this
-            for fs_ref in DIRECT_FS_REFS:
+            for fs_ref in DirectFilesystemAccessMatcher.DIRECT_FS_REFS:
                 if not fs_path.startswith(fs_ref):
                     continue
                 yield DFSA(path=fs_path)

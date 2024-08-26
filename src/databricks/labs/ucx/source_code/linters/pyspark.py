@@ -11,7 +11,6 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DIRECT_FS_REFS,
 )
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTable
@@ -178,6 +177,19 @@ class ReturnValueMatcher(Matcher):
 @dataclass
 class DirectFilesystemAccessMatcher(Matcher):
 
+    DIRECT_FS_REFS = {
+        "s3a://",
+        "s3n://",
+        "s3://",
+        "wasb://",
+        "wasbs://",
+        "abfs://",
+        "abfss://",
+        "dbfs:/",
+        "hdfs://",
+        "file:/",
+    }
+
     def matches(self, node: NodeNG):
         return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
 
@@ -191,7 +203,7 @@ class DirectFilesystemAccessMatcher(Matcher):
             return
         if not isinstance(table_arg.value, str):
             return
-        if any(table_arg.value.startswith(prefix) for prefix in DIRECT_FS_REFS):
+        if any(table_arg.value.startswith(prefix) for prefix in self.DIRECT_FS_REFS):
             yield Deprecation.from_node(
                 code='direct-filesystem-access',
                 message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
