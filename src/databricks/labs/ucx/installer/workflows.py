@@ -727,7 +727,7 @@ class WorkflowsDeployment(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="main",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD,
                         spark_conf=self._job_cluster_spark_conf("main"),
                         custom_tags={"ResourceClass": "SingleNode"},
                         num_workers=0,
