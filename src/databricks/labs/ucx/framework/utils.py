@@ -4,8 +4,6 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-_allowed_object_chars = set(string.ascii_letters + string.digits + '_')
-
 
 def escape_sql_identifier(path: str) -> str:
     """
