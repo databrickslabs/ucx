@@ -86,16 +86,21 @@ class TablesMigrator:
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
-        all_grants_to_migrate = None if acl_strategy is None else self._gc.snapshot()
-        all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
-        all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
+        all_grants_to_migrate = list(self._gc.snapshot())
+        all_migrated_groups = list(self._group.snapshot())
+        all_principal_grants = list(self._principal_grants.get_interactive_cluster_grants())
         self._init_seen_tables()
         # mounts will be used to replace the mnt based table location in the DDL for hiveserde table in-place migration
         mounts: list[Mount] = []
         if mounts_crawler:
             mounts = list(mounts_crawler.snapshot())
         if what == What.VIEW:
-            return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
+            return self._migrate_views(
+                acl_strategy,
+                all_grants_to_migrate,
+                all_migrated_groups,
+                all_principal_grants,
+            )
         return self._migrate_tables(
             what,
             acl_strategy,
@@ -109,10 +114,10 @@ class TablesMigrator:
     def _migrate_tables(
         self,
         what: What,
-        acl_strategy,
-        all_grants_to_migrate,
-        all_migrated_groups,
-        all_principal_grants,
+        acl_strategy: list[AclMigrationWhat] | None,
+        all_grants_to_migrate: list[Grant],
+        all_migrated_groups: list[MigratedGroup],
+        all_principal_grants: list[Grant],
         mounts: list[Mount],
         hiveserde_in_place_migrate: bool = False,
     ):
@@ -121,7 +126,11 @@ class TablesMigrator:
         tasks = []
         for table in tables_in_scope:
             grants = self._compute_grants(
-                table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+                table.src,
+                acl_strategy,
+                all_grants_to_migrate,
+                all_migrated_groups,
+                all_principal_grants,
             )
             tasks.append(partial(self._migrate_table, table, grants, mounts, hiveserde_in_place_migrate))
         Threads.strict("migrate tables", tasks)
@@ -130,7 +139,13 @@ class TablesMigrator:
         # the below is useful for testing
         return tasks
 
-    def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
+    def _migrate_views(
+        self,
+        acl_strategy: list[AclMigrationWhat] | None,
+        all_grants_to_migrate: list[Grant],
+        all_migrated_groups: list[MigratedGroup],
+        all_principal_grants: list[Grant],
+    ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
         sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index_full_refresh())
@@ -139,7 +154,11 @@ class TablesMigrator:
             tasks = []
             for view in batch:
                 grants = self._compute_grants(
-                    view.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+                    view.src,
+                    acl_strategy,
+                    all_grants_to_migrate,
+                    all_migrated_groups,
+                    all_principal_grants,
                 )
                 tasks.append(
                     partial(
@@ -156,7 +175,7 @@ class TablesMigrator:
     def _compute_grants(
         self,
         table: Table,
-        acl_strategies: list[AclMigrationWhat],
+        acl_strategies: list[AclMigrationWhat] | None,
         all_grants_to_migrate: list[Grant] | None,
         all_migrated_groups: list[MigratedGroup],
         all_principal_grants: list[Grant],
