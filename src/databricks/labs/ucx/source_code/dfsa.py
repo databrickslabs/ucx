@@ -81,12 +81,11 @@ class DfsaCollector:
     @classmethod
     def _collect_from_sql(cls, _path: Path, source: str) -> Iterable[DFSA]:
         try:
-            sqls = parse_sql(source, read='databricks')
-            for sql in sqls:
-                if not sql:
+            for statement in parse_sql(source, read='databricks'):
+                if not statement:
                     continue
-                yield from cls._collect_from_literals(sql)
-                yield from cls._collect_from_identifiers(sql)
+                yield from cls._collect_from_literals(statement)
+                yield from cls._collect_from_identifiers(statement)
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {source}", exc_info=e)
             yield FromTable.sql_parse_failure(source)
