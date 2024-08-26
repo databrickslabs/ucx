@@ -304,16 +304,3 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         return False
     return file_header == magic_header
 
-
-DIRECT_FS_REFS = {
-    "s3a://",
-    "s3n://",
-    "s3://",
-    "wasb://",
-    "wasbs://",
-    "abfs://",
-    "abfss://",
-    "dbfs:/",
-    "hdfs://",
-    "file:/",
-}
