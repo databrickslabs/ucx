@@ -12,7 +12,7 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import Grant, MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
@@ -21,7 +21,6 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 )
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
-    AclMigrationWhat,
     MigrationCount,
     Table,
     What,
@@ -31,7 +30,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from databricks.sdk.errors.platform import DatabricksError
 
 logger = logging.getLogger(__name__)
@@ -41,23 +40,19 @@ class TablesMigrator:
     def __init__(
         self,
         table_crawler: TablesCrawler,
-        grant_crawler: GrantsCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
-        group_manager: GroupManager,
         migration_status_refresher: MigrationStatusRefresher,
-        principal_grants: PrincipalACL,
+        migrate_grants: MigrateGrants,
     ):
         self._tc = table_crawler
-        self._gc = grant_crawler
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
-        self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
-        self._principal_grants = principal_grants
+        self._migrate_grants = migrate_grants
 
     def get_remaining_tables(self) -> list[Table]:
         self.index_full_refresh()
@@ -79,73 +74,34 @@ class TablesMigrator:
     def migrate_tables(
         self,
         what: What,
-        acl_strategy: list[AclMigrationWhat] | None = None,
         mounts_crawler: Mounts | None = None,
         hiveserde_in_place_migrate: bool = False,
     ):
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
-        all_grants_to_migrate = list(self._gc.snapshot())
-        all_migrated_groups = list(self._group.snapshot())
-        all_principal_grants = list(self._principal_grants.get_interactive_cluster_grants())
         self._init_seen_tables()
         # mounts will be used to replace the mnt based table location in the DDL for hiveserde table in-place migration
         mounts: list[Mount] = []
         if mounts_crawler:
             mounts = list(mounts_crawler.snapshot())
         if what == What.VIEW:
-            return self._migrate_views(
-                acl_strategy,
-                all_grants_to_migrate,
-                all_migrated_groups,
-                all_principal_grants,
-            )
-        return self._migrate_tables(
-            what,
-            acl_strategy,
-            all_grants_to_migrate,
-            all_migrated_groups,
-            all_principal_grants,
-            mounts,
-            hiveserde_in_place_migrate,
-        )
+            return self._migrate_views()
+        return self._migrate_tables(what, mounts, hiveserde_in_place_migrate)
 
-    def _migrate_tables(
-        self,
-        what: What,
-        acl_strategy: list[AclMigrationWhat] | None,
-        all_grants_to_migrate: list[Grant],
-        all_migrated_groups: list[MigratedGroup],
-        all_principal_grants: list[Grant],
-        mounts: list[Mount],
-        hiveserde_in_place_migrate: bool = False,
-    ):
+    def _migrate_tables(self, what: What, mounts: list[Mount], hiveserde_in_place_migrate: bool = False):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
-            grants = self._compute_grants(
-                table.src,
-                acl_strategy,
-                all_grants_to_migrate,
-                all_migrated_groups,
-                all_principal_grants,
-            )
-            tasks.append(partial(self._migrate_table, table, grants, mounts, hiveserde_in_place_migrate))
+            tasks.append(partial(self._migrate_table, table, mounts, hiveserde_in_place_migrate))
         Threads.strict("migrate tables", tasks)
         if not tasks:
             logger.info(f"No tables found to migrate with type {what.name}")
         # the below is useful for testing
         return tasks
 
-    def _migrate_views(
-        self,
-        acl_strategy: list[AclMigrationWhat] | None,
-        all_grants_to_migrate: list[Grant],
-        all_migrated_groups: list[MigratedGroup],
-        all_principal_grants: list[Grant],
-    ):
+    def _migrate_views(self):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
         sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index_full_refresh())
@@ -153,60 +109,24 @@ class TablesMigrator:
         for batch in batches:
             tasks = []
             for view in batch:
-                grants = self._compute_grants(
-                    view.src,
-                    acl_strategy,
-                    all_grants_to_migrate,
-                    all_migrated_groups,
-                    all_principal_grants,
-                )
-                tasks.append(
-                    partial(
-                        self._migrate_view,
-                        view,
-                        grants,
-                    )
-                )
+                tasks.append(partial(self._migrate_view, view))
             Threads.strict("migrate views", tasks)
             all_tasks.extend(tasks)
             self.index_full_refresh()
         return all_tasks
 
-    def _compute_grants(
-        self,
-        table: Table,
-        acl_strategies: list[AclMigrationWhat] | None,
-        all_grants_to_migrate: list[Grant] | None,
-        all_migrated_groups: list[MigratedGroup],
-        all_principal_grants: list[Grant],
-    ):
-        if acl_strategies is None:
-            acl_strategies = []
-        grants = []
-        if AclMigrationWhat.LEGACY_TACL in acl_strategies and all_grants_to_migrate is not None:
-            grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
-        if AclMigrationWhat.PRINCIPAL in acl_strategies:
-            grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
-        return grants
-
-    def _migrate_table(
-        self,
-        src_table: TableToMigrate,
-        grants: list[Grant],
-        mounts: list[Mount],
-        hiveserde_in_place_migrate: bool = False,
-    ):
+    def _migrate_table(self, src_table: TableToMigrate, mounts: list[Mount], hiveserde_in_place_migrate: bool = False):
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
         if src_table.src.what == What.DBFS_ROOT_DELTA:
-            return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
+            return self._migrate_dbfs_root_table(src_table.src, src_table.rule)
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
-            return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants, mounts)
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, mounts)
         if src_table.src.what == What.EXTERNAL_SYNC:
-            return self._migrate_external_table(src_table.src, src_table.rule, grants)
+            return self._migrate_external_table(src_table.src, src_table.rule)
         if src_table.src.what == What.TABLE_IN_MOUNT:
-            return self._migrate_table_in_mount(src_table.src, src_table.rule, grants)
+            return self._migrate_table_in_mount(src_table.src, src_table.rule)
         if src_table.src.what == What.EXTERNAL_HIVESERDE:
             # This hiveserde_in_place_migrate is used to determine if current hiveserde migration should use in-place migration or CTAS.
             # We will provide two workflows for hiveserde table migration:
@@ -217,24 +137,20 @@ class TablesMigrator:
             # User will need to decide which workflow to runs first which will migrate the hiveserde tables and mark the
             # `upgraded_to` property and hence those tables will be skipped in the migration workflow runs later.
             if hiveserde_in_place_migrate:
-                return self._migrate_external_table_hiveserde_in_place(src_table.src, src_table.rule, grants, mounts)
-            return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants, mounts)
+                return self._migrate_external_table_hiveserde_in_place(src_table.src, src_table.rule, mounts)
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, mounts)
         if src_table.src.what == What.EXTERNAL_NO_SYNC:
             # use CTAS if table cannot be upgraded using SYNC and table is not hiveserde table
-            return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants, mounts)
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, mounts)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
-    def _migrate_view(
-        self,
-        src_view: ViewToMigrate,
-        grants: list[Grant] | None = None,
-    ):
+    def _migrate_view(self, src_view: ViewToMigrate):
         if self._table_already_migrated(src_view.rule.as_uc_table_key):
             logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
             return True
         if self._view_can_be_migrated(src_view):
-            return self._migrate_view_table(src_view, grants)
+            return self._migrate_view_table(src_view)
         logger.info(f"View {src_view.src.key} is not supported for migration")
         return True
 
@@ -246,7 +162,7 @@ class TablesMigrator:
                 return False
         return True
 
-    def _migrate_view_table(self, src_view: ViewToMigrate, grants: list[Grant] | None = None):
+    def _migrate_view_table(self, src_view: ViewToMigrate):
         view_migrate_sql = self._sql_migrate_view(src_view)
         logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
         try:
@@ -258,7 +174,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_acl(src_view.src, src_view.rule, grants)
+        return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table_key)
 
     def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
         # We have to fetch create statement this way because of columns in:
@@ -268,7 +184,7 @@ class TablesMigrator:
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+    def _migrate_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
@@ -281,15 +197,9 @@ class TablesMigrator:
             )
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grants)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
 
-    def _migrate_external_table_hiveserde_in_place(
-        self,
-        src_table: Table,
-        rule: Rule,
-        grants: list[Grant],
-        mounts: list[Mount],
-    ):
+    def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule, mounts: list[Mount]):
         # verify hive serde type
         hiveserde_type = src_table.hiveserde_type(self._backend)
         if hiveserde_type in [
@@ -324,9 +234,9 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_acl(src_table, rule, grants)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
 
-    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(
@@ -339,9 +249,9 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_acl(src_table, rule, grants)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
 
-    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, grants: list[Grant], mounts: list[Mount]):
+    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, mounts: list[Mount]):
         if src_table.what not in [What.EXTERNAL_NO_SYNC, What.EXTERNAL_HIVESERDE]:
             table_migrate_sql = src_table.sql_migrate_ctas_managed(rule.as_uc_table_key)
         elif not src_table.location:
@@ -360,9 +270,9 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_acl(src_table, rule, grants)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
 
-    def _migrate_table_in_mount(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+    def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         try:
             table_schema = self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
@@ -375,22 +285,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_acl(src_table, rule, grants)
-
-    def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
-        if grants is None:
-            return True
-        for grant in grants:
-            acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
-            if acl_migrate_sql is None:
-                logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
-                continue
-            logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
-            try:
-                self._backend.execute(acl_migrate_sql)
-            except DatabricksError as e:
-                logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
-        return True
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
 
     def _table_already_migrated(self, target) -> bool:
         return target in self._seen_tables
@@ -541,40 +436,20 @@ class ACLMigrator:
     def __init__(
         self,
         tables_crawler: TablesCrawler,
-        grant_crawler: GrantsCrawler,
         workspace_info: WorkspaceInfo,
         backend: SqlBackend,
-        group_manager: GroupManager,
         migration_status_refresher: MigrationStatusRefresher,
-        principal_acl: PrincipalACL,
+        migrate_grants: MigrateGrants,
     ):
         self._table_crawler = tables_crawler
-        self._grant_crawler = grant_crawler
         self._backend = backend
         self._workspace_info = workspace_info
-        self._group_manager = group_manager
         self._migration_status_refresher = migration_status_refresher
-        self._principal_acl = principal_acl
+        self._migrate_grants = migrate_grants
 
-    def migrate_acls(
-        self,
-        *,
-        target_catalog: str | None = None,
-        legacy_table_acl: bool = True,
-        principal: bool = True,
-        hms_fed: bool = False,
-    ) -> None:
-        acl_strategies = []
+    def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()
-        if legacy_table_acl:
-            acl_strategies.append(AclMigrationWhat.LEGACY_TACL)
-        if principal:
-            acl_strategies.append(AclMigrationWhat.PRINCIPAL)
-        all_grants_to_migrate = self._grant_crawler.snapshot()
-        all_migrated_groups = self._group_manager.snapshot()
-        all_principal_grants = self._principal_acl.get_interactive_cluster_grants()
         tables = self._table_crawler.snapshot()
-
         if not tables:
             logger.info("No tables found to acl")
             return
@@ -582,14 +457,7 @@ class ACLMigrator:
             tables_to_migrate = self._get_hms_fed_tables(tables, target_catalog if target_catalog else workspace_name)
         else:
             tables_to_migrate = self._get_migrated_tables(tables)
-
-        self._migrate_acls(
-            acl_strategies,
-            all_grants_to_migrate,
-            all_migrated_groups,
-            all_principal_grants,
-            tables_to_migrate,
-        )
+        self._migrate_acls(tables_to_migrate)
 
     def _get_migrated_tables(self, tables: list[Table]) -> list[TableToMigrate]:
         # gets all the migrated table to apply ACLs to
@@ -634,71 +502,11 @@ class ACLMigrator:
             tables_to_migrate.append(table_to_migrate)
         return tables_to_migrate
 
-    def _migrate_acls(
-        self,
-        acl_strategy,
-        all_grants_to_migrate,
-        all_migrated_groups,
-        all_principal_grants,
-        tables_in_scope,
-    ) -> None:
+    def _migrate_acls(self, tables_in_scope: list[TableToMigrate]) -> None:
         tasks = []
         for table in tables_in_scope:
-            grants = self._compute_grants(
-                table.src,
-                acl_strategy,
-                all_grants_to_migrate,
-                all_migrated_groups,
-                all_principal_grants,
-            )
-            tasks.append(partial(self._migrate_acl, table.src, table.rule, grants))
+            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table_key))
         Threads.strict("migrate grants", tasks)
-
-    def _compute_grants(
-        self,
-        table: Table,
-        acl_strategy,
-        all_grants_to_migrate,
-        all_migrated_groups,
-        all_principal_grants,
-    ):
-        if acl_strategy is None:
-            acl_strategy = []
-        grants = []
-        if AclMigrationWhat.LEGACY_TACL in acl_strategy:
-            grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
-        if AclMigrationWhat.PRINCIPAL in acl_strategy:
-            grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
-        return grants
-
-    @staticmethod
-    def _match_grants(table: Table, grants: Iterable[Grant], migrated_groups: list[MigratedGroup]) -> list[Grant]:
-        matched_grants = []
-        for grant in grants:
-            if grant.database != table.database:
-                continue
-            if table.name not in (grant.table, grant.view):
-                continue
-            matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
-            if len(matched_group) > 0:
-                grant = dataclasses.replace(grant, principal=matched_group[0])
-            matched_grants.append(grant)
-        return matched_grants
-
-    def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
-        if grants is None:
-            return True
-        for grant in grants:
-            acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
-            if acl_migrate_sql is None:
-                logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
-                continue
-            logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
-            try:
-                self._backend.execute(acl_migrate_sql)
-            except DatabricksError as e:
-                logger.warning(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
-        return True
 
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()

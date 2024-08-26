@@ -1,14 +1,14 @@
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
-from dataclasses import dataclass
-from functools import partial
+from collections.abc import Iterable, Callable
+from dataclasses import dataclass, replace
+from functools import partial, cached_property
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist, NotFound
+from databricks.sdk.errors import ResourceDoesNotExist, NotFound, DatabricksError
 from databricks.sdk.service.catalog import (
     ExternalLocationInfo,
     SchemaInfo,
@@ -38,6 +38,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +580,7 @@ class PrincipalACL:
         self._mounts_crawler = mounts_crawler
         self._compute_locations = cluster_locations
 
-    def get_interactive_cluster_grants(self) -> list[Grant]:
+    def get_interactive_cluster_grants(self) -> list[Grant]:  # TODO: rename to apply()?..
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
@@ -592,7 +593,7 @@ class PrincipalACL:
             grants.update(cluster_usage)
         return list(grants)
 
-    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
+    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]) -> str | None:
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
             return None
@@ -715,3 +716,57 @@ class PrincipalACL:
             if location.url == location_url:
                 return location.name
         return None
+
+
+class MigrateGrants:
+    def __init__(
+        self,
+        sql_backend: SqlBackend,
+        group_manager: GroupManager,
+        grant_loaders: list[Callable[[], Iterable[Grant]]],
+    ):
+        self._sql_backend = sql_backend
+        self._group_manager = group_manager
+        self._grant_loaders = grant_loaders
+
+    def apply(self, src: Table, uc_table_key: str) -> bool:
+        for grant in self._match_grants(src):
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {src.kind} {uc_table_key}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
+            try:
+                self._sql_backend.execute(acl_migrate_sql)
+            except DatabricksError as e:
+                logger.warning(f"Failed to migrate ACL for {src.key} to {uc_table_key}: {e}")
+        return True
+
+    @cached_property
+    def _workspace_to_account_names(self) -> dict[str, str]:
+        return {g.name_in_workspace: g.name_in_account for g in self._group_manager.snapshot()}
+
+    @cached_property
+    def _grants(self) -> list[Grant]:
+        grants = []
+        for loader in self._grant_loaders:
+            for grant in loader():
+                grants.append(grant)
+        return grants
+
+    def _match_grants(self, table: Table) -> list[Grant]:
+        matched_grants = []
+        for grant in self._grants:
+            if grant.database != table.database:
+                continue
+            if table.name not in (grant.table, grant.view):
+                continue
+            grant = self._match_group(grant)
+            matched_grants.append(grant)
+        return matched_grants
+
+    def _match_group(self, grant: Grant) -> Grant:
+        target_principal = self._workspace_to_account_names.get(grant.principal)
+        if not target_principal:
+            return grant
+        return replace(grant, principal=target_principal)
