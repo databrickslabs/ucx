@@ -301,4 +301,3 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
             return False
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
     return content.startswith(magic_header)
-
