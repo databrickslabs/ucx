@@ -9,7 +9,12 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
-from databricks.sdk.service.catalog import AwsIamRoleResponse, ExternalLocationInfo, StorageCredentialInfo
+from databricks.sdk.service.catalog import (
+    AwsIamRoleResponse,
+    ExternalLocationInfo,
+    StorageCredentialInfo,
+    MetastoreAssignment,
+)
 from databricks.sdk.service.compute import InstanceProfile, Policy
 from databricks.sdk.service.sql import (
     EndpointConfPair,
@@ -350,6 +355,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
+    mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
@@ -358,7 +364,13 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
     assert aws.create_uc_role.assert_called
     assert (
-        call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'}, None, None)
+        call(
+            'UC_ROLE_123123',
+            'UC_POLICY',
+            {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'},
+            None,
+            None,
+        )
         in aws.put_role_policy.call_args_list
     )
 
@@ -370,14 +382,14 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-    assert call('UC_ROLE_1') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_2') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     assert (
-        call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        call('UC_ROLE_BUCKET1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
         in aws.put_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        call('UC_ROLE_BUCKET2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 
