@@ -67,3 +67,4 @@ ORDER BY
   `Last command` DESC,
   `First command` ASC,
   COALESCE(cluster_name, cluster_id)
+
