@@ -1,5 +1,6 @@
 import pytest
 from databricks.sdk.errors import NotFound
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.mark.parametrize(
@@ -97,3 +98,35 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+
+
+@pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
+def test_table_migration_job_publishes_remianed_tables(
+    ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog
+):
+    tables, dst_schema = prepare_tables_for_migration
+    installation_ctx.workspace_installation.run()
+    second_table = list(tables.values())[1]
+    table = Table(
+        "hive_metastore",
+        dst_schema.name,
+        second_table.name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+    )
+    installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
+    installation_ctx.deployed_workflows.run_workflow("migrate-tables")
+    assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
+
+    remained_tables = list(
+        sql_backend.fetch(
+            f"""
+                SELECT
+                SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)
+                AS message
+                FROM {installation_ctx.inventory_database}.logs
+                WHERE message LIKE 'remained-hive-metastore-table: %'
+            """
+        )
+    )
+    assert remained_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'

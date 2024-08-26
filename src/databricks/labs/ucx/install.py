@@ -33,6 +33,7 @@ from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
+    DeadlineExceeded,
     InternalError,
     InvalidParameterValue,
     NotFound,
@@ -40,6 +41,7 @@ from databricks.sdk.errors import (
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
+    OperationFailed,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
@@ -528,6 +530,16 @@ class WorkspaceInstallation(InstallationMixin):
                     "UCX Install: databricks labs install ucx"
                 )
                 raise BadRequest(msg) from err
+            if "Unable to load AWS credentials from any provider in the chain" in str(err):
+                msg = (
+                    "The UCX installation is configured to use external metastore. There is issue with the external metastore connectivity.\n"
+                    "Please check the UCX installation instruction https://github.com/databrickslabs/ucx?tab=readme-ov-file#prerequisites"
+                    "and re-run installation.\n"
+                    "Please Follow the Below Command to uninstall and Install UCX\n"
+                    "UCX Uninstall: databricks labs uninstall ucx.\n"
+                    "UCX Install: databricks labs install ucx"
+                )
+                raise OperationFailed(msg) from err
             raise err
 
     def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
@@ -594,7 +606,7 @@ class WorkspaceInstallation(InstallationMixin):
     # TODO: @JCZuurmond: wait for dashboard team to fix the error below,
     # then update the retry decorator and document why this is needed
     # databricks.sdk.errors.platform.InternalError: A database error occurred during import-dashboard-new
-    @retried(on=[InternalError], timeout=timedelta(minutes=4))
+    @retried(on=[InternalError, DeadlineExceeded], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")

@@ -81,7 +81,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     ctx = WorkspaceContext(w)
     if table:
-        return ctx.table_mapping.skip_table(schema, table)
+        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
 
@@ -99,6 +99,14 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
+def validate_table_locations(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """Validate if the table locations are overlapping in a workspace and across workspaces"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.validate_table_locations()
 
 
 @ucx.command(is_account=True)
@@ -190,8 +198,8 @@ def validate_groups_membership(w: WorkspaceClient):
 def revert_migrated_tables(
     w: WorkspaceClient,
     prompts: Prompts,
-    schema: str,
-    table: str,
+    schema: str | None = None,
+    table: str | None = None,
     *,
     delete_managed: bool = False,
     ctx: WorkspaceContext | None = None,
@@ -203,9 +211,9 @@ def revert_migrated_tables(
             return
     if not ctx:
         ctx = WorkspaceContext(w)
-    revert = ctx.tables_migrator.print_revert_report(delete_managed=delete_managed)
+    revert = ctx.tables_migrator.print_revert_report(schema=schema, table=table, delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        ctx.tables_migrator.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        ctx.tables_migrator.revert_migrated_tables(schema=schema, table=table, delete_managed=delete_managed)
 
 
 @ucx.command
@@ -469,6 +477,21 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             f", do you want to run the migrate-external-tables-ctas workflow?"
         ):
             deployed_workflows.run_workflow("migrate-external-tables-ctas")
+
+
+@ucx.command
+def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **named_parameters):
+    """
+    Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
+    """
+    if ctx is None:
+        ctx = WorkspaceContext(w)
+    ctx.acl_migrator.migrate_acls(
+        target_catalog=named_parameters.get("target_catalog"),
+        legacy_table_acl=True,
+        principal=True,
+        hms_fed=named_parameters.get("hms_fed", False),
+    )
 
 
 @ucx.command

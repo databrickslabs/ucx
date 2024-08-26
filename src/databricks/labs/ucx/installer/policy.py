@@ -12,6 +12,14 @@ from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 
 logger = logging.getLogger(__name__)
 
+# Known prefixes for external HMS spark attributes
+ext_hms_prefixes = [
+    "spark_conf.spark.sql.hive.metastore",
+    "spark_conf.spark.hadoop.hive.metastore",
+    "spark_conf.spark.hadoop.javax.jdo.option",
+    "spark_conf.spark.databricks.hive.metastore",
+]
+
 
 class ClusterPolicyInstaller:
     def __init__(self, installation: Installation, ws: WorkspaceClient, prompts: Prompts):
@@ -99,7 +107,7 @@ class ClusterPolicyInstaller:
 
     def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True)
-        node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
+        node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
             "node_type_id": self._policy_config(node_type_id),
@@ -142,13 +150,9 @@ class ClusterPolicyInstaller:
             instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
-            if (
-                key.startswith("spark_conf.spark.sql.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
-            ):
-                spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
+            for known_prefix in ext_hms_prefixes:
+                if key.startswith(known_prefix):
+                    spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
 
     def _get_cluster_policies_with_external_hive_metastores(self):

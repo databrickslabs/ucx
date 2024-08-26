@@ -12,6 +12,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
@@ -60,6 +61,8 @@ class AWSResourcePermissions:
         """
         roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
+        if len(missing_paths) == 0:
+            return []
         s3_buckets = set()
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_BUCKET, missing_path)
@@ -191,10 +194,9 @@ class AWSResourcePermissions:
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
-            path = PurePath(external_location.location)
             matching_role = False
             for role in compatible_roles:
-                if path.match(role.resource_path):
+                if external_location.location.startswith(role.resource_path):
                     matching_role = True
                     continue
             if matching_role:
@@ -256,7 +258,9 @@ class AWSResourcePermissions:
             "value": iam_instance_profile.instance_profile_arn,
         }
 
-        self._ws.cluster_policies.edit(str(policy.policy_id), str(policy.name), definition=json.dumps(definition_dict))
+        self._ws.cluster_policies.edit(
+            str(policy.policy_id), name=str(policy.name), definition=json.dumps(definition_dict)
+        )
 
     def _update_sql_dac_with_instance_profile(self, iam_instance_profile: AWSInstanceProfile, prompts: Prompts):
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
@@ -266,10 +270,16 @@ class AWSResourcePermissions:
                 f"workspace warehouse config. Do you want UCX to to update it with the uber instance profile?"
             ):
                 return
+        security_policy = (
+            SetWorkspaceWarehouseConfigRequestSecurityPolicy(warehouse_config.security_policy.value)
+            if warehouse_config.security_policy
+            else SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
+        )
         self._ws.warehouses.set_workspace_warehouse_config(
             data_access_config=warehouse_config.data_access_config,
             sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
             instance_profile_arn=iam_instance_profile.instance_profile_arn,
+            security_policy=security_policy,
         )
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:

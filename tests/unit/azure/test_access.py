@@ -7,9 +7,14 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.compute import Policy
-from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
+from databricks.sdk.service.sql import (
+    GetWorkspaceWarehouseConfigResponse,
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponseSecurityPolicy,
+    SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+)
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -21,14 +26,16 @@ from databricks.labs.ucx.azure.resources import (
     Principal,
     StorageAccount,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 from . import azure_api_client
+from .. import DEFAULT_CONFIG
 
 
 def test_save_spn_permissions_no_external_table(caplog):
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": []}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": []}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
@@ -48,7 +55,7 @@ def test_save_spn_permissions_no_external_table(caplog):
 
 def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
@@ -67,7 +74,9 @@ def test_save_spn_permissions_no_external_tables():
 def test_save_spn_permissions_no_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
@@ -87,7 +96,7 @@ def test_save_spn_permissions_no_azure_storage_account():
 def test_save_spn_permissions_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -118,6 +127,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
     ]
     azure_resources.role_assignments.return_value = [
         AzureRoleAssignment(
+            id="rol1",
             resource=AzureResource(f'{containers}/container1'),
             scope=AzureResource(f'{containers}/container1'),
             principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
@@ -126,6 +136,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
             role_permissions=[],
         ),
         AzureRoleAssignment(
+            id="rol2",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -170,7 +181,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
 def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -201,6 +212,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     ]
     azure_resources.role_assignments.return_value = [
         AzureRoleAssignment(
+            id="rol1",
             resource=AzureResource(f'{containers}/container1'),
             scope=AzureResource(f'{containers}/container1'),
             principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
@@ -215,6 +227,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol2",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -226,6 +239,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol3",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
@@ -234,6 +248,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             role_permissions=["Microsoft.Authorization/*"],
         ),
         AzureRoleAssignment(
+            id="rol4",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('g', 'h', 'i', 'Application', '0000-0000'),
@@ -244,6 +259,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol5",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('j', 'k', 'l', 'Application', '0000-0000'),
@@ -254,6 +270,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol6",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('j', 'k', 'l', 'Application', '0000-0000'),
@@ -264,6 +281,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol7",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('m', 'n', 'o', 'Application', '0000-0000'),
@@ -274,6 +292,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol8",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('v', 'w', 'x', 'Application', '0000-0000'),
@@ -284,6 +303,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol9",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('p', 'q', 'r', 'Application', '0000-0000'),
@@ -294,6 +314,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol10",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('s', 't', 'u', 'Application', '0000-0000'),
@@ -307,6 +328,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol11",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a1', 'b1', 'c1', 'Application', '0000-0000'),
@@ -315,6 +337,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             role_permissions=[],
         ),
         AzureRoleAssignment(
+            id="rol12",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a1', 'b1', 'c1', 'Application', '0000-0000'),
@@ -325,6 +348,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol13",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a2', 'b2', 'c2', 'Application', '0000-0000'),
@@ -335,6 +359,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             ],
         ),
         AzureRoleAssignment(
+            id="rol14",
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('a2', 'b2', 'c2', 'Application', '0000-0000'),
@@ -586,7 +611,7 @@ def test_create_global_spn_spn_present():
 
 def test_create_global_spn_no_storage():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
     installation = MockInstallation(
         {
@@ -605,7 +630,7 @@ def test_create_global_spn_no_storage():
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_uber_principal(prompts)
-    azure_resources.storage_accounts.assert_not_called()
+    azure_resources.storage_accounts.assert_called_once()
     azure_resources.create_or_update_access_connector.assert_not_called()
     azure_resources.role_assignments.assert_not_called()
     azure_resources.containers.assert_not_called()
@@ -618,48 +643,21 @@ def test_create_global_spn_no_storage():
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
-def test_create_global_spn_cluster_policy_not_found():
-    w = create_autospec(WorkspaceClient)
-    w.cluster_policies.get.side_effect = NotFound()
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
-    installation = MockInstallation(
-        {
-            'config.yml': {
-                'inventory_database': 'ucx',
-                'policy_id': 'foo1',
-                'connect': {
-                    'host': 'foo',
-                    'token': 'bar',
-                },
-            }
-        }
-    )
-    api_client = azure_api_client()
-    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    with pytest.raises(NotFound):
-        azure_resource_permission.create_uber_principal(prompts)
-    w.cluster_policies.get.assert_called_once()
-    w.secrets.get_secret.assert_not_called()
-    w.secrets.create_scope.assert_called_with("ucx")
-    w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
-    w.cluster_policies.edit.assert_not_called()
-    w.get_workspace_id.assert_called_once()
-    w.warehouses.set_workspace_warehouse_config.assert_not_called()
-
-
-def test_create_global_spn():
+def setup_create_uber_principal():
     w = create_autospec(WorkspaceClient)
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
-    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse
-    rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=[EndpointConfPair(key="foo", value="bar")]
+    )
+    rows = {
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
+        ]
+    }
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation(
@@ -675,19 +673,48 @@ def test_create_global_spn():
         }
     )
     api_client = azure_api_client()
+    w.api_client = api_client
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    return w, installation, prompts, azure_resource_permission
+
+
+def test_create_global_spn_cluster_policy_not_found() -> None:
+    w, _, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.cluster_policies.get.side_effect = NotFound()
+
+    with pytest.raises(NotFound):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    w.cluster_policies.get.assert_has_calls([call("foo1"), call("foo1")])
+    w.secrets.get_secret.asser_called_with("ucx", "uber_principal_secret")
+    w.secrets.create_scope.assert_called_with("ucx")
+    w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_called_once()
+
+
+def test_create_global_spn() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
     azure_resource_permission.create_uber_principal(prompts)
+
     installation.assert_file_written(
         'policy-backup.json',
         {'definition': '{"foo": "bar"}', 'name': 'Unity Catalog Migration (ucx) (me@example.com)', 'policy_id': 'foo'},
     )
-    call_1 = call("/v1.0/applications", {"displayName": "UCXServicePrincipal"})
-    call_2 = call("/v1.0/servicePrincipals", {"appId": "appIduser1"})
-    call_3 = call("/v1.0/servicePrincipals/Iduser1/addPassword")
-    api_client.post.assert_has_calls([call_1, call_2, call_3], any_order=True)
-    api_client.put.assert_called_once()
+    installation.assert_file_written(
+        'warehouse-config-backup.json',
+        GetWorkspaceWarehouseConfigResponse(data_access_config=[EndpointConfPair(key="foo", value="bar")]).as_dict(),
+    )
+    calls = [
+        call("/v1.0/applications", {"displayName": "UCXServicePrincipal"}),
+        call("/v1.0/servicePrincipals", {"appId": "appIduser1"}),
+        call("/v1.0/servicePrincipals/Iduser1/addPassword"),
+    ]
+    w.api_client.post.assert_has_calls(calls, any_order=True)
+    w.api_client.put.assert_called_once()
     definition = {
         "foo": "bar",
         "spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net": {
@@ -709,13 +736,14 @@ def test_create_global_spn():
         },
     }
     w.cluster_policies.edit.assert_called_with(
-        'foo1', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
     w.warehouses.get_workspace_warehouse_config.assert_called_once()
     w.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[
+            EndpointConfPair(key='foo', value='bar'),
             EndpointConfPair(
                 key='spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net', value='appIduser1'
             ),
@@ -734,6 +762,175 @@ def test_create_global_spn():
             ),
         ],
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
+    )
+
+
+@pytest.mark.parametrize(
+    "get_security_policy, set_security_policy",
+    [
+        (
+            GetWorkspaceWarehouseConfigResponseSecurityPolicy.DATA_ACCESS_CONTROL,
+            SetWorkspaceWarehouseConfigRequestSecurityPolicy.DATA_ACCESS_CONTROL,
+        ),
+        (GetWorkspaceWarehouseConfigResponseSecurityPolicy.NONE, SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE),
+    ],
+)
+def test_create_global_spn_set_warehouse_config_security_policy(get_security_policy, set_security_policy):
+    w = create_autospec(WorkspaceClient)
+    w.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        security_policy=get_security_policy
+    )
+    rows = {
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
+        ]
+    }
+    location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
+    installation = MockInstallation(DEFAULT_CONFIG.copy())
+    api_client = azure_api_client()
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission.create_uber_principal(
+        MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+    )
+
+    assert w.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.api_client.post.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config() -> None:
+    _, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+
+    def raise_permission_denied(*_, **__):
+        raise PermissionDenied()
+
+    installation.save = raise_permission_denied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.api_client.put.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    w.api_client.delete.assert_called_with("/v1.0/applications(appId='appIduser1')")
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.secrets.create_scope.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.secrets.put_secret.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.cluster_policies.edit.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+
+
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config() -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+    w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        azure_resource_permission.create_uber_principal(prompts)
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+    w.cluster_policies.edit.assert_called_with(
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
+    )
+
+
+@pytest.mark.parametrize("use_backup", [True, False])
+def test_delete_global_service_principal_after_creation(use_backup) -> None:
+    w, installation, prompts, azure_resource_permission = setup_create_uber_principal()
+
+    azure_resource_permission.create_uber_principal(prompts)
+    if not use_backup:
+        installation._overwrites.pop("policy-backup.json")  # pylint: disable=protected-access
+        installation._overwrites.pop("warehouse-config-backup.json")  # pylint: disable=protected-access
+    azure_resource_permission._delete_uber_principal()  # pylint: disable=protected-access
+
+    assert installation.load(WorkspaceConfig).uber_spn_id is None
+    calls = [
+        call("rol1", "2022-04-01"),
+        call("rol2", "2022-04-01"),
+        call("/v1.0/applications(appId='appIduser1')"),
+    ]
+    w.api_client.delete.assert_has_calls(calls)
+    w.secrets.delete_scope.assert_called_with("ucx")
+    w.cluster_policies.edit.assert_called_with(
+        'foo1', name='Unity Catalog Migration (ucx) (me@example.com)', definition='{"foo": "bar"}'
+    )
+    w.warehouses.set_workspace_warehouse_config.assert_called_with(
+        data_access_config=[EndpointConfPair(key="foo", value="bar")],
+        sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
 
 
@@ -766,7 +963,9 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
 
@@ -824,7 +1023,9 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
+        ]
     }
     backend = MockBackend(rows=rows)
 

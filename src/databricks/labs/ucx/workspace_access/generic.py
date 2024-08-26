@@ -363,7 +363,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield WorkspaceObjectInfo(
                 path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
             )

@@ -2,6 +2,7 @@ import urllib.parse
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 from databricks.sdk.core import (
@@ -13,6 +14,7 @@ from databricks.sdk.core import (
     credentials_strategy,
 )
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.assessment.crawlers import logger
 
@@ -141,6 +143,7 @@ class PrincipalSecret:
 
 @dataclass
 class AzureRoleAssignment:
+    id: str
     resource: AzureResource
     scope: AzureResource
     principal: Principal
@@ -248,7 +251,7 @@ class AzureAPIClient:
         _query: dict[str, str] = query or {}
         if api_version is not None:
             _query["api-version"] = api_version
-        return self.api_client.do("GET", path, _query, headers)
+        return self.api_client.do("GET", path, query=_query, headers=headers)
 
     def put(self, path: str, api_version: str | None = None, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
@@ -256,15 +259,15 @@ class AzureAPIClient:
         if api_version is not None:
             query["api-version"] = api_version
         if body is not None:
-            return self.api_client.do("PUT", path, query, headers, body)
+            return self.api_client.do("PUT", path, query=query, headers=headers, body=body)
         return None
 
     def post(self, path: str, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if body is not None:
-            return self.api_client.do("POST", path, query, headers, body)
-        return self.api_client.do("POST", path, query, headers)
+            return self.api_client.do("POST", path, query=query, headers=headers, body=body)
+        return self.api_client.do("POST", path, query=query, headers=headers)
 
     def delete(self, path: str, api_version: str | None = None):
         # this method is added only to be used in int test to delete the application once tests pass
@@ -272,7 +275,7 @@ class AzureAPIClient:
         query: dict[str, str] = {}
         if api_version is not None:
             query["api-version"] = api_version
-        return self.api_client.do("DELETE", path, query, headers)
+        return self.api_client.do("DELETE", path, query=query, headers=headers)
 
     def token(self):
         return self._token_source.token()
@@ -322,22 +325,130 @@ class AzureResources:
         assert principal_type is not None
         assert directory_id is not None
         assert secret is not None
-        return PrincipalSecret(Principal(client_id, display_name, object_id, principal_type, directory_id), secret)
+        principal_secret = PrincipalSecret(
+            Principal(client_id, display_name, object_id, principal_type, directory_id), secret
+        )
+        logger.info(
+            f"Created service principal ({principal_secret.client.client_id}) with access to used storage accounts: "
+            + principal_secret.client.display_name
+        )
+        return principal_secret
 
-    def delete_service_principal(self, principal_id: str):
+    def delete_service_principal(self, principal_id: str, *, safe: bool = False):
+        """Delete the service principal.
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to delete.
+        safe : bool, optional (default: True)
+            If True, will not raise an error if the service principal does not exists.
+
+        Raises
+        ------
+        NotFound :
+            If the principal is not found.
+        PermissionDenied :
+            If missing permission to delete the service principal
+        """
         try:
             self._graph.delete(f"/v1.0/applications(appId='{principal_id}')")
         except PermissionDenied:
             msg = f"User doesnt have permission to delete application {principal_id}"
             logger.error(msg)
             raise PermissionDenied(msg) from None
+        except NotFound:
+            if safe:
+                return
+            raise
+
+    def _log_permission_denied_error_for_storage_permission(self, path: str) -> None:
+        logger.error(
+            "Permission denied. Please run this cmd under the identity of a user who has "
+            f"create service principal permission: {path}"
+        )
+
+    def get_storage_permission(
+        self,
+        storage_account: StorageAccount,
+        role_guid: str,
+        *,
+        timeout: timedelta = timedelta(seconds=1),
+    ) -> AzureRoleAssignment | None:
+        """Get a storage permission.
+
+        Parameters
+        ----------
+        storage_account : StorageAccount
+            The storage account to get the permission for.
+        role_guid : str
+            The role guid to get the permission for.
+        timeout : timedelta, optional (default: timedelta(seconds=1))
+            The timeout to wait for the permission to be found.
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
+        retry = retried(on=[NotFound], timeout=timeout)
+        path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
+        try:
+            response = retry(self._mgmt.get)(path, "2022-04-01")
+            assignment = self._role_assignment(response, str(storage_account.id))
+            return assignment
+        except TimeoutError:  # TimeoutError is raised by retried
+            logger.warning(f"Storage permission not found: {path}")  # not found because retry on NotFound
+            return None
+        except PermissionDenied:
+            self._log_permission_denied_error_for_storage_permission(path)
+            raise
+
+    def _get_storage_permissions(
+        self,
+        principal_id: str,
+        storage_account: StorageAccount,
+    ) -> Iterable[AzureRoleAssignment]:
+        """Get storage permissions for a principal.
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to get the storage permissions for.
+        storage_account : StorageAccount
+            The storage account to get the permission for.
+
+        Yields
+        ------
+        AzureRoleAssignment :
+            The role assignment
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
+        path = (
+            f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments"
+            f"?$filter=principalId%20eq%20'{principal_id}'"
+        )
+        try:
+            response = self._mgmt.get(path, "2022-04-01")
+        except PermissionDenied:
+            self._log_permission_denied_error_for_storage_permission(path)
+            raise
+
+        for role_assignment in response.get("value", []):
+            assignment = self._role_assignment(role_assignment, str(storage_account.id))
+            if assignment:
+                yield assignment
 
     def apply_storage_permission(
         self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
     ):
+        role_id = _ROLES[role_name]
+        path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
         try:
-            role_id = _ROLES[role_name]
-            path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             role_definition_id = f"/subscriptions/{storage_account.id.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
             body = {
                 "properties": {
@@ -353,12 +464,54 @@ class AzureResources:
                 f" for spn {principal_id}."
             )
         except PermissionDenied:
-            msg = (
-                "Permission denied. Please run this cmd under the identity of a user who has "
-                "create service principal permission."
+            self._log_permission_denied_error_for_storage_permission(path)
+            raise
+
+    def _delete_storage_permission(
+        self, principal_id: str, storage_account: StorageAccount, *, safe: bool = False
+    ) -> None:
+        """See meth:delete_storage_permission"""
+        try:
+            storage_permissions = list(self._get_storage_permissions(principal_id, storage_account))
+        except NotFound:
+            if safe:
+                return
+            raise
+        permission_denied_ids = []
+        for permission in storage_permissions:
+            try:
+                self._mgmt.delete(permission.id, "2022-04-01")
+            except PermissionDenied:
+                self._log_permission_denied_error_for_storage_permission(permission.id)
+                permission_denied_ids.append(permission.id)
+            except NotFound:
+                continue  # Somehow deleted right in-between getting and deleting
+        if permission_denied_ids:
+            raise PermissionDenied(
+                f"Permission denied for deleting role assignments: {', '.join(permission_denied_ids)}"
             )
-            logger.error(msg)
-            raise PermissionDenied(msg) from None
+
+    def delete_storage_permission(
+        self, principal_id: str, *storage_accounts: StorageAccount, safe: bool = False
+    ) -> None:
+        """Delete storage permission(s) for a principal
+
+        Parameters
+        ----------
+        principal_id : str
+            The principal id to delete the role assignment(s) for.
+        storage_accounts : StorageAccount
+            The storage account(s) to delete permission for.
+        safe : bool, optional (default: False)
+            If True, will not raise an exception if no role assignment are found.
+
+        Raises
+        ------
+        PermissionDenied :
+            If user is missing permission to get the storage permission.
+        """
+        for storage_account in storage_accounts:
+            self._delete_storage_permission(principal_id, storage_account, safe=safe)
 
     def tenant_id(self):
         token = self._mgmt.token()
@@ -427,19 +580,21 @@ class AzureResources:
             principal_types = ["ServicePrincipal"]
         result = self._mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
-            assignment = self._role_assignment(role_assignment, resource_id, principal_types)
+            principal_type = role_assignment.get("properties", {}).get("principalType")
+            if not principal_type and principal_type not in principal_types:
+                continue
+            assignment = self._role_assignment(role_assignment, resource_id)
             if not assignment:
                 continue
             yield assignment
 
-    def _role_assignment(
-        self, role_assignment: dict, resource_id: str, principal_types: list[str]
-    ) -> AzureRoleAssignment | None:
+    def _role_assignment(self, role_assignment: dict, resource_id: str) -> AzureRoleAssignment | None:
+        id_ = role_assignment.get("id")
+        if not id_:
+            return None
         assignment_properties = role_assignment.get("properties", {})
         principal_type = assignment_properties.get("principalType")
         if not principal_type:
-            return None
-        if principal_type not in principal_types:
             return None
         principal_id = assignment_properties.get("principalId")
         if not principal_id:
@@ -460,6 +615,7 @@ class AzureResources:
         if scope == "/":
             scope = resource_id
         return AzureRoleAssignment(
+            id=id_,
             resource=AzureResource(resource_id),
             scope=AzureResource(scope),
             principal=principal,

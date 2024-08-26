@@ -1,9 +1,12 @@
+import dataclasses
 import logging
 import os
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from functools import cached_property
+from typing import ClassVar, Optional
+from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -19,6 +22,9 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
+_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss")
+
+
 @dataclass
 class ExternalLocation:
     location: str
@@ -29,6 +35,82 @@ class ExternalLocation:
 class Mount:
     name: str
     source: str
+
+
+# Union with string is invalid syntax: "LocationTrie" | None
+OptionalLocationTrie = Optional["LocationTrie"]  # pylint: disable=consider-alternative-union-syntax
+
+
+@dataclass
+class LocationTrie:
+    """A trie datastructure to search locations.
+
+    Used to find overlapping locations.
+    """
+
+    key: str = ""
+    parent: OptionalLocationTrie = None
+    children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
+    tables: list[Table] = dataclasses.field(default_factory=list)
+
+    @cached_property
+    def _path(self):
+        """The path to traverse to get to the current node."""
+        parts = []
+        current = self
+        while current:
+            parts.append(current.key)
+            current = current.parent
+        return list(reversed(parts))[1:]
+
+    @property
+    def location(self):
+        scheme, netloc, *path = self._path
+        return f"{scheme}://{netloc}/{'/'.join(path)}"
+
+    @staticmethod
+    def _parse_location(location: str | None) -> list[str]:
+        if not location:
+            return []
+        parse_result = urlparse(location)
+        parts = [parse_result.scheme, parse_result.netloc]
+        parts.extend(parse_result.path.strip("/").split("/"))
+        return parts
+
+    def insert(self, table: Table) -> None:
+        current = self
+        for part in self._parse_location(table.location):
+            if part not in current.children:
+                parent = current
+                current = LocationTrie(part, parent)
+                parent.children[part] = current
+                continue
+            current = current.children[part]
+        current.tables.append(table)
+
+    def find(self, table: Table) -> OptionalLocationTrie:
+        current = self
+        for part in self._parse_location(table.location):
+            if part not in current.children:
+                return None
+            current = current.children[part]
+        return current
+
+    def is_valid(self) -> bool:
+        """A valid location has a scheme and netloc; the path is optional."""
+        if len(self._path) < 3:
+            return False
+        scheme, netloc, *_ = self._path
+        return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
+
+    def has_children(self):
+        return len(self.children) > 0
+
+    def __iter__(self):
+        if self.is_valid():
+            yield self
+        for child in self.children.values():
+            yield from child
 
 
 class ExternalLocations(CrawlerBase[ExternalLocation]):
@@ -122,7 +204,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _external_location_list(self) -> Iterable[ExternalLocation]:
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {self._catalog}.{escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
@@ -133,7 +215,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+            f"SELECT * FROM {self._catalog}.{escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
         ):
             yield ExternalLocation(*row)
 
@@ -142,9 +224,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         tf_script = []
         cnt = 1
         res_name = ""
-        supported_prefixes = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
         for loc in missing_locations:
-            for prefix in supported_prefixes:
+            for scheme in _EXTERNAL_FILE_LOCATION_SCHEMES:
+                prefix = f"{scheme}://"
                 prefix_len = len(prefix)
                 if not loc.location.startswith(prefix):
                     continue
@@ -253,7 +335,7 @@ class Mounts(CrawlerBase[Mount]):
 
     def _try_fetch(self) -> Iterable[Mount]:
         for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
+            f"SELECT * FROM {self._catalog}.{escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
         ):
             yield Mount(*row)
 

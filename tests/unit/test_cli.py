@@ -13,13 +13,14 @@ from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
 from databricks.labs.ucx.cli import (
     alias,
     assign_metastore,
@@ -109,7 +110,7 @@ def ws():
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me().user_name = "foo"
     workspace_client.workspace.download = download
-    workspace_client.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
+    workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
         statement_id='123',
@@ -140,7 +141,7 @@ def test_skip_with_table(ws):
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER TABLE schema.table SET TBLPROPERTIES('databricks.labs.ucx.skip' = true)",
+        statement="SELECT * FROM hive_metastore.ucx.tables WHERE database='schema' AND name='table' LIMIT 1",
         byte_limit=None,
         catalog=None,
         schema=None,
@@ -216,9 +217,14 @@ def test_validate_external_locations(ws):
 
 
 def test_ensure_assessment_run(ws):
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
+
     ensure_assessment_run(ws)
 
     ws.jobs.list_runs.assert_called_once()
+    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
 def test_ensure_assessment_run_collection(ws, acc_client):
@@ -351,9 +357,16 @@ def test_save_storage_and_principal_gcp(ws):
 def test_migrate_credentials_azure(ws):
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azure_resources = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azure_resources,
+    )
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
+    azure_resources.storage_accounts.assert_called()
 
 
 def test_migrate_credentials_aws(ws):
@@ -365,16 +378,28 @@ def test_migrate_credentials_aws(ws):
     ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_limit_azure(ws):
+def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws):
+    """The storage credential limit is 200, so we should raise a warning when we hit that limit."""
     azure_resources = create_autospec(AzureResources)
     external_locations = create_autospec(ExternalLocations)
-    external_locations_mock = []
+    storage_accounts_mock, external_locations_mock = [], []
     for i in range(200):
-        external_locations_mock.append(
-            ExternalLocation(
-                location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}", table_count=i % 20
-            )
+        storage_account_id = AzureResource(
+            f"/subscriptions/test/resourceGroups/test/providers/Microsoft.Storage/storageAccounts/storage{i}"
         )
+        storage_account = StorageAccount(
+            id=storage_account_id,
+            name=f"storage{i}",
+            location="eastus",
+            default_network_action="Allow",
+        )
+        external_location = ExternalLocation(
+            location=f"abfss://container{i}@storage{i}.dfs.core.windows.net/folder{i}",
+            table_count=i % 20,
+        )
+        storage_accounts_mock.append(storage_account)
+        external_locations_mock.append(external_location)
+    azure_resources.storage_accounts.return_value = storage_accounts_mock
     external_locations.snapshot.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(
@@ -388,11 +413,20 @@ def test_migrate_credentials_limit_azure(ws):
     ws.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
-    external_locations_mock.append(
-        ExternalLocation(
-            location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25
-        )
+    storage_account_id = AzureResource(
+        "/subscriptions/test/resourceGroups/test/providers/Microsoft.Storage/storageAccounts/storage201"
     )
+    storage_account = StorageAccount(
+        id=storage_account_id,
+        name="storage201",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    external_location = ExternalLocation(
+        location=f"abfss://container{201}@storage{201}.dfs.core.windows.net/folder{201}", table_count=25
+    )
+    storage_accounts_mock.append(storage_account)
+    external_locations_mock.append(external_location)
     with pytest.raises(RuntimeWarning):
         migrate_credentials(ws, prompts, ctx=ctx)
 
@@ -601,9 +635,13 @@ def test_assign_metastore(acc_client, caplog):
 
 
 def test_migrate_tables(ws):
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
     prompts = MockPrompts({})
     migrate_tables(ws, prompts)
     ws.jobs.run_now.assert_called_with(456)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
 def test_migrate_external_hiveserde_tables_in_place(ws):
@@ -613,6 +651,9 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
 
     prompt = (
         "Found 1 (.*) hiveserde tables, do you want to run the "
@@ -623,6 +664,7 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(789)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
 def test_migrate_external_tables_ctas(ws):
@@ -632,6 +674,9 @@ def test_migrate_external_tables_ctas(ws):
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+    )
 
     prompt = (
         "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
@@ -643,6 +688,7 @@ def test_migrate_external_tables_ctas(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(987)
+    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
 def test_create_missing_principal_aws(ws):

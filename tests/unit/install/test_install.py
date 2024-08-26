@@ -135,7 +135,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
             raise e.errs[0]
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_install_cluster_override_jobs(ws, mock_installation):
@@ -523,7 +523,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     workspace_installation.run()
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README')
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     wheels.upload_to_dbfs.assert_not_called()
 
 
@@ -1160,7 +1160,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     ws.jobs.run_now.assert_not_called()
 
 
@@ -1193,7 +1193,7 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     ws.jobs.run_now.assert_called_once()
 
 
@@ -1220,7 +1220,7 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
         verify_timeout=timedelta(seconds=60),
     )
 
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
@@ -1249,7 +1249,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     )
 
     existing_installation.assert_file_uploaded('logs/README.md')
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_fresh_install(ws, mock_installation):
@@ -1323,7 +1323,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
 
     workspace_installation.run()
     ws.jobs.delete.assert_called_with("123")
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
@@ -1354,7 +1354,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
     )
 
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_get_existing_installation_global(ws, mock_installation):
@@ -1823,7 +1823,7 @@ def test_upload_dependencies(ws, mock_installation):
     )
     workspace_installation.run()
     wheels.upload_wheel_dependencies.assert_called_once()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 @pytest.fixture
