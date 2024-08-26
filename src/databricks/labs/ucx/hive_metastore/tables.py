@@ -18,6 +18,10 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
+# pylint: disable-next=import-error,import-outside-toplevel
+from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+spark = SparkSession.builder.getOrCreate()
+
 logger = logging.getLogger(__name__)
 
 
@@ -383,21 +387,33 @@ class TablesCrawler(CrawlerBase):
             yield Table(*row)
 
     def _show_tables_in_database(self, catalog: str, database: str) -> list[Table]:
+
         table_rows: list[Table] = []
         try:
             logger.debug(f"[{catalog}.{database}] listing tables and views")
-            for row in self._fetch(
-                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
-            ):
+            external_catalog = spark.sharedState.externalCatalog()
+            for row in external_catalog.listTables(catalog, database):
                 table_rows.append(
                     Table(
                         catalog=catalog,
                         database=database,
-                        name=row[1],
-                        object_type='UNKNOWN',
+                        name=row.name,
+                        object_type=row.tableType,
                         table_format='UNKNOWN',
                     )
                 )
+            # for row in self._fetch(
+            #     f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+            # ):
+            #     table_rows.append(
+            #         Table(
+            #             catalog=catalog,
+            #             database=database,
+            #             name=row[1],
+            #             object_type='UNKNOWN',
+            #             table_format='UNKNOWN',
+            #         )
+            #     )
         except NotFound:
             # This make the integration test more robust as many test schemas are being created and deleted quickly.
             # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend
