@@ -1,5 +1,5 @@
 {
   "cluster_name": "No isolation shared",
-  "spark_version": "12.3.x-cpu-scala2.12",
+  "spark_version": "12.3.x-cpu-ml-scala2.12",
   "data_security_mode": "NONE"
 }

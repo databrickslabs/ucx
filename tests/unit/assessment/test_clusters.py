@@ -149,6 +149,19 @@ def test_no_isolation_clusters():
     assert result_set[0].failures == '["No isolation shared clusters not supported in UC"]'
 
 
+def test_mlr_no_isolation_clusters():
+    ws = mock_workspace_client(cluster_ids=['no-isolation-mlr'])
+    sql_backend = MockBackend()
+    crawler = ClustersCrawler(ws, sql_backend, "ucx")
+    result_set = list(crawler.snapshot())
+    assert len(result_set) == 1
+    expected_failures = (
+        '["No isolation shared clusters not supported in UC",'
+        + ' "Shared Machine Learning Runtime clusters are not supported in UC"]'
+    )
+    assert result_set[0].failures == expected_failures
+
+
 def test_unsupported_clusters():
     ws = mock_workspace_client(cluster_ids=['legacy-passthrough'])
     sql_backend = MockBackend()
