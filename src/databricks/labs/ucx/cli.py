@@ -515,6 +515,15 @@ def join_collection(a: AccountClient, workspace_ids: str):
     w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
     account_installer.join_collection(w_ids)
 
+@ucx.command()
+def export(w: WorkspaceClient, dashboard_id: str, warehouse_id : str, output_file : str):
+    """exports the assessment dashboard"""
+    ctx = WorkspaceContext(w)
+    sql_backend = ctx.sql_backend
+    ctx.exporter(dashboard_id, sql_backend.warehouse_id, output_file)
+    #account_installer.join_collection(w_ids)
+
+
 
 @ucx.command
 def lint_local_code(

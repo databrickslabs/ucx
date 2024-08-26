@@ -25,6 +25,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
+from databricks.labs.ucx.assessment.export import Exporter
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
     AzureACL,
@@ -237,6 +238,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def tables_crawler(self):
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+
+    @cached_property
+    def export(self):
+        return Exporter(self.sql_backend, self.dashboard_id)
 
     @cached_property
     def tables_migrator(self):
