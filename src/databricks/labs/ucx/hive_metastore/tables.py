@@ -391,7 +391,7 @@ class TablesCrawler(CrawlerBase):
         table_rows: list[Table] = []
         try:
             logger.debug(f"[{catalog}.{database}] listing tables and views")
-            external_catalog = spark.sharedState.externalCatalog()
+            external_catalog = spark.catalog
             for row in external_catalog.listTables(catalog, database):
                 table_rows.append(
                     Table(
