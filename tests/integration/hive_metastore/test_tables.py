@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
@@ -12,20 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_describe_all_tables_in_databases(ws, sql_backend, spark_backend, inventory_schema, make_spark_schema, make_spark_table, env_or_skip):
+def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, make_schema, make_table, env_or_skip):
     logger.info("setting up fixtures")
 
-    os.environ["DATABRICKS_RUNTIME_VERSION"] = "15.3.x-cpu-ml-scala2.12"
+    schema_a = make_schema(catalog_name="hive_metastore")
+    schema_b = make_schema(catalog_name="hive_metastore")
+    make_schema(catalog_name="hive_metastore")
 
-    schema_a = make_spark_schema(catalog_name="hive_metastore")
-    schema_b = make_spark_schema(catalog_name="hive_metastore")
-    make_spark_schema(catalog_name="hive_metastore")
-
-    managed_table = make_spark_table(schema_name=schema_a.name)
-    external_table = make_spark_table(schema_name=schema_b.name, external=True)
-    tmp_table = make_spark_table(schema_name=schema_a.name, ctas="SELECT 2+2 AS four")
-    view = make_spark_table(schema_name=schema_b.name, ctas="SELECT 2+2 AS four", view=True)
-    non_delta = make_spark_table(schema_name=schema_a.name, non_delta=True)
+    managed_table = make_table(schema_name=schema_a.name)
+    external_table = make_table(schema_name=schema_b.name, external=True)
+    tmp_table = make_table(schema_name=schema_a.name, ctas="SELECT 2+2 AS four")
+    view = make_table(schema_name=schema_b.name, ctas="SELECT 2+2 AS four", view=True)
+    non_delta = make_table(schema_name=schema_a.name, non_delta=True)
 
     logger.info(
         f"managed_table={managed_table.full_name}, "
