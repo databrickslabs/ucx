@@ -1,7 +1,6 @@
 import dataclasses
 import json
 
-import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.service.catalog import AwsIamRoleRequest
