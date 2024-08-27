@@ -56,7 +56,7 @@ class TableSizeCrawler(CrawlerBase):
 
     def _try_load(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self.full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield TableSize(*row)
 
     def snapshot(self) -> list[TableSize]:
