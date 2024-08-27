@@ -200,7 +200,8 @@ def mock_workspace_client(
             ]
         ),
     }
-    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    ws.workspace.download.side_effect = lambda file_name, *, format = None: io.StringIO(
+        download_yaml[os.path.basename(file_name)])
     return ws
 
 
