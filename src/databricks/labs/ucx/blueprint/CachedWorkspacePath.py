@@ -1,8 +1,27 @@
 from collections import OrderedDict
 from io import StringIO
-from typing import BinaryIO, TypeVar, Generic, TextIO
+from typing import TextIO, BinaryIO
 
 from databricks.labs.blueprint.paths import WorkspacePath
+
+
+class _CachedIO:
+
+    def __init__(self, wrapped):
+        self._type = type(wrapped)
+        self._content = wrapped.read()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+
+    def read(self, *_args, **_kwargs):
+        return self._content
+
+    def __iter__(self):
+        yield from self._type(self._content)
 
 
 # lru_cache won't let us invalidate cache entries
@@ -10,7 +29,7 @@ from databricks.labs.blueprint.paths import WorkspacePath
 class WorkspaceLruCache:
 
     _WORKSPACE_CACHE_MAX_SIZE = 128
-    _WORKSPACE_CACHE = OrderedDict()
+    _WORKSPACE_CACHE: OrderedDict[str, _CachedIO] = OrderedDict()
 
     def __init__(self, func):
         self._func = func
@@ -22,12 +41,8 @@ class WorkspaceLruCache:
             cache.move_to_end(path)
             return cache[path]
         result = self._func(*args, **kwargs)
-        if isinstance(result, TextIO):
-            result = _CachedIO[TextIO, str](result)
-        if isinstance(result, StringIO):
-            result = _CachedIO[StringIO, str](result)
-        if isinstance(result, BinaryIO):
-            result = _CachedIO[BinaryIO, bytes](result)
+        if isinstance(result, (StringIO, TextIO, BinaryIO)):
+            result = _CachedIO(result)
         cache[path] = result
         if len(cache) > self._WORKSPACE_CACHE_MAX_SIZE:
             cache.popitem(last=False)
@@ -43,30 +58,6 @@ class WorkspaceLruCache:
             cls._WORKSPACE_CACHE.pop(path)
 
 
-T = TypeVar("T")
-R = TypeVar("R")
-
-
-class _CachedIO(Generic[T, R]):
-
-    def __init__(self, wrapped: T):
-        self._type = type(wrapped)
-        self._content: R = wrapped.read()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return False
-
-    def read(self, *_args, **_kwargs) -> R:
-        return self._content
-
-    def __iter__(self) -> R:
-        for item in self._type(self._content):
-            yield item
-
-
 def workspace_lru_cache(func):
 
     cache = WorkspaceLruCache(func)
@@ -74,7 +65,7 @@ def workspace_lru_cache(func):
     # we need a wrapper to receive self in args
     def wrapper(*args, **kwargs):
         nonlocal cache
-        return cache.__call__(*args, **kwargs)
+        return cache(*args, **kwargs)
 
     return wrapper
 
