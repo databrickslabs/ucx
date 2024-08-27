@@ -30,7 +30,7 @@ def test_cleanup(mock_backend):
 
     permission_manager.cleanup()
 
-    assert mock_backend.queries[0] == "DROP TABLE IF EXISTS `hive_metastore`.`test_database`.`permissions`"
+    assert mock_backend.queries[0] == "DROP TABLE IF EXISTS hive_metastore.test_database.permissions"
 
 
 def test_save(mock_backend):
