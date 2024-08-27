@@ -19,32 +19,32 @@ from tests.unit import GROUPS, PERMISSIONS
 
 def test_runtime_delete_backup_groups(run_workflow) -> None:
     ctx = run_workflow(RemoveWorkspaceLocalGroups.delete_backup_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_runtime_apply_permissions_to_account_groups(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.apply_permissions_to_account_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_rename_workspace_local_group(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.rename_workspace_local_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_reflect_account_groups_on_workspace(run_workflow) -> None:
     ctx = run_workflow(PermissionsMigrationAPI.reflect_account_groups_on_workspace)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_migrate_permissions_experimental(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[("123", "QUERIES", "temp")],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
@@ -63,12 +63,12 @@ def test_migrate_permissions_experimental(run_workflow) -> None:
 
 def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[("123", "QUERIES", "temp")],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
@@ -89,7 +89,7 @@ def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
 
 def test_migrate_permissions_not_enabled_error(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
@@ -106,7 +106,7 @@ def test_migrate_permissions_not_enabled_error(run_workflow) -> None:
 def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
     """Check that permission migration continues for other groups even if it fails for a single group."""
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),  # Will fail immediately.
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),  # Will fail midway.
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),  # Will succeed.
