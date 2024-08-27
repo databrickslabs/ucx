@@ -10,6 +10,7 @@ so that you'll be able to [scope the migration](docs/assessment.md) and execute 
 The [README notebook](#readme-notebook), which can be found in the installation folder contains further instructions and explanations of the different ucx workflows & dashboards.
 Once the migration is scoped, you can start with the [table migration process](#Table-Migration).
 
+
 More workflows, like notebook code migration are coming in future releases.
 
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
