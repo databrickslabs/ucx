@@ -4,7 +4,7 @@ import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import partial
+from functools import partial, cached_property
 
 import sqlglot
 from sqlglot import expressions
@@ -472,3 +472,42 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
+
+
+class FasterTableScanHack:
+    def __init__(self, spark: any):
+        self._spark = spark
+
+    @cached_property
+    def _external_catalog(self):
+        return self._spark._jsparkSession.sharedState().externalCatalog()
+
+    def _iterator(self, result: any):
+        it = result.iterator()
+        while it.hasNext():
+            yield it.next()
+
+    def list_tables(self, database: str) -> list[str]:
+        try:
+            return list(self._iterator(self._external_catalog.listTables(database)))
+        except Exception as err:
+            logger.warning(f"Failed to list tables in {database}: {err}")
+
+    def get_table(self, database: str, table: str) -> any:
+        raw_table = self._external_catalog.getTable(database, table)
+        table_format = raw_table.provider().getOrElse(None)
+        if not table_format:
+            table_format = "UNKNOWN"
+        location_uri = raw_table.storage().locationUri().getOrElse(None)
+        if location_uri:
+            location_uri = location_uri.toString()
+        view_text = raw_table.viewText()
+        return Table(
+            catalog='hive_metastore',
+            database=database,
+            name=table,
+            object_type=raw_table.tableType().name(),
+            table_format=table_format,
+            location=location_uri,
+            view_text=view_text,
+        )
