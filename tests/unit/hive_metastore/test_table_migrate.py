@@ -254,8 +254,8 @@ def test_migrate_external_table_failed_sync(ws, caplog):
             None,
             None,
             {},
-            False,
-            "",
+            True,
+            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
         ),
         # test failed migration
         (
@@ -300,6 +300,7 @@ def test_migrate_external_hiveserde_table_in_place(
     mount_crawler = create_autospec(Mounts)
     mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
     migrate_grants = create_autospec(MigrateGrants)
+
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -925,70 +926,35 @@ GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "ta
 
 def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     # all grants succeed except for one
-    errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
-    rows = test_produce_proper_queries_rows
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other", "view"])
+    table_crawler = create_autospec(TablesCrawler)
+    src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
+    table_crawler.snapshot.return_value = [src]
+    table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
 
     migrate_grants = create_autospec(MigrateGrants)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        ws,
-        backend,
-        table_mapping,
-        migration_status_refresher,
-        migrate_grants,
-    )
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
-    migration_status_refresher.get_seen_tables.return_value = {
-        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
-    }
     migration_index = create_autospec(MigrationIndex)
-    migration_index.get.return_value = MigrationStatus(
-        src_schema="db1_src",
-        src_table="managed_dbfs",
-        dst_catalog="ucx_default",
-        dst_schema="db1_dst",
-        dst_table="managed_dbfs",
-    )
-    migration_index.is_migrated.return_value = True
+    migration_index.is_migrated.return_value = False
     migration_status_refresher.index.return_value = migration_index
+    sql_backend = MockBackend()
 
-    table_migrate.migrate_tables(what=What.VIEW)
-
-    migrate_grants.apply.assert_called()
-
-    assert_grant_statements(backend.queries, expected_statements, unexpected_statements)
-
-    assert "Cannot identify UC grant" in caplog.text
-    assert (
-        "Failed to migrate ACL for hive_metastore.db1_src.view_src to ucx_default.db1_dst.view_dst: "
-        "TABLE_OR_VIEW_NOT_FOUND: error"
-    ) in caplog.text
-
-
-def test_migrate_principal_acls_should_produce_proper_queries(ws):
-    errors = {}
-    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other", "view"])
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    migrate_grants = create_autospec(MigrateGrants)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
-        backend,
+        sql_backend,
         table_mapping,
         migration_status_refresher,
         migrate_grants,
     )
+
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
-    migrate_grants.apply.assert_called()
+    migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
+    sql_backend.queries == [
+        'CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;',
+        "ALTER TABLE hive_metastore.db1_src.managed_dbfs SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
+        "ALTER TABLE ucx_default.db1_dst.managed_dbfs SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
+    ]
 
 
 def test_migrate_views_should_be_properly_sequenced(ws):

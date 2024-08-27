@@ -92,14 +92,9 @@ test_produce_proper_queries_rows = {
 
 
 def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
-    # all grants succeed except for one
-    errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
-    rows = test_produce_proper_queries_rows
-    backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
-    table_crawler.snapshot.return_value = [
-        Table('ucx_default', 'db1_dst', 'view_dst', 'VIEW', 'UNKNOWN'),
-    ]
+    src = Table('hive_metastore', 'db1_src', 'view_src', 'VIEW', 'UNKNOWN')
+    table_crawler.snapshot.return_value = [src]
 
     workspace_info = ws_info
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
@@ -115,87 +110,31 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
         "ucx_default.db1_dst.view_dst": "hive_metastore.db1_src.view_src",
     }
     acl_migrate.migrate_acls()
-    migrate_grants.apply.assert_called()
-
-    assert_grant_statements(backend.queries, expected_statements, unexpected_statements)
-
-    assert "Cannot identify UC grant" in caplog.text
+    migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.view_dst')
 
 
-def test_migrate_principal_acls_should_produce_proper_queries(ws, ws_info):
-    errors = {}
-    rows = {
-        'SELECT \\* FROM hive_metastore.inventory_database.tables': UCX_TABLES[
-            ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
-        ],
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
+def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
+    table_crawler = create_autospec(TablesCrawler)
+    src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
+    table_crawler.snapshot.return_value = [src]
+    workspace_info = ws_info
+    migrate_grants = create_autospec(MigrateGrants)
+
     migration_index = create_autospec(MigrationIndex)
+    migration_index.is_migrated.return_value = True
+
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
     }
-    migration_index.is_migrated.return_value = True
     migration_status_refresher.index.return_value = migration_index
-    principal_grants = create_autospec(PrincipalACL)
-    expected_grants = [
-        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'db1_src', 'managed_dbfs'),
-        Grant('spn1', "USE", "hive_metastore", 'db1_src'),
-        Grant('spn1', "USE", "hive_metastore"),
-    ]
-    principal_grants.get_interactive_cluster_grants.return_value = expected_grants
-    migrate_grants = create_autospec(MigrateGrants)
-    acl_migrate = ACLMigrator(
-        table_crawler,
-        ws_info,
-        backend,
-        migration_status_refresher,
-        migrate_grants,
-    )
-    acl_migrate.migrate_acls()
-
-    migrate_grants.apply.assert_called()
-
-    assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
-
-
-def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
-    # all grants succeed except for one
-    errors = {}
-    rows = {
-        'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
-            ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
-        ],
-        'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
-            ("11", "workspace_group", "account group", "temp", "", "", "", ""),
-        ],
-        'SELECT \\* FROM hive_metastore.inventory_database.tables': UCX_TABLES[
-            ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
-        ],
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    workspace_info = ws_info
-    migration_status_refresher = create_autospec(MigrationStatusRefresher)
-    migrate_grants = create_autospec(MigrateGrants)
 
     acl_migrate = ACLMigrator(
         table_crawler,
         workspace_info,
-        backend,
         migration_status_refresher,
         migrate_grants,
     )
-    migration_status_refresher.get_seen_tables.return_value = {
-        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
-    }
     acl_migrate.migrate_acls(hms_fed=True)
-    migration_index = create_autospec(MigrationIndex)
-    migration_index.is_migrated.return_value = True
-    migration_status_refresher.index.return_value = migration_index
 
-    migrate_grants.apply.assert_called()
-
-    assert "GRANT SELECT ON TABLE hms_fed.db1_src.managed_dbfs TO `account group`" in backend.queries
-    assert "GRANT MODIFY ON TABLE hms_fed.db1_src.managed_dbfs TO `account group`" not in backend.queries
+    migrate_grants.apply.assert_called_with(src, 'hms_fed.db1_src.managed_dbfs')
