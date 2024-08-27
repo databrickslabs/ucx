@@ -207,6 +207,9 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
             {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
         ),
     )
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        instance_profile_arn=None
+    )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
@@ -221,7 +224,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     )
     aws_resource_permissions.create_uber_principal(prompts)
     aws.put_role_policy.assert_called_with(
-        'role1',
+        'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
         {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'},
         None,
@@ -317,8 +320,10 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
     def command_call(cmd: str):
         command_calls.append(cmd)
         if "iam create-role" in cmd:
-            return 0, f'{{"Role":{{"Arn":"{instance_profile_arn}"}}}}', ""
+            return 1, f'{{"Role":{{"Arn":"{instance_profile_arn}"}}}}', ""
         if "iam create-instance-profile" in cmd:
+            return 0, f'{{"InstanceProfile":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "iam get-instance-profile" in cmd:
             return 0, f'{{"InstanceProfile":{{"Arn":"{instance_profile_arn}"}}}}', ""
         if "sts get-caller-identity" in cmd:
             return 0, '{"Account":"123"}', ""

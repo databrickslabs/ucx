@@ -1,5 +1,5 @@
+import dataclasses
 import json
-import logging
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
@@ -63,9 +63,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     assert external_location[0].credential_name == f"ucx_{rand}"
 
 
-def test_create_uber_instance_profile(
-    ws, env_or_skip, make_random, make_cluster_policy, aws_cli_ctx
-):
+def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster_policy, aws_cli_ctx):
     env_or_skip("AWS_PROFILE")
     aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.sql_backend.save_table(
@@ -75,7 +73,9 @@ def test_create_uber_instance_profile(
     )
     # create a new policy
     policy = make_cluster_policy()
-    aws_cli_ctx.installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
+    aws_cli_ctx.installation.save(
+        dataclasses.replace(aws_cli_ctx.workspace_installation.config, policy_id=policy.policy_id)
+    )
     # create a new uber instance profile
     aws_cli_ctx.save_tables()
     aws_resource_permission = aws_cli_ctx.aws_resource_permissions()
@@ -102,10 +102,7 @@ def test_create_uber_instance_profile(
     AWSResources(aws_cli_ctx.aws_profile()).delete_instance_profile(role_name, role_name)
 
 
-def test_fail_create_uber_instance_profile(
-    ws, env_or_skip, make_random, make_cluster_policy,
-    aws_cli_ctx
-):
+def test_fail_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster_policy, aws_cli_ctx):
     env_or_skip("AWS_PROFILE")
     aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.sql_backend.save_table(
@@ -113,12 +110,15 @@ def test_fail_create_uber_instance_profile(
         [ExternalLocation("s3://buck}et1/FOLDER1", 1)],
         ExternalLocation,
     )
-    aws_cli_ctx.installation.save([AWSInstanceProfile("role1", "role1")],
-                                  filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+    aws_cli_ctx.installation.save(
+        [AWSInstanceProfile("role1", "role1")], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME
+    )
     # create a new policy
 
     policy = make_cluster_policy()
-    aws_cli_ctx.installation.save(WorkspaceConfig(inventory_database='ucx', policy_id=policy.policy_id))
+    aws_cli_ctx.installation.save(
+        dataclasses.replace(aws_cli_ctx.workspace_installation.config, policy_id=policy.policy_id)
+    )
     aws_cli_ctx.save_tables()
 
     # create a new uber instance profile
@@ -132,8 +132,6 @@ def test_fail_create_uber_instance_profile(
                 }
             )
         )
-
-    policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
 
     config = aws_cli_ctx.installation.load(WorkspaceConfig)
     assert config.uber_instance_profile is None  # check that the uber instance profile was not created
