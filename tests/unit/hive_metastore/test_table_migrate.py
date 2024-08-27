@@ -31,12 +31,6 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
-from .test_migrate_acls import (
-    assert_grant_statements,
-    expected_statements,
-    unexpected_statements,
-    test_produce_proper_queries_rows,
-)
 
 from .. import mock_table_mapping, mock_workspace_client
 
@@ -319,9 +313,9 @@ def test_migrate_external_hiveserde_table_in_place(
     if migrated:
         assert expected_value in backend.queries
         migrate_grants.apply.assert_called()
-    else:
-        migrate_grants.apply.assert_not_called()
-        assert expected_value in caplog.text
+        return
+    migrate_grants.apply.assert_not_called()
+    assert expected_value in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -603,7 +597,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     table_crawler.snapshot.return_value = test_tables
     table_mapping = mock_table_mapping()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    migrate_grants = create_autospec(MigrateGrants)
+    migrate_grants = create_autospec(MigrateGrants)  # pylint: disable=mock-no-usage
     table_migrate = TablesMigrator(
         table_crawler,
         client,
@@ -736,6 +730,10 @@ def test_is_upgraded(ws):
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
+    table_crawler.snapshot.return_value = [
+        Table("hive_metastore", "schema1", "table1", "MANAGED", "DELTA"),
+        Table("hive_metastore", "schema1", "table2", "MANAGED", "DELTA"),
+    ]
     table_mapping = mock_table_mapping()
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -950,7 +948,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
-    sql_backend.queries == [
+    assert sql_backend.queries == [
         'CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;',
         "ALTER TABLE hive_metastore.db1_src.managed_dbfs SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
         "ALTER TABLE ucx_default.db1_dst.managed_dbfs SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",

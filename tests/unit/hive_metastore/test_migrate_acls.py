@@ -1,24 +1,17 @@
 import logging
 from unittest.mock import create_autospec
 import pytest
-from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL, MigrateGrants
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    ACLMigrator,
-)
+from databricks.labs.ucx.hive_metastore.grants import MigrateGrants, ACLMigrator, Grant
 from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatusRefresher,
     MigrationIndex,
 )
-from databricks.labs.ucx.hive_metastore.tables import (
-    TablesCrawler, Table,
-)
-
-from .. import GROUPS
-from ..workspace_access.test_tacl import UCX_TABLES
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, Table
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
 
@@ -35,60 +28,6 @@ def ws_info():
     info = create_autospec(WorkspaceInfo)
     info.current.return_value = "hms_fed"
     return info
-
-
-GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
-
-expected_statements = [
-    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
-    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
-    "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`",
-    "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`",
-]
-
-unexpected_statements = [
-    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`",
-    "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`",
-    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`",
-    "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_other TO `account group`",
-    "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_other TO `account group`",
-    "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`",
-]
-
-
-def assert_grant_statements(backend_queries, check_in, check_not_in):
-    for statement in check_in:
-        assert statement in backend_queries
-    for statement in check_not_in:
-        assert statement not in backend_queries
-
-
-test_produce_proper_queries_rows = {
-    'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
-        ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
-        ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
-        ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
-        ("workspace_group", "INVALID", "", "db1_src", "managed_other", ""),
-        ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
-        ("workspace_group", "SELECT", "", "db1_random", "view_src", ""),
-    ],
-    r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
-    'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
-        ("11", "workspace_group", "account group", "temp", "", "", "", ""),
-    ],
-    "SHOW CREATE TABLE": [
-        {
-            "createtab_stmt": "CREATE OR REPLACE VIEW "
-            "hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
-        }
-    ],
-    'SELECT \\* FROM hive_metastore.inventory_database.tables': UCX_TABLES[
-        ("hive_metastore", "db1_src", "managed_dbfs", "table", "DELTA", "/foo/bar/test", None),
-        ("hive_metastore", "db1_src", "managed_mnt", "table", "DELTA", "/foo/bar/test", None),
-        ("hive_metastore", "db1_src", "managed_other", "table", "DELTA", "/foo/bar/test", None),
-        ("hive_metastore", "db1_src", "view_src", "table", "DELTA", "/foo/bar/test", "select * from foo.bar"),
-    ],
-}
 
 
 def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
@@ -138,3 +77,50 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     acl_migrate.migrate_acls(hms_fed=True)
 
     migrate_grants.apply.assert_called_with(src, 'hms_fed.db1_src.managed_dbfs')
+
+
+def test_migrate_matched_grants_applies():
+    sql_backend = create_autospec(SqlBackend)
+    group_manager = create_autospec(GroupManager)
+    src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
+    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
+    migrate_grants.apply(src, 'catalog.schema.table')
+
+    group_manager.snapshot.assert_called()
+    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE catalog.schema.table TO `me`')
+
+
+def test_migrate_matched_grants_applies_and_remaps_group():
+    sql_backend = create_autospec(SqlBackend)
+    group_manager = create_autospec(GroupManager)
+    group_manager.snapshot.return_value = [
+        MigratedGroup(
+            name_in_workspace='me',
+            name_in_account='myself',
+            id_in_workspace='..',
+            temporary_name='..',
+        ),
+    ]
+    src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
+    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
+    migrate_grants.apply(src, 'catalog.schema.table')
+
+    group_manager.snapshot.assert_called()
+    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE catalog.schema.table TO `myself`')
+
+
+def test_migrate_no_matched_grants_no_apply():
+    sql_backend = create_autospec(SqlBackend)
+    group_manager = create_autospec(GroupManager)
+    src = Table('hive_metastore', 'default', 'bar', 'MANAGED', 'DELTA')
+    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
+    migrate_grants.apply(src, 'catalog.schema.table')
+
+    group_manager.snapshot.assert_not_called()
+    sql_backend.execute.assert_not_called()

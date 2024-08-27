@@ -32,13 +32,13 @@ from databricks.labs.ucx.hive_metastore.grants import (
     PrincipalACL,
     AwsACL,
     MigrateGrants,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
-    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -255,7 +255,6 @@ class GlobalContext(abc.ABC):
         return ACLMigrator(
             self.tables_crawler,
             self.workspace_info,
-            self.sql_backend,
             self.migration_status_refresher,
             self.migrate_grants,
         )

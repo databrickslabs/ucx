@@ -1,18 +1,16 @@
 import dataclasses
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
-from databricks.labs.ucx.hive_metastore.grants import Grant, MigrateGrants
+from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
@@ -30,7 +28,6 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 from databricks.sdk.errors.platform import DatabricksError
 
 logger = logging.getLogger(__name__)
@@ -402,20 +399,6 @@ class TablesMigrator:
     def _init_seen_tables(self):
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
 
-    @staticmethod
-    def _match_grants(table: Table, grants: Iterable[Grant], migrated_groups: list[MigratedGroup]) -> list[Grant]:
-        matched_grants = []
-        for grant in grants:
-            if grant.database != table.database:
-                continue
-            if table.name not in (grant.table, grant.view):
-                continue
-            matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
-            if len(matched_group) > 0:
-                grant = dataclasses.replace(grant, principal=matched_group[0])
-            matched_grants.append(grant)
-        return matched_grants
-
     def _sql_alter_to(self, table: Table, target_table_key: str):
         return f"ALTER {table.kind} {escape_sql_identifier(table.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
@@ -426,85 +409,6 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
-
-    def _is_migrated(self, schema: str, table: str) -> bool:
-        index = self._migration_status_refresher.index()
-        return index.is_migrated(schema, table)
-
-
-class ACLMigrator:
-    def __init__(
-        self,
-        tables_crawler: TablesCrawler,
-        workspace_info: WorkspaceInfo,
-        migration_status_refresher: MigrationStatusRefresher,
-        migrate_grants: MigrateGrants,
-    ):
-        self._table_crawler = tables_crawler
-        self._workspace_info = workspace_info
-        self._migration_status_refresher = migration_status_refresher
-        self._migrate_grants = migrate_grants
-
-    def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
-        workspace_name = self._workspace_info.current()
-        tables = self._table_crawler.snapshot()
-        if not tables:
-            logger.info("No tables found to acl")
-            return
-        if hms_fed:
-            tables_to_migrate = self._get_hms_fed_tables(tables, target_catalog if target_catalog else workspace_name)
-        else:
-            tables_to_migrate = self._get_migrated_tables(tables)
-        self._migrate_acls(tables_to_migrate)
-
-    def _get_migrated_tables(self, tables: list[Table]) -> list[TableToMigrate]:
-        # gets all the migrated table to apply ACLs to
-        tables_to_migrate = []
-        seen_tables = self._migration_status_refresher.get_seen_tables()
-        reverse_seen_tables = {v: k for k, v in seen_tables.items()}
-        for table in tables:
-            if table.key not in reverse_seen_tables:
-                logger.warning(f"Table {table.key} not found in migration status. Skipping.")
-                continue
-            dst_table_parts = reverse_seen_tables[table.key].split(".")
-            if len(dst_table_parts) != 3:
-                logger.warning(
-                    f"Invalid table name {reverse_seen_tables[table.key]} found in migration status. Skipping."
-                )
-                continue
-            rule = Rule(
-                self._workspace_info.current(),
-                dst_table_parts[0],
-                table.database,
-                dst_table_parts[1],
-                table.name,
-                dst_table_parts[2],
-            )
-            table_to_migrate = TableToMigrate(table, rule)
-            tables_to_migrate.append(table_to_migrate)
-        return tables_to_migrate
-
-    def _get_hms_fed_tables(self, tables: list[Table], target_catalog) -> list[TableToMigrate]:
-        # if it is hms_fed acl migration, migrate all the acls for tables in the provided catalog
-        tables_to_migrate = []
-        for table in tables:
-            rule = Rule(
-                self._workspace_info.current(),
-                target_catalog,
-                table.database,
-                table.database,
-                table.name,
-                table.name,
-            )
-            table_to_migrate = TableToMigrate(table, rule)
-            tables_to_migrate.append(table_to_migrate)
-        return tables_to_migrate
-
-    def _migrate_acls(self, tables_in_scope: list[TableToMigrate]) -> None:
-        tasks = []
-        for table in tables_in_scope:
-            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table_key))
-        Threads.strict("migrate grants", tasks)
 
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()
