@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, 
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
 
@@ -524,7 +524,7 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -557,7 +557,7 @@ def test_migrate_external_tables_with_principal_acl_azure(
         user_name=user_with_cluster_access.user_name,
         group_name=group_with_cluster_access.display_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -598,7 +598,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -625,7 +625,7 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
         permission_level=PermissionLevel.CAN_USE,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -708,7 +708,7 @@ def test_migrate_external_tables_with_spn_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         service_principal_name=spn_with_mount_access,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False

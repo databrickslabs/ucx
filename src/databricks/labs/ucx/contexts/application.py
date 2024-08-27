@@ -31,13 +31,14 @@ from databricks.labs.ucx.hive_metastore.grants import (
     GrantsCrawler,
     PrincipalACL,
     AwsACL,
+    MigrateGrants,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
-    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -242,25 +243,32 @@ class GlobalContext(abc.ABC):
     def tables_migrator(self):
         return TablesMigrator(
             self.tables_crawler,
-            self.grants_crawler,
             self.workspace_client,
             self.sql_backend,
             self.table_mapping,
-            self.group_manager,
             self.migration_status_refresher,
-            self.principal_acl,
+            self.migrate_grants,
         )
 
     @cached_property
     def acl_migrator(self):
         return ACLMigrator(
             self.tables_crawler,
-            self.grants_crawler,
             self.workspace_info,
+            self.migration_status_refresher,
+            self.migrate_grants,
+        )
+
+    @cached_property
+    def migrate_grants(self):
+        grant_loaders = [
+            self.grants_crawler.snapshot,
+            self.principal_acl.get_interactive_cluster_grants,
+        ]
+        return MigrateGrants(
             self.sql_backend,
             self.group_manager,
-            self.migration_status_refresher,
-            self.principal_acl,
+            grant_loaders,
         )
 
     @cached_property
