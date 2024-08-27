@@ -580,7 +580,7 @@ class PrincipalACL:
         self._mounts_crawler = mounts_crawler
         self._compute_locations = cluster_locations
 
-    def get_interactive_cluster_grants(self) -> list[Grant]:  # TODO: rename to apply()?..
+    def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()

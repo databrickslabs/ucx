@@ -14,7 +14,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationIndex,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
-    TablesCrawler,
+    TablesCrawler, Table,
 )
 
 from .. import GROUPS
@@ -96,7 +96,11 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
     rows = test_produce_proper_queries_rows
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_crawler = create_autospec(TablesCrawler)
+    table_crawler.snapshot.return_value = [
+        Table('ucx_default', 'db1_dst', 'view_dst', 'VIEW', 'UNKNOWN'),
+    ]
+
     workspace_info = ws_info
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
 
@@ -104,14 +108,10 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     acl_migrate = ACLMigrator(
         table_crawler,
         workspace_info,
-        backend,
         migration_status_refresher,
         migrate_grants,
     )
     migration_status_refresher.get_seen_tables.return_value = {
-        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
-        "ucx_default.db1_dst.managed_mnt": "hive_metastore.db1_src.managed_mnt",
-        "ucx_default.db1_dst.managed_other": "hive_metastore.db1_src.managed_other",
         "ucx_default.db1_dst.view_dst": "hive_metastore.db1_src.view_src",
     }
     acl_migrate.migrate_acls()

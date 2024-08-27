@@ -437,12 +437,10 @@ class ACLMigrator:
         self,
         tables_crawler: TablesCrawler,
         workspace_info: WorkspaceInfo,
-        backend: SqlBackend,
         migration_status_refresher: MigrationStatusRefresher,
         migrate_grants: MigrateGrants,
     ):
         self._table_crawler = tables_crawler
-        self._backend = backend
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
