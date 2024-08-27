@@ -511,3 +511,34 @@ class FasterTableScanHack:
             location=location_uri,
             view_text=view_text,
         )
+
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return [row[0] for row in self._fetch("SHOW DATABASES")]
+        return self._include_database
+
+
+    def _crawl(self) -> Iterable[Table]:
+        """Crawls and lists tables within the specified catalog and database.
+
+        After performing initial scan of all tables, starts making parallel
+        DESCRIBE TABLE EXTENDED queries for every table.
+
+        Production tasks would most likely be executed through `tables.scala`
+        within `crawl_tables` task due to `spark.sharedState.externalCatalog`
+        lower-level APIs not requiring a roundtrip to storage, which is not
+        possible for Azure storage with credentials supplied through Spark
+        conf (see https://github.com/databrickslabs/ucx/issues/249).
+
+        See also https://github.com/databrickslabs/ucx/issues/247
+        """
+        tasks = []
+        catalog = "hive_metastore"
+        table_names = [partial(self.list_tables, database) for database in self._all_databases()]
+        for batch in Threads.strict('listing tables', table_names):
+            for table in batch:
+                tasks.append(partial(self._describe, table.catalog, table.database, table.name))
+        catalog_tables, errors = Threads.gather(f"describing tables in {catalog}", tasks)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+        return catalog_tables
