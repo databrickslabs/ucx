@@ -14,6 +14,8 @@ def escape_sql_identifier(path: str) -> str:
     Returns:
          str: The path with all parts escaped in backticks.
     """
+    if not path:
+        return path
     parts = path.split(".", maxsplit=2)
     escaped = [f"`{part.strip('`')}`" for part in parts]
     return ".".join(escaped)
