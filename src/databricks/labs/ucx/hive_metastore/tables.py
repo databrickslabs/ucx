@@ -18,10 +18,6 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
-# pylint: disable-next=import-error,import-outside-toplevel
-from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
-spark = SparkSession.builder.getOrCreate()
-
 logger = logging.getLogger(__name__)
 
 
@@ -386,25 +382,19 @@ class TablesCrawler(CrawlerBase):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Table(*row)
 
-    def _iterator(self, result: any):
-        it = result.iterator()
-        while it.hasNext():
-            yield it.next()
-
     def _show_tables_in_database(self, catalog: str, database: str) -> list[Table]:
-
         table_rows: list[Table] = []
         try:
             logger.debug(f"[{catalog}.{database}] listing tables and views")
-            external_catalog = self._spark._jsparkSession.sharedState().externalCatalog()
-            table_list = list(self._iterator(external_catalog.listTables(database)))
-            for row in table_list:
+            for row in self._fetch(
+                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+            ):
                 table_rows.append(
                     Table(
                         catalog=catalog,
                         database=database,
-                        name=row.name,
-                        object_type=row.tableType,
+                        name=row[1],
+                        object_type='UNKNOWN',
                         table_format='UNKNOWN',
                     )
                 )
