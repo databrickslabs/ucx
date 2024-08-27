@@ -517,7 +517,6 @@ class FasterTableScanHack:
             return [row[0] for row in self._fetch("SHOW DATABASES")]
         return self._include_database
 
-
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
@@ -537,7 +536,7 @@ class FasterTableScanHack:
         table_names = [partial(self.list_tables, database) for database in self._all_databases()]
         for batch in Threads.strict('listing tables', table_names):
             for table in batch:
-                tasks.append(partial(self._describe, table.catalog, table.database, table.name))
+                tasks.append(partial(self.get_table, 'default', table))
         catalog_tables, errors = Threads.gather(f"describing tables in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
