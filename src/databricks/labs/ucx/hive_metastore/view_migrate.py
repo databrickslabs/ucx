@@ -72,7 +72,7 @@ class ViewToMigrate(TableToMigrate):
                 table_name.replace(new_view_name)
         # safely replace CREATE with CREATE IF NOT EXISTS
         create.args['exists'] = True
-        return create.sql('databricks')
+        return create.sql('databricks', identify=True)
 
     def __hash__(self):
         return hash(self.src)

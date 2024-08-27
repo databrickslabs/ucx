@@ -65,20 +65,20 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert (
-        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
+        "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;"
         in backend.queries
     )
-    assert "SYNC TABLE ucx_default.db1_dst.managed_mnt FROM hive_metastore.db1_src.managed_mnt;" in backend.queries
+    assert "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;" in backend.queries
     assert (
-        "ALTER TABLE hive_metastore.db1_src.managed_dbfs "
+        "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
     ) in backend.queries
     assert (
-        f"ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
-    assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in backend.queries
+    assert "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;" in backend.queries
     migrate_grants.apply.assert_called()
 
 
@@ -87,7 +87,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     rows = {
         "SHOW CREATE TABLE": [
             {
-                "createtab_stmt": "CREATE EXTERNAL TABLE hive_metastore.db1_src.managed_dbfs "
+                "createtab_stmt": "CREATE EXTERNAL TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
                 "(foo STRING,bar STRING) USING PARQUET "
                 "LOCATION 's3://some_location/table'"
             }
@@ -111,15 +111,15 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     migrate_grants.apply.assert_called()
 
     assert (
-        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs "
-        "AS SELECT * FROM hive_metastore.db1_src.managed_dbfs" in backend.queries
+        "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` "
+        "AS SELECT * FROM `hive_metastore`.`db1_src`.`managed_dbfs`" in backend.queries
     )
     assert (
-        "ALTER TABLE hive_metastore.db1_src.managed_dbfs "
+        "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
     ) in backend.queries
     assert (
-        f"ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
@@ -169,9 +169,9 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     migrate_grants.apply.assert_called()
 
     assert backend.queries == [
-        "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
+        "SYNC TABLE `ucx_default`.`db1_dst`.`external_dst` FROM `hive_metastore`.`db1_src`.`external_src`;",
         (
-            f"ALTER TABLE ucx_default.db1_dst.external_dst "
+            f"ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
             f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , "
             f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
         ),
@@ -324,17 +324,17 @@ def test_migrate_external_hiveserde_table_in_place(
         (
             What.EXTERNAL_HIVESERDE,
             "external_hiveserde",
-            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
+            "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`external_dst` LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM `hive_metastore`.`db1_src`.`external_src`",
         ),
         (
             What.EXTERNAL_NO_SYNC,
             "external_no_sync",
-            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3:/bucket/test/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
+            "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`external_dst` LOCATION 's3:/bucket/test/table1_ctas_migrated' AS SELECT * FROM `hive_metastore`.`db1_src`.`external_src`",
         ),
         (
             What.EXTERNAL_NO_SYNC,
             "external_no_sync_missing_location",
-            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst AS SELECT * FROM hive_metastore.db1_src.external_src",
+            "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`external_dst` AS SELECT * FROM `hive_metastore`.`db1_src`.`external_src`",
         ),
     ],
 )
@@ -428,7 +428,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
 
 def test_migrate_view_should_produce_proper_queries(ws):
     errors = {}
-    original_view = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
+    original_view = "CREATE OR REPLACE VIEW `hive_metastore`.`db1_src`.`view_src` AS SELECT * FROM `db1_src`.`managed_dbfs`"
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": original_view}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
@@ -455,13 +455,13 @@ def test_migrate_view_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
-    create = "CREATE OR REPLACE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM ucx_default.db1_dst.new_managed_dbfs"
+    create = "CREATE OR REPLACE VIEW IF NOT EXISTS `ucx_default`.`db1_dst`.`view_dst` AS SELECT * FROM `ucx_default`.`db1_dst`.`new_managed_dbfs`"
     assert create in backend.queries
     src = (
-        "ALTER VIEW hive_metastore.db1_src.view_src SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
+        "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     )
     assert src in backend.queries
-    dst = f"ALTER VIEW ucx_default.db1_dst.view_dst SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+    dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     assert dst in backend.queries
     migrate_grants.apply.assert_called()
 
@@ -505,7 +505,7 @@ def test_migrate_view_with_columns(ws):
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
-    create = "CREATE OR REPLACE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst (a, b) AS SELECT * FROM ucx_default.db1_dst.new_managed_dbfs"
+    create = "CREATE OR REPLACE VIEW IF NOT EXISTS `ucx_default`.`db1_dst`.`view_dst` (`a`, `b`) AS SELECT * FROM `ucx_default`.`db1_dst`.`new_managed_dbfs`"
     assert create in backend.queries
     migrate_grants.apply.assert_called()
 
@@ -617,15 +617,15 @@ def test_revert_migrated_tables_skip_managed():
     table_migrate.revert_migrated_tables(schema="test_schema1")
     revert_queries = backend.queries
     assert (
-        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
-    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_queries
+    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest1`" in revert_queries
     assert (
-        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
-    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_queries
+    assert "DROP VIEW IF EXISTS `cat1`.`schema1`.`dest_view1`" in revert_queries
 
 
 def test_revert_migrated_tables_including_managed():
@@ -637,20 +637,20 @@ def test_revert_migrated_tables_including_managed():
     table_migrate.revert_migrated_tables(schema="test_schema1", delete_managed=True)
     revert_with_managed_queries = backend.queries
     assert (
-        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_with_managed_queries
+    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest1`" in revert_with_managed_queries
     assert (
-        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_with_managed_queries
+    assert "DROP VIEW IF EXISTS `cat1`.`schema1`.`dest_view1`" in revert_with_managed_queries
     assert (
-        "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP TABLE IF EXISTS cat1.schema1.dest2" in revert_with_managed_queries
+    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest2`" in revert_with_managed_queries
 
 
 def test_no_migrated_tables(ws):
@@ -723,8 +723,8 @@ def test_empty_revert_report(ws):
 def test_is_upgraded(ws):
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES schema1.table1": MockBackend.rows("key", "value")["upgrade_to", "fake_dest"],
-        "SHOW TBLPROPERTIES schema1.table2": MockBackend.rows("key", "value")[
+        "SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "fake_dest"],
+        "SHOW TBLPROPERTIES `schema1`.`table2`": MockBackend.rows("key", "value")[
             "upgraded_to", "table table2 does not have property: upgraded_to"
         ],
     }
@@ -760,7 +760,7 @@ def test_table_status():
 
     datetime.datetime = FakeDate
     errors = {}
-    rows = {"SHOW TBLPROPERTIES schema1.table1": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]}
+    rows = {"SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     table_crawler.snapshot.return_value = [
@@ -852,7 +852,7 @@ def test_table_status_reset():
     table_status_crawler = MigrationStatusRefresher(client, backend, "ucx", table_crawler)
     table_status_crawler.reset()
     assert backend.queries == [
-        "TRUNCATE TABLE hive_metastore.ucx.migration_status",
+        "TRUNCATE TABLE `hive_metastore`.`ucx`.`migration_status`",
     ]
     table_crawler.snapshot.assert_not_called()
     client.catalogs.list.assert_not_called()
@@ -949,22 +949,22 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
 
     migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
     assert sql_backend.queries == [
-        'CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;',
-        "ALTER TABLE hive_metastore.db1_src.managed_dbfs SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
-        "ALTER TABLE ucx_default.db1_dst.managed_dbfs SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
+        'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
+        "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
+        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
     ]
 
 
 def test_migrate_views_should_be_properly_sequenced(ws):
     errors = {}
     rows = {
-        "SHOW CREATE TABLE hive_metastore.db1_src.v1_src": [
+        "SHOW CREATE TABLE `hive_metastore`.`db1_src`.`v1_src`": [
             {"createtab_stmt": "CREATE OR REPLACE VIEW hive_metastore.db1_src.v1_src AS select * from db1_src.v3_src"},
         ],
-        "SHOW CREATE TABLE hive_metastore.db1_src.v2_src": [
+        "SHOW CREATE TABLE `hive_metastore`.`db1_src`.`v2_src`": [
             {"createtab_stmt": "CREATE OR REPLACE VIEW hive_metastore.db1_src.v2_src AS select * from db1_src.t1_src"},
         ],
-        "SHOW CREATE TABLE hive_metastore.db1_src.v3_src": [
+        "SHOW CREATE TABLE `hive_metastore`.`db1_src`.`v3_src`": [
             {"createtab_stmt": "CREATE OR REPLACE VIEW hive_metastore.db1_src.v3_src AS select * from db1_src.v2_src"},
         ],
     }
@@ -1059,7 +1059,7 @@ def test_table_in_mount_mapping_with_table_owner():
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
-        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
+        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
     migrate_grants.apply.assert_called()
@@ -1102,7 +1102,7 @@ def test_table_in_mount_mapping_with_partition_information():
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
-        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
+        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
     migrate_grants.apply.assert_called()
