@@ -26,6 +26,16 @@ CANT_FIND_UCX_MSG = (
 )
 
 
+def get_contexts(
+    w: WorkspaceClient, a: AccountClient | None = None, run_as_collection: bool = False, **named_parameters
+) -> list[WorkspaceContext]:
+    if not a:
+        a = AccountClient(product='ucx', product_version=__version__)
+    account_installer = AccountInstaller(a)
+    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
+    return workspace_contexts
+
+
 @ucx.command
 def workflows(w: WorkspaceClient):
     """Show deployed workflows and their state"""
@@ -159,10 +169,7 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
-    if not a:
-        a = AccountClient(product='ucx', product_version=__version__)
-    account_installer = AccountInstaller(a)
-    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection)
+    workspace_contexts = get_contexts(w, a, run_as_collection)
     # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
     skip_job_status = bool(run_as_collection)
     for ctx in workspace_contexts:
@@ -300,11 +307,7 @@ def principal_prefix_access(
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass subscription_id for azure and aws_profile for aws."""
-
-    if not a:
-        a = AccountClient(product='ucx', product_version=__version__)
-    account_installer = AccountInstaller(a)
-    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
+    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
     if ctx:
         workspace_contexts = [ctx]
     if w.config.is_azure:
