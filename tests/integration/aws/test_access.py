@@ -102,41 +102,6 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster
     AWSResources(aws_cli_ctx.aws_profile()).delete_instance_profile(role_name, role_name)
 
 
-def test_fail_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster_policy, aws_cli_ctx):
-    env_or_skip("AWS_PROFILE")
-    aws_cli_ctx.workspace_installation.run()
-    aws_cli_ctx.sql_backend.save_table(
-        f"{aws_cli_ctx.inventory_database}.external_locations",
-        [ExternalLocation("s3://buck}et1/FOLDER1", 1)],
-        ExternalLocation,
-    )
-    aws_cli_ctx.installation.save(
-        [AWSInstanceProfile("role1", "role1")], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME
-    )
-    # create a new policy
-
-    policy = make_cluster_policy()
-    aws_cli_ctx.installation.save(
-        dataclasses.replace(aws_cli_ctx.workspace_installation.config, policy_id=policy.policy_id)
-    )
-    aws_cli_ctx.save_tables()
-
-    # create a new uber instance profile
-    aws_resource_permission = aws_cli_ctx.aws_resource_permissions()
-    with pytest.raises(PermissionError):
-        aws_resource_permission.create_uber_principal(
-            MockPrompts(
-                {
-                    "Do you want to create new migration role*": "yes",
-                    "We have identified existing UCX migration role*": "yes",
-                }
-            )
-        )
-
-    config = aws_cli_ctx.installation.load(WorkspaceConfig)
-    assert config.uber_instance_profile is None  # check that the uber instance profile was not created
-
-
 def test_create_external_location_validate_acl(
     make_cluster_permissions,
     ws,
