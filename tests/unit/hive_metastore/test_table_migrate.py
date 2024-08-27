@@ -68,7 +68,10 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;"
         in backend.queries
     )
-    assert "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;" in backend.queries
+    assert (
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;"
+        in backend.queries
+    )
     assert (
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
@@ -78,7 +81,10 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
-    assert "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;" in backend.queries
+    assert (
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
+        in backend.queries
+    )
     migrate_grants.apply.assert_called()
 
 
