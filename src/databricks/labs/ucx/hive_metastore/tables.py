@@ -532,11 +532,12 @@ class FasterTableScanHack:
         See also https://github.com/databrickslabs/ucx/issues/247
         """
         tasks = []
-        databases = [partial(self._all_databases)]
-        for database_batch in Threads.strict('listing databases', databases):
-            for database in database_batch:
-                table_names = [partial(self.list_tables, database)]
-                for table_batch in Threads.strict('listing tables', table_names):
+        databases = self._all_databases()
+        for database in databases:
+            print(f"Scanning {database}")
+            table_names = [partial(self.list_tables, database)]
+            for table_batch in Threads.strict(f'listing tables', table_names):
+                if len(table_batch) > 0:
                     for table in table_batch:
                         tasks.append(partial(self.get_table, database, table))
         catalog_tables, errors = Threads.gather(f"describing tables in ", tasks)
