@@ -18,17 +18,18 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
     profile = env_or_skip("AWS_PROFILE")
-    rand = make_random(5).lower()
     aws_cli_ctx.workspace_installation.run()
+    rand = make_random(5).lower()
     sql_backend.save_table(
         f"{inventory_schema}.external_locations",
         [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1), ExternalLocation(f"s3://bucket{rand}/FOLDER2", 1)],
+        ExternalLocation,
     )
     aws = AWSResources(profile)
     role_name = f"UCX_ROLE_{rand}"
     policy_name = f"UCX_POLICY_{rand}"
     account_id = aws.validate_connection().get("Account")
-    s3_prefixes = {f"bucket{rand}"}
+    s3_prefixes = {f"s3://bucket{rand}"}
     aws.create_uc_role(role_name)
     aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
     ws.storage_credentials.create(
@@ -36,10 +37,9 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         aws_iam_role=AwsIamRoleRequest(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"),
         read_only=False,
     )
-    installation = Installation(ws, rand)
     external_location = ExternalLocations(ws, sql_backend, inventory_schema)
     aws_permissions = AWSResourcePermissions(
-        installation,
+        aws_cli_ctx.installation,
         ws,
         aws,
         external_location,
