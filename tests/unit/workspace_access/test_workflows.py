@@ -44,7 +44,9 @@ def test_migrate_permissions_experimental(run_workflow) -> None:
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[
+            ("123", "QUERIES", "temp")
+        ],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
@@ -68,7 +70,9 @@ def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[
+            ("123", "QUERIES", "temp")
+        ],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
