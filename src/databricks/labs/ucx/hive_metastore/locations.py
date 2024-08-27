@@ -214,9 +214,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(
-            f"SELECT * FROM {self._catalog}.{escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
-        ):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ExternalLocation(*row)
 
     @staticmethod
