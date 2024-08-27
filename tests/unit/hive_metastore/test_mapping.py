@@ -194,13 +194,17 @@ def test_skip_happy_path(caplog):
     table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
     mapping.skip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
     ws.tables.get.assert_not_called()
-    sbe.execute.assert_called_with(f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     view = Table(
         catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
     )
     mapping.skip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
     ws.tables.get.assert_not_called()
-    sbe.execute.assert_called_with(f"ALTER VIEW `schema`.`view` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER VIEW `schema`.`view` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
     sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
@@ -367,7 +371,10 @@ def test_table_with_no_target_reverted():
         ),
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
-    assert "ALTER TABLE `hive_metastore`.`schema1`.`table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');" in backend.queries
+    assert (
+        "ALTER TABLE `hive_metastore`.`schema1`.`table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in backend.queries
+    )
 
 
 def test_skipping_rules_existing_targets():

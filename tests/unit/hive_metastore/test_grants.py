@@ -296,7 +296,9 @@ def test_grants_returning_error_when_showing_grants():
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE `hive_metastore`.`test_database`.`table2`": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
+        "SHOW GRANTS ON TABLE `hive_metastore`.`test_database`.`table2`": SHOW_GRANTS[
+            ("principal1", "OWNER", "TABLE", ""),
+        ],
         "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
@@ -330,7 +332,9 @@ def test_grants_returning_error_when_describing():
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE `hive_metastore`.`test_database`.`table2`": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
+        "SHOW GRANTS ON TABLE `hive_metastore`.`test_database`.`table2`": SHOW_GRANTS[
+            ("principal1", "OWNER", "TABLE", ""),
+        ],
         "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
