@@ -20,7 +20,7 @@ def test_view_to_migrate_sql_migrate_view():
     migration_index = MigrationIndex(
         [
             MigrationStatus("test_schema1", "test_table1", "cat1", "schema1", "dest_table1"),
-            MigrationStatus("test_schema1", "test_view1")
+            MigrationStatus("test_schema1", "test_view1"),
         ]
     )
 
