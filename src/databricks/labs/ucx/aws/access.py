@@ -73,8 +73,6 @@ class AWSResourcePermissions:
                 AWSUCRoleCandidate(self._generate_role_name(single_role, role_name, ""), policy_name, list(s3_buckets))
             )
         else:
-            for idx, s3_prefix in enumerate(sorted(list(s3_buckets))):
-                roles.append(AWSUCRoleCandidate(f"{role_name}_{idx + 1}", policy_name, [s3_prefix]))
             for s3_prefix in list(s3_buckets):
                 roles.append(
                     AWSUCRoleCandidate(
