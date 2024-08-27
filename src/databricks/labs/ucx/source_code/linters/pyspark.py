@@ -228,111 +228,111 @@ class DirectFilesystemAccessMatcher(Matcher):
         # No transformations to apply
         return
 
-    # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
-
 
 class SparkMatchers:
 
-    _SPARK_SESSION_MATCHERS = [QueryMatcher("sql", 1, 1000, 0, "sqlQuery"), TableNameMatcher("table", 1, 1, 0)]
+    def __init__(self, dfsa_matchers_only: bool):
 
-    # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
-    _SPARK_CATALOG_MATCHERS = [
-        TableNameMatcher("cacheTable", 1, 2, 0, "tableName"),
-        TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
-        TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
-        TableNameMatcher("getTable", 1, 1, 0),
-        TableNameMatcher("isCached", 1, 1, 0),
-        TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
-        TableNameMatcher("tableExists", 1, 2, 0, "tableName"),
-        TableNameMatcher("recoverPartitions", 1, 1, 0),
-        TableNameMatcher("refreshTable", 1, 1, 0),
-        TableNameMatcher("uncacheTable", 1, 1, 0),
-        ReturnValueMatcher("listTables", 0, 2, 0),
-    ]
+        direct_fs_access_matchers: list[Matcher] = [
+            DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
+            DirectFilesystemAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
+            DirectFilesystemAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
+            DirectFilesystemAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
+            DirectFilesystemAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
+            DirectFilesystemAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
+            DirectFilesystemAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
+            DirectFilesystemAccessMatcher("text", 1, 3, 0),
+            DirectFilesystemAccessMatcher("csv", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("json", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("orc", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("parquet", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("save", 0, 1000, 0, "path"),
+            DirectFilesystemAccessMatcher("load", 0, 1000, 0, "path"),
+            DirectFilesystemAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
+            DirectFilesystemAccessMatcher("addFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("binaryFiles", 1, 2, 0),
+            DirectFilesystemAccessMatcher("binaryRecords", 1, 2, 0),
+            DirectFilesystemAccessMatcher("dump_profiles", 1, 1, 0),
+            DirectFilesystemAccessMatcher("hadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("newAPIHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("pickleFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("saveAsHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
+            DirectFilesystemAccessMatcher("saveAsPickleFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsSequenceFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsTextFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("load_from_path", 1, 1, 0),
+        ]
 
-    # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
-    _SPARK_DATAFRAME_MATCHERS = [
-        TableNameMatcher("writeTo", 1, 1, 0),
-    ]
+        if dfsa_matchers_only:
+            self._build_matchers(direct_fs_access_matchers)
+            return
 
-    # nothing to migrate in Column, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Column.html
-    # nothing to migrate in Observation, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Observation.html
-    # nothing to migrate in Row, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Row.html
-    # nothing to migrate in GroupedData, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.GroupedData.html
-    # nothing to migrate in PandasCogroupedOps, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.PandasCogroupedOps.html
-    # nothing to migrate in DataFrameNaFunctions, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameNaFunctions.html
-    # nothing to migrate in DataFrameStatFunctions, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameStatFunctions.html
-    # nothing to migrate in Window, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Window.html
+        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
+        spark_session_matchers = [QueryMatcher("sql", 1, 1000, 0, "sqlQuery"), TableNameMatcher("table", 1, 1, 0)]
 
-    # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
-    _SPARK_DATAFRAMEREADER_MATCHR = [
-        TableNameMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
-    ]
+        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
+        spark_catalog_matchers = [
+            TableNameMatcher("cacheTable", 1, 2, 0, "tableName"),
+            TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
+            TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
+            TableNameMatcher("getTable", 1, 1, 0),
+            TableNameMatcher("isCached", 1, 1, 0),
+            TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
+            TableNameMatcher("tableExists", 1, 2, 0, "tableName"),
+            TableNameMatcher("recoverPartitions", 1, 1, 0),
+            TableNameMatcher("refreshTable", 1, 1, 0),
+            TableNameMatcher("uncacheTable", 1, 1, 0),
+            ReturnValueMatcher("listTables", 0, 2, 0),
+        ]
 
-    # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
-    _SPARK_DATAFRAMEWRITER_MATCHR = [
-        TableNameMatcher("insertInto", 1, 2, 0, "tableName"),
-        # TODO jdbc: could the url be a databricks url, raise warning ?
-        TableNameMatcher("saveAsTable", 1, 4, 0, "name"),
-    ]
+        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
+        spark_dataframe_matchers = [
+            TableNameMatcher("writeTo", 1, 1, 0),
+        ]
 
-    # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
-    # nothing to migrate in UDFRegistration, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDFRegistration.html
+        # nothing to migrate in Column, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Column.html
+        # nothing to migrate in Observation, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Observation.html
+        # nothing to migrate in Row, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Row.html
+        # nothing to migrate in GroupedData, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.GroupedData.html
+        # nothing to migrate in PandasCogroupedOps, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.PandasCogroupedOps.html
+        # nothing to migrate in DataFrameNaFunctions, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameNaFunctions.html
+        # nothing to migrate in DataFrameStatFunctions, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameStatFunctions.html
+        # nothing to migrate in Window, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Window.html
 
-    _SPARK_DFSA_MATCHERS = [
-        DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
-        DirectFilesystemAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
-        DirectFilesystemAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
-        DirectFilesystemAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
-        DirectFilesystemAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
-        DirectFilesystemAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
-        DirectFilesystemAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
-        DirectFilesystemAccessMatcher("text", 1, 3, 0),
-        DirectFilesystemAccessMatcher("csv", 1, 1000, 0),
-        DirectFilesystemAccessMatcher("json", 1, 1000, 0),
-        DirectFilesystemAccessMatcher("orc", 1, 1000, 0),
-        DirectFilesystemAccessMatcher("parquet", 1, 1000, 0),
-        DirectFilesystemAccessMatcher("save", 0, 1000, 0, "path"),
-        DirectFilesystemAccessMatcher("load", 0, 1000, 0, "path"),
-        DirectFilesystemAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
-        DirectFilesystemAccessMatcher("addFile", 1, 3, 0),
-        DirectFilesystemAccessMatcher("binaryFiles", 1, 2, 0),
-        DirectFilesystemAccessMatcher("binaryRecords", 1, 2, 0),
-        DirectFilesystemAccessMatcher("dump_profiles", 1, 1, 0),
-        DirectFilesystemAccessMatcher("hadoopFile", 1, 8, 0),
-        DirectFilesystemAccessMatcher("newAPIHadoopFile", 1, 8, 0),
-        DirectFilesystemAccessMatcher("pickleFile", 1, 3, 0),
-        DirectFilesystemAccessMatcher("saveAsHadoopFile", 1, 8, 0),
-        DirectFilesystemAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
-        DirectFilesystemAccessMatcher("saveAsPickleFile", 1, 2, 0),
-        DirectFilesystemAccessMatcher("saveAsSequenceFile", 1, 2, 0),
-        DirectFilesystemAccessMatcher("saveAsTextFile", 1, 2, 0),
-        DirectFilesystemAccessMatcher("load_from_path", 1, 1, 0),
-    ]
+        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
+        spark_dataframereader_matchers = [
+            TableNameMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
+        ]
 
-    # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
-    # nothing to migrate in UserDefinedTableFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedTableFunction.html
+        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
+        spark_dataframewriter_matchers = [
+            TableNameMatcher("insertInto", 1, 2, 0, "tableName"),
+            # TODO jdbc: could the url be a databricks url, raise warning ?
+            TableNameMatcher("saveAsTable", 1, 4, 0, "name"),
+        ]
 
-    @classmethod
-    def all_matchers(cls):
-        matchers = {}
-        for matcher in (
-            cls._SPARK_SESSION_MATCHERS
-            + cls._SPARK_CATALOG_MATCHERS
-            + cls._SPARK_DATAFRAME_MATCHERS
-            + cls._SPARK_DATAFRAMEREADER_MATCHR
-            + cls._SPARK_DATAFRAMEWRITER_MATCHR
-            + cls._SPARK_DFSA_MATCHERS
-        ):
-            matchers[matcher.method_name] = matcher
-        return matchers
+        # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
+        # nothing to migrate in UDFRegistration, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDFRegistration.html
+        # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
+        # nothing to migrate in UserDefinedTableFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedTableFunction.html
+        self._build_matchers(
+            spark_session_matchers
+            + spark_catalog_matchers
+            + spark_dataframe_matchers
+            + spark_dataframereader_matchers
+            + spark_dataframewriter_matchers
+            + direct_fs_access_matchers
+        )
 
-    @classmethod
-    def dfsa_matchers(cls):
-        matchers = {}
-        for matcher in cls._SPARK_DFSA_MATCHERS:
-            matchers[matcher.method_name] = matcher
-        return matchers
+    def _build_matchers(self, matchers: list[Matcher]):
+        self._matchers: dict[str, Matcher] = {}
+        for matcher in matchers:
+            self._matchers[matcher.method_name] = matcher
+
+    @property
+    def matchers(self):
+        return self._matchers
 
 
 class SparkSql(PythonLinter, Fixer):
@@ -341,7 +341,7 @@ class SparkSql(PythonLinter, Fixer):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
-        self._spark_matchers = SparkMatchers.dfsa_matchers() if dfsa_matchers_only else SparkMatchers.all_matchers()
+        self._spark_matchers = SparkMatchers(dfsa_matchers_only).matchers
 
     def name(self) -> str:
         # this is the same fixer, just in a different language context
