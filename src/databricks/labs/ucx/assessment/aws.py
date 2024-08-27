@@ -409,9 +409,9 @@ class AWSResources:
         self._run_json_command(f"iam delete-instance-profile --instance-profile-name {instance_profile_name}")
         self._run_json_command(f"iam delete-role --role-name {role_name}")
 
-    def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str):
+    def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str) -> bool:
         # there can only be one role associated with iam instance profile
-        self._run_command(
+        return self._run_command(
             f"iam add-role-to-instance-profile --instance-profile-name {instance_profile_name} --role-name {role_name}"
         )
 

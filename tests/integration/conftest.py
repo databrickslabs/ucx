@@ -572,7 +572,8 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
             installation_ctx.installation,
             installation_ctx.workspace_client,
             AWSResources(aws_profile()),
-            ExternalLocations(installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database),
+            ExternalLocations(installation_ctx.workspace_client, installation_ctx.sql_backend,
+                              installation_ctx.inventory_database),
         )
     return installation_ctx.replace(aws_profile=aws_profile, aws_cli_run_command=aws_cli_run_command, aws_resource_permissions=aws_resource_permissions)
 
@@ -677,6 +678,7 @@ class MockInstallationContext(MockRuntimeContext):
         default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
         workspace_config = replace(
             workspace_config,
+            inventory_database=self.inventory_database,
             override_clusters={
                 "main": default_cluster_id,
                 "tacl": tacl_cluster_id,
