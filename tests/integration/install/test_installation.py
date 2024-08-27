@@ -160,7 +160,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
     spark_version = ws.clusters.select_spark_version(latest=True)
     assert policy_definition["spark_version"]["value"] == spark_version
-    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
+    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
     if ws.config.is_azure:
         assert (
             policy_definition["azure_attributes.availability"]["value"]
