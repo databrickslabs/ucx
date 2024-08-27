@@ -532,12 +532,14 @@ class FasterTableScanHack:
         See also https://github.com/databrickslabs/ucx/issues/247
         """
         tasks = []
-        catalog = "hive_metastore"
-        table_names = [partial(self.list_tables, database) for database in self._all_databases()]
-        for batch in Threads.strict('listing tables', table_names):
-            for table in batch:
-                tasks.append(partial(self.get_table, 'default', table))
-        catalog_tables, errors = Threads.gather(f"describing tables in {catalog}", tasks)
+        databases = [partial(self._all_databases)]
+        for database_batch in Threads.strict('listing databases', databases):
+            for database in database_batch:
+                table_names = [partial(self.list_tables, database)]
+                for table_batch in Threads.strict('listing tables', table_names):
+                    for table in table_batch:
+                        tasks.append(partial(self.get_table, database, table))
+        catalog_tables, errors = Threads.gather(f"describing tables in ", tasks)
         if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
+            logger.error(f"Detected {len(errors)} while scanning tables in ")
         return catalog_tables
