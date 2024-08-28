@@ -87,7 +87,6 @@ class ViewsMigrationSequencer:
         self._tables = tables
         self._index = index
         self._result_view_list: list[ViewToMigrate] = []
-        self._result_tables_set: set[TableView] = set()
 
     def sequence_batches(self) -> list[list[ViewToMigrate]]:
         """Sequence the views in batches to migrate them in the right order.
@@ -113,16 +112,18 @@ class ViewsMigrationSequencer:
             views_to_migrate.add(view_to_migrate)
 
         batches: list[list[ViewToMigrate]] = []
+        sequenced_views: dict[ViewToMigrate: TableView] = {}
         while len(views_to_migrate) > 0:
-            next_batch = self._next_batch(views_to_migrate)
+            next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=sequenced_views)
             self._result_view_list.extend(next_batch)
-            table_views = {TableView("hive_metastore", t.src.database, t.src.name) for t in next_batch}
-            self._result_tables_set.update(table_views)
+            for view in next_batch:
+                sequenced_views[view] = TableView("hive_metastore", view.src.database, view.src.name)
             views_to_migrate.difference_update(next_batch)
             batches.append(list(next_batch))
         return batches
 
-    def _next_batch(self, views: set[ViewToMigrate]) -> set[ViewToMigrate]:
+    def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> set[ViewToMigrate]:
+        views_from_previous_batches = views_from_previous_batches or {}
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
@@ -133,7 +134,7 @@ class ViewsMigrationSequencer:
                 result.add(view)
             else:
                 # does the view have at least one view dependency that is not yet processed ?
-                not_processed_yet = view_deps - self._result_tables_set
+                not_processed_yet = view_deps - set(views_from_previous_batches.values())
                 if len(not_processed_yet) == 0:
                     result.add(view)
                     continue
