@@ -96,7 +96,7 @@ def test_save_spn_permissions_no_azure_storage_account():
 def test_save_spn_permissions_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -181,7 +181,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
 def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["s3://bucket1/folder1", "1"],
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
         ]
@@ -654,7 +654,7 @@ def setup_create_uber_principal():
         data_access_config=[EndpointConfPair(key="foo", value="bar")]
     )
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
         ]
     }
@@ -783,7 +783,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
         security_policy=get_security_policy
     )
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
         ]
     }
@@ -963,7 +963,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
         ]
     }
@@ -1023,7 +1023,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
             ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
         ]
     }

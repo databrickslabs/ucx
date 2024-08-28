@@ -328,7 +328,7 @@ class TablesMigrator:
         )
         try:
             self._backend.execute(table.sql_unset_upgraded_to())
-            self._backend.execute(f"DROP {table.kind} IF EXISTS {target_table_key}")
+            self._backend.execute(f"DROP {table.kind} IF EXISTS {escape_sql_identifier(target_table_key)}")
         except DatabricksError as e:
             logger.warning(f"Failed to revert table {table.key}: {e}")
 

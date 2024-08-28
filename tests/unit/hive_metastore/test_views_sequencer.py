@@ -162,13 +162,13 @@ def test_migrate_circular_view_chain_raises_value_error() -> None:
 
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     db_rows: dict[str, list[tuple]] = {}
-    select_query = 'SELECT \\* FROM hive_metastore.schema.tables'
+    select_query = 'SELECT \\* FROM `hive_metastore`.`schema`.`tables`'
     for dbname in dbnames:
         # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
         # pylint: disable=cell-var-from-loop
         valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
         show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
-        db_rows[f'SHOW TABLES FROM hive_metastore.{dbname}'] = show_tuples
+        db_rows[f'SHOW TABLES FROM `hive_metastore`.`{dbname}`'] = show_tuples
         # catalog, database, table, object_type, table_format, location, view_text
         select_tuples = [
             (

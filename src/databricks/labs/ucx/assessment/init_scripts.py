@@ -12,6 +12,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     AZURE_SP_CONF_FAILURE_MSG,
     azure_sp_conf_in_init_scripts,
 )
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
 logger = logging.getLogger(__name__)
@@ -83,5 +84,5 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScript
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[GlobalInitScriptInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield GlobalInitScriptInfo(*row)

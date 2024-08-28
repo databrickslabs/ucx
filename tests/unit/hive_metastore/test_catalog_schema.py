@@ -166,11 +166,11 @@ def test_catalog_schema_acl():
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     queries = [
-        'GRANT USE SCHEMA ON DATABASE catalog1.schema3 TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE catalog2.schema2 TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE catalog2.schema3 TO `user1`',
-        'GRANT USE CATALOG ON CATALOG catalog1 TO `user1`',
-        'GRANT USE CATALOG ON CATALOG catalog2 TO `user1`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user1`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user1`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `user1`',
+        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user1`',
     ]
     assert len(backend.queries) == len(queries)
     for query in queries:

@@ -202,9 +202,10 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             external_locations.append(ExternalLocation(jdbc_location, 1))
 
     def _external_location_list(self) -> Iterable[ExternalLocation]:
+        tables_identifier = escape_sql_identifier(f"{self._catalog}.{self._schema}.tables")
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {self._catalog}.{escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {tables_identifier} WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
@@ -214,9 +215,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return self._snapshot(self._try_fetch, self._external_location_list)
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(
-            f"SELECT * FROM {self._catalog}.{escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
-        ):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ExternalLocation(*row)
 
     @staticmethod
@@ -334,9 +333,7 @@ class Mounts(CrawlerBase[Mount]):
         return self._snapshot(self._try_fetch, self._list_mounts)
 
     def _try_fetch(self) -> Iterable[Mount]:
-        for row in self._fetch(
-            f"SELECT * FROM {self._catalog}.{escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
-        ):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Mount(*row)
 
 
