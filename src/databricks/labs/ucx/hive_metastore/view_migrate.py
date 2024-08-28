@@ -105,12 +105,10 @@ class ViewsMigrationSequencer:
         The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
         practice d remains small and v decreases rapidly
         """
-        all_tables: dict[str, TableToMigrate] = {}
         views = set()
         for table in self._tables:
             if table.src.view_text is not None:
                 table = ViewToMigrate(table.src, table.rule)
-            all_tables[table.src.key] = table
             if isinstance(table, ViewToMigrate):
                 views.add(table)
         # when migrating views we want them in batches
