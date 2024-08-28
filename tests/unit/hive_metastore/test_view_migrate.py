@@ -68,7 +68,7 @@ def tables(request, samples) -> list[TableToMigrate]:
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
-def test_migrate_no_view_returns_empty_sequence(tables):
+def test_empty_sequence_without_views(tables):
     migration_index = MigrationIndex(
         [
             MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
@@ -89,7 +89,7 @@ def flatten(lists: list[list[T]]) -> list[T]:
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1")], indirect=True)
-def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
+def test_sequence_direct_view(tables) -> None:
     expected = ["hive_metastore.db1.v1"]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
@@ -100,7 +100,7 @@ def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.t2", "db1.v2")], indirect=True)
-def test_migrate_direct_views_returns_sequence(tables) -> None:
+def test_sequence_direct_views(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v2"]
     migration_index = MigrationIndex(
         [MigrationStatus("db1", "t1", "cat1", "db1", "t1"), MigrationStatus("db1", "t2", "cat1", "db1", "t2")]
@@ -113,7 +113,7 @@ def test_migrate_direct_views_returns_sequence(tables) -> None:
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4")], indirect=True)
-def test_migrate_indirect_views_returns_correct_sequence(tables) -> None:
+def test_sequence_indirect_views(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
@@ -124,7 +124,7 @@ def test_migrate_indirect_views_returns_correct_sequence(tables) -> None:
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4", "db1.v5", "db1.v6", "db1.v7")], indirect=True)
-def test_migrate_deep_indirect_views_returns_correct_sequence(tables) -> None:
+def test_sequence_deep_indirect_views(tables) -> None:
     expected = [
         "hive_metastore.db1.v1",
         "hive_metastore.db1.v4",
