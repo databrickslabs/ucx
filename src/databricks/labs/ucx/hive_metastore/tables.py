@@ -519,9 +519,11 @@ class FasterTableScanCrawler:
             location_uri = location_uri.toString()
         view_text = raw_table.viewText()
 
-        #
-        # properties_list = list(self._iterator(raw_table.properties()))
+        # get properties
         properties_list = list(self._iterator(raw_table.properties()))
+
+        # TODO:
+        # loop over properties and extract values
 
         for property in properties_list:
             iterator = property
