@@ -174,7 +174,7 @@ class ViewsMigrationSequencer:
         dependencies = [dep for dep in view.dependencies]
         while dependencies:
             dependency = self._get_view_to_migrate(dependencies.pop(0).key)
-            if not dependency:  # Dependency is not a view to migrate, like a table
+            if not dependency:  # Only views (to migrate) can cause a circular dependency, tables can be ignored
                 continue
             if dependency == view:
                 raise RecursionError(
