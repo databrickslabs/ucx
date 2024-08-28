@@ -105,20 +105,20 @@ class ViewsMigrationSequencer:
         The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
         practice d remains small and v decreases rapidly
         """
-        views = set()
-        for table in self._tables:
-            if table.src.view_text is not None:
-                table = ViewToMigrate(table.src, table.rule)
-            if isinstance(table, ViewToMigrate):
-                views.add(table)
-        # when migrating views we want them in batches
+        views_to_migrate = set()
+        for table_or_view in self._tables:
+            if table_or_view.src.view_text is None:
+                continue
+            view_to_migrate = ViewToMigrate(table_or_view.src, table_or_view.rule)
+            views_to_migrate.add(view_to_migrate)
+
         batches: list[list[ViewToMigrate]] = []
-        while len(views) > 0:
-            next_batch = self._next_batch(views)
+        while len(views_to_migrate) > 0:
+            next_batch = self._next_batch(views_to_migrate)
             self._result_view_list.extend(next_batch)
             table_views = {TableView("hive_metastore", t.src.database, t.src.name) for t in next_batch}
             self._result_tables_set.update(table_views)
-            views.difference_update(next_batch)
+            views_to_migrate.difference_update(next_batch)
             batches.append(list(next_batch))
         return batches
 
