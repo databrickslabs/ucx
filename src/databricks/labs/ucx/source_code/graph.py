@@ -4,7 +4,8 @@ import abc
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import TypeVar, Generic
 
 from astroid import (  # type: ignore
     NodeNG,
@@ -581,3 +582,43 @@ class InheritedContext:
             return self
         tree = self._tree.renumber(-1)
         return InheritedContext(tree, self.found)
+
+
+T = TypeVar("T")
+
+
+class DependencyGraphWalker(abc.ABC, Generic[T]):
+
+    def __init__(self, graph: DependencyGraph, walked_paths: set[Path] | None, path_lookup: PathLookup):
+        self._graph = graph
+        self._walked_paths: set[Path] = walked_paths or set()
+        self._path_lookup = path_lookup
+
+    def walk(self) -> Iterable[T]:
+        for dependency in self._graph.root_dependencies:
+            root_path = dependency.path  # since it's a root
+            yield from self._walk_one(dependency, self._graph, root_path)
+
+    def _walk_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
+        if dependency.path in self._walked_paths:
+            return
+        self._walked_paths.add(dependency.path)
+        self._log_walk_one(dependency)
+        if dependency.path.is_file() or is_a_notebook(dependency.path):
+            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
+            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+            yield from self._process_dependency(dependency, path_lookup, inherited_tree)
+            maybe_graph = graph.locate_dependency(dependency.path)
+            # missing graph problems have already been reported while building the graph
+            if maybe_graph.graph:
+                child_graph = maybe_graph.graph
+                for child_dependency in child_graph.local_dependencies:
+                    yield from self._walk_one(child_dependency, child_graph, root_path)
+
+    def _log_walk_one(self, dependency: Dependency):
+        logger.info(f'Analyzing dependency: {dependency}')
+
+    @abc.abstractmethod
+    def _process_dependency(
+        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+    ) -> Iterable[T]: ...
