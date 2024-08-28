@@ -521,39 +521,27 @@ class FasterTableScanCrawler:
             view_text = raw_table.viewText()
 
             # get properties
-            properties_list = list(self._iterator(raw_table.properties()))
+            properties_list = self._iterator(raw_table.properties())
+            for each_property in properties_list:
+                key = each_property._1()
+                value = each_property._2()
 
-            # TODO:
-            # loop over properties and extract values
+                redacted_key = "*******"
 
-            for property in properties_list:
-                iterator = property
-                print(type(iterator._1))
-                # while iterator.hasNext():
-                #     print(iterator.next())
-            # for key, value in properties_list[0]:
-            #     print(key)
-            #     print(value)
+                if key == "personalAccessToken" or key.lower() == "password":
+                    value = redacted_key
 
-            # for key, value in properties_list:
-            #     print(key)
-            #     print(value)
-            #     # something = list(self._iterator(property))
-            #     # # something = property.toList()
-            #     # print(something)
-            #     # for some in something:
-            #     #     print(f"{some}")
-            # redacted_key = "******"
+            # TODO: add all properties to the table object
 
-            # return Table(
-            #     catalog='hive_metastore',
-            #     database=database,
-            #     name=table,
-            #     object_type=raw_table.tableType().name(),
-            #     table_format=table_format,
-            #     location=location_uri,
-            #     view_text=view_text,
-            # )
+            return Table(
+                catalog='hive_metastore',
+                database=database,
+                name=table,
+                object_type=raw_table.tableType().name(),
+                table_format=table_format,
+                location=location_uri,
+                view_text=view_text,
+            )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
