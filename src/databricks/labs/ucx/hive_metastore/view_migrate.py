@@ -174,7 +174,7 @@ class ViewsMigrationSequencer:
                 If a circular dependency is detected between views.
         """
         dependency_keys = [dep.key for dep in view.dependencies]
-        while dependency_keys:
+        while len(dependency_keys) > 0:
             dependency = self._get_view_to_migrate(dependency_keys.pop(0))
             if not dependency:  # Only views (to migrate) can cause a circular dependency, tables can be ignored
                 continue
