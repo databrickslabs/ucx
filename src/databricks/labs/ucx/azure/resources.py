@@ -581,7 +581,7 @@ class AzureResources:
         result = self._mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
             principal_type = role_assignment.get("properties", {}).get("principalType")
-            if not principal_type and principal_type not in principal_types:
+            if not principal_type or principal_type not in principal_types:
                 continue
             assignment = self._role_assignment(role_assignment, resource_id)
             if not assignment:
