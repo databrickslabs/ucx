@@ -89,6 +89,7 @@ class ViewsMigrationSequencer:
 
     @cached_property
     def _views(self) -> dict[ViewToMigrate, TableView]:
+        # Views is a mapping as the TableView is required when resolving dependencies
         views = {}
         for table_or_view in self._tables:
             if table_or_view.src.view_text is None:
