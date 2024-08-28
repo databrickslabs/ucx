@@ -551,7 +551,7 @@ class FasterTableScanCrawler:
             return list(self._iterator(self._external_catalog.listDatabases()))
         return self._include_database
 
-    def _crawl(self) -> Iterable[Table]:
+    def _crawl(self, catalog: str) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
         After performing initial scan of all tables, starts making parallel
@@ -573,7 +573,7 @@ class FasterTableScanCrawler:
             for table_batch in Threads.strict(f'listing tables', table_names):
                 if len(table_batch) > 0:
                     for table in table_batch:
-                        tasks.append(partial(self._describe, catalog, database, table))
+                        tasks.append(partial(self._describe, database, table))
         catalog_tables, errors = Threads.gather(f"describing tables in ", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} errors while scanning tables in ")
