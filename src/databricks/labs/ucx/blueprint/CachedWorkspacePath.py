@@ -1,6 +1,6 @@
 from collections import OrderedDict
-from io import StringIO
-from typing import TextIO, BinaryIO
+from io import StringIO, BytesIO
+from typing import BinaryIO
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
@@ -8,7 +8,6 @@ from databricks.labs.blueprint.paths import WorkspacePath
 class _CachedIO:
 
     def __init__(self, wrapped):
-        self._type = type(wrapped)
         self._content = wrapped.read()
 
     def __enter__(self):
@@ -21,7 +20,25 @@ class _CachedIO:
         return self._content
 
     def __iter__(self):
-        yield from self._type(self._content)
+        if isinstance(self._content, str):
+            yield from StringIO(self._content)
+            return
+        yield from self._as_string_io().__iter__()
+
+    def with_mode(self, mode: str):
+        if 'b' in mode:
+            return self._as_bytes_io()
+        return self._as_string_io()
+
+    def _as_bytes_io(self):
+        if isinstance(self._content, bytes):
+            return self
+        return BytesIO(self._content.encode("utf-8-sig"))
+
+    def _as_string_io(self):
+        if isinstance(self._content, str):
+            return self
+        return StringIO(self._content.decode("utf-8"))
 
 
 # lru_cache won't let us invalidate cache entries
@@ -39,9 +56,10 @@ class WorkspaceLruCache:
         cache = self._WORKSPACE_CACHE
         if path in cache:
             cache.move_to_end(path)
-            return cache[path]
+            return cache[path].with_mode(args[1])
         result = self._func(*args, **kwargs)
-        if isinstance(result, (StringIO, TextIO, BinaryIO)):
+        # can't read twice from an IO so need to cache content
+        if isinstance(result, (StringIO, BinaryIO)):
             result = _CachedIO(result)
         cache[path] = result
         if len(cache) > self._WORKSPACE_CACHE_MAX_SIZE:
@@ -80,6 +98,7 @@ class CachedWorkspacePath(WorkspacePath):
         errors: str | None = None,
         newline: str | None = None,
     ):
+        # only cache reads
         if 'r' in mode:
             return self._cached_open(mode, buffering, encoding, errors, newline)
         WorkspaceLruCache.remove(str(self))

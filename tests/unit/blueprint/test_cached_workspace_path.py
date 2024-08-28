@@ -6,6 +6,7 @@ from tests.unit import mock_workspace_client
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.blueprint.CachedWorkspacePath import CachedWorkspacePath
+from databricks.labs.ucx.source_code.base import guess_encoding
 
 
 def test_path_like_returns_cached_instance():
@@ -60,3 +61,11 @@ def test_download_is_called_again_after_rename():
     path.rename("abcd")
     _ = path.read_text()
     assert ws.workspace.download.call_count == 3  # rename reads the old content
+
+
+def test_encoding_is_guessed_after_download():
+    ws = mock_workspace_client()
+    ws.workspace.download.side_effect = lambda _, *, format: io.BytesIO("abc".encode())
+    path = CachedWorkspacePath(ws, "path")
+    _ = path.read_text()
+    guess_encoding(path)
