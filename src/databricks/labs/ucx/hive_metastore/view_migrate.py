@@ -114,13 +114,13 @@ class ViewsMigrationSequencer:
         The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
         practice d remains small and v decreases rapidly
         """
-        views_to_migrate = set(self._views.keys())
         batches: list[list[ViewToMigrate]] = []
-        sequenced_views: dict[ViewToMigrate: TableView] = {}
+        views_to_migrate = set(self._views.keys())
+        views_sequenced: dict[ViewToMigrate: TableView] = {}
         while len(views_to_migrate) > 0:
-            next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=sequenced_views)
+            next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
             for view in next_batch:
-                sequenced_views[view] = self._views[view]
+                views_sequenced[view] = self._views[view]
             views_to_migrate.difference_update(next_batch)
             batches.append(list(next_batch))
         return batches
