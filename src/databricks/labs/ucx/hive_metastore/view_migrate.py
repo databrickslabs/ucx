@@ -140,19 +140,18 @@ class ViewsMigrationSequencer:
         result: list[ViewToMigrate] = list()
         for view in views:
             self._check_circular_dependency(view)
-            view_deps = set(view.dependencies)
-            if len(view_deps) == 0:
+            dependencies = set(view.dependencies)
+            if len(dependencies) == 0:
                 result.append(view)
                 continue
             # If all dependencies are already processed, we can add the view to the next batch
-            not_processed_yet = view_deps - set(views_from_previous_batches.values())
+            not_processed_yet = dependencies - set(views_from_previous_batches.values())
             if len(not_processed_yet) == 0:
                 result.append(view)
                 continue
             if all(self._index.is_migrated(table_view.schema, table_view.name) for table_view in not_processed_yet):
                 result.append(view)
-        # prevent infinite loop
-        if len(result) == 0 and len(views) > 0:
+        if len(result) == 0 and len(views) > 0:  # prevent infinite loop
             raise ValueError(f"Invalid table references are preventing migration: {views}")
         return result
 
