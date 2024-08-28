@@ -89,7 +89,7 @@ def test_migrate_matched_grants_applies():
     migrate_grants.apply(src, 'catalog.schema.table')
 
     group_manager.snapshot.assert_called()
-    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE catalog.schema.table TO `me`')
+    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE `catalog`.`schema`.`table` TO `me`')
 
 
 def test_migrate_matched_grants_applies_and_remaps_group():
@@ -110,7 +110,7 @@ def test_migrate_matched_grants_applies_and_remaps_group():
     migrate_grants.apply(src, 'catalog.schema.table')
 
     group_manager.snapshot.assert_called()
-    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE catalog.schema.table TO `myself`')
+    sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE `catalog`.`schema`.`table` TO `myself`')
 
 
 def test_migrate_no_matched_grants_no_apply():

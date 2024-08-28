@@ -255,7 +255,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
             None,
             {},
             True,
-            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
+            "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`external_dst` LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM `hive_metastore`.`db1_src`.`external_src`",
         ),
         # test failed migration
         (
