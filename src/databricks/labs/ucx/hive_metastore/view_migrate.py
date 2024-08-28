@@ -132,11 +132,8 @@ class ViewsMigrationSequencer:
                 if len(not_processed_yet) == 0:
                     result.add(view)
                     continue
-                if not [
-                    table_view
-                    for table_view in not_processed_yet
-                    if not self._index.is_migrated(table_view.schema, table_view.name)
-                ]:
+                # If all dependencies are already processed, we can add the view to the next batch
+                if all(self._index.is_migrated(table_view.schema, table_view.name) for table_view in not_processed_yet):
                     result.add(view)
         # prevent infinite loop
         if len(result) == 0 and len(views) > 0:
