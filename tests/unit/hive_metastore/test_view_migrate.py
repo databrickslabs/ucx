@@ -12,7 +12,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def flatten(lists: list[list[T]]) -> list[T]:
