@@ -10,6 +10,7 @@ from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer
 
 SCHEMA_NAME = "schema"
@@ -45,40 +46,22 @@ class Samples:
                     cls.samples[key] = sample
 
 
-def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
-    db_rows: dict[str, list[tuple]] = {}
-    select_query = 'SELECT \\* FROM hive_metastore.schema.tables'
-    for dbname in dbnames:
-        # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
-        # pylint: disable=cell-var-from-loop
-        valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
-        show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
-        db_rows[f'SHOW TABLES FROM hive_metastore.{dbname}'] = show_tuples
-        # catalog, database, table, object_type, table_format, location, view_text
-        select_tuples = [
-            (
-                "hive_metastore",
-                s["db"],
-                s["table"],
-                "type",
-                "DELTA" if s.get("view_text", None) is None else "VIEW",
-                None,
-                s.get("view_text", None),
-            )
-            for s in valid_samples
-        ]
-        db_rows[select_query] = select_tuples
-    return MockBackend(rows=db_rows)
-
-
 @pytest.fixture
 def tables(request) -> list[TableToMigrate]:
     sample_names = request.param
     samples = Samples.load(*sample_names)
-    database_names = set(sample["db"] for sample in samples)
-    sql_backend = mock_backend(samples, *database_names)
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, list(database_names))
-    return [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+    tables = []
+    for sample in samples:
+        table = Table(
+            "hive_metastore",
+            sample["db"],
+            sample["table"],
+            "type",
+            "DELTA" if sample.get("view_text") is None else "VIEW",
+            view_text=sample.get("view_text"),
+        )
+        tables.append(table)
+    return [TableToMigrate(table, _RULE) for table in tables]
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
