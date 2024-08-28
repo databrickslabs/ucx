@@ -71,76 +71,67 @@ def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     return MockBackend(rows=db_rows)
 
 
-def test_migrate_no_view_returns_empty_sequence():
-    samples = Samples.load("db1.t1", "db2.t1")
-    sql_backend = mock_backend(samples, "db1", "db2")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1", "db2"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-    migration_index = MigrationIndex(
-        [MigrationStatus("db1", "t1", "cat1", "db2", "t1"), MigrationStatus("db2", "t2", "cat1", "db2", "t1")],
-    )
+@pytest.fixture
+def tables(request) -> list[TableToMigrate]:
+    sample_names = request.param
+    samples = Samples.load(*sample_names)
+    database_names = set(sample["db"] for sample in samples)
+    sql_backend = mock_backend(samples, *database_names)
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, list(database_names))
+    return [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+
+
+@pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
+def test_migrate_no_view_returns_empty_sequence(tables):
+    migration_index = MigrationIndex([
+        MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
+        MigrationStatus("db2", "t2", "cat1", "db2", "t1"),
+    ])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
     batches = sequencer.sequence_batches()
-    sequence = list(flatten(batches))
-    assert len(sequence) == 0
+
+    assert len(batches) == 0
 
 
-def test_migrate_direct_view_returns_singleton_sequence() -> None:
-    samples = Samples.load("db1.t1", "db1.v1")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+@pytest.mark.parametrize("tables", [("db1.t1", "db1.v1")], indirect=True)
+def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
+
     batches = sequencer.sequence_batches()
+
     sequence = list(flatten(batches))
     assert len(sequence) == 1
-    table = sequence[0]
-    assert table.src.key == "hive_metastore.db1.v1"
+    assert sequence[0].src.key == "hive_metastore.db1.v1"
 
 
-def test_migrate_direct_views_returns_sequence() -> None:
-    samples = Samples.load("db1.t1", "db1.v1", "db1.t2", "db1.v2")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-    migration_index = MigrationIndex(
-        [MigrationStatus("db1", "t1", "cat1", "db1", "t1"), MigrationStatus("db1", "t2", "cat1", "db1", "t2")],
-    )
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
-    batches = sequencer.sequence_batches()
-    sequence = list(flatten(batches))
-    assert len(sequence) == 2
+@pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.t2", "db1.v2")], indirect=True)
+def test_migrate_direct_views_returns_sequence(tables) -> None:
     expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
-    actual = {t.src.key for t in sequence}
-    assert expected == actual
-
-
-def test_migrate_indirect_views_returns_correct_sequence() -> None:
-    samples = Samples.load("db1.t1", "db1.v1", "db1.v4")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    migration_index = MigrationIndex([
+        MigrationStatus("db1", "t1", "cat1", "db1", "t1"),
+        MigrationStatus("db1", "t2", "cat1", "db1", "t2")
+    ])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
+
     batches = sequencer.sequence_batches()
-    sequence = list(flatten(batches))
-    assert len(sequence) == 2
+
+    assert {t.src.key for t in flatten(batches)} == expected
+
+
+@pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4")], indirect=True)
+def test_migrate_indirect_views_returns_correct_sequence(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
-    actual = [t.src.key for t in sequence]
-    assert expected == actual
-
-
-def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
-    samples = Samples.load("db1.t1", "db1.v1", "db1.v4", "db1.v5", "db1.v6", "db1.v7")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
+
     batches = sequencer.sequence_batches()
-    sequence = list(flatten(batches))
-    assert len(sequence) == 5
+
+    assert [t.src.key for t in flatten(batches)] == expected
+
+
+@pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4", "db1.v5", "db1.v6", "db1.v7")], indirect=True)
+def test_migrate_deep_indirect_views_returns_correct_sequence(tables) -> None:
     expected = [
         "hive_metastore.db1.v1",
         "hive_metastore.db1.v4",
@@ -148,28 +139,27 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
         "hive_metastore.db1.v6",
         "hive_metastore.db1.v5",
     ]
-    actual = [t.src.key for t in sequence]
-    assert expected == actual
-
-
-def test_sequence_view_with_view_and_table_dependency() -> None:
-    expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v15"]
-    samples = Samples.load("db1.v1", "db1.v15")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
+
     batches = sequencer.sequence_batches()
-    assert len(batches) == 2
+
     assert [t.src.key for t in flatten(batches)] == expected
 
 
-def test_sequence_view_with_invalid_query_raises_value_error() -> None:
-    samples = Samples.load("db1.v8")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+@pytest.mark.parametrize("tables", [("db1.v1", "db1.v15")], indirect=True)
+def test_sequence_view_with_view_and_table_dependency(tables) -> None:
+    expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v15"]
+    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
+
+    batches = sequencer.sequence_batches()
+
+    assert [t.src.key for t in flatten(batches)] == expected
+
+
+@pytest.mark.parametrize("tables", [("db1.v8",)], indirect=True)
+def test_sequence_view_with_invalid_query_raises_value_error(tables) -> None:
     migration_index = MigrationIndex([])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
 
@@ -178,11 +168,8 @@ def test_sequence_view_with_invalid_query_raises_value_error() -> None:
     assert "Could not analyze view SQL:" in str(error)
 
 
-def test_sequencing_logs_unresolved_dependencies(caplog) -> None:
-    samples = Samples.load("db1.v9")
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+@pytest.mark.parametrize("tables", [("db1.v9",)], indirect=True)
+def test_sequencing_logs_unresolved_dependencies(caplog, tables) -> None:
     migration_index = MigrationIndex([])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
 
@@ -192,17 +179,14 @@ def test_sequencing_logs_unresolved_dependencies(caplog) -> None:
 
 
 @pytest.mark.parametrize(
-    "sample_names",
+    "tables",
     [
         ("db1.v10", "db1.v11"),
         ("db1.v12", "db1.v13", "db1.v14"),
-    ]
+    ],
+    indirect=True,
 )
-def test_sequencing_logs_circular_dependency(caplog, sample_names) -> None:
-    samples = Samples.load(*sample_names)
-    sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+def test_sequencing_logs_circular_dependency(caplog, tables) -> None:
     migration_index = MigrationIndex([])
     sequencer = ViewsMigrationSequencer(tables, migration_index)
 
