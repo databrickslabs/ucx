@@ -121,29 +121,29 @@ class ViewsMigrationSequencer:
             next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
             for view in next_batch:
                 views_sequenced[view] = self._views[view]
+            batches.append(next_batch)
             views_to_migrate.difference_update(next_batch)
-            batches.append(list(next_batch))
         return batches
 
-    def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> set[ViewToMigrate]:
+    def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> list[ViewToMigrate]:
         views_from_previous_batches = views_from_previous_batches or {}
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
-        result: set[ViewToMigrate] = set()
+        result: list[ViewToMigrate] = list()
         for view in views:
             view_deps = set(view.dependencies)
             self._check_circular_dependency(view, views)
             if len(view_deps) == 0:
-                result.add(view)
+                result.append(view)
             else:
                 # does the view have at least one view dependency that is not yet processed ?
                 not_processed_yet = view_deps - set(views_from_previous_batches.values())
                 if len(not_processed_yet) == 0:
-                    result.add(view)
+                    result.append(view)
                     continue
                 # If all dependencies are already processed, we can add the view to the next batch
                 if all(self._index.is_migrated(table_view.schema, table_view.name) for table_view in not_processed_yet):
-                    result.add(view)
+                    result.append(view)
         # prevent infinite loop
         if len(result) == 0 and len(views) > 0:
             raise ValueError(f"Invalid table references are preventing migration: {views}")
