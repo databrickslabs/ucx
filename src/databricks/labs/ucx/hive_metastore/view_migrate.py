@@ -90,14 +90,21 @@ class ViewsMigrationSequencer:
         self._result_tables_set: set[TableView] = set()
 
     def sequence_batches(self) -> list[list[ViewToMigrate]]:
-        # sequencing is achieved using a very simple algorithm:
-        # for each view, we register dependencies (extracted from view_text)
-        # then given the remaining set of views to process,
-        # and the growing set of views already processed
-        # we check if each remaining view refers to not yet processed views
-        # if none, then it's safe to add that view to the next batch of views
-        # the complexity for a given set of views v and a dependency depth d looks like Ov^d
-        # this seems enormous but in practice d remains small and v decreases rapidly
+        """Sequence the views in batches to migrate them in the right order.
+
+        Batch sequencing uses the following algorithm:
+        0. For each view, we register dependencies (extracted from view_text),
+        1. Then to create a new batch of views,
+           We require the dependencies that are covered already:
+             1. The migrated tables
+             2. The (growing) set of views from already sequenced previous batches
+           For each remaining view, we check if all its dependencies are covered for. If that is the case, then we
+           add that view to the new batch of views.
+        1. We repeat point from point 1. until all views are sequenced.
+
+        The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
+        practice d remains small and v decreases rapidly
+        """
         all_tables: dict[str, TableToMigrate] = {}
         views = set()
         for table in self._tables:
