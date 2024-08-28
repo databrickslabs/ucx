@@ -151,6 +151,19 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
     assert expected == actual
 
 
+def test_sequence_view_with_view_and_table_dependency() -> None:
+    expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v15"]
+    samples = Samples.load("db1.v1", "db1.v15")
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    batches = sequencer.sequence_batches()
+    assert len(batches) == 2
+    assert [t.src.key for t in flatten(batches)] == expected
+
+
 def test_migrate_invalid_sql_raises_value_error() -> None:
     with pytest.raises(ValueError) as error:
         samples = Samples.load("db1.v8")
