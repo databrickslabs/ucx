@@ -152,12 +152,11 @@ class ViewsMigrationSequencer:
         result = []
         for view in views:
             self._check_circular_dependency(view)
-            dependencies = set(view.dependencies)
-            if len(dependencies) == 0:
+            if len(view.dependencies) == 0:
                 result.append(view)
                 continue
             # If all dependencies are already processed, we can add the view to the next batch
-            not_processed_yet = dependencies - set(views_from_previous_batches)
+            not_processed_yet = set(view.dependencies) - views_from_previous_batches
             if len(not_processed_yet) == 0:
                 result.append(view)
                 continue
