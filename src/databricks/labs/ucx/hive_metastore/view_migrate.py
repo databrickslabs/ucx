@@ -133,7 +133,12 @@ class ViewsMigrationSequencer:
         return batches
 
     def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> list[ViewToMigrate]:
-        """For sequencing algorithm see docstring of :meth:sequence_batches"""
+        """For sequencing algorithm see docstring of :meth:sequence_batches.
+
+        Raises:
+            RecursionError :
+                If an infinite loop is detected.
+        """
         views_from_previous_batches = views_from_previous_batches or {}
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
@@ -152,14 +157,14 @@ class ViewsMigrationSequencer:
             if all(self._index.is_migrated(table_view.schema, table_view.name) for table_view in not_processed_yet):
                 result.append(view)
         if len(result) == 0 and len(views) > 0:  # prevent infinite loop
-            raise ValueError(f"Invalid table references are preventing migration: {views}")
+            raise RecursionError(f"Invalid table references are preventing migration: {views}")
         return result
 
     def _check_circular_dependency(self, view: ViewToMigrate) -> None:
         """Check for circular dependencies in the views to migrate.
 
         Raises:
-            ValueError :
+            RecursionError :
                 If a circular dependency is detected between views.
         """
         dependencies = [dep for dep in view.dependencies]
@@ -168,7 +173,7 @@ class ViewsMigrationSequencer:
             if not dependency:  # Dependency is not a view to migrate, like a table
                 continue
             if dependency == view:
-                raise ValueError(
+                raise RecursionError(
                     f"Circular dependency detected between {view.src.name} and {dependency.src.name} "
                 )
             dependencies.extend(dep for dep in dependency.dependencies)
