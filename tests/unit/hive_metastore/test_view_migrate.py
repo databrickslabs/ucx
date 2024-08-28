@@ -218,5 +218,3 @@ def test_migrate_circular_view_chain_raises_value_error() -> None:
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
     assert "Circular dependency detected between" in str(error)
-
-

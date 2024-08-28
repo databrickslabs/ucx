@@ -123,7 +123,7 @@ class ViewsMigrationSequencer:
         """
         batches: list[list[ViewToMigrate]] = []
         views_to_migrate = set(self._views.keys())
-        views_sequenced: dict[ViewToMigrate: TableView] = {}
+        views_sequenced: dict[ViewToMigrate, TableView] = {}
         while len(views_to_migrate) > 0:
             try:
                 next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
@@ -136,7 +136,9 @@ class ViewsMigrationSequencer:
             views_to_migrate.difference_update(next_batch)
         return batches
 
-    def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> list[ViewToMigrate]:
+    def _next_batch(
+        self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate, TableView] | None
+    ) -> list[ViewToMigrate]:
         """For sequencing algorithm see docstring of :meth:sequence_batches.
 
         Raises:
@@ -177,8 +179,5 @@ class ViewsMigrationSequencer:
             if not dependency:  # Only views (to migrate) can cause a circular dependency, tables can be ignored
                 continue
             if dependency == view:
-                raise RecursionError(
-                    f"Circular dependency detected between {view.src.name} and {dependency.src.name} "
-                )
+                raise RecursionError(f"Circular dependency detected between {view.src.name} and {dependency.src.name} ")
             dependencies.extend(dep for dep in dependency.dependencies)
-
