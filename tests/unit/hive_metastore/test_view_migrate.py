@@ -1,3 +1,4 @@
+import logging
 import json
 from itertools import chain
 from pathlib import Path
@@ -164,57 +165,47 @@ def test_sequence_view_with_view_and_table_dependency() -> None:
     assert [t.src.key for t in flatten(batches)] == expected
 
 
-def test_migrate_invalid_sql_raises_value_error() -> None:
+def test_sequence_view_with_invalid_query_raises_value_error() -> None:
+    samples = Samples.load("db1.v8")
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+    migration_index = MigrationIndex([])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
+
     with pytest.raises(ValueError) as error:
-        samples = Samples.load("db1.v8")
-        sql_backend = mock_backend(samples, "db1")
-        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-        migration_index = MigrationIndex([])
-        sequencer = ViewsMigrationSequencer(tables, migration_index)
-        batches = sequencer.sequence_batches()
-        sequence = list(flatten(batches))
-        assert sequence is None  # should never get there
+        sequencer.sequence_batches()
     assert "Could not analyze view SQL:" in str(error)
 
 
-def test_migrate_invalid_sql_tables_raises_value_error() -> None:
-    with pytest.raises(ValueError) as error:
-        samples = Samples.load("db1.v9")
-        sql_backend = mock_backend(samples, "db1")
-        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-        migration_index = MigrationIndex([])
-        sequencer = ViewsMigrationSequencer(tables, migration_index)
-        batches = sequencer.sequence_batches()
-        sequence = list(flatten(batches))
-        assert sequence is None  # should never get there
-    assert "Invalid table references are preventing migration:" in str(error)
+def test_sequencing_logs_unresolved_dependencies(caplog) -> None:
+    samples = Samples.load("db1.v9")
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+    migration_index = MigrationIndex([])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
+
+    with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore.view_migrate"):
+        sequencer.sequence_batches()
+    assert "Unresolved dependencies prevent batch sequencing:" in caplog.text
 
 
-def test_migrate_circular_views_raises_value_error() -> None:
-    with pytest.raises(ValueError) as error:
-        samples = Samples.load("db1.v10", "db1.v11")
-        sql_backend = mock_backend(samples, "db1")
-        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-        migration_index = MigrationIndex([])
-        sequencer = ViewsMigrationSequencer(tables, migration_index)
-        batches = sequencer.sequence_batches()
-        sequence = list(flatten(batches))
-        assert sequence is None  # should never get there
-    assert "Circular dependency detected between" in str(error)
+@pytest.mark.parametrize(
+    "sample_names",
+    [
+        ("db1.v10", "db1.v11"),
+        ("db1.v12", "db1.v13", "db1.v14"),
+    ]
+)
+def test_sequencing_logs_circular_dependency(caplog, sample_names) -> None:
+    samples = Samples.load(*sample_names)
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
+    migration_index = MigrationIndex([])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
 
-
-def test_migrate_circular_view_chain_raises_value_error() -> None:
-    with pytest.raises(ValueError) as error:
-        samples = Samples.load("db1.v12", "db1.v13", "db1.v14")
-        sql_backend = mock_backend(samples, "db1")
-        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        tables = [TableToMigrate(table, _RULE) for table in crawler.snapshot()]
-        migration_index = MigrationIndex([])
-        sequencer = ViewsMigrationSequencer(tables, migration_index)
-        batches = sequencer.sequence_batches()
-        sequence = list(flatten(batches))
-        assert sequence is None  # should never get there
-    assert "Circular dependency detected between" in str(error)
+    with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore.view_migrate"):
+        sequencer.sequence_batches()
+    assert f"Circular dependency detected starting from:" in caplog.text
