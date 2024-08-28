@@ -83,9 +83,9 @@ class ViewToMigrate(TableToMigrate):
 
 class ViewsMigrationSequencer:
 
-    def __init__(self, tables: Collection[TableToMigrate], index: MigrationIndex):
-        self._tables = tables
-        self._index = index
+    def __init__(self, tables_to_migrate: Collection[TableToMigrate], *, migration_index: MigrationIndex | None = None):
+        self._tables = tables_to_migrate
+        self._index = migration_index or MigrationIndex([])
 
     @cached_property
     def _views(self) -> dict[ViewToMigrate, TableView]:

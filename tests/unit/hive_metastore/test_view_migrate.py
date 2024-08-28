@@ -87,7 +87,7 @@ def test_migrate_no_view_returns_empty_sequence(tables):
         MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
         MigrationStatus("db2", "t2", "cat1", "db2", "t1"),
     ])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
     batches = sequencer.sequence_batches()
 
     assert len(batches) == 0
@@ -96,7 +96,7 @@ def test_migrate_no_view_returns_empty_sequence(tables):
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1")], indirect=True)
 def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
@@ -112,7 +112,7 @@ def test_migrate_direct_views_returns_sequence(tables) -> None:
         MigrationStatus("db1", "t1", "cat1", "db1", "t1"),
         MigrationStatus("db1", "t2", "cat1", "db1", "t2")
     ])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
@@ -123,7 +123,7 @@ def test_migrate_direct_views_returns_sequence(tables) -> None:
 def test_migrate_indirect_views_returns_correct_sequence(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
@@ -140,7 +140,7 @@ def test_migrate_deep_indirect_views_returns_correct_sequence(tables) -> None:
         "hive_metastore.db1.v5",
     ]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
@@ -151,7 +151,7 @@ def test_migrate_deep_indirect_views_returns_correct_sequence(tables) -> None:
 def test_sequence_view_with_view_and_table_dependency(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v15"]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
@@ -160,8 +160,7 @@ def test_sequence_view_with_view_and_table_dependency(tables) -> None:
 
 @pytest.mark.parametrize("tables", [("db1.v8",)], indirect=True)
 def test_sequence_view_with_invalid_query_raises_value_error(tables) -> None:
-    migration_index = MigrationIndex([])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables)
 
     with pytest.raises(ValueError) as error:
         sequencer.sequence_batches()
@@ -170,8 +169,7 @@ def test_sequence_view_with_invalid_query_raises_value_error(tables) -> None:
 
 @pytest.mark.parametrize("tables", [("db1.v9",)], indirect=True)
 def test_sequencing_logs_unresolved_dependencies(caplog, tables) -> None:
-    migration_index = MigrationIndex([])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables)
 
     with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore.view_migrate"):
         sequencer.sequence_batches()
@@ -187,8 +185,7 @@ def test_sequencing_logs_unresolved_dependencies(caplog, tables) -> None:
     indirect=True,
 )
 def test_sequencing_logs_circular_dependency(caplog, tables) -> None:
-    migration_index = MigrationIndex([])
-    sequencer = ViewsMigrationSequencer(tables, migration_index)
+    sequencer = ViewsMigrationSequencer(tables)
 
     with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore.view_migrate"):
         sequencer.sequence_batches()
