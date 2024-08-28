@@ -29,6 +29,7 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[ClusterInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ClusterInfo(*row)
 
 
@@ -232,5 +233,5 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[PolicyInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PolicyInfo(*row)

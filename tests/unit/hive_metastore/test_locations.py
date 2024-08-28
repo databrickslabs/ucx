@@ -143,7 +143,7 @@ def test_external_locations():
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
     sql_backend = MockBackend(
         rows={
-            'SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL': [
+            'SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL': [
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
@@ -190,7 +190,7 @@ def test_external_locations():
                     ]
                 ),
             ],
-            r"SELECT \* FROM hive_metastore.test.mounts": [
+            r"SELECT \* FROM `hive_metastore`.`test`.`mounts`": [
                 ("/mnt/ucx", "s3://us-east-1-ucx-container"),
             ],
         }
@@ -219,7 +219,7 @@ def test_save_external_location_mapping_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
                 ("gcs://test_location2/test2/table2", ""),
                 ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
@@ -270,7 +270,7 @@ def test_save_external_location_mapping_no_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
             ],
         }
@@ -285,7 +285,7 @@ def test_match_table_external_locations():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM hive_metastore.test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/a/b/c/table1", ""),
                 ("s3://test_location/a/b/table1", ""),
                 ("gcs://test_location2/a/b/table2", ""),
@@ -324,8 +324,8 @@ def test_mount_listing_multiple_folders():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -363,8 +363,8 @@ def test_mount_listing_sub_folders():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -404,8 +404,8 @@ def test_partitioned_parquet_layout():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -461,8 +461,8 @@ def test_partitioned_delta():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -494,8 +494,8 @@ def test_filtering_irrelevant_paths():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -527,8 +527,8 @@ def test_filter_irrelevant_mounts():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -562,10 +562,10 @@ def test_historical_data_should_be_overwritten():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': TABLE_STORAGE[
+            '`hive_metastore`.`test`.`tables`': TABLE_STORAGE[
                 ("catalog", "database", "name", "object_type", "table_format", "location")
             ],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -619,8 +619,8 @@ def test_mount_include_paths():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -658,8 +658,8 @@ def test_mount_listing_csv_json():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -704,12 +704,12 @@ def test_mount_listing_seen_tables():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': TABLE_STORAGE[
+            '`hive_metastore`.`test`.`tables`': TABLE_STORAGE[
                 ("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
                 ("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
                 ("hive_metastore", "database", "name_3", "MANAGED", "DELTA", None),
             ],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")

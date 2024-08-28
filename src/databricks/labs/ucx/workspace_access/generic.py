@@ -24,6 +24,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -363,7 +364,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield WorkspaceObjectInfo(
                 path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
             )

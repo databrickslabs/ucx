@@ -194,16 +194,20 @@ def test_skip_happy_path(caplog):
     table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
     mapping.skip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
     ws.tables.get.assert_not_called()
-    sbe.execute.assert_called_with(f"ALTER TABLE schema.table SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     view = Table(
         catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
     )
     mapping.skip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
     ws.tables.get.assert_not_called()
-    sbe.execute.assert_called_with(f"ALTER VIEW schema.view SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER VIEW `schema`.`view` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
-    sbe.execute.assert_called_with(f"ALTER SCHEMA schema SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
 
 
@@ -245,18 +249,18 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
             ["test_schema2"],
             ["test_schema3"],
         ],
-        "SHOW TBLPROPERTIES test_schema1.test_table1": [
+        "SHOW TBLPROPERTIES `test_schema1`.`test_table1`": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES test_schema1.test_view1": [
+        "SHOW TBLPROPERTIES `test_schema1`.`test_view1`": [
             {"key": "databricks.labs.ucx.skip", "value": "true"},
         ],
-        "SHOW TBLPROPERTIES test_schema1.test_table2": [
+        "SHOW TBLPROPERTIES `test_schema1`.`test_table2`": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
-        "DESCRIBE SCHEMA EXTENDED test_schema1": [],
-        "DESCRIBE SCHEMA EXTENDED test_schema2": [],
-        "DESCRIBE SCHEMA EXTENDED test_schema3": [
+        "DESCRIBE SCHEMA EXTENDED `test_schema1`": [],
+        "DESCRIBE SCHEMA EXTENDED `test_schema2`": [],
+        "DESCRIBE SCHEMA EXTENDED `test_schema3`": [
             {
                 "database_description_item": "Properties",
                 "database_description_value": "((databricks.labs.ucx.skip,true))",
@@ -333,7 +337,7 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
 def test_table_with_no_target_reverted():
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES schema1.table1": [
+        "SHOW TBLPROPERTIES `schema1`.`table1`": [
             {"key": "upgraded_to", "value": "non.existing.table"},
         ],
     }
@@ -367,7 +371,10 @@ def test_table_with_no_target_reverted():
         ),
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
-    assert "ALTER TABLE hive_metastore.schema1.table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');" in backend.queries
+    assert (
+        "ALTER TABLE `hive_metastore`.`schema1`.`table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        in backend.queries
+    )
 
 
 def test_skipping_rules_existing_targets():
@@ -402,7 +409,7 @@ def test_skipping_rules_existing_targets():
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
 
-    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+    assert ["DESCRIBE SCHEMA EXTENDED `schema1`"] == backend.queries
 
 
 def test_mismatch_from_table_raises_exception():
@@ -442,7 +449,7 @@ def test_mismatch_from_table_raises_exception():
             assert len(e.errs) == 1
             raise e.errs[0]
 
-    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+    assert ["DESCRIBE SCHEMA EXTENDED `schema1`"] == backend.queries
 
 
 def test_table_not_in_crawled_tables():
@@ -460,7 +467,7 @@ def test_table_not_in_crawled_tables():
     tables_crawler.snapshot.return_value = []
     table_mapping.get_tables_to_migrate(tables_crawler)
 
-    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+    assert ["DESCRIBE SCHEMA EXTENDED `schema1`"] == backend.queries
 
 
 def test_skipping_rules_database_skipped():
@@ -472,7 +479,7 @@ def test_skipping_rules_database_skipped():
     )
     errors = {}
     rows = {
-        "DESCRIBE SCHEMA EXTENDED schema2": [
+        "DESCRIBE SCHEMA EXTENDED `schema2`": [
             {
                 "database_description_item": "Properties",
                 "database_description_value": "((databricks.labs.ucx.skip,true))",
@@ -506,8 +513,8 @@ def test_skipping_rules_database_skipped():
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
 
-    assert "SHOW TBLPROPERTIES schema1.table1" in backend.queries
-    assert "SHOW TBLPROPERTIES schema2.table2" not in backend.queries
+    assert "SHOW TBLPROPERTIES `schema1`.`table1`" in backend.queries
+    assert "SHOW TBLPROPERTIES `schema2`.`table2`" not in backend.queries
 
 
 def test_skip_missing_table_in_snapshot():
@@ -666,7 +673,7 @@ def test_tables_in_mounts():
     tables_crawler.snapshot.return_value = []
     table_mapping.get_tables_to_migrate(tables_crawler)
 
-    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+    assert ["DESCRIBE SCHEMA EXTENDED `schema1`"] == backend.queries
 
 
 def test_mapping_table_in_mount():
@@ -825,7 +832,7 @@ def test_mapping_broken_table(caplog):
 def test_table_with_no_target_reverted_failed(caplog):
     errors = {"ALTER TABLE": "ALTER_TABLE_FAILED"}
     rows = {
-        "SHOW TBLPROPERTIES schema1.table1": [
+        "SHOW TBLPROPERTIES `schema1`.`table1`": [
             {"key": "upgraded_to", "value": "non.existing.table"},
         ],
     }

@@ -65,14 +65,14 @@ class ViewToMigrate(TableToMigrate):
             if table_name.db == self.src.database and table_name.name == self.src.name:
                 # See https://github.com/tobymao/sqlglot/issues/3311
                 new_view_name = expressions.Table(
-                    catalog=self.rule.catalog_name,
-                    db=self.rule.dst_schema,
-                    this=self.rule.dst_table,
+                    catalog=expressions.to_identifier(self.rule.catalog_name),
+                    db=expressions.to_identifier(self.rule.dst_schema),
+                    this=expressions.to_identifier(self.rule.dst_table),
                 )
                 table_name.replace(new_view_name)
         # safely replace CREATE with CREATE IF NOT EXISTS
         create.args['exists'] = True
-        return create.sql('databricks')
+        return create.sql('databricks', identify=True)
 
     def __hash__(self):
         return hash(self.src)

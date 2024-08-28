@@ -321,9 +321,11 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
-    assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
+    assert (
+        view1_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}`"
+    )
     view2_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view2.name}").view_definition
-    assert view2_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_view1.name}"
+    assert view2_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_view1.name}`"
     view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
     assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
 
@@ -533,8 +535,8 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert target_table_grants.privilege_assignments[0].principal == user.user_name
-    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+    assert target_table_grants.privilege_assignments[-1].principal == user.user_name
+    assert target_table_grants.privilege_assignments[-1].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
