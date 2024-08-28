@@ -65,19 +65,18 @@ def test_migrate_no_view_returns_empty_sequence(tables):
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1")], indirect=True)
 def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
+    expected = ["hive_metastore.db1.v1"]
     migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
 
-    sequence = list(flatten(batches))
-    assert len(sequence) == 1
-    assert sequence[0].src.key == "hive_metastore.db1.v1"
+    assert [t.src.key for t in flatten(batches)] == expected
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.t2", "db1.v2")], indirect=True)
 def test_migrate_direct_views_returns_sequence(tables) -> None:
-    expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
+    expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v2"]
     migration_index = MigrationIndex(
         [MigrationStatus("db1", "t1", "cat1", "db1", "t1"), MigrationStatus("db1", "t2", "cat1", "db1", "t2")]
     )
@@ -85,7 +84,7 @@ def test_migrate_direct_views_returns_sequence(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
-    assert {t.src.key for t in flatten(batches)} == expected
+    assert [t.src.key for t in flatten(batches)] == expected
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4")], indirect=True)
