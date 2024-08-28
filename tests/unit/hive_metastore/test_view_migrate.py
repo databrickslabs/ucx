@@ -44,6 +44,32 @@ class Samples:
                     cls.samples[key] = sample
 
 
+def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
+    db_rows: dict[str, list[tuple]] = {}
+    select_query = 'SELECT \\* FROM hive_metastore.schema.tables'
+    for dbname in dbnames:
+        # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
+        # pylint: disable=cell-var-from-loop
+        valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
+        show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
+        db_rows[f'SHOW TABLES FROM hive_metastore.{dbname}'] = show_tuples
+        # catalog, database, table, object_type, table_format, location, view_text
+        select_tuples = [
+            (
+                "hive_metastore",
+                s["db"],
+                s["table"],
+                "type",
+                "DELTA" if s.get("view_text", None) is None else "VIEW",
+                None,
+                s.get("view_text", None),
+            )
+            for s in valid_samples
+        ]
+        db_rows[select_query] = select_tuples
+    return MockBackend(rows=db_rows)
+
+
 def test_migrate_no_view_returns_empty_sequence():
     samples = Samples.load("db1.t1", "db2.t1")
     sql_backend = mock_backend(samples, "db1", "db2")
@@ -181,27 +207,3 @@ def test_migrate_circular_view_chain_raises_value_error() -> None:
     assert "Circular dependency detected between" in str(error)
 
 
-def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
-    db_rows: dict[str, list[tuple]] = {}
-    select_query = 'SELECT \\* FROM `hive_metastore`.`schema`.`tables`'
-    for dbname in dbnames:
-        # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
-        # pylint: disable=cell-var-from-loop
-        valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
-        show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
-        db_rows[f'SHOW TABLES FROM `hive_metastore`.`{dbname}`'] = show_tuples
-        # catalog, database, table, object_type, table_format, location, view_text
-        select_tuples = [
-            (
-                "hive_metastore",
-                s["db"],
-                s["table"],
-                "type",
-                "DELTA" if s.get("view_text", None) is None else "VIEW",
-                None,
-                s.get("view_text", None),
-            )
-            for s in valid_samples
-        ]
-        db_rows[select_query] = select_tuples
-    return MockBackend(rows=db_rows)
