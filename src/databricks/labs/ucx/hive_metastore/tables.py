@@ -474,9 +474,19 @@ class TablesCrawler(CrawlerBase):
             return None
 
 
-class FasterTableScanHack:
-    def __init__(self, spark: any):
+class FasterTableScanCrawler:
+    def __init__(self, spark: any, include_databases: list[str] | None = None):
         self._spark = spark
+        self._include_database = include_databases
+
+    def snapshot(self) -> list[Table]:
+        """
+        Takes a snapshot of tables in the specified catalog and database.
+
+        Returns:
+            list[Table]: A list of Table objects representing the snapshot of tables.
+        """
+        return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     @cached_property
     def _external_catalog(self):
@@ -493,7 +503,13 @@ class FasterTableScanHack:
         except Exception as err:
             logger.warning(f"Failed to list tables in {database}: {err}")
 
-    def get_table(self, database: str, table: str) -> any:
+
+    def _describe(self, catalog, database, table) -> Table | None:
+        """Fetches metadata like table type, data format, external table location,
+        and the text of a view if specified for a specific table within the given
+        catalog and database.
+        """
+
         raw_table = self._external_catalog.getTable(database, table)
         table_format = raw_table.provider().getOrElse(None)
         if not table_format:
@@ -502,19 +518,43 @@ class FasterTableScanHack:
         if location_uri:
             location_uri = location_uri.toString()
         view_text = raw_table.viewText()
-        return Table(
-            catalog='hive_metastore',
-            database=database,
-            name=table,
-            object_type=raw_table.tableType().name(),
-            table_format=table_format,
-            location=location_uri,
-            view_text=view_text,
-        )
+
+        #
+        # properties_list = list(self._iterator(raw_table.properties()))
+        properties_list = list(self._iterator(raw_table.properties()))
+
+        for property in properties_list:
+            iterator = property
+            print(type(iterator._1))
+            # while iterator.hasNext():
+            #     print(iterator.next())
+        # for key, value in properties_list[0]:
+        #     print(key)
+        #     print(value)
+
+        # for key, value in properties_list:
+        #     print(key)
+        #     print(value)
+        #     # something = list(self._iterator(property))
+        #     # # something = property.toList()
+        #     # print(something)
+        #     # for some in something:
+        #     #     print(f"{some}")
+        # redacted_key = "******"
+
+        # return Table(
+        #     catalog='hive_metastore',
+        #     database=database,
+        #     name=table,
+        #     object_type=raw_table.tableType().name(),
+        #     table_format=table_format,
+        #     location=location_uri,
+        #     view_text=view_text,
+        # )
 
     def _all_databases(self) -> list[str]:
         if not self._include_database:
-            return [row[0] for row in self._fetch("SHOW DATABASES")]
+            return list(self._iterator(self._external_catalog.listDatabases()))
         return self._include_database
 
     def _crawl(self) -> Iterable[Table]:
@@ -534,13 +574,13 @@ class FasterTableScanHack:
         tasks = []
         databases = self._all_databases()
         for database in databases:
-            print(f"Scanning {database}")
+            logger.info(f"Scanning {database}")
             table_names = [partial(self.list_tables, database)]
             for table_batch in Threads.strict(f'listing tables', table_names):
                 if len(table_batch) > 0:
                     for table in table_batch:
-                        tasks.append(partial(self.get_table, database, table))
+                        tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"describing tables in ", tasks)
         if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while scanning tables in ")
+            logger.error(f"Detected {len(errors)} errors while scanning tables in ")
         return catalog_tables
