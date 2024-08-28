@@ -125,7 +125,11 @@ class ViewsMigrationSequencer:
         views_to_migrate = set(self._views.keys())
         views_sequenced: dict[ViewToMigrate: TableView] = {}
         while len(views_to_migrate) > 0:
-            next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
+            try:
+                next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
+            except RecursionError as e:
+                logger.error(f"Could not sequence views: {views_to_migrate}", exc_info=e)
+                break  # By returning the current batches, we can migrate the views that are not causing the recursion
             for view in next_batch:
                 views_sequenced[view] = self._views[view]
             batches.append(next_batch)
