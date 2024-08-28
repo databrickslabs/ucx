@@ -123,7 +123,7 @@ class ViewsMigrationSequencer:
         """
         batches: list[list[ViewToMigrate]] = []
         views_to_migrate = set(self._views.keys())
-        views_sequenced: dict[ViewToMigrate, TableView] = {}
+        views_sequenced: set[TableView] = set()
         while len(views_to_migrate) > 0:
             try:
                 next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
@@ -131,13 +131,13 @@ class ViewsMigrationSequencer:
                 logger.error(f"Could not sequence views: {views_to_migrate}", exc_info=e)
                 break  # By returning the current batches, we can migrate the views that are not causing the recursion
             for view in next_batch:
-                views_sequenced[view] = self._views[view]
+                views_sequenced.add(self._views[view])
             batches.append(next_batch)
             views_to_migrate.difference_update(next_batch)
         return batches
 
     def _next_batch(
-        self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate, TableView] | None
+        self, views: set[ViewToMigrate], *, views_from_previous_batches: set[TableView] | None
     ) -> list[ViewToMigrate]:
         """For sequencing algorithm see docstring of :meth:sequence_batches.
 
@@ -145,7 +145,7 @@ class ViewsMigrationSequencer:
             RecursionError :
                 If an infinite loop is detected.
         """
-        views_from_previous_batches = views_from_previous_batches or {}
+        views_from_previous_batches = views_from_previous_batches or set()
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
         result = []
@@ -156,7 +156,7 @@ class ViewsMigrationSequencer:
                 result.append(view)
                 continue
             # If all dependencies are already processed, we can add the view to the next batch
-            not_processed_yet = dependencies - set(views_from_previous_batches.values())
+            not_processed_yet = dependencies - set(views_from_previous_batches)
             if len(not_processed_yet) == 0:
                 result.append(view)
                 continue
