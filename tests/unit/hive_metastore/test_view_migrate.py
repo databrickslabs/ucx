@@ -1,6 +1,6 @@
-import logging
+import itertools
 import json
-from itertools import chain
+import logging
 from pathlib import Path
 from typing import TypeVar
 
@@ -16,7 +16,7 @@ T = TypeVar('T')
 
 
 def flatten(lists: list[list[T]]) -> list[T]:
-    return list(chain.from_iterable(lists))
+    return list(itertools.chain.from_iterable(lists))
 
 
 @pytest.fixture(scope="session")
