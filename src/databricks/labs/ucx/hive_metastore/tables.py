@@ -503,7 +503,6 @@ class FasterTableScanCrawler:
         except Exception as err:
             logger.warning(f"Failed to list tables in {database}: {err}")
 
-
     def _describe(self, catalog, database, table) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
         and the text of a view if specified for a specific table within the given
@@ -522,14 +521,22 @@ class FasterTableScanCrawler:
 
             # get properties
             properties_list = self._iterator(raw_table.properties())
-            for each_property in properties_list:
-                key = each_property._1()
-                value = each_property._2()
 
-                redacted_key = "*******"
+            if len(properties_list) < 0:
+                storage_properties = None
+            else:
+                formatted_items = []
+                for each_property in properties_list:
+                    key = each_property._1()
+                    value = each_property._2()
 
-                if key == "personalAccessToken" or key.lower() == "password":
-                    value = redacted_key
+                    redacted_key = "*******"
+
+                    if key == "personalAccessToken" or key.lower() == "password":
+                        value = redacted_key
+                    elif value is None:
+                        value = "None"
+                storage_properties = f"[{', '.join(formatted_items)}]"
 
             # TODO: add all properties to the table object
 
@@ -541,6 +548,7 @@ class FasterTableScanCrawler:
                 table_format=table_format,
                 location=location_uri,
                 view_text=view_text,
+                storage_properties=storage_properties,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
