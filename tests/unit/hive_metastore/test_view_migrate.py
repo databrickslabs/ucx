@@ -23,6 +23,27 @@ def flatten(lists: list[list[T]]) -> list[T]:
 _RULE = Rule("ws1", "cat1", "schema", "db1", "table1", "table2")
 
 
+class Samples:
+    samples: dict = {}
+
+    @classmethod
+    def load(cls, *names: str):
+        cls._preload_all()
+        valid_keys = set(names)
+        return [cls.samples[key] for key in filter(lambda key: key in valid_keys, cls.samples.keys())]
+
+    @classmethod
+    def _preload_all(cls):
+        if len(cls.samples) == 0:
+            path = Path(Path(__file__).parent, "tables", "tables_and_views.json")
+            with open(path, encoding="utf-8") as file:
+                samples = json.load(file)
+                cls.samples = {}
+                for sample in samples:
+                    key = sample["db"] + "." + sample["table"]
+                    cls.samples[key] = sample
+
+
 def test_migrate_no_view_returns_empty_sequence():
     samples = Samples.load("db1.t1", "db2.t1")
     sql_backend = mock_backend(samples, "db1", "db2")
@@ -184,24 +205,3 @@ def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
         ]
         db_rows[select_query] = select_tuples
     return MockBackend(rows=db_rows)
-
-
-class Samples:
-    samples: dict = {}
-
-    @classmethod
-    def load(cls, *names: str):
-        cls._preload_all()
-        valid_keys = set(names)
-        return [cls.samples[key] for key in filter(lambda key: key in valid_keys, cls.samples.keys())]
-
-    @classmethod
-    def _preload_all(cls):
-        if len(cls.samples) == 0:
-            path = Path(Path(__file__).parent, "tables", "tables_and_views.json")
-            with open(path, encoding="utf-8") as file:
-                samples = json.load(file)
-                cls.samples = {}
-                for sample in samples:
-                    key = sample["db"] + "." + sample["table"]
-                    cls.samples[key] = sample
