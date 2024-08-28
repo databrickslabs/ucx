@@ -5,15 +5,12 @@ from pathlib import Path
 from typing import TypeVar
 
 import pytest
-from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer
 
-SCHEMA_NAME = "schema"
 
 T = TypeVar('T')
 
@@ -22,36 +19,23 @@ def flatten(lists: list[list[T]]) -> list[T]:
     return list(chain.from_iterable(lists))
 
 
-_RULE = Rule("ws1", "cat1", "schema", "db1", "table1", "table2")
-
-
-class Samples:
-    samples: dict = {}
-
-    @classmethod
-    def load(cls, *names: str):
-        cls._preload_all()
-        valid_keys = set(names)
-        return [cls.samples[key] for key in filter(lambda key: key in valid_keys, cls.samples.keys())]
-
-    @classmethod
-    def _preload_all(cls):
-        if len(cls.samples) == 0:
-            path = Path(Path(__file__).parent, "tables", "tables_and_views.json")
-            with open(path, encoding="utf-8") as file:
-                samples = json.load(file)
-                cls.samples = {}
-                for sample in samples:
-                    key = sample["db"] + "." + sample["table"]
-                    cls.samples[key] = sample
+@pytest.fixture(scope="session")
+def samples() -> dict[str, dict[str, str]]:
+    path = Path(Path(__file__).parent, "tables", "tables_and_views.json")
+    samples_with_key = {}
+    with path.open(encoding="utf-8") as f:
+        for sample in json.load(f):
+            key = sample["db"] + "." + sample["table"]
+            samples_with_key[key] = sample
+    return samples_with_key
 
 
 @pytest.fixture
-def tables(request) -> list[TableToMigrate]:
-    sample_names = request.param
-    samples = Samples.load(*sample_names)
-    tables = []
-    for sample in samples:
+def tables(request, samples) -> list[TableToMigrate]:
+    tables_to_migrate = []
+    rule = Rule("ws1", "cat1", "schema", "db1", "table1", "table2")
+    for key in request.param:
+        sample = samples[key]
         table = Table(
             "hive_metastore",
             sample["db"],
@@ -60,8 +44,9 @@ def tables(request) -> list[TableToMigrate]:
             "DELTA" if sample.get("view_text") is None else "VIEW",
             view_text=sample.get("view_text"),
         )
-        tables.append(table)
-    return [TableToMigrate(table, _RULE) for table in tables]
+        table_to_migrate = TableToMigrate(table, rule)
+        tables_to_migrate.append(table_to_migrate)
+    return tables_to_migrate
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
