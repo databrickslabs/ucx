@@ -86,7 +86,16 @@ class ViewsMigrationSequencer:
     def __init__(self, tables: Collection[TableToMigrate], index: MigrationIndex):
         self._tables = tables
         self._index = index
-        self._result_view_list: list[ViewToMigrate] = []
+
+    @cached_property
+    def _views(self) -> dict[ViewToMigrate, TableView]:
+        views = {}
+        for table_or_view in self._tables:
+            if table_or_view.src.view_text is None:
+                continue
+            view_to_migrate = ViewToMigrate(table_or_view.src, table_or_view.rule)
+            views[view_to_migrate] = TableView("hive_metastore", view_to_migrate.src.database, view_to_migrate.src.name)
+        return views
 
     def sequence_batches(self) -> list[list[ViewToMigrate]]:
         """Sequence the views in batches to migrate them in the right order.
@@ -104,18 +113,11 @@ class ViewsMigrationSequencer:
         The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
         practice d remains small and v decreases rapidly
         """
-        views_to_migrate = set()
-        for table_or_view in self._tables:
-            if table_or_view.src.view_text is None:
-                continue
-            view_to_migrate = ViewToMigrate(table_or_view.src, table_or_view.rule)
-            views_to_migrate.add(view_to_migrate)
-
+        views_to_migrate = set(self._views.keys())
         batches: list[list[ViewToMigrate]] = []
         sequenced_views: dict[ViewToMigrate: TableView] = {}
         while len(views_to_migrate) > 0:
             next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=sequenced_views)
-            self._result_view_list.extend(next_batch)
             for view in next_batch:
                 sequenced_views[view] = TableView("hive_metastore", view.src.database, view.src.name)
             views_to_migrate.difference_update(next_batch)
@@ -163,8 +165,7 @@ class ViewsMigrationSequencer:
         # This method acts as a mapper between TableView and ViewToMigrate. We check if the key passed matches with
         # any of the views in the list of views. This means the circular dependency will be identified only
         # if the dependencies are present in the list of views passed to _next_batch() or the _result_view_list
-        # ToDo: see if a mapper between TableView and ViewToMigrate can be implemented
-        all_views = list(views) + self._result_view_list
+        all_views = list(views) + list(self._views.keys())
         for view in all_views:
             if view.src.key == key:
                 return view
