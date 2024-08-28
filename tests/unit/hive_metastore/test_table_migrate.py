@@ -434,7 +434,9 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
 
 def test_migrate_view_should_produce_proper_queries(ws):
     errors = {}
-    original_view = "CREATE OR REPLACE VIEW `hive_metastore`.`db1_src`.`view_src` AS SELECT * FROM `db1_src`.`managed_dbfs`"
+    original_view = (
+        "CREATE OR REPLACE VIEW `hive_metastore`.`db1_src`.`view_src` AS SELECT * FROM `db1_src`.`managed_dbfs`"
+    )
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": original_view}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
@@ -463,9 +465,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
 
     create = "CREATE OR REPLACE VIEW IF NOT EXISTS `ucx_default`.`db1_dst`.`view_dst` AS SELECT * FROM `ucx_default`.`db1_dst`.`new_managed_dbfs`"
     assert create in backend.queries
-    src = (
-        "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
-    )
+    src = "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     assert src in backend.queries
     dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     assert dst in backend.queries
@@ -766,7 +766,9 @@ def test_table_status():
 
     datetime.datetime = FakeDate
     errors = {}
-    rows = {"SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]}
+    rows = {
+        "SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]
+    }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     table_crawler.snapshot.return_value = [
