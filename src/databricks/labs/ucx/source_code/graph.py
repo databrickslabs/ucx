@@ -591,7 +591,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
 
     def __init__(self, graph: DependencyGraph, walked_paths: set[Path] | None, path_lookup: PathLookup):
         self._graph = graph
-        self._walked_paths: set[Path] = walked_paths or set()
+        self._walked_paths: set[Path] = set() if walked_paths is None else walked_paths
         self._path_lookup = path_lookup
 
     def walk(self) -> Iterable[T]:
