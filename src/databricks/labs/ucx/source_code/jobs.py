@@ -18,8 +18,8 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
-from databricks.labs.ucx.blueprint.CachedWorkspacePath import CachedWorkspacePath
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.mixins.cached_workspace_path import CachedPath
 from databricks.labs.ucx.source_code.base import CurrentSessionState, is_a_notebook, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -124,7 +124,7 @@ class WorkflowTaskContainer(SourceContainer):
         parsed_path = parse.urlparse(path)
         match parsed_path.scheme:
             case "":
-                return CachedWorkspacePath(self._ws, path)
+                return CachedPath(self._ws, path)
             case "dbfs":
                 return DBFSPath(self._ws, parsed_path.path)
             case other:
@@ -187,7 +187,7 @@ class WorkflowTaskContainer(SourceContainer):
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         # Notebooks can't be on DBFS.
-        path = CachedWorkspacePath(self._ws, notebook_path)
+        path = CachedPath(self._ws, notebook_path)
         return graph.register_notebook(path, False)
 
     def _register_spark_python_task(self, graph: DependencyGraph):
@@ -262,7 +262,7 @@ class WorkflowTaskContainer(SourceContainer):
             if library.notebook.path:
                 notebook_path = library.notebook.path
                 # Notebooks can't be on DBFS.
-                path = CachedWorkspacePath(self._ws, notebook_path)
+                path = CachedPath(self._ws, notebook_path)
                 # the notebook is the root of the graph, so there's no context to inherit
                 yield from graph.register_notebook(path, inherit_context=False)
             if library.jar:

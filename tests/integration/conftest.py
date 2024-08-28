@@ -29,7 +29,6 @@ from databricks.labs.ucx.assessment.azure import (
 )
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
-from databricks.labs.ucx.blueprint.CachedWorkspacePath import WorkspaceLruCache
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
@@ -40,6 +39,7 @@ from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.mixins.cached_workspace_path import clear_path_lru_cache
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
@@ -969,5 +969,5 @@ def pytest_ignore_collect(path):
 
 @pytest.fixture(autouse=True)
 def _clear_lru_cache():
-    WorkspaceLruCache.clear()
+    clear_path_lru_cache()
     yield
