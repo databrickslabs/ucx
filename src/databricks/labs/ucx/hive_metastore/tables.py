@@ -509,50 +509,54 @@ class FasterTableScanCrawler:
         and the text of a view if specified for a specific table within the given
         catalog and database.
         """
+        full_name = f"{catalog}.{database}.{table}"
+        try:
+            raw_table = self._external_catalog.getTable(database, table)
+            table_format = raw_table.provider().getOrElse(None)
+            if not table_format:
+                table_format = "UNKNOWN"
+            location_uri = raw_table.storage().locationUri().getOrElse(None)
+            if location_uri:
+                location_uri = location_uri.toString()
+            view_text = raw_table.viewText()
 
-        raw_table = self._external_catalog.getTable(database, table)
-        table_format = raw_table.provider().getOrElse(None)
-        if not table_format:
-            table_format = "UNKNOWN"
-        location_uri = raw_table.storage().locationUri().getOrElse(None)
-        if location_uri:
-            location_uri = location_uri.toString()
-        view_text = raw_table.viewText()
+            # get properties
+            properties_list = list(self._iterator(raw_table.properties()))
 
-        # get properties
-        properties_list = list(self._iterator(raw_table.properties()))
+            # TODO:
+            # loop over properties and extract values
 
-        # TODO:
-        # loop over properties and extract values
+            for property in properties_list:
+                iterator = property
+                print(type(iterator._1))
+                # while iterator.hasNext():
+                #     print(iterator.next())
+            # for key, value in properties_list[0]:
+            #     print(key)
+            #     print(value)
 
-        for property in properties_list:
-            iterator = property
-            print(type(iterator._1))
-            # while iterator.hasNext():
-            #     print(iterator.next())
-        # for key, value in properties_list[0]:
-        #     print(key)
-        #     print(value)
+            # for key, value in properties_list:
+            #     print(key)
+            #     print(value)
+            #     # something = list(self._iterator(property))
+            #     # # something = property.toList()
+            #     # print(something)
+            #     # for some in something:
+            #     #     print(f"{some}")
+            # redacted_key = "******"
 
-        # for key, value in properties_list:
-        #     print(key)
-        #     print(value)
-        #     # something = list(self._iterator(property))
-        #     # # something = property.toList()
-        #     # print(something)
-        #     # for some in something:
-        #     #     print(f"{some}")
-        # redacted_key = "******"
-
-        # return Table(
-        #     catalog='hive_metastore',
-        #     database=database,
-        #     name=table,
-        #     object_type=raw_table.tableType().name(),
-        #     table_format=table_format,
-        #     location=location_uri,
-        #     view_text=view_text,
-        # )
+            # return Table(
+            #     catalog='hive_metastore',
+            #     database=database,
+            #     name=table,
+            #     object_type=raw_table.tableType().name(),
+            #     table_format=table_format,
+            #     location=location_uri,
+            #     view_text=view_text,
+            # )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error(f"Couldn't fetch information for table {full_name} : {e}")
+            return None
 
     def _all_databases(self) -> list[str]:
         if not self._include_database:
