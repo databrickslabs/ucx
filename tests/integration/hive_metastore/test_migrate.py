@@ -535,8 +535,8 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert target_table_grants.privilege_assignments[0].principal == user.user_name
-    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+    assert target_table_grants.privilege_assignments[-1].principal == user.user_name
+    assert target_table_grants.privilege_assignments[-1].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
