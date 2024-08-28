@@ -126,6 +126,7 @@ class ViewsMigrationSequencer:
         return batches
 
     def _next_batch(self, views: set[ViewToMigrate], *, views_from_previous_batches: dict[ViewToMigrate: TableView] | None) -> list[ViewToMigrate]:
+        """For sequencing algorithm see docstring of :meth:sequence_batches"""
         views_from_previous_batches = views_from_previous_batches or {}
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
