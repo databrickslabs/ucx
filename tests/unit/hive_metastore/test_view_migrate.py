@@ -83,10 +83,12 @@ def tables(request) -> list[TableToMigrate]:
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
 def test_migrate_no_view_returns_empty_sequence(tables):
-    migration_index = MigrationIndex([
-        MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
-        MigrationStatus("db2", "t2", "cat1", "db2", "t1"),
-    ])
+    migration_index = MigrationIndex(
+        [
+            MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
+            MigrationStatus("db2", "t2", "cat1", "db2", "t1"),
+        ]
+    )
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
     batches = sequencer.sequence_batches()
 
@@ -108,10 +110,9 @@ def test_migrate_direct_view_returns_singleton_sequence(tables) -> None:
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.t2", "db1.v2")], indirect=True)
 def test_migrate_direct_views_returns_sequence(tables) -> None:
     expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
-    migration_index = MigrationIndex([
-        MigrationStatus("db1", "t1", "cat1", "db1", "t1"),
-        MigrationStatus("db1", "t2", "cat1", "db1", "t2")
-    ])
+    migration_index = MigrationIndex(
+        [MigrationStatus("db1", "t1", "cat1", "db1", "t1"), MigrationStatus("db1", "t2", "cat1", "db1", "t2")]
+    )
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
@@ -189,4 +190,4 @@ def test_sequencing_logs_circular_dependency(caplog, tables) -> None:
 
     with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore.view_migrate"):
         sequencer.sequence_batches()
-    assert f"Circular dependency detected starting from:" in caplog.text
+    assert "Circular dependency detected starting from:" in caplog.text

@@ -100,7 +100,7 @@ class ViewsMigrationSequencer:
 
     def _get_view_to_migrate(self, key: str) -> ViewToMigrate | None:
         """Get a view to migrate by key"""
-        for view in self._views.keys():
+        for view in self._views:
             if view.src.key == key:
                 return view
         return None
@@ -148,7 +148,7 @@ class ViewsMigrationSequencer:
         views_from_previous_batches = views_from_previous_batches or {}
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
-        result: list[ViewToMigrate] = list()
+        result = []
         for view in views:
             self._check_circular_dependency(view)
             dependencies = set(view.dependencies)
@@ -173,11 +173,11 @@ class ViewsMigrationSequencer:
             RecursionError :
                 If a circular dependency is detected between views.
         """
-        dependencies = [dep for dep in view.dependencies]
-        while dependencies:
-            dependency = self._get_view_to_migrate(dependencies.pop(0).key)
+        dependency_keys = [dep.key for dep in view.dependencies]
+        while dependency_keys:
+            dependency = self._get_view_to_migrate(dependency_keys.pop(0))
             if not dependency:  # Only views (to migrate) can cause a circular dependency, tables can be ignored
                 continue
             if dependency == view:
                 raise RecursionError(f"Circular dependency detected starting from: {view.src.full_name}")
-            dependencies.extend(dep for dep in dependency.dependencies)
+            dependency_keys.extend(dep.key for dep in dependency.dependencies)
