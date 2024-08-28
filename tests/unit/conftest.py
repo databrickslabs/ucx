@@ -8,7 +8,6 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.mixins.cached_workspace_path import clear_path_lru_cache
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import WorkspaceClient, AccountClient
@@ -109,9 +108,3 @@ def mock_notebook_resolver():
     resolver = create_autospec(BaseNotebookResolver)
     resolver.resolve_notebook.return_value = None
     return resolver
-
-
-@pytest.fixture(autouse=True)
-def _clear_lru_cache():
-    clear_path_lru_cache()
-    yield

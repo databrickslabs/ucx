@@ -39,7 +39,6 @@ from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
-from databricks.labs.ucx.mixins.cached_workspace_path import clear_path_lru_cache
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
@@ -965,9 +964,3 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
-
-
-@pytest.fixture(autouse=True)
-def _clear_lru_cache():
-    clear_path_lru_cache()
-    yield

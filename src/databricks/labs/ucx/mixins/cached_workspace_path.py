@@ -1,11 +1,13 @@
+from __future__ import annotations
+
+import os
 from collections import OrderedDict
+from collections.abc import Generator
 from io import StringIO, BytesIO
-from threading import local
 
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.workspace import ObjectInfo
 from databricks.labs.blueprint.paths import WorkspacePath
-
-thread_local = local()
-thread_local.cache = OrderedDict()
 
 
 class _CachedIO:
@@ -57,54 +59,52 @@ class _CachedIO:
 # so we provide our own custom lru_cache
 class _PathLruCache:
 
-    _CACHE_MAX_SIZE = 2048
-    _CACHE: OrderedDict[str, bytes | str] = thread_local.cache
+    def __init__(self, max_entries: int):
+        self._datas: OrderedDict[str, bytes | str] = OrderedDict()
+        self._max_entries = max_entries
 
-    def __init__(self, func):
-        self._func = func
-
-    def __call__(self, *args, **kwargs):
-        path = str(args[0])  # the CachedWorkspacePath instance
-        cache = self._CACHE
-        if path in cache:
-            cache.move_to_end(path)
-            return _CachedIO(cache[path]).with_mode(args[1])
-        io_obj = self._func(*args, **kwargs)
-        # can't read twice from an IO so need to cache content rather than the result
+    def open(self, cached_path: _CachedPath, mode, buffering, encoding, errors, newline):
+        path = str(cached_path)
+        if path in self._datas:
+            self._datas.move_to_end(path)
+            return _CachedIO(self._datas[path]).with_mode(mode)
+        io_obj = WorkspacePath.open(cached_path, mode, buffering, encoding, errors, newline)
+        # can't read twice from an IO so need to cache data rather than the io object
         data = io_obj.read()
-        cache[path] = data
-        result = _CachedIO(data).with_mode(args[1])
-        if len(cache) > self._CACHE_MAX_SIZE:
-            cache.popitem(last=False)
+        self._datas[path] = data
+        result = _CachedIO(data).with_mode(mode)
+        if len(self._datas) > self._max_entries:
+            self._datas.popitem(last=False)
         return result
 
-    @classmethod
-    def clear(cls):
-        cls._CACHE.clear()
+    def clear(self):
+        self._datas.clear()
 
-    @classmethod
-    def remove(cls, path: str):
-        if path in cls._CACHE:
-            cls._CACHE.pop(path)
+    def remove(self, path: str):
+        if path in self._datas:
+            self._datas.pop(path)
 
 
-def _workspace_lru_cache(func):
+class _CachedPath(WorkspacePath):
+    def __init__(self, cache: _PathLruCache, ws: WorkspaceClient, *args: str | bytes | os.PathLike):
+        super().__init__(ws, *args)
+        self._cache = cache
 
-    cache = _PathLruCache(func)
+    def with_object_info(self, object_info: ObjectInfo):
+        self._cached_object_info = object_info
+        return self
 
-    # we need a wrapper to receive self in args
-    def wrapper(*args, **kwargs):
-        nonlocal cache
-        return cache(*args, **kwargs)
+    def with_segments(self, *path_segments: bytes | str | os.PathLike) -> _CachedPath:
+        return type(self)(self._cache, self._ws, *path_segments)
 
-    return wrapper
-
-
-def clear_path_lru_cache():
-    _PathLruCache.clear()
-
-
-class CachedPath(WorkspacePath):
+    def iterdir(self) -> Generator[_CachedPath, None, None]:
+        for object_info in self._ws.workspace.list(self.as_posix()):
+            path = object_info.path
+            if path is None:
+                msg = f"Cannot initialise without object path: {object_info}"
+                raise ValueError(msg)
+            child = _CachedPath(self._cache, self._ws, path)
+            yield child.with_object_info(object_info)
 
     def open(
         self,
@@ -116,15 +116,24 @@ class CachedPath(WorkspacePath):
     ):
         # only cache reads
         if 'r' in mode:
-            return self._cached_open(mode, buffering, encoding, errors, newline)
-        _PathLruCache.remove(str(self))
+            return self._cache.open(self, mode, buffering, encoding, errors, newline)
+        self._cache.remove(str(self))
         return super().open(mode, buffering, encoding, errors, newline)
 
-    @_workspace_lru_cache
     def _cached_open(self, mode: str, buffering: int, encoding: str | None, errors: str | None, newline: str | None):
         return super().open(mode, buffering, encoding, errors, newline)
 
     # _rename calls unlink so no need to override it
     def unlink(self, missing_ok: bool = False) -> None:
-        _PathLruCache.remove(str(self))
+        self._cache.remove(str(self))
         return super().unlink(missing_ok)
+
+
+class WorkspaceCache:
+
+    def __init__(self, ws: WorkspaceClient, max_entries=2048):
+        self._ws = ws
+        self._cache = _PathLruCache(max_entries)
+
+    def get_path(self, path: str):
+        return _CachedPath(self._cache, self._ws, path)
