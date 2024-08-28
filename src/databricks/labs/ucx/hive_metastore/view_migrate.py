@@ -94,6 +94,7 @@ class ViewsMigrationSequencer:
             if table_or_view.src.view_text is None:
                 continue
             view_to_migrate = ViewToMigrate(table_or_view.src, table_or_view.rule)
+            # All views to migrate are stored in the hive_metastore
             views[view_to_migrate] = TableView("hive_metastore", view_to_migrate.src.database, view_to_migrate.src.name)
         return views
 
@@ -119,7 +120,7 @@ class ViewsMigrationSequencer:
         while len(views_to_migrate) > 0:
             next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=sequenced_views)
             for view in next_batch:
-                sequenced_views[view] = TableView("hive_metastore", view.src.database, view.src.name)
+                sequenced_views[view] = self._views[view]
             views_to_migrate.difference_update(next_batch)
             batches.append(list(next_batch))
         return batches
