@@ -98,6 +98,13 @@ class ViewsMigrationSequencer:
             views[view_to_migrate] = TableView("hive_metastore", view_to_migrate.src.database, view_to_migrate.src.name)
         return views
 
+    def _get_view_to_migrate(self, key: str) -> ViewToMigrate | None:
+        """Get a view to migrate by key"""
+        for view in self._views.keys():
+            if view.src.key == key:
+                return view
+        return None
+
     def sequence_batches(self) -> list[list[ViewToMigrate]]:
         """Sequence the views in batches to migrate them in the right order.
 
@@ -132,8 +139,8 @@ class ViewsMigrationSequencer:
         # because we'd lose the opportunity to check the SQL
         result: list[ViewToMigrate] = list()
         for view in views:
+            self._check_circular_dependency(view)
             view_deps = set(view.dependencies)
-            self._check_circular_dependency(view, views)
             if len(view_deps) == 0:
                 result.append(view)
                 continue
@@ -149,25 +156,21 @@ class ViewsMigrationSequencer:
             raise ValueError(f"Invalid table references are preventing migration: {views}")
         return result
 
-    def _check_circular_dependency(self, initial_view, views):
-        queue = []
-        queue.extend(dep for dep in initial_view.dependencies)
-        while queue:
-            current_view = self._get_view_instance(queue.pop(0).key, views)
-            if not current_view:
-                continue
-            if current_view == initial_view:
-                raise ValueError(
-                    f"Circular dependency detected between {initial_view.src.name} and {current_view.src.name} "
-                )
-            queue.extend(dep for dep in current_view.dependencies)
+    def _check_circular_dependency(self, view: ViewToMigrate) -> None:
+        """Check for circular dependencies in the views to migrate.
 
-    def _get_view_instance(self, key: str, views: set[ViewToMigrate]) -> ViewToMigrate | None:
-        # This method acts as a mapper between TableView and ViewToMigrate. We check if the key passed matches with
-        # any of the views in the list of views. This means the circular dependency will be identified only
-        # if the dependencies are present in the list of views passed to _next_batch() or the _result_view_list
-        all_views = list(views) + list(self._views.keys())
-        for view in all_views:
-            if view.src.key == key:
-                return view
-        return None
+        Raises:
+            ValueError :
+                If a circular dependency is detected between views.
+        """
+        dependencies = [dep for dep in view.dependencies]
+        while dependencies:
+            dependency = self._get_view_to_migrate(dependencies.pop(0).key)
+            if not dependency:  # Dependency is not a view to migrate, like a table
+                continue
+            if dependency == view:
+                raise ValueError(
+                    f"Circular dependency detected between {view.src.name} and {dependency.src.name} "
+                )
+            dependencies.extend(dep for dep in dependency.dependencies)
+
