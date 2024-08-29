@@ -419,7 +419,7 @@ class WorkflowLinter:
                 self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
             ) -> Iterable[LocatedAdvice]:
                 ctx = LinterContext(migration_index, session_state)
-                # FileLinter will determine which file/notebook linter to use
+                # FileLinter determines which file/notebook linter to use
                 linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
