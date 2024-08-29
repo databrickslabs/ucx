@@ -481,6 +481,7 @@ class FasterTableScanCrawler(CrawlerBase):
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
         self._spark = SparkSession.builder.getOrCreate()
 
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
@@ -594,11 +595,11 @@ class FasterTableScanCrawler(CrawlerBase):
         for database in databases:
             logger.info(f"Scanning {database}")
             table_names = [partial(self.list_tables, database)]
-            for table_batch in Threads.strict(f'listing tables', table_names):
+            for table_batch in Threads.strict('listing tables', table_names):
                 if len(table_batch) > 0:
                     for table in table_batch:
-                        tasks.append(partial(self._describe, database, table))
-        catalog_tables, errors = Threads.gather(f"describing tables in ", tasks)
+                        tasks.append(partial(self._describe, catalog, database, table))
+        catalog_tables, errors = Threads.gather("describing tables in ", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} errors while scanning tables in ")
         return catalog_tables
