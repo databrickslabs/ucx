@@ -109,6 +109,7 @@ def test_sequence_direct_views(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
+    assert len(batches) == 1
     # Sort because the order of the views is not guaranteed as they both depend on just tables
     assert sorted([t.src.key for t in flatten(batches)]) == expected
 
@@ -121,6 +122,7 @@ def test_sequence_indirect_views(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
+    assert len(batches) == 2
     assert [t.src.key for t in flatten(batches)] == expected
 
 
@@ -138,6 +140,7 @@ def test_sequence_deep_indirect_views(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
+    assert len(batches) == 5
     assert [t.src.key for t in flatten(batches)] == expected
 
 
@@ -149,6 +152,7 @@ def test_sequence_view_with_view_and_table_dependency(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
+    assert len(batches) == 2
     assert [t.src.key for t in flatten(batches)] == expected
 
 
