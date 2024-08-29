@@ -96,7 +96,7 @@ def test_dfsa_tables_trigger_messages_param(query: str, table: str):
     assert actual == [
         Deprecation(
             code='direct-file-system-access-in-sql-query',
-            message=f'Deprecated direct file system access: {table}',
+            message=f'The use of direct file system access is deprecated: {table}',
             start_line=0,
             start_col=0,
             end_line=0,
