@@ -366,3 +366,6 @@ class AWSResourcePermissions:
             metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
             return f"{role_name}_{metastore_id}"
         return f"{role_name}_{location[5:]}"
+
+    def delete_uc_role(self, role_name: str):
+        self._aws_resources.delete_role(role_name)

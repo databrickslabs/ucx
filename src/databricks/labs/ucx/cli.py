@@ -364,8 +364,11 @@ def delete_missing_principals(
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
     if ctx.is_aws:
-        return ctx.iam_role_creation.delete_missing_principal(prompts, single_role=single_role, role_name=role_name, policy_name=policy_name)
+        return ctx.iam_role_creation.delete_missing_principal(
+            prompts, single_role=single_role, role_name=role_name, policy_name=policy_name
+        )
     raise ValueError("Unsupported cloud provider")
+
 
 @ucx.command
 def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters):
