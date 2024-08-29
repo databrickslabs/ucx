@@ -2,13 +2,18 @@ import logging
 from collections.abc import Iterable
 
 from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
-from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
+from sqlglot import Expression
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, PythonLinter
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    Deprecation,
+    CurrentSessionState,
+    PythonLinter,
+    SQLLinter,
+)
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
-from databricks.labs.ucx.source_code.queries import FromTable
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +73,7 @@ class DetectDbfsVisitor(TreeVisitor):
         yield from self._advices
 
 
-class DBFSUsageLinter(PythonLinter):
+class DBFSUsagePyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
@@ -89,7 +94,7 @@ class DBFSUsageLinter(PythonLinter):
         yield from visitor.get_advices()
 
 
-class FromDbfsFolder(Linter):
+class DbfsUsageSQLLinter(SQLLinter):
     def __init__(self):
         self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
 
@@ -97,19 +102,8 @@ class FromDbfsFolder(Linter):
     def name() -> str:
         return 'dbfs-query'
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            queries = parse_sql(code, read='databricks')
-            for query in queries:
-                if not query:
-                    continue
-                yield from self._lint_query(query)
-        except SqlParseError as e:
-            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield FromTable.sql_parse_failure(code)
-
-    def _lint_query(self, query: Expression):
-        for table in query.find_all(Table):
+    def lint_expression(self, expression: Expression):
+        for table in expression.find_all(Table):
             # Check table names for deprecated DBFS table names
             yield from self._check_dbfs_folder(table)
 
