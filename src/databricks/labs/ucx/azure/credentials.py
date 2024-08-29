@@ -20,7 +20,6 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AccessConnector
 
 logger = logging.getLogger(__name__)
 
@@ -274,14 +273,17 @@ class ServicePrincipalMigration(SecretsMixin):
                 )
                 execution_result.append(validation_results)
             except (PermissionDenied, NotFound, BadRequest) as e:
-                logger.error("Error creating storage credentials")
-                self._resource_permissions.delete_storage_credentials(execution_result)
+                logger.error(
+                    "Error creating storage credentials. Please check error message and try again."
+                    "Rolling back storage credential that are created."
+                )
+                self._resource_permissions.delete_storage_credential(execution_result)
                 raise e
         return execution_result
 
     def _create_storage_credentials_for_storage_accounts(
         self,
-    ) -> tuple[list[StorageCredentialValidationResult], list[tuple[AccessConnector, str]]]:
+    ) -> list[StorageCredentialValidationResult]:
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
         execution_results: list[StorageCredentialValidationResult] = []
@@ -297,14 +299,17 @@ class ServicePrincipalMigration(SecretsMixin):
             except BadRequest:
                 logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
             except (PermissionDenied, NotFound):
-                logger.error("Error creating all access connectors. Deleting incomplete ones.")
-                self._resource_permissions.delete_storage_credentials(execution_results)
+                logger.error(
+                    "Error validating all storage credentials. Please check the error message and tr again."
+                    "Rolling back access connectors and storage credentials created."
+                )
+                self._resource_permissions.delete_storage_credential(execution_results)
                 delete_access_connectors = [access_connector for access_connector, _ in access_connectors]
                 self._resource_permissions.delete_access_connectors(delete_access_connectors)
             else:
                 execution_results.append(validation_results)
 
-        return execution_results, access_connectors
+        return execution_results
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         plan_confirmed = prompts.confirm(
@@ -312,9 +317,8 @@ class ServicePrincipalMigration(SecretsMixin):
             "account."
         )
         execution_results: list[StorageCredentialValidationResult] = []
-        access_connectors: list[tuple[AccessConnector, str]] = []
         if plan_confirmed:
-            execution_results, access_connectors = self._create_storage_credentials_for_storage_accounts()
+            execution_results = self._create_storage_credentials_for_storage_accounts()
 
         sp_migration_infos = self._generate_migration_list(include_names)
         if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
@@ -328,12 +332,7 @@ class ServicePrincipalMigration(SecretsMixin):
         )
         sp_results = []
         if plan_confirmed:
-            try:
-                sp_results = self._migrate_service_principals(sp_migration_infos)
-            except (BadRequest, PermissionDenied, NotFound):
-                self._resource_permissions.delete_storage_credentials(execution_results)
-                delete_access_connectors = [access_connector for access_connector, _ in access_connectors]
-                self._resource_permissions.delete_access_connectors(delete_access_connectors)
+            sp_results = self._migrate_service_principals(sp_migration_infos)
 
         execution_results = execution_results + sp_results
         if execution_results:
