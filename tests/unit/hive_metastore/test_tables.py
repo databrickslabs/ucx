@@ -484,14 +484,20 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
     assert expected_log in caplog.text
 
 
-def test_fast_table_scan_crawler(caplog, mocker):
+def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     errors = {}
     rows = {
-        "table_size": [],
         "hive_metastore.inventory_database.tables": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
+            ("hive_metastore", "db1", "table2", "MANAGED", "DELTA", "/dbfs/location/table", None),
+            ("hive_metastore", "db1", "table3", "MANAGED", "DELTA", "dbfs:/mnt/location/table", None),
+            ("hive_metastore", "db1", "table4", "MANAGED", "DELTA", "s3:/location/table", None),
+            ("hive_metastore", "db1", "table5", "MANAGED", "DELTA", "/dbfs/mnt/location/table", None),
+            ("hive_metastore", "db1", "table6", "MANAGED", "DELTA", "/dbfs/databricks-datasets/location/table", None),
+            ("hive_metastore", "db1", "table7", "MANAGED", "DELTA", "dbfs:/databricks-datasets/location/table", None),
+            ("hive_metastore", "db1", "table8", "MANAGED", "DELTA", "/databricks-datasets/location/table", None),
+            ("hive_metastore", "db1", "view", "VIEW", "DELTA", None, "SELECT * FROM TABLE"),
         ],
-        "SHOW DATABASES": [("db1",)],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     pyspark_sql_session = mocker.Mock()
@@ -503,5 +509,5 @@ def test_fast_table_scan_crawler(caplog, mocker):
 
     results = ftsc.snapshot()
 
-    assert results
+    assert len(results) == 9
 

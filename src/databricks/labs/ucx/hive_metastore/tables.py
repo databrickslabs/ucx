@@ -483,7 +483,7 @@ class FasterTableScanCrawler(CrawlerBase):
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
         self._spark = SparkSession.builder.getOrCreate()
 
-        super().__init__(backend, "hive_metastore", schema, "table_size", Table)
+        super().__init__(backend, "hive_metastore", schema, "tables", Table)
 
     def snapshot(self) -> list[Table]:
         """
