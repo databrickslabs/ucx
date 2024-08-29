@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 import logging
+from abc import ABC
 from collections.abc import Iterable
 
 from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
@@ -18,7 +20,49 @@ from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 logger = logging.getLogger(__name__)
 
 
-class DetectDbfsVisitor(TreeVisitor):
+class DFSAPattern(ABC):
+
+    def __init__(self, prefix: str, allowed_roots: list[str]):
+        self._prefix = prefix
+        self._allowed_roots = allowed_roots
+
+    def matches(self, value: str) -> bool:
+        return value.startswith(self._prefix) and not self._matches_allowed_root(value)
+
+    def _matches_allowed_root(self, value: str):
+        return any(value.startswith(f"{self._prefix}/{root}/") for root in self._allowed_roots)
+
+
+# the below aims to implement https://docs.databricks.com/en/files/index.html
+DFSA_PATTERNS = [
+    DFSAPattern("dbfs:/", []),
+    DFSAPattern("file:/", ["Workspace", "tmp"]),
+    DFSAPattern("s3:/", []),
+    DFSAPattern("s3n:/", []),
+    DFSAPattern("s3a:/", []),
+    DFSAPattern("wasb:/", []),
+    DFSAPattern("wasbs:/", []),
+    DFSAPattern("abfs:/", []),
+    DFSAPattern("abfss:/", []),
+    DFSAPattern("hdfs:/", []),
+    DFSAPattern("/mnt:/", []),
+    DFSAPattern("/", ["Volumes", "Workspace", "tmp"]),
+]
+
+
+@dataclass
+class DFSA:
+    """A DFSA is a record describing a Direct File System Access"""
+    path: str
+
+
+@dataclass
+class DFSANode:
+    dfsa: DFSA
+    node: NodeNG
+
+
+class DetectDfsaVisitor(TreeVisitor):
     """
     Visitor that detects file system paths in Python code and checks them
     against a list of known deprecated paths.
@@ -26,9 +70,8 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def __init__(self, session_state: CurrentSessionState) -> None:
         self._session_state = session_state
-        self._advices: list[Advice] = []
-        self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
-        self._reported_locations: set[tuple[int, int]] = set()  # Set to store reported locations; astroid coordinates!
+        self._dfsa_nodes: list[DFSANode] = []
+        self._reported_locations: set[tuple[int, int]] = set()
 
     def visit_call(self, node: Call):
         for arg in node.args:
@@ -53,27 +96,20 @@ class DetectDbfsVisitor(TreeVisitor):
         if self._already_reported(source_node, inferred):
             return
         value = inferred.as_string()
-        if any(value.startswith(prefix) for prefix in self._fs_prefixes):
-            advisory = Deprecation.from_node(
-                code='dbfs-usage',
-                message=f"Deprecated file system path: {value}",
-                node=source_node,
-            )
-            self._advices.append(advisory)
+        if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
+            self._dfsa_nodes.append(DFSANode(DFSA(value), source_node))
+            self._reported_locations.add((source_node.lineno, source_node.col_offset))
 
     def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
-        all_nodes = [source_node]
-        all_nodes.extend(inferred.nodes)
-        reported = any((node.lineno, node.col_offset) in self._reported_locations for node in all_nodes)
-        for node in all_nodes:
-            self._reported_locations.add((node.lineno, node.col_offset))
-        return reported
+        all_nodes = [source_node] + inferred.nodes
+        return any((node.lineno, node.col_offset) in self._reported_locations for node in all_nodes)
 
-    def get_advices(self) -> Iterable[Advice]:
-        yield from self._advices
+    @property
+    def dfsa_nodes(self):
+        return self._dfsa_nodes
 
 
-class DBFSUsagePyLinter(PythonLinter):
+class DFSAPyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
@@ -83,15 +119,21 @@ class DBFSUsagePyLinter(PythonLinter):
         """
         Returns the name of the linter, for reporting etc
         """
-        return 'dbfs-usage'
+        return 'dfsa-usage'
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         """
         Lints the code looking for file system paths that are deprecated
         """
-        visitor = DetectDbfsVisitor(self._session_state)
+        visitor = DetectDfsaVisitor(self._session_state)
         visitor.visit(tree.node)
-        yield from visitor.get_advices()
+        for dfsa_node in visitor.dfsa_nodes:
+            advisory = Deprecation.from_node(
+                code='direct-file-system-access',
+                message=f"Deprecated direct file system access: {dfsa_node.dfsa.path}",
+                node=dfsa_node.node,
+            )
+            yield advisory
 
 
 class DbfsUsageSqlLinter(SqlLinter):
@@ -100,22 +142,22 @@ class DbfsUsageSqlLinter(SqlLinter):
 
     @staticmethod
     def name() -> str:
-        return 'dbfs-query'
+        return 'dfsa-query'
 
     def lint_expression(self, expression: Expression):
         for table in expression.find_all(Table):
-            # Check table names for deprecated DBFS table names
-            yield from self._check_dbfs_folder(table)
+            # Check table names for direct file system access
+            yield from self._check_dfsa(table)
 
-    def _check_dbfs_folder(self, table: Table) -> Iterable[Advice]:
+    def _check_dfsa(self, table: Table) -> Iterable[Advice]:
         """
         Check if the table is a DBFS table or reference in some way
         and yield a deprecation message if it is
         """
-        if any(table.name.startswith(prefix) for prefix in self._dbfs_prefixes):
+        if any(pattern.matches(table.name) for pattern in DFSA_PATTERNS):
             yield Deprecation(
-                code='dbfs-read-from-sql-query',
-                message=f"The use of DBFS is deprecated: {table.name}",
+                code='direct-file-system-access-in-sql-query',
+                message=f"Deprecated direct file system access: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
