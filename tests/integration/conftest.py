@@ -581,6 +581,7 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
         aws_profile=aws_profile,
         aws_cli_run_command=aws_cli_run_command,
         aws_resource_permissions=aws_resource_permissions,
+        connect_config=installation_ctx.workspace_client.config,
     )
 
 

@@ -7,7 +7,7 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
-from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
+from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources, AWSUCRoleCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -29,13 +29,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     policy_name = f"UCX_POLICY_{rand}"
     account_id = aws.validate_connection().get("Account")
     s3_prefixes = {f"s3://bucket{rand}"}
-    aws.create_uc_role(role_name)
-    aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
-    ws.storage_credentials.create(
-        f"ucx_{rand}",
-        aws_iam_role=AwsIamRoleRequest(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"),
-        read_only=False,
-    )
+
     external_location = ExternalLocations(ws, sql_backend, inventory_schema)
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
@@ -44,6 +38,16 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         external_location,
         account_id,
     )
+    role_candidate = AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes))
+    aws_permissions.create_uc_roles([role_candidate])
+
+    credential = ws.storage_credentials.create(
+        f"ucx_{rand}",
+        aws_iam_role=AwsIamRoleRequest(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"),
+        read_only=False,
+    )
+    aws.update_uc_role(role_name, f"arn:aws:iam::{account_id}:role/{role_name}", credential.id)
+
     external_location_migration = AWSExternalLocationsMigration(
         ws,
         external_location,
@@ -105,11 +109,20 @@ def test_create_external_location_validate_acl(
     ws,
     make_user,
     make_cluster,
+    make_random,
+    sql_backend,
     aws_cli_ctx,
     env_or_skip,
+    inventory_schema,
 ):
+    profile = env_or_skip("AWS_PROFILE")
+    aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.with_dummy_resource_permission()
-    aws_cli_ctx.save_locations()
+    aws_cli_ctx.sql_backend.save_table(
+        f"{inventory_schema}.external_locations",
+        [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/{env_or_skip('TEST_A_LOCATION')}", 1),],
+        ExternalLocation,
+    )
     cluster = make_cluster(
         single_node=True,
         data_security_mode=DataSecurityMode.NONE,
@@ -121,9 +134,24 @@ def test_create_external_location_validate_acl(
         permission_level=PermissionLevel.CAN_RESTART,
         user_name=cluster_user.user_name,
     )
-    location_migration = aws_cli_ctx.external_locations_migration
+    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
+    aws = AWSResources(profile)
+    account_id = aws.validate_connection().get("Account")
+    aws_permissions = AWSResourcePermissions(
+        aws_cli_ctx.installation,
+        ws,
+        aws,
+        external_location,
+        account_id,
+    )
+    external_location_migration = AWSExternalLocationsMigration(
+        ws,
+        external_location,
+        aws_permissions,
+        aws_cli_ctx.principal_acl,
+    )
     try:
-        location_migration.run()
+        external_location_migration.run()
         permissions = ws.grants.get(
             SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=cluster_user.user_name
         )

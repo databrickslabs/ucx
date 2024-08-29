@@ -197,7 +197,9 @@ class AWSResources:
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
-            actions = action["Action"]
+            actions = action.get("Action")
+            if not actions:
+                continue
             s3_actions = self._s3_actions(actions)
             if not s3_actions or self.S3_READONLY not in s3_actions:
                 continue
