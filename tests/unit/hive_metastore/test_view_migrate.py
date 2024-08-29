@@ -109,7 +109,8 @@ def test_sequence_direct_views(tables) -> None:
 
     batches = sequencer.sequence_batches()
 
-    assert [t.src.key for t in flatten(batches)] == expected
+    # Sort because the order of the views is not guaranteed as they both depend on just tables
+    assert sorted([t.src.key for t in flatten(batches)]) == expected
 
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4")], indirect=True)
