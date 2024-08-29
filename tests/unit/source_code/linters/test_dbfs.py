@@ -116,7 +116,7 @@ def test_dbfs_queries_failure(query: str):
     assert actual == [
         Failure(
             code='sql-parse-error',
-            message=f'SQL query is not supported yet: {query}',
+            message=f'SQL expression is not supported yet: {query}',
             start_line=0,
             start_col=0,
             end_line=0,
