@@ -304,9 +304,9 @@ class ServicePrincipalMigration(SecretsMixin):
                     "trying again. "
                     "Removing successfully created storage credentials."
                 )
-                self._resource_permissions.delete_storage_credential(execution_results)
+                self._resource_permissions.delete_storage_credential(*execution_results)
                 delete_access_connectors = [access_connector for access_connector, _ in access_connectors]
-                self._resource_permissions.delete_access_connectors(delete_access_connectors)
+                self._resource_permissions.delete_access_connectors(*delete_access_connectors)
             else:
                 execution_results.append(validation_results)
 

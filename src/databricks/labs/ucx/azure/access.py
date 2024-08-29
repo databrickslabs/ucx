@@ -517,7 +517,7 @@ class AzureResourcePermissions:
                 "Removing successfully created access connectors."
             )
             delete_access_connectors = [access_connector for access_connector, _ in results]
-            self.delete_access_connectors(delete_access_connectors)
+            self.delete_access_connectors(*delete_access_connectors)
             raise ManyError(errors)
         return list(results)
 
@@ -527,7 +527,7 @@ class AzureResourcePermissions:
 
     def delete_access_connectors(self, *access_connectors: Any):
         for access_connector in access_connectors:
-            self._azurerm.delete_access_connector(str(access_connector))
+            self._azurerm.delete_access_connector(str(access_connector.id))
 
     def _apply_storage_permission(
         self,
