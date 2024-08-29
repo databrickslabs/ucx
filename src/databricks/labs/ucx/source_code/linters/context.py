@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSql
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
-from databricks.labs.ucx.source_code.queries import FromTable
+from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
 
 
 class LinterContext:
@@ -33,7 +33,7 @@ class LinterContext:
         sql_fixers: list[Fixer] = []
 
         if index is not None:
-            from_table = FromTable(index, session_state=session_state)
+            from_table = FromTableSQLLinter(index, session_state=session_state)
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             python_linters.append(SparkSql(from_table, index, session_state))

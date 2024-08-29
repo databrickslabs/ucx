@@ -10,7 +10,7 @@ from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTable
+from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class Redash:
             return
         # backup the query
         self._installation.save(query, filename=f'backup/queries/{query.id}.json')
-        from_table = FromTable(self._index, self._get_session_state(query))
+        from_table = FromTableSQLLinter(self._index, self._get_session_state(query))
         new_query = UpdateQueryRequestQuery(
             query_text=from_table.apply(query.query),
             tags=self._get_migrated_tags(query.tags),

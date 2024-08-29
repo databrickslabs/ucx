@@ -5,12 +5,12 @@ from astroid import Call, Const, Expr  # type: ignore
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.linters.pyspark import TableNameMatcher, SparkSql
-from databricks.labs.ucx.source_code.queries import FromTable
+from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
 
 
 def test_spark_no_sql(empty_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(empty_index, session_state)
+    ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index, session_state)
 
     assert not list(sqf.lint("print(1)"))
@@ -22,14 +22,14 @@ schema="some_schema"
 df4.write.saveAsTable(f"{schema}.member_measure")
 """
     session_state = CurrentSessionState()
-    ftf = FromTable(empty_index, session_state)
+    ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index, session_state)
     assert not list(sqf.lint(source))
 
 
 def test_spark_sql_no_match(empty_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(empty_index, session_state)
+    ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index, session_state)
 
     old_code = """
@@ -43,7 +43,7 @@ for i in range(10):
 
 def test_spark_sql_match(migration_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(migration_index, session_state)
+    ftf = FromTableSQLLinter(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """
@@ -74,7 +74,7 @@ for i in range(10):
 
 def test_spark_sql_match_named(migration_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(migration_index, session_state)
+    ftf = FromTableSQLLinter(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """
@@ -105,7 +105,7 @@ for i in range(10):
 
 def test_spark_table_return_value_apply(migration_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(migration_index, session_state)
+    ftf = FromTableSQLLinter(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index, session_state)
     old_code = """spark.read.csv('s3://bucket/path')
 for table in spark.catalog.listTables():
@@ -117,7 +117,7 @@ for table in spark.catalog.listTables():
 
 def test_spark_sql_fix(migration_index):
     session_state = CurrentSessionState()
-    ftf = FromTable(migration_index, session_state)
+    ftf = FromTableSQLLinter(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """spark.read.csv("s3://bucket/path")
@@ -541,7 +541,7 @@ for i in range(10):
 )
 def test_spark_cloud_direct_access(empty_index, code, expected):
     session_state = CurrentSessionState()
-    ftf = FromTable(empty_index, session_state)
+    ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index, session_state)
     advisories = list(sqf.lint(code))
     assert advisories == expected
@@ -561,7 +561,7 @@ FS_FUNCTIONS = [
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
 def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
-    ftf = FromTable(empty_index, session_state)
+    ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/bucket/path")"""
@@ -609,7 +609,7 @@ def test_get_full_function_name_for_non_method():
 
 
 def test_apply_table_name_matcher_with_missing_constant(migration_index):
-    from_table = FromTable(migration_index, CurrentSessionState('old'))
+    from_table = FromTableSQLLinter(migration_index, CurrentSessionState('old'))
     matcher = TableNameMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('some.things')")
     node = tree.first_statement()
@@ -622,7 +622,7 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index):
 
 
 def test_apply_table_name_matcher_with_existing_constant(migration_index):
-    from_table = FromTable(migration_index, CurrentSessionState('old'))
+    from_table = FromTableSQLLinter(migration_index, CurrentSessionState('old'))
     matcher = TableNameMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('old.things')")
     node = tree.first_statement()
