@@ -132,7 +132,8 @@ class ViewsMigrationSequencer:
                 logger.error(
                     f"Cannot sequence views {views_to_migrate} given migration index {self._index}", exc_info=e
                 )
-                break  # By returning the current batches, we can migrate the views that are not causing the recursion
+                # By returning the current batches, we can migrate the views that are not causing the recursion
+                return batches
             for view in next_batch:
                 views_sequenced.add(self._views[view])
             batches.append(next_batch)
