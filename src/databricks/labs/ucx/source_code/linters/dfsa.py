@@ -130,7 +130,7 @@ class DFSAPyLinter(PythonLinter):
         for dfsa_node in visitor.dfsa_nodes:
             advisory = Deprecation.from_node(
                 code='direct-file-system-access',
-                message=f"Deprecated direct file system access: {dfsa_node.dfsa.path}",
+                message=f"The use of direct file system access is deprecated: {dfsa_node.dfsa.path}",
                 node=dfsa_node.node,
             )
             yield advisory
@@ -157,7 +157,7 @@ class DbfsUsageSqlLinter(SqlLinter):
         if any(pattern.matches(table.name) for pattern in DFSA_PATTERNS):
             yield Deprecation(
                 code='direct-file-system-access-in-sql-query',
-                message=f"Deprecated direct file system access: {table.name}",
+                message=f"The use of direct file system access is deprecated: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
