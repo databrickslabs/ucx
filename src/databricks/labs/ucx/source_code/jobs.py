@@ -20,7 +20,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
-from databricks.labs.ucx.source_code.base import CurrentSessionState, is_a_notebook, LocatedAdvice
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
