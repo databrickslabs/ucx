@@ -117,7 +117,7 @@ class ViewsMigrationSequencer:
              2. The (growing) set of views from already sequenced previous batches
            For each remaining view, we check if all its dependencies are covered for. If that is the case, then we
            add that view to the new batch of views.
-        1. We repeat point from point 1. until all views are sequenced.
+        2. We repeat point from point 1. until all views are sequenced.
 
         The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
         practice d remains small and v decreases rapidly
