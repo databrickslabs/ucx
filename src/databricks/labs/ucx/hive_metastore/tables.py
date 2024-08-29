@@ -522,7 +522,7 @@ class FasterTableScanCrawler:
             # get properties
             properties_list = self._iterator(raw_table.properties())
 
-            if len(properties_list) < 0:
+            if len(list(properties_list)) < 0:
                 storage_properties = None
             else:
                 formatted_items = []
