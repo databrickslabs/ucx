@@ -317,9 +317,9 @@ class ServicePrincipalMigration(SecretsMixin):
             "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
             "account."
         )
-        execution_results: list[StorageCredentialValidationResult] = []
+        ac_results: list[StorageCredentialValidationResult] = []
         if plan_confirmed:
-            execution_results = self._create_storage_credentials_for_storage_accounts()
+            ac_results = self._create_storage_credentials_for_storage_accounts()
 
         sp_migration_infos = self._generate_migration_list(include_names)
         if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
@@ -335,7 +335,7 @@ class ServicePrincipalMigration(SecretsMixin):
         if plan_confirmed:
             sp_results = self._migrate_service_principals(sp_migration_infos)
 
-        execution_results = execution_results + sp_results
+        execution_results = ac_results + sp_results
         if execution_results:
             results_file = self.save(execution_results)
             logger.info(

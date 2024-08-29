@@ -514,7 +514,7 @@ class AzureResourcePermissions:
         if len(errors) > 0:
             logger.error(
                 "Error creating access connectors. Please review the error message and resolve the issue before trying again. "
-                f"Removing successfully created access connectors."
+                "Removing successfully created access connectors."
             )
             delete_access_connectors = [access_connector for access_connector, _ in results]
             self.delete_access_connectors(delete_access_connectors)
