@@ -73,7 +73,7 @@ class DetectDbfsVisitor(TreeVisitor):
         yield from self._advices
 
 
-class DBFSUsageLinter(PythonLinter):
+class DBFSUsagePyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
