@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
-from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
+from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
@@ -253,7 +253,7 @@ do_something_with_stuff(stuff)
 stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
-    linter = DbutilsLinter(CurrentSessionState())
+    linter = DbutilsPyLinter(CurrentSessionState())
     tree = Tree.parse(source)
     nodes = linter.list_dbutils_notebook_run_calls(tree)
     assert len(nodes) == 2
@@ -265,7 +265,7 @@ import stuff
 do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
-    linter = DbutilsLinter(CurrentSessionState())
+    linter = DbutilsPyLinter(CurrentSessionState())
     tree = Tree.parse(source)
     nodes = linter.list_dbutils_notebook_run_calls(tree)
     assert len(nodes) == 0
@@ -277,7 +277,7 @@ name1 = "John"
 name2 = f"{name1}"
 dbutils.notebook.run(f"Hey {name2}")
     """
-    linter = DbutilsLinter(CurrentSessionState())
+    linter = DbutilsPyLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert len(advices) == 1
     assert advices[0].code == "notebook-run-cannot-compute-value"

@@ -1,15 +1,13 @@
-from collections.abc import Iterable
-
 import logging
-from sqlglot import parse as parse_sql, ParseError as SqlParseError
+from sqlglot import parse as parse_sql
 from sqlglot.expressions import Table, Expression, Use, Create
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import Deprecation, Fixer, CurrentSessionState, SQLLinter
 
 logger = logging.getLogger(__name__)
 
 
-class FromTable(Linter, Fixer):
+class FromTableSQLLinter(SQLLinter, Fixer):
     """Linter and Fixer for table migrations in SQL queries.
 
     This class is responsible for identifying and fixing table migrations in
@@ -18,7 +16,7 @@ class FromTable(Linter, Fixer):
 
     def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
         """
-        Initializes the FromTable class.
+        Initializes the FromTableLinter class.
 
         Args:
             index: The migration index, which is a mapping of source tables to destination tables.
@@ -42,37 +40,14 @@ class FromTable(Linter, Fixer):
     def schema(self):
         return self._session_state.schema
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            statements = parse_sql(code, read='databricks')
-            for statement in statements:
-                if not statement:
-                    continue
-                yield from self._lint_statement(statement)
-        except SqlParseError as e:
-            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield self.sql_parse_failure(code)
-
-    @staticmethod
-    def sql_parse_failure(code: str):
-        return Failure(
-            code='sql-parse-error',
-            message=f"SQL query is not supported yet: {code}",
-            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
-        )
-
-    def _lint_statement(self, statement: Expression):
-        for table in statement.find_all(Table):
-            if isinstance(statement, Use):
+    def lint_expression(self, expression: Expression):
+        for table in expression.find_all(Table):
+            if isinstance(expression, Use):
                 # Sqlglot captures the database name in the Use statement as a Table, with
                 # the schema  as the table name.
                 self._session_state.schema = table.name
                 continue
-            if isinstance(statement, Create) and getattr(statement, "kind", None) == "SCHEMA":
+            if isinstance(expression, Create) and getattr(expression, "kind", None) == "SCHEMA":
                 # Sqlglot captures the schema name in the Create statement as a Table, with
                 # the schema  as the db name.
                 self._session_state.schema = table.db

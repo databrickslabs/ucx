@@ -8,14 +8,14 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader
 
-from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
+from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter, ImportSource, SysPathChange
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.cells import PythonCodeAnalyzer
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
     tree = Tree.parse('')
-    assert not DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+    assert not DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
 
 
 def test_linter_returns_list_of_dbutils_notebook_run_calls():
@@ -25,7 +25,7 @@ for i in z:
     ww =   dbutils.notebook.run("toto")
 """
     tree = Tree.parse(code)
-    calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+    calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
     assert {"toto", "stuff"} == {str(call.node.args[0].value) for call in calls}
 
 
@@ -189,7 +189,7 @@ dbutils.notebook.run(name)
 )
 def test_infers_dbutils_notebook_run_dynamic_value(code, expected) -> None:
     tree = Tree.parse(code)
-    calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+    calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
     all_paths: list[str] = []
     for call in calls:
         _, paths = call.get_notebook_paths(CurrentSessionState())
