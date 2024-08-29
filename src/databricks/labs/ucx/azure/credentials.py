@@ -300,8 +300,9 @@ class ServicePrincipalMigration(SecretsMixin):
                 logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
             except (PermissionDenied, NotFound):
                 logger.error(
-                    "Error validating all storage credentials. Please check the error message and tr again."
-                    "Rolling back access connectors and storage credentials created."
+                    "Error creating access connectors. Please review the error message and resolve the issue before "
+                    "trying again. "
+                    "Removing successfully created storage credentials."
                 )
                 self._resource_permissions.delete_storage_credential(execution_results)
                 delete_access_connectors = [access_connector for access_connector, _ in access_connectors]
