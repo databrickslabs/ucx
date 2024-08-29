@@ -120,7 +120,7 @@ def test_create_external_location_validate_acl(
     aws_cli_ctx.with_dummy_resource_permission()
     aws_cli_ctx.sql_backend.save_table(
         f"{inventory_schema}.external_locations",
-        [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/{env_or_skip('TEST_A_LOCATION')}", 1),],
+        [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}", 1),],
         ExternalLocation,
     )
     cluster = make_cluster(
