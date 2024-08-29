@@ -481,10 +481,9 @@ class FasterTableScanCrawler(CrawlerBase):
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+        self._spark = SparkSession.builder.getOrCreate()
 
         super().__init__(backend, "hive_metastore", schema, "table_size", Table)
-        self._tables_crawler = TablesCrawler(backend, schema, include_databases)
-        self._spark = SparkSession.builder.getOrCreate()
 
     def snapshot(self) -> list[Table]:
         """
