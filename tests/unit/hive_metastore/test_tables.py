@@ -1,8 +1,10 @@
+import sys
+
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
 
 
 def test_is_delta_true():
@@ -480,3 +482,26 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
 
     assert migrate_sql is None
     assert expected_log in caplog.text
+
+
+def test_fast_table_scan_crawler(caplog, mocker):
+    errors = {}
+    rows = {
+        "table_size": [],
+        "hive_metastore.inventory_database.tables": [
+            ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
+        ],
+        "SHOW DATABASES": [("db1",)],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    ftsc = FasterTableScanCrawler(backend, "inventory_database")
+
+    # TODO: Mock Scala funtions
+
+    results = ftsc.snapshot()
+
+    assert results
+

@@ -474,10 +474,17 @@ class TablesCrawler(CrawlerBase):
             return None
 
 
-class FasterTableScanCrawler:
-    def __init__(self, spark: any, include_databases: list[str] | None = None):
-        self._spark = spark
+class FasterTableScanCrawler(CrawlerBase):
+    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+        self._backend = backend
         self._include_database = include_databases
+
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+        super().__init__(backend, "hive_metastore", schema, "table_size", Table)
+        self._tables_crawler = TablesCrawler(backend, schema, include_databases)
+        self._spark = SparkSession.builder.getOrCreate()
 
     def snapshot(self) -> list[Table]:
         """
@@ -487,6 +494,11 @@ class FasterTableScanCrawler:
             list[Table]: A list of Table objects representing the snapshot of tables.
         """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def _try_load(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Table(*row)
 
     @cached_property
     def _external_catalog(self):
@@ -539,6 +551,9 @@ class FasterTableScanCrawler:
                 storage_properties = f"[{', '.join(formatted_items)}]"
 
             # TODO: add all properties to the table object
+            partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
+            print(f"Partition Column Names: {partition_column_names}")
+            is_partitioned = len(partition_column_names) > 0
 
             return Table(
                 catalog='hive_metastore',
@@ -549,6 +564,7 @@ class FasterTableScanCrawler:
                 location=location_uri,
                 view_text=view_text,
                 storage_properties=storage_properties,
+                is_partitioned=is_partitioned,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
@@ -559,7 +575,7 @@ class FasterTableScanCrawler:
             return list(self._iterator(self._external_catalog.listDatabases()))
         return self._include_database
 
-    def _crawl(self, catalog: str) -> Iterable[Table]:
+    def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
         After performing initial scan of all tables, starts making parallel
@@ -574,6 +590,7 @@ class FasterTableScanCrawler:
         See also https://github.com/databrickslabs/ucx/issues/247
         """
         tasks = []
+        catalog = "hive_metastore"
         databases = self._all_databases()
         for database in databases:
             logger.info(f"Scanning {database}")
