@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectLinter
-from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
+from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLinter
 from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
 
 
@@ -41,7 +41,7 @@ class LinterContext:
 
         python_linters += [
             DBFSUsagePyLinter(session_state),
-            DBRv8d0Linter(dbr_version=session_state.dbr_version),
+            DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
             SparkConnectLinter(session_state),
             DbutilsLinter(session_state),
         ]
