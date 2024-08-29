@@ -103,6 +103,10 @@ def sync_workspace_info(a: AccountClient):
     ctx.account_workspaces.sync_workspace_info()
 
 
+def upload(a: AccountClient, path: str, run_as_collection: bool = False, **named_parameters):
+    """Upload a file to the (collection of) workspace(s)"""
+
+
 @ucx.command(is_account=True)
 def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
     """Report compatibility of all workspaces available in the account"""
