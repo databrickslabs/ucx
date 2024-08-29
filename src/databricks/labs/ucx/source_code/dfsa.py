@@ -13,12 +13,12 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     file_language,
     guess_encoding,
+    SQLLinter,
 )
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
 from databricks.labs.ucx.source_code.linters.pyspark import DirectFilesystemAccessMatcher
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.queries import FromTable
 
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ class DfsaCollector:
                 yield from cls._collect_from_identifiers(statement)
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {source}", exc_info=e)
-            yield FromTable.sql_parse_failure(source)
+            yield SQLLinter.sql_parse_failure(source)
 
     @classmethod
     def _collect_from_literals(cls, expression: SqlExpression) -> Iterable[DFSA]:
