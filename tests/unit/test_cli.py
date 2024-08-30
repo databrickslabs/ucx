@@ -10,12 +10,13 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
-from databricks.sdk.service import iam, jobs, sql
+from databricks.sdk.service import jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -50,6 +51,7 @@ from databricks.labs.ucx.cli import (
     show_all_metastores,
     skip,
     sync_workspace_info,
+    upload,
     validate_external_locations,
     validate_groups_membership,
     workflows,
@@ -74,6 +76,7 @@ def ws():
                     'host': 'foo',
                     'token': 'bar',
                 },
+                'installed_workspace_ids': [123,],
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -108,7 +111,7 @@ def ws():
     workspace_client = create_autospec(WorkspaceClient)
     workspace_client.get_workspace_id.return_value = 123
     workspace_client.config.host = 'https://localhost'
-    workspace_client.current_user.me().user_name = "foo"
+    workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
     workspace_client.workspace.download = download
     workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
@@ -131,7 +134,7 @@ def test_open_remote_config(ws):
 
 
 def test_installations(ws, capsys):
-    ws.users.list.return_value = [iam.User(user_name='foo')]
+    ws.users.list.return_value = [User(user_name='foo')]
     installations(ws)
     assert '{"database": "ucx", "path": "/Users/foo/.ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
@@ -176,6 +179,23 @@ def test_sync_workspace_info():
     a = create_autospec(AccountClient)
     sync_workspace_info(a)
     a.workspaces.list.assert_called()
+
+
+def test_upload(tmp_path, ws, acc_client):
+    test_file = tmp_path / "test.txt"
+    content = b"test"
+    test_file.write_bytes(content)
+    acc_client.workspaces.get.return_value = Workspace()
+    acc_client.get_workspace_client.return_value = ws
+
+    upload(test_file, ws, run_as_collection=True, a=acc_client)
+
+    ws.workspace.upload.assert_called_with(
+        f"/Users/foo/.ucx/{test_file.name}",
+        content,
+        format=ImportFormat.AUTO,
+        overwrite=True,
+    )
 
 
 def test_create_account_groups():
