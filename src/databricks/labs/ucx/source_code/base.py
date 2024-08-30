@@ -137,7 +137,7 @@ class Linter:
     def lint(self, code: str) -> Iterable[Advice]: ...
 
 
-class SQLLinter(Linter):
+class SqlLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
         try:
@@ -231,9 +231,9 @@ class CurrentSessionState:
             return None
 
 
-class SQLSequentialLinter(SQLLinter):
+class SqlSequentialLinter(SqlLinter):
 
-    def __init__(self, linters: list[SQLLinter]):
+    def __init__(self, linters: list[SqlLinter]):
         self._linters = linters
 
     def lint_expression(self, expression: Expression) -> Iterable[Advice]:

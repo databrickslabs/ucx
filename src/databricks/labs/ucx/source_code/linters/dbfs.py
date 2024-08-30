@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
     PythonLinter,
-    SQLLinter,
+    SqlLinter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
@@ -94,7 +94,7 @@ class DBFSUsagePyLinter(PythonLinter):
         yield from visitor.get_advices()
 
 
-class DbfsUsageSQLLinter(SQLLinter):
+class DbfsUsageSQLLinter(SqlLinter):
     def __init__(self):
         self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
 
