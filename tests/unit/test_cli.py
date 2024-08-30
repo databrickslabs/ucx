@@ -215,12 +215,15 @@ def test_sync_workspace_info():
     a.workspaces.list.assert_called()
 
 
-def test_upload(tmp_path, workspace_clients, acc_client):
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_upload(tmp_path, workspace_clients, acc_client, run_as_collection):
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
     test_file = tmp_path / "test.txt"
     content = b"test"
     test_file.write_bytes(content)
 
-    upload(test_file, workspace_clients[0], run_as_collection=True, a=acc_client)
+    upload(test_file, workspace_clients[0], run_as_collection=run_as_collection, a=acc_client)
 
     for ws in workspace_clients:
         ws.workspace.upload.assert_called_with(
