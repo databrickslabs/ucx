@@ -131,6 +131,15 @@ def ws1() -> WorkspaceClient:
     return create_workspace_client_mock(123)
 
 
+@pytest.fixture
+def ws2() -> WorkspaceClient:
+    return create_workspace_client_mock(456)
+
+
+@pytest.fixture
+def workspaces(ws1, ws2) -> list[WorkspaceClient]:
+    return [ws1, ws2]
+
 
 @pytest.fixture
 def acc_client(acc_client, ws1):
