@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsageLinter, FromDbfsFolder
+from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsagePyLinter, DbfsUsageSqlLinter
 
 
 class TestDetectDBFS:
@@ -17,7 +17,7 @@ class TestDetectDBFS:
         ],
     )
     def test_detects_dbfs_paths(self, code, expected):
-        linter = DBFSUsageLinter(CurrentSessionState())
+        linter = DBFSUsagePyLinter(CurrentSessionState())
         advices = list(linter.lint(code))
         for advice in advices:
             assert isinstance(advice, Advice)
@@ -46,7 +46,7 @@ for system in systems:
         ],
     )
     def test_dbfs_usage_linter(self, code, expected):
-        linter = DBFSUsageLinter(CurrentSessionState())
+        linter = DBFSUsagePyLinter(CurrentSessionState())
         advices = linter.lint(code)
         count = 0
         for advice in advices:
@@ -55,7 +55,7 @@ for system in systems:
         assert count == expected
 
     def test_dbfs_name(self):
-        linter = DBFSUsageLinter(CurrentSessionState())
+        linter = DBFSUsagePyLinter(CurrentSessionState())
         assert linter.name() == "dbfs-usage"
 
 
@@ -72,7 +72,7 @@ for system in systems:
     ],
 )
 def test_non_dbfs_trigger_nothing(query):
-    ftf = FromDbfsFolder()
+    ftf = DbfsUsageSqlLinter()
     assert not list(ftf.lint(query))
 
 
@@ -90,7 +90,7 @@ def test_non_dbfs_trigger_nothing(query):
     ],
 )
 def test_dbfs_tables_trigger_messages_param(query: str, table: str):
-    ftf = FromDbfsFolder()
+    ftf = DbfsUsageSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
@@ -111,12 +111,12 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
     ],
 )
 def test_dbfs_queries_failure(query: str):
-    ftf = FromDbfsFolder()
+    ftf = DbfsUsageSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
             code='sql-parse-error',
-            message=f'SQL query is not supported yet: {query}',
+            message=f'SQL expression is not supported yet: {query}',
             start_line=0,
             start_col=0,
             end_line=0,
@@ -126,5 +126,5 @@ def test_dbfs_queries_failure(query: str):
 
 
 def test_dbfs_queries_name():
-    ftf = FromDbfsFolder()
+    ftf = DbfsUsageSqlLinter()
     assert ftf.name() == 'dbfs-query'

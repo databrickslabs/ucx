@@ -5,7 +5,7 @@ import pytest
 
 from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
+from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectPyLinter
 from databricks.sdk.service.compute import DataSecurityMode
 
 
@@ -15,7 +15,7 @@ def session_state() -> CurrentSessionState:
 
 
 def test_jvm_access_match_shared(session_state):
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -36,7 +36,7 @@ spark._jspark._jvm.com.my.custom.Name()
 
 def test_jvm_access_match_serverless(session_state):
     session_state.is_serverless = True
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -57,7 +57,7 @@ spark._jspark._jvm.com.my.custom.Name()
 
 
 def test_rdd_context_match_shared(session_state):
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -102,7 +102,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
 
 def test_rdd_context_match_serverless(session_state):
     session_state.is_serverless = True
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
@@ -144,7 +144,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
 
 
 def test_rdd_map_partitions(session_state):
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """
 df = spark.createDataFrame([])
 df.rdd.mapPartitions(myUdf)
@@ -164,7 +164,7 @@ df.rdd.mapPartitions(myUdf)
 
 
 def test_conf_shared(session_state):
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """df.sparkContext.getConf().get('spark.my.conf')"""
     assert [
         Failure(
@@ -180,7 +180,7 @@ def test_conf_shared(session_state):
 
 def test_conf_serverless(session_state):
     session_state.is_serverless = True
-    linter = SparkConnectLinter(session_state)
+    linter = SparkConnectPyLinter(session_state)
     code = """sc._conf().get('spark.my.conf')"""
     expected = [
         Failure(
@@ -270,7 +270,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
 
 def test_valid_code():
-    linter = SparkConnectLinter(CurrentSessionState(data_security_mode=DataSecurityMode.USER_ISOLATION))
+    linter = SparkConnectPyLinter(CurrentSessionState(data_security_mode=DataSecurityMode.USER_ISOLATION))
     code = """
 df = spark.range(10)
 df.collect()

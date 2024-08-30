@@ -96,7 +96,7 @@ class NoFormatPythonLinter:
                 )
 
 
-class DBRv8d0Linter(PythonLinter):
+class DBRv8d0PyLinter(PythonLinter):
     """Performs Python linting for backwards incompatible changes in DBR version 8.0.
     Specifically, it yields advice for table-creation with implicit format.
     """
