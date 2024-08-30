@@ -532,11 +532,13 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     assert len(target_tables) == 1
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert target_table_grants.privilege_assignments[-1].principal == user.user_name
-    assert target_table_grants.privilege_assignments[-1].privileges == [Privilege.MODIFY, Privilege.SELECT]
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
+    assert len(target_principals) == 0, f"Missing grant for user {user.user_name}"
+    assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
