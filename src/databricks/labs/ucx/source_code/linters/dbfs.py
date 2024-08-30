@@ -94,7 +94,7 @@ class DBFSUsagePyLinter(PythonLinter):
         yield from visitor.get_advices()
 
 
-class DbfsUsageSQLLinter(SqlLinter):
+class DbfsUsageSqlLinter(SqlLinter):
     def __init__(self):
         self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
 

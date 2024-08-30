@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.base import Deprecation, Fixer, CurrentSess
 logger = logging.getLogger(__name__)
 
 
-class FromTableSQLLinter(SqlLinter, Fixer):
+class FromTableSqlLinter(SqlLinter, Fixer):
     """Linter and Fixer for table migrations in SQL queries.
 
     This class is responsible for identifying and fixing table migrations in

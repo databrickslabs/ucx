@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsagePyLinter, DbfsUsageSQLLinter
+from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsagePyLinter, DbfsUsageSqlLinter
 
 
 class TestDetectDBFS:
@@ -72,7 +72,7 @@ for system in systems:
     ],
 )
 def test_non_dbfs_trigger_nothing(query):
-    ftf = DbfsUsageSQLLinter()
+    ftf = DbfsUsageSqlLinter()
     assert not list(ftf.lint(query))
 
 
@@ -90,7 +90,7 @@ def test_non_dbfs_trigger_nothing(query):
     ],
 )
 def test_dbfs_tables_trigger_messages_param(query: str, table: str):
-    ftf = DbfsUsageSQLLinter()
+    ftf = DbfsUsageSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
@@ -111,7 +111,7 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
     ],
 )
 def test_dbfs_queries_failure(query: str):
-    ftf = DbfsUsageSQLLinter()
+    ftf = DbfsUsageSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
@@ -126,5 +126,5 @@ def test_dbfs_queries_failure(query: str):
 
 
 def test_dbfs_queries_name():
-    ftf = DbfsUsageSQLLinter()
+    ftf = DbfsUsageSqlLinter()
     assert ftf.name() == 'dbfs-query'

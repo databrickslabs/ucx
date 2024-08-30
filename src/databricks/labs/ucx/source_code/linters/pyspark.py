@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
 )
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
-from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
+from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
 
@@ -37,12 +37,12 @@ class Matcher(ABC):
 
     @abstractmethod
     def lint(
-        self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         """raises Advices by linting the code"""
 
     @abstractmethod
-    def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         """applies recommendations"""
 
     def _get_table_arg(self, node: Call):
@@ -78,7 +78,7 @@ class Matcher(ABC):
 class QueryMatcher(Matcher):
 
     def lint(
-        self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if table_arg:
@@ -93,7 +93,7 @@ class QueryMatcher(Matcher):
                 )
 
     @classmethod
-    def _lint_table_arg(cls, from_table: FromTableSQLLinter, call_node: NodeNG, inferred: InferredValue):
+    def _lint_table_arg(cls, from_table: FromTableSqlLinter, call_node: NodeNG, inferred: InferredValue):
         if inferred.is_inferred():
             for advice in from_table.lint(inferred.as_string()):
                 yield advice.replace_from_node(call_node)
@@ -104,7 +104,7 @@ class QueryMatcher(Matcher):
                 node=call_node,
             )
 
-    def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         new_query = from_table.apply(table_arg.value)
@@ -115,7 +115,7 @@ class QueryMatcher(Matcher):
 class TableNameMatcher(Matcher):
 
     def lint(
-        self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         table_name = table_arg.as_string().strip("'").strip('"')
@@ -137,7 +137,7 @@ class TableNameMatcher(Matcher):
                 node=node,
             )
 
-    def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         dst = self._find_dest(index, table_arg.value, from_table.schema)
@@ -162,7 +162,7 @@ class ReturnValueMatcher(Matcher):
         )
 
     def lint(
-        self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
@@ -171,7 +171,7 @@ class ReturnValueMatcher(Matcher):
             node=node,
         )
 
-    def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -200,7 +200,7 @@ class DirectFilesystemAccessMatcher(Matcher):
         )
 
     def lint(
-        self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if not isinstance(table_arg, Const):
@@ -223,7 +223,7 @@ class DirectFilesystemAccessMatcher(Matcher):
                 node=node,
             )
 
-    def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -331,7 +331,7 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
 
     _spark_matchers = SparkMatchers()
 
-    def __init__(self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state):
+    def __init__(self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
