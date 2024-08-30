@@ -55,7 +55,7 @@ def test_python_library_resolver_resolves_library_with_known_problems(mock_path_
     problems = python_library_resolver.register_library(mock_path_lookup, "boto3==1.17.0")
 
     assert len(problems) == 1
-    assert problems[0].code == "direct-file-system-access"
+    assert problems[0].code == "direct-filesystem-access"
 
 
 def test_python_library_resolver_installs_with_command(mock_path_lookup):

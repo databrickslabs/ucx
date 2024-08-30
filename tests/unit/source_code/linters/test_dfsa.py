@@ -112,8 +112,8 @@ def test_dfsa_tables_trigger_messages_param(query: str, table: str):
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
-            code='direct-file-system-access-in-sql-query',
-            message=f'The use of direct file system access is deprecated: {table}',
+            code='direct-filesystem-access-in-sql-query',
+            message=f'The use of direct filesystem references is deprecated: {table}',
             start_line=0,
             start_col=0,
             end_line=0,

@@ -123,9 +123,9 @@ def test_job_task_linter_library_installed_cluster(
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
     expected_messages = {
         'second_notebook:3 [dbfs-usage] Deprecated file system path: /mnt/something',
-        'second_notebook:3 [implicit-dbfs-usage] The use of direct file system access is deprecated: /mnt/something',
+        'second_notebook:3 [implicit-dbfs-usage] The use of direct filesystem references is deprecated: /mnt/something',
         'some_file.py:0 [dbfs-usage] Deprecated file system path: /mnt/foo/bar',
-        'some_file.py:0 [implicit-dbfs-usage] The use of direct file system access is deprecated: /mnt/foo/bar',
+        'some_file.py:0 [implicit-dbfs-usage] The use of direct filesystem references is deprecated: /mnt/foo/bar',
     }
 
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()

@@ -203,8 +203,8 @@ class DirectFilesystemAccessMatcher(Matcher):
             value = inferred.as_string()
             if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
                 yield Deprecation.from_node(
-                    code='direct-file-system-access',
-                    message=f"The use of direct file system access is deprecated: {value}",
+                    code='direct-filesystem-access',
+                    message=f"The use of direct filesystem references is deprecated: {value}",
                     node=node,
                 )
 
