@@ -16,3 +16,4 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
 -- ucx[implicit-dbfs-usage:+2:8:+2:43] The use of default dbfs: references is deprecated: /mnt/things/e/f/g
 -- ucx[dbfs-usage:+1:23:+1:42] Deprecated file system path: /mnt/things/e/f/g
 -- MAGIC display(spark.read.csv('/mnt/things/e/f/g'))
+
