@@ -143,9 +143,9 @@ class LocalCodeLinter:
         is_dir = path.is_dir()
         loader = self._folder_loader if is_dir else self._file_loader
         path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
-        start_dep = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(start_dep, None, self._dependency_resolver, path_lookup, self._session_state)
-        container = start_dep.load(path_lookup)
+        root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
+        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
+        container = root_dependency.load(path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
@@ -165,8 +165,10 @@ class LocalCodeLinter:
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
 
+        if linted_paths is None:
+            linted_paths = set()
         walker = LintingWalker(graph, linted_paths, self._path_lookup)
-        yield from walker.walk()
+        yield from walker
 
 
 class LocalFileMigrator:
