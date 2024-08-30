@@ -215,19 +215,20 @@ def test_sync_workspace_info():
     a.workspaces.list.assert_called()
 
 
-def test_upload(tmp_path, ws1, acc_client):
+def test_upload(tmp_path, workspace_clients, acc_client):
     test_file = tmp_path / "test.txt"
     content = b"test"
     test_file.write_bytes(content)
 
-    upload(test_file, ws1, run_as_collection=True, a=acc_client)
+    upload(test_file, workspace_clients[0], run_as_collection=True, a=acc_client)
 
-    ws1.workspace.upload.assert_called_with(
-        f"/Users/foo/.ucx/{test_file.name}",
-        content,
-        format=ImportFormat.AUTO,
-        overwrite=True,
-    )
+    for ws in workspace_clients:
+        ws.workspace.upload.assert_called_with(
+            f"/Users/foo/.ucx/{test_file.name}",
+            content,
+            format=ImportFormat.AUTO,
+            overwrite=True,
+        )
 
 
 def test_create_account_groups():
@@ -277,10 +278,11 @@ def test_ensure_assessment_run(ws1, acc_client):
     ws1.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_ensure_assessment_run_collection(ws1, acc_client):
-    ensure_assessment_run(ws1, True, acc_client)
+def test_ensure_assessment_run_collection(workspace_clients, acc_client):
+    ensure_assessment_run(workspace_clients[0], run_as_collection=True, a=acc_client)
 
-    ws1.jobs.run_now.assert_called_with(123)
+    for ws in workspace_clients:
+        ws.jobs.run_now.assert_called_with(123)
 
 
 def test_repair_run(ws1):
