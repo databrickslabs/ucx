@@ -481,10 +481,8 @@ class FasterTableScanCrawler(CrawlerBase):
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
-
-        self._spark = SparkSession.builder.getOrCreate()
-
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        self._spark = SparkSession.builder.getOrCreate()
 
     def snapshot(self) -> list[Table]:
         """
@@ -504,16 +502,22 @@ class FasterTableScanCrawler(CrawlerBase):
     def _external_catalog(self):
         return self._spark._jsparkSession.sharedState().externalCatalog()
 
-    def _iterator(self, result: any):
+    def _iterator(self, result: typing.Any) -> Iterator:
         it = result.iterator()
         while it.hasNext():
             yield it.next()
 
-    def list_tables(self, database: str) -> list[str]:
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return list(self._iterator(self._external_catalog.listDatabases()))
+        return self._include_database
+
+    def _list_tables(self, database: str) -> list[str] | None:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:
             logger.warning(f"Failed to list tables in {database}: {err}")
+            return None
 
     def _describe(self, catalog, database, table) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
@@ -537,7 +541,7 @@ class FasterTableScanCrawler(CrawlerBase):
             if len(list(properties_list)) < 0:
                 storage_properties = None
             else:
-                formatted_items = []
+                formatted_items: list[str] = []
                 for each_property in properties_list:
                     key = each_property._1()
                     value = each_property._2()
@@ -570,10 +574,6 @@ class FasterTableScanCrawler(CrawlerBase):
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
-    def _all_databases(self) -> list[str]:
-        if not self._include_database:
-            return list(self._iterator(self._external_catalog.listDatabases()))
-        return self._include_database
 
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
@@ -594,7 +594,7 @@ class FasterTableScanCrawler(CrawlerBase):
         databases = self._all_databases()
         for database in databases:
             logger.info(f"Scanning {database}")
-            table_names = [partial(self.list_tables, database)]
+            table_names = [partial(self._list_tables, database)]
             for table_batch in Threads.strict('listing tables', table_names):
                 if len(table_batch) > 0:
                     for table in table_batch:

@@ -1,4 +1,5 @@
 import sys
+from unittest.mock import create_autospec, MagicMock
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
@@ -502,12 +503,59 @@ def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     backend = MockBackend(fails_on_first=errors, rows=rows)
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
-
     ftsc = FasterTableScanCrawler(backend, "inventory_database")
-
-    # TODO: Mock Scala funtions
-
     results = ftsc.snapshot()
 
     assert len(results) == 9
+
+# TODO: work in progress
+@pytest.skip
+def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
+    # errors = {"SELECT * FROM hive_metastore.inventory_database.tables": "TABLE_NOT_FOUND"}
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+    ftsc = FasterTableScanCrawler(backend, "inventory_database")
+
+    class CustomIterator:
+        def __init__(self, values):
+            self._values = iter(values)
+            self._has_next = True
+
+        def hasNext(self):
+            try:
+                self._next_value = next(self._values)
+                self._has_next = True
+            except StopIteration:
+                self._has_next = False
+            return self._has_next
+
+        def next(self):
+            if self._has_next:
+                return self._next_value
+            raise StopIteration
+
+    mock_list_databases_iterator = mocker.Mock()
+    mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
+    mock_list_tables_iterator = mocker.Mock()
+    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1", "table2"])
+
+    get_table_mock = mocker.Mock()
+    get_table_mock.provider.getOrElse.return_value = "delta"
+
+    list_tables_mock = {
+        "default": mock_list_tables_iterator,
+        "test_database": mock_list_tables_iterator
+    }
+
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
+
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = get_table_mock
+    results = ftsc.snapshot()
 
