@@ -249,7 +249,7 @@ def test_functional_with_parent(
 
 @pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup, simple_dependency_resolver, extended_test_index):
-    path = mock_path_lookup.resolve(Path("functional/table-migration/table-migration-notebook.sql"))
+    path = mock_path_lookup.resolve(Path("functional/file-access/python-notebook-with-embedded-sql.py"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)
     sample.verify(path_lookup, simple_dependency_resolver, extended_test_index)
