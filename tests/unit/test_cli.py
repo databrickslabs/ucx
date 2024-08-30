@@ -121,6 +121,13 @@ def ws():
     return workspace_client
 
 
+@pytest.fixture
+def acc_client(acc_client, ws):
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123)
+    acc_client.get_workspace_client.return_value = ws
+    return acc_client
+
+
 def test_workflow(ws, caplog):
     workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
@@ -185,8 +192,6 @@ def test_upload(tmp_path, ws, acc_client):
     test_file = tmp_path / "test.txt"
     content = b"test"
     test_file.write_bytes(content)
-    acc_client.workspaces.get.return_value = Workspace()
-    acc_client.get_workspace_client.return_value = ws
 
     upload(test_file, ws, run_as_collection=True, a=acc_client)
 
@@ -247,7 +252,8 @@ def test_ensure_assessment_run(ws, acc_client):
 
 def test_ensure_assessment_run_collection(ws, acc_client):
     ensure_assessment_run(ws, True, acc_client)
-    acc_client.workspaces.get.assert_called_once()
+
+    ws.jobs.run_now.assert_called_with(123)
 
 
 def test_repair_run(ws):
