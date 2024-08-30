@@ -761,11 +761,10 @@ class AzureResources:
 
         return access_connector
 
-    def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:
+    def delete_access_connector(self, url: str) -> None:
         """Delete an access connector.
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         self._mgmt.delete(url, api_version="2023-05-01")

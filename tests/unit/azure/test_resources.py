@@ -546,5 +546,6 @@ def test_azure_resources_create_or_update_access_connector() -> None:
 def test_azure_resources_delete_access_connector() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
-    azure_resource.delete_access_connector("002", "rg-test", "test-access-connector")
+    url = "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector"
+    azure_resource.delete_access_connector(url)
     assert api_client.delete.called

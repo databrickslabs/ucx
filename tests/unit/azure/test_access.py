@@ -15,6 +15,7 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
     SetWorkspaceWarehouseConfigRequestSecurityPolicy,
 )
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -1063,4 +1064,63 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
 
     w.cluster_policies.get.assert_not_called()
     w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+
+
+def test_create_access_connectors_for_storage_accounts_rollback(caplog):
+    """Log that the permissions for the access connector are applied."""
+    w = create_autospec(WorkspaceClient)
+
+    rows = {
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
+            ["abfss://container2@storage2.dfs.core.windows.net/folder2", "1"],
+        ]
+    }
+    backend = MockBackend(rows=rows)
+
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = [
+        StorageAccount(
+            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
+            name="storage1",
+            location="westeu",
+            default_network_action="Allow",
+        ),
+        StorageAccount(
+            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage2'),
+            name="storage2",
+            location="westeu",
+            default_network_action="Allow",
+        ),
+    ]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azure_resources.create_or_update_access_connector.side_effect = [
+        AccessConnector(
+            id=access_connector_id,
+            name="ac-test",
+            location="westeu",
+            provisioning_state="Succeeded",
+            identity_type="SystemAssigned",
+            principal_id="test",
+            tenant_id="test",
+        ),
+        PermissionDenied(),
+    ]
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    with pytest.raises(ManyError):
+        azure_resource_permission.create_access_connectors_for_storage_accounts()
+        assert any("STORAGE_BLOB_DATA_CONTRIBUTOR" in message for message in caplog.messages)
+
+    azure_resources.delete_access_connector.assert_called_with(
+        '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test'
+    )
     w.secrets.create_scope.assert_not_called()
