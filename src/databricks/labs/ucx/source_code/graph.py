@@ -4,7 +4,7 @@ import abc
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import TypeVar, Generic
 
 from astroid import (  # type: ignore
@@ -589,17 +589,19 @@ T = TypeVar("T")
 
 class DependencyGraphWalker(abc.ABC, Generic[T]):
 
-    def __init__(self, graph: DependencyGraph, walked_paths: set[Path] | None, path_lookup: PathLookup):
+    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
         self._graph = graph
-        self._walked_paths: set[Path] = set() if walked_paths is None else walked_paths
+        self._walked_paths = walked_paths
         self._path_lookup = path_lookup
 
-    def walk(self) -> Iterable[T]:
+    def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:
-            root_path = dependency.path  # since it's a root
-            yield from self._walk_one(dependency, self._graph, root_path)
+            # the dependency is a root, so its path is the one to use
+            # for computing lineage and building python global context
+            root_path = dependency.path
+            yield from self._iter_one(dependency, self._graph, root_path)
 
-    def _walk_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
+    def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
         if dependency.path in self._walked_paths:
             return
         self._walked_paths.add(dependency.path)
@@ -613,10 +615,10 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
             if maybe_graph.graph:
                 child_graph = maybe_graph.graph
                 for child_dependency in child_graph.local_dependencies:
-                    yield from self._walk_one(child_dependency, child_graph, root_path)
+                    yield from self._iter_one(child_dependency, child_graph, root_path)
 
     def _log_walk_one(self, dependency: Dependency):
-        logger.info(f'Analyzing dependency: {dependency}')
+        logger.debug(f'Analyzing dependency: {dependency}')
 
     @abc.abstractmethod
     def _process_dependency(
