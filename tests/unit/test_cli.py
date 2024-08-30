@@ -64,8 +64,13 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
-@pytest.fixture
-def ws1():
+def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
+    # This function is meant to cover the setup for the tests below, it is not intended to be more flexibile than that.
+    # If you want to create mocks with other workspace ids, please update the list below with **all** workspace ids
+    # used by the tests
+    installed_workspace_ids = [123, 456]
+    assert workspace_id in installed_workspace_ids
+
     state = {
         "/Users/foo/.ucx/config.yml": yaml.dump(
             {
@@ -76,7 +81,7 @@ def ws1():
                     'host': 'foo',
                     'token': 'bar',
                 },
-                'installed_workspace_ids': [123,],
+                'installed_workspace_ids': installed_workspace_ids,
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -109,7 +114,7 @@ def ws1():
         return io.StringIO(state[path])
 
     workspace_client = create_autospec(WorkspaceClient)
-    workspace_client.get_workspace_id.return_value = 123
+    workspace_client.get_workspace_id.return_value = workspace_id
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
     workspace_client.workspace.download = download
@@ -119,6 +124,12 @@ def ws1():
         statement_id='123',
     )
     return workspace_client
+
+
+@pytest.fixture
+def ws1() -> WorkspaceClient:
+    return create_workspace_client_mock(123)
+
 
 
 @pytest.fixture
