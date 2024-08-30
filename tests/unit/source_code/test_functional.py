@@ -240,7 +240,7 @@ def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simpl
     sample.verify(path_lookup, simple_dependency_resolver, extended_test_index)
 
 
-# @pytest.mark.skip(reason="Used for troubleshooting failing tests")
+@pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup, simple_dependency_resolver, extended_test_index):
     path = mock_path_lookup.resolve(Path("functional/table-migration/table-migration-notebook.sql"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
