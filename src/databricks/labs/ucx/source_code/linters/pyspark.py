@@ -21,6 +21,7 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Matcher(ABC):
     method_name: str

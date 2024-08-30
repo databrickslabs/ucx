@@ -40,7 +40,7 @@ class LinterContext:
             python_fixers.append(SparkSqlPyLinter(from_table, index, session_state))
 
         python_linters += [
-            DFSAPyLinter(session_state),
+            DfsaPyLinter(session_state),
             DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
             SparkConnectPyLinter(session_state),
             DbutilsPyLinter(session_state),

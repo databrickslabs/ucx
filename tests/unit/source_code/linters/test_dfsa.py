@@ -1,19 +1,21 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.linters.dfsa import DFSAPyLinter, DFSASQLLinter, DFSA_PATTERNS
+from databricks.labs.ucx.source_code.linters.dfsa import DfsaPyLinter, DfsaSqlLinter, DFSA_PATTERNS
 
 
-"""see https://github.com/databrickslabs/ucx/issues/2350"""
 @pytest.mark.parametrize(
-    "path, matches", [
-        ("/mnt/foo/bar",True),
-        ("dbfs:/mnt/foo/bar",True),
+    "path, matches",
+    [
+        ("/mnt/foo/bar", True),
+        ("dbfs:/mnt/foo/bar", True),
         ("s3a://bucket1/folder1", True),
-        ("/dbfs/mnt/foo/bar",True),
+        ("/dbfs/mnt/foo/bar", True),
         ("/tmp/foo", False),
-    ])
+    ],
+)
 def test_matches_dfs_pattern(path, matches):
+    """see https://github.com/databrickslabs/ucx/issues/2350"""
     matched = any(pattern.matches(path) for pattern in DFSA_PATTERNS)
     assert matches == matched
 
@@ -30,7 +32,7 @@ def test_matches_dfs_pattern(path, matches):
     ],
 )
 def test_detects_dfsa_paths(code, expected):
-    linter = DFSAPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = list(linter.lint(code))
     for advice in advices:
         assert isinstance(advice, Advice)
@@ -60,7 +62,7 @@ for system in systems:
     ],
 )
 def test_dfsa_usage_linter(code, expected):
-    linter = DFSAPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = linter.lint(code)
     count = 0
     for advice in advices:
@@ -70,7 +72,7 @@ def test_dfsa_usage_linter(code, expected):
 
 
 def test_dfsa_name():
-    linter = DFSAPyLinter(CurrentSessionState())
+    linter = DfsaPyLinter(CurrentSessionState())
     assert linter.name() == "dfsa-usage"
 
 
@@ -84,7 +86,7 @@ def test_dfsa_name():
     ],
 )
 def test_non_dfsa_triggers_nothing(query):
-    ftf = DFSASQLLinter()
+    ftf = DfsaSqlLinter()
     assert not list(ftf.lint(query))
 
 
@@ -102,10 +104,11 @@ def test_non_dfsa_triggers_nothing(query):
         ("SELECT * FROM json.`s3a://abc/d/e/f`", "s3a://abc/d/e/f"),
         ("SELECT * FROM delta.`s3a://abc/d/e/f` WHERE foo > 6", "s3a://abc/d/e/f"),
         ("SELECT * FROM delta.`s3a://foo/bar`", "s3a://foo/bar"),
+        ("SELECT * FROM csv.`dbfs:/mnt/foo`", "dbfs:/mnt/foo"),
     ],
 )
 def test_dfsa_tables_trigger_messages_param(query: str, table: str):
-    ftf = DFSASQLLinter()
+    ftf = DfsaSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
@@ -126,7 +129,7 @@ def test_dfsa_tables_trigger_messages_param(query: str, table: str):
     ],
 )
 def test_dfsa_queries_failure(query: str):
-    ftf = DFSASQLLinter()
+    ftf = DfsaSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
@@ -141,5 +144,5 @@ def test_dfsa_queries_failure(query: str):
 
 
 def test_dfsa_queries_name():
-    ftf = DFSASQLLinter()
+    ftf = DfsaSqlLinter()
     assert ftf.name() == 'dfsa-query'

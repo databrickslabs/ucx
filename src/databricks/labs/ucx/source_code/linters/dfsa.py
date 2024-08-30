@@ -3,7 +3,7 @@ import logging
 from abc import ABC
 from collections.abc import Iterable
 
-from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
 from sqlglot import Expression
 from sqlglot.expressions import Table
 
@@ -59,6 +59,7 @@ DFSA_PATTERNS = [
 @dataclass
 class DFSA:
     """A DFSA is a record describing a Direct File System Access"""
+
     path: str
 
 
@@ -119,9 +120,9 @@ class _DetectDfsaVisitor(TreeVisitor):
         return self._dfsa_nodes
 
 
-class DFSAPyLinter(PythonLinter):
+class DfsaPyLinter(PythonLinter):
 
-    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates = False):
+    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates=False):
         self._session_state = session_state
         self._allow_spark_duplicates = allow_spark_duplicates
 
