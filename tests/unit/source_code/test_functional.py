@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -66,6 +66,7 @@ class Expectation:
 _UCX_REGEX_SUFFIX = r" ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
 _STATE_REGEX_SUFFIX = r' ucx\[session-state] (?P<session_state_json>\{.*})'
 
+
 class Functional:
 
     _ucx_regex = {
@@ -106,7 +107,9 @@ class Functional:
         self.parent = parent
         self.language = CellLanguage.PYTHON if path.suffix.endswith("py") else CellLanguage.SQL
 
-    def verify(self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex) -> None:
+    def verify(
+        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex
+    ) -> None:
         expected_problems = list(self._expected_problems())
         actual_advices = list(self._lint(path_lookup, dependency_resolver, migration_index))
         # Convert the actual problems to the same type as our expected problems for easier comparison.
@@ -128,7 +131,9 @@ class Functional:
         assert no_errors, "\n".join(errors)
         # TODO: output annotated file with comments for quick fixing
 
-    def _lint(self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex) -> Iterable[Advice]:
+    def _lint(
+        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex
+    ) -> Iterable[Advice]:
         session_state = self._test_session_state()
         print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
@@ -234,7 +239,9 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
         ("_child_that_uses_value_from_parent.py", "grand_parent_that_imports_parent_that_magic_runs_child.py"),
     ],
 )
-def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simple_dependency_resolver, extended_test_index) -> None:
+def test_functional_with_parent(
+    child: str, parent: str, mock_path_lookup, simple_dependency_resolver, extended_test_index
+) -> None:
     sample = Functional.for_child(child, parent)
     path_lookup = mock_path_lookup.change_directory(sample.path.parent)
     sample.verify(path_lookup, simple_dependency_resolver, extended_test_index)
