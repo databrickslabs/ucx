@@ -65,7 +65,7 @@ from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
 @pytest.fixture
-def ws():
+def ws1():
     state = {
         "/Users/foo/.ucx/config.yml": yaml.dump(
             {
@@ -122,34 +122,34 @@ def ws():
 
 
 @pytest.fixture
-def acc_client(acc_client, ws):
+def acc_client(acc_client, ws1):
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123)
-    acc_client.get_workspace_client.return_value = ws
+    acc_client.get_workspace_client.return_value = ws1
     return acc_client
 
 
-def test_workflow(ws, caplog):
-    workflows(ws)
+def test_workflow(ws1, caplog):
+    workflows(ws1)
     assert "Fetching deployed jobs..." in caplog.messages
-    ws.jobs.list_runs.assert_called()
+    ws1.jobs.list_runs.assert_called()
 
 
-def test_open_remote_config(ws):
+def test_open_remote_config(ws1):
     with patch("webbrowser.open") as mock_webbrowser_open:
-        open_remote_config(ws)
+        open_remote_config(ws1)
         mock_webbrowser_open.assert_called_with('https://localhost/#workspace/Users/foo/.ucx/config.yml')
 
 
-def test_installations(ws, capsys):
-    ws.users.list.return_value = [User(user_name='foo')]
-    installations(ws)
+def test_installations(ws1, capsys):
+    ws1.users.list.return_value = [User(user_name='foo')]
+    installations(ws1)
     assert '{"database": "ucx", "path": "/Users/foo/.ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
 
-def test_skip_with_table(ws):
-    skip(ws, "schema", "table")
+def test_skip_with_table(ws1):
+    skip(ws1, "schema", "table")
 
-    ws.statement_execution.execute_statement.assert_called_with(
+    ws1.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
         statement="SELECT * FROM `hive_metastore`.`ucx`.`tables` WHERE database='schema' AND name='table' LIMIT 1",
         byte_limit=None,
@@ -161,10 +161,10 @@ def test_skip_with_table(ws):
     )
 
 
-def test_skip_with_schema(ws):
-    skip(ws, "schema", None)
+def test_skip_with_schema(ws1):
+    skip(ws1, "schema", None)
 
-    ws.statement_execution.execute_statement.assert_called_with(
+    ws1.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
         statement="ALTER SCHEMA `schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
         byte_limit=None,
@@ -176,8 +176,8 @@ def test_skip_with_schema(ws):
     )
 
 
-def test_skip_no_schema(ws, caplog):
-    skip(ws, schema=None, table="table")
+def test_skip_no_schema(ws1, caplog):
+    skip(ws1, schema=None, table="table")
 
     assert '--schema is a required parameter.' in caplog.messages
 
@@ -188,14 +188,14 @@ def test_sync_workspace_info():
     a.workspaces.list.assert_called()
 
 
-def test_upload(tmp_path, ws, acc_client):
+def test_upload(tmp_path, ws1, acc_client):
     test_file = tmp_path / "test.txt"
     content = b"test"
     test_file.write_bytes(content)
 
-    upload(test_file, ws, run_as_collection=True, a=acc_client)
+    upload(test_file, ws1, run_as_collection=True, a=acc_client)
 
-    ws.workspace.upload.assert_called_with(
+    ws1.workspace.upload.assert_called_with(
         f"/Users/foo/.ucx/{test_file.name}",
         content,
         format=ImportFormat.AUTO,
@@ -225,79 +225,79 @@ def test_create_account_groups_with_id():
         create_account_groups(a, prompts, ctx=ctx)
 
 
-def test_manual_workspace_info(ws):
+def test_manual_workspace_info(ws1):
     prompts = MockPrompts({'Workspace name for 123': 'abc', 'Next workspace id': ''})
-    manual_workspace_info(ws, prompts)
+    manual_workspace_info(ws1, prompts)
 
 
-def test_create_table_mapping(ws):
+def test_create_table_mapping(ws1):
     with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
-        create_table_mapping(ws)
+        create_table_mapping(ws1)
 
 
-def test_validate_external_locations(ws):
-    validate_external_locations(ws, MockPrompts({}))
+def test_validate_external_locations(ws1):
+    validate_external_locations(ws1, MockPrompts({}))
 
-    ws.statement_execution.execute_statement.assert_called()
+    ws1.statement_execution.execute_statement.assert_called()
 
 
-def test_ensure_assessment_run(ws, acc_client):
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+def test_ensure_assessment_run(ws1, acc_client):
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
     )
-    ensure_assessment_run(ws, a=acc_client)
-    ws.jobs.list_runs.assert_called_once()
-    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+    ensure_assessment_run(ws1, a=acc_client)
+    ws1.jobs.list_runs.assert_called_once()
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_ensure_assessment_run_collection(ws, acc_client):
-    ensure_assessment_run(ws, True, acc_client)
+def test_ensure_assessment_run_collection(ws1, acc_client):
+    ensure_assessment_run(ws1, True, acc_client)
 
-    ws.jobs.run_now.assert_called_with(123)
-
-
-def test_repair_run(ws):
-    repair_run(ws, "assessment")
-
-    ws.jobs.list_runs.assert_called_once()
+    ws1.jobs.run_now.assert_called_with(123)
 
 
-def test_no_step_in_repair_run(ws):
+def test_repair_run(ws1):
+    repair_run(ws1, "assessment")
+
+    ws1.jobs.list_runs.assert_called_once()
+
+
+def test_no_step_in_repair_run(ws1):
     with pytest.raises(KeyError):
-        repair_run(ws, "")
+        repair_run(ws1, "")
 
 
-def test_revert_migrated_tables(ws, caplog):
+def test_revert_migrated_tables(ws1, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    ctx = WorkspaceContext(ws).replace(
+    ctx = WorkspaceContext(ws1).replace(
         is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test', is_gcp=False
     )
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
+    assert revert_migrated_tables(ws1, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
     prompts = MockPrompts({'.*': 'yes'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
+    assert revert_migrated_tables(ws1, prompts, schema=None, table=None, ctx=ctx) is None
     assert 'No migrated tables were found.' in caplog.messages
 
 
-def test_move_no_catalog(ws, caplog):
+def test_move_no_catalog(ws1, caplog):
     prompts = MockPrompts({})
-    move(ws, prompts, "", "", "", "", "")
+    move(ws1, prompts, "", "", "", "", "")
 
     assert 'Please enter from_catalog and to_catalog details' in caplog.messages
 
 
-def test_move_same_schema(ws, caplog):
+def test_move_same_schema(ws1, caplog):
     prompts = MockPrompts({})
-    move(ws, prompts, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+    move(ws1, prompts, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
 
     assert 'please select a different schema or catalog to migrate to' in caplog.messages
 
 
-def test_move_no_schema(ws, caplog):
+def test_move_no_schema(ws1, caplog):
     prompts = MockPrompts({})
-    move(ws, prompts, "SrcCat", "", "*", "TgtCat", "")
+    move(ws1, prompts, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
         'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
@@ -305,34 +305,34 @@ def test_move_no_schema(ws, caplog):
     )
 
 
-def test_move(ws):
+def test_move(ws1):
     prompts = MockPrompts({'.*': 'yes'})
-    move(ws, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
+    move(ws1, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
-    ws.tables.list.assert_called_once()
+    ws1.tables.list.assert_called_once()
 
 
-def test_move_aborted_via_prompt(ws):
+def test_move_aborted_via_prompt(ws1):
     prompts = MockPrompts({'.*tables will be dropped and recreated.*': 'no'})
-    move(ws, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
+    move(ws1, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
-    ws.tables.list.assert_not_called()
+    ws1.tables.list.assert_not_called()
 
 
-def test_alias_no_catalog(ws, caplog):
-    alias(ws, "", "", "", "", "")
+def test_alias_no_catalog(ws1, caplog):
+    alias(ws1, "", "", "", "", "")
 
     assert "Please enter from_catalog and to_catalog details" in caplog.messages
 
 
-def test_alias_same_schema(ws, caplog):
-    alias(ws, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+def test_alias_same_schema(ws1, caplog):
+    alias(ws1, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
 
     assert 'please select a different schema or catalog to migrate to' in caplog.messages
 
 
-def test_alias_no_schema(ws, caplog):
-    alias(ws, "SrcCat", "", "*", "TgtCat", "")
+def test_alias_no_schema(ws1, caplog):
+    alias(ws1, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
         'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
@@ -340,73 +340,73 @@ def test_alias_no_schema(ws, caplog):
     )
 
 
-def test_alias(ws):
-    alias(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
+def test_alias(ws1):
+    alias(ws1, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
-    ws.tables.list.assert_called_once()
+    ws1.tables.list.assert_called_once()
 
 
-def test_save_storage_and_principal_azure_no_azure_cli(ws):
-    ws.config.is_azure = True
-    ctx = WorkspaceContext(ws)
+def test_save_storage_and_principal_azure_no_azure_cli(ws1):
+    ws1.config.is_azure = True
+    ctx = WorkspaceContext(ws1)
     with pytest.raises(ValueError):
-        principal_prefix_access(ws, ctx, False)
+        principal_prefix_access(ws1, ctx, False)
 
 
-def test_save_storage_and_principal_azure(ws, caplog, acc_client):
+def test_save_storage_and_principal_azure(ws1, caplog, acc_client):
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    ws.config.is_azure = True
-    ws.config.is_aws = False
-    ctx = WorkspaceContext(ws).replace(azure_resource_permissions=azure_resource_permissions)
-    principal_prefix_access(ws, ctx, False, a=acc_client)
+    ws1.config.is_azure = True
+    ws1.config.is_aws = False
+    ctx = WorkspaceContext(ws1).replace(azure_resource_permissions=azure_resource_permissions)
+    principal_prefix_access(ws1, ctx, False, a=acc_client)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
-def test_validate_groups_membership(ws):
-    validate_groups_membership(ws)
-    ws.groups.list.assert_called()
+def test_validate_groups_membership(ws1):
+    validate_groups_membership(ws1)
+    ws1.groups.list.assert_called()
 
 
-def test_save_storage_and_principal_aws(ws, acc_client):
+def test_save_storage_and_principal_aws(ws1, acc_client):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ctx = WorkspaceContext(ws).replace(aws_resource_permissions=aws_resource_permissions)
-    principal_prefix_access(ws, ctx=ctx, a=acc_client)
+    ws1.config.is_azure = False
+    ws1.config.is_aws = True
+    ctx = WorkspaceContext(ws1).replace(aws_resource_permissions=aws_resource_permissions)
+    principal_prefix_access(ws1, ctx=ctx, a=acc_client)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
-def test_save_storage_and_principal_gcp(ws):
-    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+def test_save_storage_and_principal_gcp(ws1):
+    ctx = WorkspaceContext(ws1).replace(is_aws=False, is_azure=False)
     with pytest.raises(ValueError):
-        principal_prefix_access(ws, ctx=ctx)
+        principal_prefix_access(ws1, ctx=ctx)
 
 
-def test_migrate_credentials_azure(ws):
-    ws.workspace.upload.return_value = "test"
+def test_migrate_credentials_azure(ws1):
+    ws1.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
     azure_resources = create_autospec(AzureResources)
-    ctx = WorkspaceContext(ws).replace(
+    ctx = WorkspaceContext(ws1).replace(
         is_azure=True,
         azure_cli_authenticated=True,
         azure_subscription_id='test',
         azure_resources=azure_resources,
     )
-    migrate_credentials(ws, prompts, ctx=ctx)
-    ws.storage_credentials.list.assert_called()
+    migrate_credentials(ws1, prompts, ctx=ctx)
+    ws1.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
 
-def test_migrate_credentials_aws(ws):
+def test_migrate_credentials_aws(ws1):
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
-    migrate_credentials(ws, prompts, ctx=ctx)
-    ws.storage_credentials.list.assert_called()
+    ctx = WorkspaceContext(ws1).replace(is_aws=True, aws_resources=aws_resources)
+    migrate_credentials(ws1, prompts, ctx=ctx)
+    ws1.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws):
+def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws1):
     """The storage credential limit is 200, so we should raise a warning when we hit that limit."""
     azure_resources = create_autospec(AzureResources)
     external_locations = create_autospec(ExternalLocations)
@@ -430,15 +430,15 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
     azure_resources.storage_accounts.return_value = storage_accounts_mock
     external_locations.snapshot.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
-    ctx = WorkspaceContext(ws).replace(
+    ctx = WorkspaceContext(ws1).replace(
         is_azure=True,
         azure_cli_authenticated=True,
         azure_subscription_id='test',
         azure_resources=azure_resources,
         external_locations=external_locations,
     )
-    migrate_credentials(ws, prompts, ctx=ctx)
-    ws.storage_credentials.list.assert_called()
+    migrate_credentials(ws1, prompts, ctx=ctx)
+    ws1.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
     storage_account_id = AzureResource(
@@ -456,10 +456,10 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
     storage_accounts_mock.append(storage_account)
     external_locations_mock.append(external_location)
     with pytest.raises(RuntimeWarning):
-        migrate_credentials(ws, prompts, ctx=ctx)
+        migrate_credentials(ws1, prompts, ctx=ctx)
 
 
-def test_migrate_credentials_limit_aws(ws):
+def test_migrate_credentials_limit_aws(ws1):
     aws_resources = create_autospec(AWSResources)
     external_locations = create_autospec(ExternalLocations)
 
@@ -483,9 +483,9 @@ def test_migrate_credentials_limit_aws(ws):
     prompts = MockPrompts({'.*': 'yes'})
     AWSResourcePermissions.load_uc_compatible_roles = Mock()
     AWSResourcePermissions.load_uc_compatible_roles.return_value = aws_role_actions_mock
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources, external_locations=external_locations)
-    migrate_credentials(ws, prompts, ctx=ctx)
-    ws.storage_credentials.list.assert_called()
+    ctx = WorkspaceContext(ws1).replace(is_aws=True, aws_resources=aws_resources, external_locations=external_locations)
+    migrate_credentials(ws1, prompts, ctx=ctx)
+    ws1.storage_credentials.list.assert_called()
 
     external_locations_mock.append(ExternalLocation(location="s3://labsawsbucket/201", table_count=25))
     aws_role_actions_mock.append(
@@ -497,50 +497,50 @@ def test_migrate_credentials_limit_aws(ws):
         )
     )
     with pytest.raises(RuntimeWarning):
-        migrate_credentials(ws, prompts, ctx=ctx)
+        migrate_credentials(ws1, prompts, ctx=ctx)
 
 
-def test_create_master_principal_not_azure(ws):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
+def test_create_master_principal_not_azure(ws1):
+    ws1.config.is_azure = False
+    ws1.config.is_aws = False
     prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
+    ctx = WorkspaceContext(ws1)
     with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, ctx=ctx)
+        create_uber_principal(ws1, prompts, ctx=ctx)
 
 
-def test_create_master_principal_no_subscription(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
+def test_create_master_principal_no_subscription(ws1):
+    ws1.config.auth_type = "azure-cli"
+    ws1.config.is_azure = True
     prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
+    ctx = WorkspaceContext(ws1)
     with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
+        create_uber_principal(ws1, prompts, ctx=ctx, subscription_id="")
 
 
-def test_create_uber_principal(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
+def test_create_uber_principal(ws1):
+    ws1.config.auth_type = "azure-cli"
+    ws1.config.is_azure = True
     prompts = MockPrompts({})
     with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, subscription_id="12")
+        create_uber_principal(ws1, prompts, subscription_id="12")
 
 
-def test_migrate_locations_azure(ws):
+def test_migrate_locations_azure(ws1):
     azurerm = create_autospec(AzureResources)
-    ctx = WorkspaceContext(ws).replace(
+    ctx = WorkspaceContext(ws1).replace(
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
         azure_subscription_id='test',
         azure_resources=azurerm,
     )
-    migrate_locations(ws, ctx=ctx)
-    ws.external_locations.list.assert_called()
+    migrate_locations(ws1, ctx=ctx)
+    ws1.external_locations.list.assert_called()
     azurerm.storage_accounts.assert_called()
 
 
-def test_migrate_locations_aws(ws, caplog):
+def test_migrate_locations_aws(ws1, caplog):
     successful_return = """
     {
         "UserId": "uu@mail.com",
@@ -552,62 +552,61 @@ def test_migrate_locations_aws(ws, caplog):
     def successful_call(_):
         return 0, successful_return, ""
 
-    ctx = WorkspaceContext(ws).replace(
+    ctx = WorkspaceContext(ws1).replace(
         is_aws=True,
         is_azure=False,
         aws_profile="profile",
         aws_cli_run_command=successful_call,
     )
-    migrate_locations(ws, ctx=ctx)
-    ws.external_locations.list.assert_called()
+    migrate_locations(ws1, ctx=ctx)
+    ws1.external_locations.list.assert_called()
 
 
-def test_migrate_locations_gcp(ws):
-    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+def test_migrate_locations_gcp(ws1):
+    ctx = WorkspaceContext(ws1).replace(is_aws=False, is_azure=False)
     with pytest.raises(ValueError):
-        migrate_locations(ws, ctx=ctx)
+        migrate_locations(ws1, ctx=ctx)
 
 
-def test_create_catalogs_schemas(ws):
+def test_create_catalogs_schemas(ws1):
     prompts = MockPrompts({'.*': 's3://test'})
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
-    create_catalogs_schemas(ws, prompts)
-    ws.catalogs.list.assert_called_once()
+    ws1.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
+    create_catalogs_schemas(ws1, prompts)
+    ws1.catalogs.list.assert_called_once()
 
 
-def test_create_catalogs_schemas_handles_existing(ws, caplog):
+def test_create_catalogs_schemas_handles_existing(ws1, caplog):
     prompts = MockPrompts({'.*': 's3://test'})
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
-    ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
-    ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
-    create_catalogs_schemas(ws, prompts)
-    ws.catalogs.list.assert_called_once()
+    ws1.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
+    ws1.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
+    ws1.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
+    create_catalogs_schemas(ws1, prompts)
+    ws1.catalogs.list.assert_called_once()
 
     assert "Catalog test already exists. Skipping." in caplog.messages
     assert "Schema test in catalog test already exists. Skipping." in caplog.messages
 
 
-def test_cluster_remap(ws, caplog):
+def test_cluster_remap(ws1, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
-    ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
-    ws.clusters.list.return_value = [
+    ws1.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
+    ws1.clusters.list.return_value = [
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
     ]
-    cluster_remap(ws, prompts)
+    cluster_remap(ws1, prompts)
     assert "Remapping the Clusters to UC" in caplog.messages
 
 
-def test_cluster_remap_error(ws, caplog):
+def test_cluster_remap_error(ws1, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
-    ws.clusters.list.return_value = []
-    cluster_remap(ws, prompts)
+    ws1.clusters.list.return_value = []
+    cluster_remap(ws1, prompts)
     assert "No cluster information present in the workspace" in caplog.messages
 
 
-def test_revert_cluster_remap(ws, caplog, mocker):
+def test_revert_cluster_remap(caplog):
+    # TODO: What is this test supposed to test? Why do we expect a TypeError below?
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.workspace.list.return_value = [ObjectInfo(path='/ucx/backup/clusters/123.json')]
@@ -615,39 +614,38 @@ def test_revert_cluster_remap(ws, caplog, mocker):
         revert_cluster_remap(ws, prompts)
 
 
-def test_revert_cluster_remap_empty(ws, caplog):
+def test_revert_cluster_remap_empty(ws1, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
-    revert_cluster_remap(ws, prompts)
+    revert_cluster_remap(ws1, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
-    ws.workspace.list.assert_called_once()
+    ws1.workspace.list.assert_called_once()
 
 
-def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
-    ws.workspace.list.side_effect = [
+def test_relay_logs(ws1, caplog):
+    ws1.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
+    ws1.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1', object_type=ObjectType.DIRECTORY),
         ],
         [ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1/foo.log-123')],
     ]
-    logs(ws)
+    logs(ws1)
     assert 'Something is logged' in caplog.messages
 
 
-def test_migrate_local_code(ws):
+def test_migrate_local_code(ws1):
     prompts = MockPrompts({'.*': 'yes'})
     with patch.object(LocalFileMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
+        migrate_local_code(ws1, prompts)
 
         mock_apply.assert_called_once_with(Path.cwd())
 
 
-def test_migrate_local_code_aborted_via_prompt(ws):
+def test_migrate_local_code_aborted_via_prompt(ws1):
     prompts = MockPrompts({'.*apply UC migration to all files.*': 'no'})
     with patch.object(LocalFileMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
+        migrate_local_code(ws1, prompts)
 
         mock_apply.assert_not_called()
 
@@ -662,24 +660,24 @@ def test_assign_metastore(acc_client, caplog):
         assign_metastore(acc_client, "123")
 
 
-def test_migrate_tables(ws):
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+def test_migrate_tables(ws1):
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
     )
     prompts = MockPrompts({})
-    migrate_tables(ws, prompts)
-    ws.jobs.run_now.assert_called_with(456)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+    migrate_tables(ws1, prompts)
+    ws1.jobs.run_now.assert_called_with(456)
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_migrate_external_hiveserde_tables_in_place(ws):
+def test_migrate_external_hiveserde_tables_in_place(ws1):
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
         catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+    ctx = WorkspaceContext(ws1).replace(tables_crawler=tables_crawler)
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
     )
 
@@ -689,20 +687,20 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     )
     prompts = MockPrompts({prompt: "Yes"})
 
-    migrate_tables(ws, prompts, ctx=ctx)
+    migrate_tables(ws1, prompts, ctx=ctx)
 
-    ws.jobs.run_now.assert_called_with(789)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
+    ws1.jobs.run_now.assert_called_with(789)
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
-def test_migrate_external_tables_ctas(ws):
+def test_migrate_external_tables_ctas(ws1):
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
         catalog="hive_metastore", database="test", name="externalctas", object_type="UNKNOWN", table_format="EXTERNAL"
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+    ctx = WorkspaceContext(ws1).replace(tables_crawler=tables_crawler)
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
     )
 
@@ -713,51 +711,51 @@ def test_migrate_external_tables_ctas(ws):
 
     prompts = MockPrompts({prompt: "Yes"})
 
-    migrate_tables(ws, prompts, ctx=ctx)
+    migrate_tables(ws1, prompts, ctx=ctx)
 
-    ws.jobs.run_now.assert_called_with(987)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
+    ws1.jobs.run_now.assert_called_with(987)
+    ws1.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
-def test_create_missing_principal_aws(ws):
+def test_create_missing_principal_aws(ws1):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    ctx = WorkspaceContext(ws1).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
     prompts = MockPrompts({'.*': 'yes'})
-    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    create_missing_principals(ws1, prompts=prompts, ctx=ctx)
     aws_resource_permissions.create_uc_roles.assert_called_once()
 
 
-def test_create_missing_principal_aws_not_approved(ws):
+def test_create_missing_principal_aws_not_approved(ws1):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    ctx = WorkspaceContext(ws1).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
     prompts = MockPrompts({'.*': 'No'})
-    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    create_missing_principals(ws1, prompts=prompts, ctx=ctx)
     aws_resource_permissions.create_uc_roles.assert_not_called()
 
 
-def test_create_missing_principal_azure(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=True)
+def test_create_missing_principal_azure(ws1, caplog):
+    ctx = WorkspaceContext(ws1).replace(is_aws=False, is_azure=True)
     prompts = MockPrompts({'.*': 'yes'})
     with pytest.raises(ValueError) as failure:
-        create_missing_principals(ws, prompts=prompts, ctx=ctx)
+        create_missing_principals(ws1, prompts=prompts, ctx=ctx)
     assert str(failure.value) == "Unsupported cloud provider"
 
 
-def test_migrate_dbsql_dashboards(ws, caplog):
-    migrate_dbsql_dashboards(ws)
-    ws.dashboards.list.assert_called_once()
+def test_migrate_dbsql_dashboards(ws1, caplog):
+    migrate_dbsql_dashboards(ws1)
+    ws1.dashboards.list.assert_called_once()
 
 
-def test_revert_dbsql_dashboards(ws, caplog):
-    revert_dbsql_dashboards(ws)
-    ws.dashboards.list.assert_called_once()
+def test_revert_dbsql_dashboards(ws1, caplog):
+    revert_dbsql_dashboards(ws1)
+    ws1.dashboards.list.assert_called_once()
 
 
-def test_cli_missing_awscli(ws, mocker, caplog):
+def test_cli_missing_awscli(ws1, mocker, caplog):
     mocker.patch("shutil.which", side_effect=ValueError("Couldn't find AWS CLI in path"))
     with pytest.raises(ValueError):
-        ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
-        migrate_locations(ws, ctx)
+        ctx = WorkspaceContext(ws1).replace(is_aws=True, is_azure=False, aws_profile="profile")
+        migrate_locations(ws1, ctx)
 
 
 def test_join_collection():
