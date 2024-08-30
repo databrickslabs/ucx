@@ -1,4 +1,4 @@
-# ucx[direct-filesystem-access:+1:5:+1:39] The use of direct filesystem references is deprecated: s3://bucket/path
+# ucx[direct-file-system-access:+1:5:+1:39] The use of direct file system access is deprecated: s3://bucket/path
 df = spark.read.csv("s3://bucket/path")
 for i in range(10):
 
