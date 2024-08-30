@@ -1,253 +1,126 @@
-import requests
-import json
 import os
+import re
 import csv
-import zipfile
-import time
+import logging
+from pathlib import Path
+from zipfile import ZipFile
+from concurrent.futures import ThreadPoolExecutor
 
-# Set up your Databricks credentials and workspace information
-DATABRICKS_HOST = os.getenv("DATABRICKS_HOST")
-DATABRICKS_TOKEN = os.getenv("TOKEN")
-WAREHOUSE_ID = os.getenv("WAREHOUSE_ID")
-DASHBOARD_ID = os.getenv("DASHBOARD_ID")
-OUTPUT_FILE = os.getenv("OUTPUT_FILE")
+from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 
-# Set up the headers with your Databricks token
-headers = {
-    'Authorization': f'Bearer {DATABRICKS_TOKEN}',
-    'Content-Type': 'application/json'
-}
-
-class Exporter():
-    # Function to check and start the SQL warehouse if it's not running
-    def ensure_warehouse_running(warehouse_id, max_retries=5, delay=10):
-        url = f"{DATABRICKS_HOST}/api/2.0/sql/warehouses/{warehouse_id}"
-
-        for attempt in range(max_retries):
-            response = requests.get(url, headers=headers)
-
-            if response.status_code != 200:
-                print(f"Failed to check warehouse status: {response.status_code} - {response.text}")
-                return False
-
-            status = response.json().get('state')
-            if status == "RUNNING":
-                print("Warehouse is running.")
-                return True
-            elif status == "STOPPED":
-                print("Warehouse is stopped. Attempting to start it...")
-                start_url = f"{DATABRICKS_HOST}/api/2.0/sql/warehouses/{warehouse_id}/start"
-                start_response = requests.post(start_url, headers=headers)
-                if start_response.status_code != 202:
-                    print(f"Failed to start warehouse: {start_response.status_code} - {start_response.text}")
-                    return False
-
-            print(f"Waiting for warehouse to start (attempt {attempt + 1}/{max_retries})...")
-            time.sleep(delay)
-
-        print("Max retries reached. Warehouse is not running.")
-        return False
+logger = logging.getLogger(__name__)
 
 
-    # Function to get the dashboard metadata
-    def get_dashboard_content(dashboard_id):
-        url = f"{DATABRICKS_HOST}/api/2.0/lakeview/dashboards/{dashboard_id}"
-        payload = {
-            "id": dashboard_id
-        }
-        response = requests.get(url, headers=headers, data=json.dumps(payload))
+class Exporter:
+    # File and Path Constants
+    _ZIP_FILE_NAME = "ucx_asseassment_results.zip"
+    _UCX_MAIN_QUERIES_PATH = "src/databricks/labs/ucx/queries/assessment/main"
 
-        if response.status_code != 200:
-            print(f"Failed to retrieve dashboard: {response.status_code} - {response.text}")
-            return None
+    def __init__(self, ctx: WorkspaceContext):
+        self._ctx = ctx
 
-        return response.json()
+    def _get_ucx_main_queries(self) -> list[dict[str, str]]:
+        """Retrieve and construct the main UCX queries."""
+        pattern = r"\b.inventory\b"
+        schema = self._ctx.inventory_database
 
+        # Create Path object for the UCX_MAIN_QUERIES_PATH
+        ucx_main_queries_path = Path(self._UCX_MAIN_QUERIES_PATH)
 
-    # Function to process the serialized dashboard content and extract datasets
-    def extract_datasets(serialized_dashboard):
-        dashboard_content = json.loads(serialized_dashboard)
-        return dashboard_content.get('datasets', [])
+        # List all SQL files in the directory, excluding those with 'count' in their names
+        sql_files = [
+            file for file in ucx_main_queries_path.iterdir() if file.suffix == ".sql" and "count" not in file.name
+        ]
 
+        ucx_main_queries = [
+            {
+                "name": "01_1_permissions",
+                "query": f"SELECT * FROM {schema}.permissions",
+            },
+            {"name": "02_2_ucx_grants", "query": f"SELECT * FROM {schema}.grants;"},
+            {"name": "03_3_groups", "query": f"SELECT * FROM {schema}.groups;"},
+        ]
 
-    # Function to create a persistent table with data and get the schema
-    def create_table_with_data_and_get_schema(sql_query, table_name, max_retries=5, poll_delay=5):
-        # Create the persistent table with data
-        create_table_sql = f"CREATE OR REPLACE TABLE {table_name} AS {sql_query}"
-        statement_id = execute_query(create_table_sql)
+        for sql_file in sql_files:
+            content = sql_file.read_text()
+            modified_content = re.sub(pattern, f" {schema}", content, flags=re.IGNORECASE)
+            query_name = sql_file.stem
+            ucx_main_queries.append({"name": query_name, "query": modified_content})
 
-        # Poll for the completion of the query
-        if not poll_for_query_completion(statement_id, max_retries, poll_delay):
-            print(f"Failed to create table '{table_name}' as the query did not complete successfully.")
-            return None
+        return ucx_main_queries
 
-        # Retry logic for DESCRIBE TABLE
-        for attempt in range(max_retries):
-            # Describe the table to get the schema
-            schema_query = f"DESCRIBE TABLE {table_name}"
-            schema_statement_id = execute_query(schema_query)
-            schema, _ = get_query_results(schema_statement_id)
+    @staticmethod
+    def _extract_target_name(name: str, pattern: str) -> str:
+        """Extract target name from the file name using the provided pattern."""
+        match = re.search(pattern, name)
+        return match.group(1) if match else ""
 
-            if schema:
-                # Extract the schema names from the result
-                schema_columns = [row[0] for row in schema if row]
-                return schema_columns
-            else:
-                print(f"Attempt {attempt + 1} to describe the table failed. Retrying...")
-                time.sleep(poll_delay)
+    @staticmethod
+    def _cleanup(path: Path, target_name: str) -> None:
+        """Remove a specific CSV file in the given path that matches the target name."""
+        target_file = path.joinpath(target_name)
 
-        print(f"Max retries reached. Failed to retrieve schema for table '{table_name}'.")
-        return None
+        if target_file.exists():
+            target_file.unlink()
 
+    def _execute_query(self, path: Path, result: dict[str, str]) -> None:
+        """Execute a SQL query and write the result to a CSV file."""
+        pattern = r"^\d+_\d+_(.*)"
+        match = re.search(pattern, result["name"])
+        if match:
+            file_name = f"{match.group(1)}.csv"
+            csv_path = os.path.join(path, file_name)
 
-    # Function to poll for the completion of a query
-    def poll_for_query_completion(statement_id, max_retries, poll_delay):
-        for attempt in range(max_retries):
-            url = f"{DATABRICKS_HOST}/api/2.0/sql/statements/{statement_id}"
-            response = requests.get(url, headers=headers)
-            if response.status_code != 200:
-                print(f"Failed to poll query status: {response.status_code} - {response.text}")
-                return False
+            query_results = list(self._ctx.sql_backend.fetch(result["query"]))
 
-            result = response.json()
-            state = result.get('status', {}).get('state')
-            if state == "SUCCEEDED":
-                print("Query succeeded.")
-                return True
-            elif state == "FAILED":
-                print(f"Query failed: {result['status']['error']['message']}")
-                return False
+            if query_results:
+                headers = query_results[0].asDict().keys()
+                with open(csv_path, mode='w', newline='', encoding='utf-8') as file:
+                    writer = csv.DictWriter(file, fieldnames=headers)
+                    writer.writeheader()
+                    for row in query_results:
+                        writer.writerow(row.asDict())
+                # Add the CSV file to the ZIP archive
+                self._add_to_zip(path, file_name)
 
-            print(f"Query is still running... (attempt {attempt + 1}/{max_retries})")
-            time.sleep(poll_delay)
+    def _add_to_zip(self, path: Path, file_name) -> None:
+        """Create a ZIP file containing all the CSV files."""
+        zip_path = path / self._ZIP_FILE_NAME
+        file_path = path / file_name
 
-        print("Max retries reached. Query did not complete.")
-        return False
+        try:
+            with ZipFile(zip_path, 'a') as zipf:
+                zipf.write(file_path, arcname=file_name)
 
+        except FileNotFoundError:
+            print(f"File {file_path} not found.")
+        except PermissionError:
+            print(f"Permission denied for {file_path} or {zip_path}.")
 
-    # Function to execute the SQL query
-    def execute_query(sql_query):
-        url = f"{DATABRICKS_HOST}/api/2.0/sql/statements"
-        payload = {
-            "statement": sql_query,
-            "warehouse_id": WAREHOUSE_ID
-        }
+        # Clean up the file if it was successfully added
+        if file_path.exists():
+            self._cleanup(path, file_name)
 
-        print("Executing SQL Query:", sql_query)
-        response = requests.post(url, headers=headers, json=payload)
+    def export_results(self, prompts: Prompts, path: Path | None) -> None:
+        """Main method to export results to CSV files inside a ZIP archive."""
+        results = self._get_ucx_main_queries()
+        if path is None:
+            response = prompts.question(
+                "Choose a path to save the UCX Assessment results",
+                default=Path.cwd().as_posix(),
+                validate=lambda p_: Path(p_).exists(),
+            )
+            path = Path(response)
+        try:
+            logger.info(f"Exporting UCX Assessment (Main) results to {path}")
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(self._execute_query, path, result) for result in results]
+                for future in futures:
+                    future.result()
 
-        if response.status_code != 200:
-            print(f"Failed to execute query: {response.status_code} - {response.text}")
-            return None
-
-        statement_data = response.json()
-        return statement_data['statement_id']
-
-
-    # Function to get the schema and query results by statement ID with enhanced error handling
-    def get_query_results(statement_id):
-        url = f"{DATABRICKS_HOST}/api/2.0/sql/statements/{statement_id}"
-
-        while True:
-            response = requests.get(url, headers=headers)
-            if response.status_code != 200:
-                print(f"Failed to retrieve query results: {response.status_code} - {response.text}")
-                return None, None
-
-            result = response.json()
-
-            if result['status']['state'] == 'SUCCEEDED':
-                if 'data_array' in result['result']:
-                    data_array = result['result']['data_array']
-                    return data_array, None  # Returning None for schema here as we extract it separately
-                else:
-                    print("No data array found in the response.")
-                    return [], None  # Return empty list to indicate no data but still proceed
-            elif result['status']['state'] == 'FAILED':
-                print(f"Query failed: {result['status']['error']['message']}")
-                return None, None
-            else:
-                print(f"Query is still running... Waiting before retrying.")
-                time.sleep(5)  # Wait before checking again
-
-
-    # Function to write datasets to CSV files and zip them
-    def write_csvs_to_zip(zip_filename, datasets):
-        with zipfile.ZipFile(zip_filename, 'w') as zipf:
-            for dataset_name, rows, columns in datasets:
-                csv_filename = f"{dataset_name}.csv"
-
-                # If no data rows were returned, ensure at least an empty CSV with headers is created
-                if rows is None:
-                    print(f"Warning: No data returned for dataset '{dataset_name}'. Creating empty CSV...")
-                    rows = []
-
-                # Write CSV data to a string buffer
-                with open(csv_filename, 'w', newline='') as csvfile:
-                    csvwriter = csv.writer(csvfile)
-
-                    # Write the header (column names)
-                    csvwriter.writerow(columns)
-
-                    # Write the data rows (which may be empty)
-                    csvwriter.writerows(rows)
-
-                # Add the CSV file to the zip archive
-                zipf.write(csv_filename)
-
-                # Clean up the CSV file after adding it to the zip (optional)
-                os.remove(csv_filename)
-
-        print(f"Created zip file: {zip_filename}")
-
-
-    # Main function to get all datasets' outputs from a dashboard and save as a zip with CSVs
-    def get_dashboard_data_as_csv_zip(dashboard_id, zip_filename):
-        # Ensure the warehouse is running before starting
-        if not ensure_warehouse_running(WAREHOUSE_ID):
-            print("Warehouse is not running. Exiting.")
-            return
-
-        datasets = []
-        dashboard_content = get_dashboard_content(dashboard_id)
-
-        if not dashboard_content:
-            print("Dashboard content could not be retrieved.")
-            return
-
-        serialized_dashboard = dashboard_content.get('serialized_dashboard', '{}')
-        datasets_info = extract_datasets(serialized_dashboard)
-
-        for dataset in datasets_info:
-            query = dataset.get('query')
-            if query:
-                print(f"Executing query: {dataset['displayName']}")
-
-                # Create a persistent table with data and get the schema
-                table_name = f"temp_table_{dataset['displayName'][:20].replace(' ', '_')}"  # Limit and format name
-                schema = create_table_with_data_and_get_schema(query, table_name)
-                if schema:
-                    print("Extracted Schema from Persistent Table:", schema)
-                    datasets.append((dataset['displayName'], None, schema))  # Data to be filled in later
-                else:
-                    print(f"Failed to extract schema for dataset '{dataset['displayName']}'.")
-
-        # Now fetch the data from each persistent table
-        for dataset_name, _, schema in datasets:
-            query = f"SELECT * FROM temp_table_{dataset_name[:20].replace(' ', '_')}"
-            statement_id = execute_query(query)
-            query_results, _ = get_query_results(statement_id)
-            datasets[datasets.index((dataset_name, _, schema))] = (dataset_name, query_results, schema)
-
-        # Write all datasets to a zip file with CSVs
-        write_csvs_to_zip(zip_filename, datasets)
-
-        # Optionally, drop the persistent tables to clean up
-        for dataset_name, _, _ in datasets:
-            table_name = f"temp_table_{dataset_name[:20].replace(' ', '_')}"
-            drop_table_sql = f"DROP TABLE IF EXISTS {table_name}"
-            execute_query(drop_table_sql)
-
-
-    # Example usage
-    get_dashboard_data_as_csv_zip(DASHBOARD_ID, "output_datasets.zip")
+        except TimeoutError as e:
+            print("A thread execution timed out. Check the query execution logic.")
+            print(f"Error exporting results: {e}")
+        finally:
+            logger.info(f"UCX Assessment (Main) results exported to {path}")

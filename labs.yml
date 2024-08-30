@@ -264,15 +264,7 @@ commands:
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
 
   - name: export
-    is_account_level: true
-    description: workspace_id to join a collection.
+    description: export widget data from the assessment
     flags:
-      - name: warehouse-id
-        description: ID for warehouse to be used for assessment query results extraction
-      - name: host
-        description: Host for determining the assessment target dashboard
-      - name: dashboard-id
-          description: ID for dashboard containing the main assessment results
-      - name: output-file
-          description: zip file name for housing all CSV results
-
+      - name: stuff
+        description: more stuff
