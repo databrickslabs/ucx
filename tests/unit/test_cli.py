@@ -137,14 +137,21 @@ def ws2() -> WorkspaceClient:
 
 
 @pytest.fixture
-def workspaces(ws1, ws2) -> list[WorkspaceClient]:
+def workspace_clients(ws1, ws2) -> list[WorkspaceClient]:
     return [ws1, ws2]
 
 
 @pytest.fixture
-def acc_client(acc_client, ws1):
-    acc_client.workspaces.get.return_value = Workspace(workspace_id=123)
-    acc_client.get_workspace_client.return_value = ws1
+def acc_client(acc_client: AccountClient, workspace_clients: list[WorkspaceClient]) -> AccountClient:
+    acc_client.workspaces.get.side_effect = lambda workspace_id: Workspace(workspace_id=workspace_id)
+
+    def get_workspace_client(workspace: Workspace) -> WorkspaceClient:
+        workspace_client = [ws for ws in workspace_clients if ws.get_workspace_id() == workspace.workspace_id]
+        if len(workspace_client) == 0:
+            raise NotFound(f"Workspace not found: {workspace.workspace_id}")
+        return workspace_client[0]
+
+    acc_client.get_workspace_client.side_effect = get_workspace_client
     return acc_client
 
 
