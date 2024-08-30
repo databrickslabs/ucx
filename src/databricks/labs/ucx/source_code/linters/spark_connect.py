@@ -242,7 +242,7 @@ class CommandContextMatcher(SharedClusterMatcher):
             )
 
 
-class SparkConnectLinter(PythonLinter):
+class SparkConnectPyLinter(PythonLinter):
     def __init__(self, session_state: CurrentSessionState):
         if session_state.data_security_mode != DataSecurityMode.USER_ISOLATION:
             self._matchers = []
