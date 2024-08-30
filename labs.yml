@@ -43,6 +43,13 @@ commands:
     is_account_level: true
     description: upload workspace config to all workspaces in the account where ucx is installed
 
+  - name: upload
+    is_account_level: true
+    description: upload file to all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to upload
+
   - name: report-account-compatibility
     is_account_level: true
     description: aggregation of UCX output of multiple workspaces in the account.
