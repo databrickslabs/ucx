@@ -103,6 +103,7 @@ def sync_workspace_info(a: AccountClient):
     ctx.account_workspaces.sync_workspace_info()
 
 
+@ucx.command(is_account=True)
 def upload(w: WorkspaceClient, path: Path, run_as_collection: bool = False, a: AccountClient | None = None):
     """Upload a file to the (collection of) workspace(s)"""
     for ctx in get_contexts(w, a, run_as_collection):
