@@ -736,7 +736,10 @@ class MigrateGrants:
         for grant in self._match_grants(src):
             acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
             if acl_migrate_sql is None:
-                logger.warning(f"failed-to-migrate: Cannot identify UC grant for {src.kind} {uc_table_key}. Skipping.")
+                logger.warning(
+                    f"failed-to-migrate: Cannot identify UC grant for hive metastore grant {grant.action_type} on "
+                    f"{src.kind} {uc_table_key}. Skipping."
+                )
                 continue
             logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
             try:
