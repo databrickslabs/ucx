@@ -83,86 +83,104 @@ class ViewToMigrate(TableToMigrate):
 
 class ViewsMigrationSequencer:
 
-    def __init__(self, tables: Collection[TableToMigrate], index: MigrationIndex):
-        self._tables = tables
-        self._index = index
-        self._result_view_list: list[ViewToMigrate] = []
-        self._result_tables_set: set[TableView] = set()
+    def __init__(self, tables_to_migrate: Collection[TableToMigrate], *, migration_index: MigrationIndex | None = None):
+        self._tables = tables_to_migrate  # Also contains views to migrate
+        self._index = migration_index or MigrationIndex([])
 
-    def sequence_batches(self) -> list[list[ViewToMigrate]]:
-        # sequencing is achieved using a very simple algorithm:
-        # for each view, we register dependencies (extracted from view_text)
-        # then given the remaining set of views to process,
-        # and the growing set of views already processed
-        # we check if each remaining view refers to not yet processed views
-        # if none, then it's safe to add that view to the next batch of views
-        # the complexity for a given set of views v and a dependency depth d looks like Ov^d
-        # this seems enormous but in practice d remains small and v decreases rapidly
-        all_tables: dict[str, TableToMigrate] = {}
-        views = set()
-        for table in self._tables:
-            if table.src.view_text is not None:
-                table = ViewToMigrate(table.src, table.rule)
-            all_tables[table.src.key] = table
-            if isinstance(table, ViewToMigrate):
-                views.add(table)
-        # when migrating views we want them in batches
-        batches: list[list[ViewToMigrate]] = []
-        while len(views) > 0:
-            next_batch = self._next_batch(views)
-            self._result_view_list.extend(next_batch)
-            table_views = {TableView("hive_metastore", t.src.database, t.src.name) for t in next_batch}
-            self._result_tables_set.update(table_views)
-            views.difference_update(next_batch)
-            batches.append(list(next_batch))
-        return batches
-
-    def _next_batch(self, views: set[ViewToMigrate]) -> set[ViewToMigrate]:
-        # we can't (slightly) optimize by checking len(views) == 0 or 1,
-        # because we'd lose the opportunity to check the SQL
-        result: set[ViewToMigrate] = set()
-        for view in views:
-            view_deps = set(view.dependencies)
-            self._check_circular_dependency(view, views)
-            if len(view_deps) == 0:
-                result.add(view)
-            else:
-                # does the view have at least one view dependency that is not yet processed ?
-                not_processed_yet = view_deps - self._result_tables_set
-                if len(not_processed_yet) == 0:
-                    result.add(view)
-                    continue
-                if not [
-                    table_view
-                    for table_view in not_processed_yet
-                    if not self._index.is_migrated(table_view.schema, table_view.name)
-                ]:
-                    result.add(view)
-        # prevent infinite loop
-        if len(result) == 0 and len(views) > 0:
-            raise ValueError(f"Invalid table references are preventing migration: {views}")
-        return result
-
-    def _check_circular_dependency(self, initial_view, views):
-        queue = []
-        queue.extend(dep for dep in initial_view.dependencies)
-        while queue:
-            current_view = self._get_view_instance(queue.pop(0).key, views)
-            if not current_view:
+    @cached_property
+    def _views(self) -> dict[ViewToMigrate, TableView]:
+        # Views is a mapping as the TableView is required when resolving dependencies
+        views = {}
+        for table_or_view in self._tables:
+            if table_or_view.src.view_text is None:
                 continue
-            if current_view == initial_view:
-                raise ValueError(
-                    f"Circular dependency detected between {initial_view.src.name} and {current_view.src.name} "
-                )
-            queue.extend(dep for dep in current_view.dependencies)
+            view_to_migrate = ViewToMigrate(table_or_view.src, table_or_view.rule)
+            # All views to migrate are stored in the hive_metastore
+            views[view_to_migrate] = TableView("hive_metastore", view_to_migrate.src.database, view_to_migrate.src.name)
+        return views
 
-    def _get_view_instance(self, key: str, views: set[ViewToMigrate]) -> ViewToMigrate | None:
-        # This method acts as a mapper between TableView and ViewToMigrate. We check if the key passed matches with
-        # any of the views in the list of views. This means the circular dependency will be identified only
-        # if the dependencies are present in the list of views passed to _next_batch() or the _result_view_list
-        # ToDo: see if a mapper between TableView and ViewToMigrate can be implemented
-        all_views = list(views) + self._result_view_list
-        for view in all_views:
+    def _get_view_to_migrate(self, key: str) -> ViewToMigrate | None:
+        """Get a view to migrate by key"""
+        for view in self._views:
             if view.src.key == key:
                 return view
         return None
+
+    def sequence_batches(self) -> list[list[ViewToMigrate]]:
+        """Sequence the views in batches to migrate them in the right order.
+
+        Batch sequencing uses the following algorithm:
+        0. For each view, we register dependencies (extracted from view_text),
+        1. Then to create a new batch of views,
+           We require the dependencies that are covered already:
+             1. The migrated tables
+             2. The (growing) set of views from already sequenced previous batches
+           For each remaining view, we check if all its dependencies are covered for. If that is the case, then we
+           add that view to the new batch of views.
+        2. We repeat point from point 1. until all views are sequenced.
+
+        The complexity for a given set of views v and a dependency depth d looks like Ov^d, this seems enormous but in
+        practice d remains small and v decreases rapidly
+        """
+        batches: list[list[ViewToMigrate]] = []
+        views_to_migrate = set(self._views.keys())
+        views_sequenced: set[TableView] = set()
+        while len(views_to_migrate) > 0:
+            try:
+                next_batch = self._next_batch(views_to_migrate, views_from_previous_batches=views_sequenced)
+            except RecursionError as e:
+                logger.error(
+                    f"Cannot sequence views {views_to_migrate} given migration index {self._index}", exc_info=e
+                )
+                # By returning the current batches, we can migrate the views that are not causing the recursion
+                return batches
+            for view in next_batch:
+                views_sequenced.add(self._views[view])
+            batches.append(next_batch)
+            views_to_migrate.difference_update(next_batch)
+        return batches
+
+    def _next_batch(
+        self, views: set[ViewToMigrate], *, views_from_previous_batches: set[TableView] | None
+    ) -> list[ViewToMigrate]:
+        """For sequencing algorithm see docstring of :meth:sequence_batches.
+
+        Raises:
+            RecursionError :
+                If an infinite loop is detected.
+        """
+        views_from_previous_batches = views_from_previous_batches or set()
+        # we can't (slightly) optimize by checking len(views) == 0 or 1,
+        # because we'd lose the opportunity to check the SQL
+        result = []
+        for view in views:
+            self._check_circular_dependency(view)
+            if len(view.dependencies) == 0:
+                result.append(view)
+                continue
+            # If all dependencies are already processed, we can add the view to the next batch
+            not_processed_yet = set(view.dependencies) - views_from_previous_batches
+            if len(not_processed_yet) == 0:
+                result.append(view)
+                continue
+            if all(self._index.is_migrated(table_view.schema, table_view.name) for table_view in not_processed_yet):
+                result.append(view)
+        if len(result) == 0 and len(views) > 0:  # prevent infinite loop
+            raise RecursionError(f"Unresolved dependencies prevent batch sequencing: {views}")
+        return result
+
+    def _check_circular_dependency(self, view: ViewToMigrate) -> None:
+        """Check for circular dependencies in the views to migrate.
+
+        Raises:
+            RecursionError :
+                If a circular dependency is detected between views.
+        """
+        dependency_keys = [dep.key for dep in view.dependencies]
+        while len(dependency_keys) > 0:
+            dependency = self._get_view_to_migrate(dependency_keys.pop(0))
+            if not dependency:  # Only views (to migrate) can cause a circular dependency, tables can be ignored
+                continue
+            if dependency == view:
+                raise RecursionError(f"Circular dependency detected starting from: {view.src.full_name}")
+            dependency_keys.extend(dep.key for dep in dependency.dependencies)

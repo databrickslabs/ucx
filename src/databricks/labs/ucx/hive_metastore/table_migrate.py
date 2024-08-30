@@ -101,7 +101,7 @@ class TablesMigrator:
     def _migrate_views(self):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index_full_refresh())
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, migration_index=self.index_full_refresh())
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []
