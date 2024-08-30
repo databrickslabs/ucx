@@ -106,6 +106,7 @@ def sync_workspace_info(a: AccountClient):
 @ucx.command(is_account=True)
 def upload(path: Path, w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """Upload a file to the (collection of) workspace(s)"""
+    logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
     for ctx in get_contexts(w, a, run_as_collection):
         ctx.installation.upload(path.name, path.read_bytes())
 
