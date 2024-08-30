@@ -26,7 +26,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "import s3fs",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=0,
@@ -40,7 +40,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "from s3fs import something",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=0,
@@ -56,7 +56,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "import s3fs, certifi",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=0,
@@ -71,7 +71,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "def func():\n    import s3fs",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
@@ -85,7 +85,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "import s3fs as s",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=0,
@@ -99,7 +99,7 @@ S3FS_DEPRECATION_MESSAGE = (
             "from s3fs.subpackage import something",
             [
                 DependencyProblem(
-                    code='direct-file-system-access',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=0,
@@ -134,7 +134,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     (
         [
             DependencyProblem(
-                code='direct-file-system-access',
+                code='direct-filesystem-access',
                 message=S3FS_DEPRECATION_MESSAGE,
                 source_path=Path('leaf9.py'),
                 start_line=0,
