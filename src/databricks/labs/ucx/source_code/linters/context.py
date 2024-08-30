@@ -6,11 +6,11 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
-    SQLSequentialLinter,
+    SqlSequentialLinter,
     CurrentSessionState,
     PythonSequentialLinter,
     PythonLinter,
-    SQLLinter,
+    SqlLinter,
 )
 from databricks.labs.ucx.source_code.linters.dfsa import DFSAPyLinter, DFSASQLLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectPyLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLinter
-from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
+from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 
 
 class LinterContext:
@@ -29,11 +29,11 @@ class LinterContext:
         python_linters: list[PythonLinter] = []
         python_fixers: list[Fixer] = []
 
-        sql_linters: list[SQLLinter] = []
+        sql_linters: list[SqlLinter] = []
         sql_fixers: list[Fixer] = []
 
         if index is not None:
-            from_table = FromTableSQLLinter(index, session_state=session_state)
+            from_table = FromTableSqlLinter(index, session_state=session_state)
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             python_linters.append(SparkSqlPyLinter(from_table, index, session_state))
@@ -47,7 +47,7 @@ class LinterContext:
         ]
         sql_linters.append(DFSASQLLinter())
 
-        self._linters: dict[Language, list[SQLLinter] | list[PythonLinter]] = {
+        self._linters: dict[Language, list[SqlLinter] | list[PythonLinter]] = {
             Language.PYTHON: python_linters,
             Language.SQL: sql_linters,
         }
@@ -65,7 +65,7 @@ class LinterContext:
         if language is Language.PYTHON:
             return PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]))
         if language is Language.SQL:
-            return SQLSequentialLinter(cast(list[SQLLinter], self._linters[language]))
+            return SqlSequentialLinter(cast(list[SqlLinter], self._linters[language]))
         raise ValueError(f"Unsupported language: {language}")
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:

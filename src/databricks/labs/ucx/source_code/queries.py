@@ -2,12 +2,12 @@ import logging
 from sqlglot import parse as parse_sql
 from sqlglot.expressions import Table, Expression, Use, Create
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, Fixer, CurrentSessionState, SQLLinter
+from databricks.labs.ucx.source_code.base import Deprecation, Fixer, CurrentSessionState, SqlLinter
 
 logger = logging.getLogger(__name__)
 
 
-class FromTableSQLLinter(SQLLinter, Fixer):
+class FromTableSqlLinter(SqlLinter, Fixer):
     """Linter and Fixer for table migrations in SQL queries.
 
     This class is responsible for identifying and fixing table migrations in

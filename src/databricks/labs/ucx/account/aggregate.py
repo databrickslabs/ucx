@@ -16,7 +16,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, 
 from databricks.labs.ucx.hive_metastore.locations import LocationTrie
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
+from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -81,7 +81,7 @@ class AccountAggregate:
                         )
                     ]
                 )
-                from_table = FromTableSQLLinter(stub_index, CurrentSessionState(schema=inventory_database))
+                from_table = FromTableSqlLinter(stub_index, CurrentSessionState(schema=inventory_database))
                 logger.info(f"Querying Schema {inventory_database}")
 
                 workspace_specific_query = from_table.apply(query)
