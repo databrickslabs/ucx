@@ -3,7 +3,7 @@ import logging
 from abc import ABC
 from collections.abc import Iterable
 
-from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
 from sqlglot import Expression
 from sqlglot.expressions import Table
 
@@ -30,13 +30,19 @@ class DFSAPattern(ABC):
         return value.startswith(self._prefix) and not self._matches_allowed_root(value)
 
     def _matches_allowed_root(self, value: str):
-        return any(value.startswith(f"{self._prefix}/{root}/") for root in self._allowed_roots)
+        return any(value.startswith(f"{self._prefix}/{root}") for root in self._allowed_roots)
+
+
+class RootPattern(DFSAPattern):
+
+    def _matches_allowed_root(self, value: str):
+        return any(value.startswith(f"/{root}") for root in self._allowed_roots)
 
 
 # the below aims to implement https://docs.databricks.com/en/files/index.html
 DFSA_PATTERNS = [
     DFSAPattern("dbfs:/", []),
-    DFSAPattern("file:/", ["Workspace", "tmp"]),
+    DFSAPattern("file:/", ["Workspace/", "tmp/"]),
     DFSAPattern("s3:/", []),
     DFSAPattern("s3n:/", []),
     DFSAPattern("s3a:/", []),
@@ -45,8 +51,8 @@ DFSA_PATTERNS = [
     DFSAPattern("abfs:/", []),
     DFSAPattern("abfss:/", []),
     DFSAPattern("hdfs:/", []),
-    DFSAPattern("/mnt:/", []),
-    DFSAPattern("/", ["Volumes", "Workspace", "tmp"]),
+    DFSAPattern("/mnt/", []),
+    RootPattern("/", ["Volumes/", "Workspace/", "tmp/"]),
 ]
 
 
@@ -62,16 +68,17 @@ class DFSANode:
     node: NodeNG
 
 
-class DetectDfsaVisitor(TreeVisitor):
+class _DetectDfsaVisitor(TreeVisitor):
     """
     Visitor that detects file system paths in Python code and checks them
     against a list of known deprecated paths.
     """
 
-    def __init__(self, session_state: CurrentSessionState) -> None:
+    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates: bool) -> None:
         self._session_state = session_state
         self._dfsa_nodes: list[DFSANode] = []
         self._reported_locations: set[tuple[int, int]] = set()
+        self._allow_spark_duplicates = allow_spark_duplicates
 
     def visit_call(self, node: Call):
         for arg in node.args:
@@ -95,6 +102,9 @@ class DetectDfsaVisitor(TreeVisitor):
     def _check_str_constant(self, source_node, inferred: InferredValue):
         if self._already_reported(source_node, inferred):
             return
+        # avoid duplicate advices that are reported by SparkSqlPyLinter
+        if Tree(source_node).is_from_module("spark") and not self._allow_spark_duplicates:
+            return
         value = inferred.as_string()
         if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
             self._dfsa_nodes.append(DFSANode(DFSA(value), source_node))
@@ -111,8 +121,9 @@ class DetectDfsaVisitor(TreeVisitor):
 
 class DFSAPyLinter(PythonLinter):
 
-    def __init__(self, session_state: CurrentSessionState):
+    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates = False):
         self._session_state = session_state
+        self._allow_spark_duplicates = allow_spark_duplicates
 
     @staticmethod
     def name() -> str:
@@ -125,7 +136,7 @@ class DFSAPyLinter(PythonLinter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        visitor = DetectDfsaVisitor(self._session_state)
+        visitor = _DetectDfsaVisitor(self._session_state, self._allow_spark_duplicates)
         visitor.visit(tree.node)
         for dfsa_node in visitor.dfsa_nodes:
             advisory = Deprecation.from_node(

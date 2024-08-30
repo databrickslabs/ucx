@@ -179,6 +179,8 @@ class Tree:
             return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
         if isinstance(self._node, Attribute):
             return Tree(self._node.expr).is_from_module(module_name)
+        if isinstance(self._node, Const):
+            return Tree(self._node.parent).is_from_module(module_name)
         return False
 
     def has_global(self, name: str) -> bool:

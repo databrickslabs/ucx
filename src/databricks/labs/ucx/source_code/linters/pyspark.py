@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -12,10 +13,13 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
 )
+from databricks.labs.ucx.source_code.linters.dfsa import DFSA_PATTERNS
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSQLLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
 
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Matcher(ABC):
@@ -178,18 +182,6 @@ class ReturnValueMatcher(Matcher):
 
 @dataclass
 class DirectFilesystemAccessMatcher(Matcher):
-    _DIRECT_FS_REFS = {
-        "s3a://",
-        "s3n://",
-        "s3://",
-        "wasb://",
-        "wasbs://",
-        "abfs://",
-        "abfss://",
-        "dbfs:/",
-        "hdfs://",
-        "file:/",
-    }
 
     def matches(self, node: NodeNG):
         return (
@@ -203,25 +195,17 @@ class DirectFilesystemAccessMatcher(Matcher):
         self, from_table: FromTableSQLLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if not isinstance(table_arg, Const):
-            return
-        if not table_arg.value:
-            return
-        if not isinstance(table_arg.value, str):
-            return
-        if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
-            yield Deprecation.from_node(
-                code='direct-filesystem-access',
-                message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
-                node=node,
-            )
-            return
-        if table_arg.value.startswith("/") and self._check_call_context(node):
-            yield Deprecation.from_node(
-                code='implicit-dbfs-usage',
-                message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
-                node=node,
-            )
+        for inferred in InferredValue.infer_from_node(table_arg):
+            if not inferred.is_inferred():
+                logger.debug(f"Could not infer value of {table_arg.as_string()}")
+                continue
+            value = inferred.as_string()
+            if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
+                yield Deprecation.from_node(
+                    code='direct-file-system-access',
+                    message=f"The use of direct file system access is deprecated: {value}",
+                    node=node,
+                )
 
     def apply(self, from_table: FromTableSQLLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply

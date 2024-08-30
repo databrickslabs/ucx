@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from databricks.sdk.service.workspace import Language
+
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
@@ -61,10 +63,15 @@ class Expectation:
             end_line=advice.end_line,
         )
 
-
 class Functional:
-    _re = re.compile(
-        r"# ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
+
+    _UCX_REG_EX = r"ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
+
+    _sql_ucx_re = re.compile(
+        r"-- " + _UCX_REG_EX
+    )
+    _python_ucx_re = re.compile(
+        r"# " + _UCX_REG_EX
     )
     _re_session_state = re.compile(r'# ucx\[session-state] (?P<session_state_json>\{.*})')
 
@@ -144,9 +151,9 @@ class Functional:
         linter = FileLinter(ctx, path_lookup, session_state, self.path, inherited_tree)
         return linter.lint()
 
-    def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
+    def _regex_match(self, regex: re.Pattern[str], language: Language) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
         with self.path.open('rb') as f:
-            for comment in self._comments(f):
+            for comment in self._comments(f, language):
                 if not comment.text.startswith('# ucx['):
                     continue
                 match = regex.match(comment.text)
@@ -156,7 +163,9 @@ class Functional:
                 yield comment, groups
 
     def _expected_problems(self) -> Generator[Expectation, None, None]:
-        for comment, groups in self._regex_match(self._re):
+        language = Language.PYTHON if self.path.suffix.endswith("py") else Language.SQL
+        regex = self._python_ucx_re if language is Language.PYTHON else self._sql_ucx_re
+        for comment, groups in self._regex_match(regex, language):
             reported_start_line = groups['start_line']
             if '+' in reported_start_line:
                 start_line = int(reported_start_line[1:]) + comment.start_line
@@ -187,11 +196,18 @@ class Functional:
         return CurrentSessionState.from_json(json.loads(json_str))
 
     @staticmethod
-    def _comments(f) -> Generator[Comment, None, None]:
-        for token in tokenize.tokenize(f.readline):
-            if token.type != tokenize.COMMENT:
-                continue
-            yield Comment.from_token(token)
+    def _comments(f, language: Language) -> Generator[Comment, None, None]:
+        if language is Language.PYTHON:
+            for token in tokenize.tokenize(f.readline):
+                if token.type != tokenize.COMMENT:
+                    continue
+                yield Comment.from_token(token)
+            return
+        if language is Language.SQL:
+            for idx, line in enumerate(f.readlines()):
+                if not line.startswith("--"):
+                    continue
+                yield Comment(text=line, start_line=idx, end_line=idx)
 
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
@@ -217,9 +233,9 @@ def test_functional_with_parent(child: str, parent: str, mock_path_lookup, simpl
     sample.verify(path_lookup, simple_dependency_resolver)
 
 
-@pytest.mark.skip(reason="Used for troubleshooting failing tests")
+# @pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup, simple_dependency_resolver):
-    path = mock_path_lookup.resolve(Path("functional/widgets.py"))
+    path = mock_path_lookup.resolve(Path("functional/file-access/sql-notebook-with-embedded-python.sql"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)
     sample.verify(path_lookup, simple_dependency_resolver)

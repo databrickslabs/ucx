@@ -1095,7 +1095,7 @@
     "boto3": [],
     "boto3.s3": [
       {
-        "code": "direct-filesystem-access",
+        "code": "direct-file-system-access",
         "message": "AWS IAM Instance Profiles are not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
       }
     ]
@@ -24935,7 +24935,7 @@
   "s3fs": {
     "s3fs": [
       {
-        "code": "direct-filesystem-access",
+        "code": "direct-file-system-access",
         "message": "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
       }
     ]
@@ -24943,7 +24943,7 @@
   "s3transfer": {
     "s3transfer": [
       {
-        "code": "direct-filesystem-access",
+        "code": "direct-file-system-access",
         "message": "S3Transfer library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
       }
     ]

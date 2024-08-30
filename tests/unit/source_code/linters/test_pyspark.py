@@ -54,8 +54,8 @@ for i in range(10):
 """
     assert list(sqf.lint(old_code)) == [
         Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: s3://bucket/path',
+            code='direct-file-system-access',
+            message='The use of direct file system access is deprecated: s3://bucket/path',
             start_line=1,
             start_col=0,
             end_line=1,
@@ -85,8 +85,8 @@ for i in range(10):
 """
     assert list(sqf.lint(old_code)) == [
         Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
+            code='direct-file-system-access',
+            message='The use of direct file system access is deprecated: ' 's3://bucket/path',
             start_line=1,
             start_col=0,
             end_line=1,
@@ -143,8 +143,8 @@ for i in range(10):
             """dbutils.fs.ls("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -157,8 +157,8 @@ for i in range(10):
             """dbutils.fs.cp("s3n://bucket/path", "s3n://another_bucket/another_path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3n://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3n://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -171,8 +171,8 @@ for i in range(10):
             """dbutils.fs.rm("s3://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -185,8 +185,8 @@ for i in range(10):
             """dbutils.fs.head("wasb://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: wasb://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: wasb://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -199,8 +199,8 @@ for i in range(10):
             """dbutils.fs.put("wasbs://bucket/path", "data")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: wasbs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -213,8 +213,8 @@ for i in range(10):
             """dbutils.fs.mkdirs("abfs://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: abfs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: abfs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -227,8 +227,8 @@ for i in range(10):
             """dbutils.fs.mv("wasb://bucket/path", "wasb://another_bucket/another_path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: wasb://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: wasb://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -241,8 +241,8 @@ for i in range(10):
             """spark.read.text("wasbs://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: wasbs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -255,8 +255,8 @@ for i in range(10):
             """spark.read.csv("abfs://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: abfs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: abfs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -275,8 +275,8 @@ for i in range(10):
   .save())""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message='The use of direct filesystem references is deprecated: '
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: '
                     "s3a://your_bucket_name/your_directory/",
                     start_line=1,
                     start_col=1,
@@ -290,8 +290,8 @@ for i in range(10):
             """spark.read.json("abfss://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: abfss://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: abfss://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -304,8 +304,8 @@ for i in range(10):
             """spark.read.orc("dbfs://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: dbfs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: dbfs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -318,8 +318,8 @@ for i in range(10):
             """spark.read.parquet("hdfs://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: hdfs://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: hdfs://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -332,8 +332,8 @@ for i in range(10):
             """spark.write.save("file://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: file://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: file://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -346,8 +346,8 @@ for i in range(10):
             """spark.read.load("/bucket/path")""",
             [
                 Deprecation(
-                    code='implicit-dbfs-usage',
-                    message="The use of default dbfs: references is deprecated: /bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: /bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -360,8 +360,8 @@ for i in range(10):
             """spark.addFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -374,8 +374,8 @@ for i in range(10):
             """spark.binaryFiles("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -388,8 +388,8 @@ for i in range(10):
             """spark.binaryRecords("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -402,8 +402,8 @@ for i in range(10):
             """spark.dump_profiles("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -416,8 +416,8 @@ for i in range(10):
             """spark.hadoopFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -430,8 +430,8 @@ for i in range(10):
             """spark.newAPIHadoopFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -444,8 +444,8 @@ for i in range(10):
             """spark.pickleFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -458,8 +458,8 @@ for i in range(10):
             """spark.saveAsHadoopFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -472,8 +472,8 @@ for i in range(10):
             """spark.saveAsNewAPIHadoopFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -486,8 +486,8 @@ for i in range(10):
             """spark.saveAsPickleFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -500,8 +500,8 @@ for i in range(10):
             """spark.saveAsSequenceFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -514,8 +514,8 @@ for i in range(10):
             """spark.saveAsTextFile("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -528,8 +528,8 @@ for i in range(10):
             """spark.load_from_path("s3a://bucket/path")""",
             [
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
+                    code='direct-file-system-access',
+                    message="The use of direct file system access is deprecated: s3a://bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -559,12 +559,12 @@ FS_FUNCTIONS = [
 
 
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
-def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
+def test_direct_cloud_access_to_tmp_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
     ftf = FromTableSQLLinter(empty_index, session_state)
     sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
-    code = f"""spark.{fs_function}("/bucket/path")"""
+    code = f"""spark.{fs_function}("/tmp/bucket/path")"""
     advisories = list(sqf.lint(code))
     assert not advisories
 

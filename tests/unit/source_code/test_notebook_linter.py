@@ -11,119 +11,6 @@ index = MigrationIndex([])
 @pytest.mark.parametrize(
     "lang, source, expected",
     [
-        # 2 alerts
-        (
-            Language.SQL,
-            """-- Databricks notebook source
--- MAGIC %md # This is a SQL notebook, that has Python cell embedded
-
--- COMMAND ----------
-
-SELECT * FROM csv.`dbfs:/mnt/whatever`
-
-
-
-
-
--- COMMAND ----------
-
--- MAGIC %python
--- MAGIC display(spark.read.csv('/mnt/things/e/f/g'))
-""",
-            [
-                Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/whatever',
-                    start_line=5,
-                    start_col=0,
-                    end_line=5,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='implicit-dbfs-usage',
-                    message='The use of default dbfs: references is deprecated: /mnt/things/e/f/g',
-                    start_line=14,
-                    start_col=8,
-                    end_line=14,
-                    end_col=43,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /mnt/things/e/f/g',
-                    start_line=14,
-                    start_col=23,
-                    end_line=14,
-                    end_col=42,
-                ),
-            ],
-        ),
-        (
-            Language.PYTHON,
-            # 3 alerts
-            """# Databricks notebook source
-# MAGIC %md # This is a Python notebook, that has SQL cell embedded
-
-# COMMAND ----------
-
-display(spark.read.csv('/mnt/things/e/f/g'))
-
-# COMMAND ----------
-
-# MAGIC %sql  SELECT * FROM csv.`dbfs:/mnt/foo`
-
-# COMMAND ----------
-
-# MAGIC %md mess around with formatting
-
-
-
-
-# COMMAND ----------
-
-
-# MAGIC %sql
-# MAGIC SELECT * FROM
-# MAGIC   csv.`dbfs:/mnt/bar/e/f/g`
-# MAGIC WHERE _c1 > 5
-
-
-
-""",
-            [
-                Deprecation(
-                    code='implicit-dbfs-usage',
-                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
-                    start_line=5,
-                    start_col=8,
-                    end_line=5,
-                    end_col=43,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /mnt/things/e/f/g',
-                    start_line=5,
-                    start_col=23,
-                    end_line=5,
-                    end_col=42,
-                ),
-                Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/foo',
-                    start_line=9,
-                    start_col=0,
-                    end_line=9,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g',
-                    start_line=21,
-                    start_col=0,
-                    end_line=21,
-                    end_col=1024,
-                ),
-            ],
-        ),
         (
             Language.SQL,
             """-- Databricks notebook source
@@ -171,136 +58,161 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
     """,
             [
                 Deprecation(
-                    code='implicit-dbfs-usage',
-                    message='The use of default dbfs: references is deprecated: /mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /mnt/foo/bar',
                     start_line=15,
                     start_col=0,
                     end_line=15,
                     end_col=34,
                 ),
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message='The use of direct filesystem references is deprecated: dbfs:/mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs:/mnt/foo/bar',
                     start_line=16,
                     start_col=0,
                     end_line=16,
                     end_col=39,
                 ),
                 Deprecation(
-                    code='direct-filesystem-access',
-                    message='The use of direct filesystem references is deprecated: dbfs://mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs://mnt/foo/bar',
                     start_line=17,
                     start_col=0,
                     end_line=17,
                     end_col=40,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: dbfs:/...',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs:/...',
+                    start_line=19,
+                    start_col=0,
+                    end_line=19,
+                    end_col=24,
+                ),
+
+                Deprecation(
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs:/...',
                     start_line=7,
                     start_col=7,
                     end_line=7,
                     end_col=18,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /dbfs/mnt',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /dbfs/mnt',
                     start_line=8,
                     start_col=7,
                     end_line=8,
                     end_col=18,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /mnt/',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /mnt/',
                     start_line=9,
                     start_col=7,
                     end_line=9,
                     end_col=14,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: dbfs:/...',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs:/...',
                     start_line=10,
                     start_col=7,
                     end_line=10,
                     end_col=18,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /dbfs/mnt/data',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /dbfs/mnt/data',
                     start_line=11,
                     start_col=10,
                     end_line=11,
                     end_col=26,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /dbfs/mnt/data',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /data',
+                    start_line=12,
+                    start_col=10,
+                    end_line=12,
+                    end_col=17,
+                ),
+                Deprecation(
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /dbfs/mnt/data',
                     start_line=13,
                     start_col=10,
                     end_line=13,
                     end_col=26,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: /mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /data',
+                    start_line=13,
+                    start_col=28,
+                    end_line=13,
+                    end_col=35,
+                ),
+                Deprecation(
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: /mnt/foo/bar',
                     start_line=15,
                     start_col=19,
                     end_line=15,
                     end_col=33,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: dbfs:/mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs:/mnt/foo/bar',
                     start_line=16,
                     start_col=19,
                     end_line=16,
                     end_col=38,
                 ),
                 Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path: dbfs://mnt/foo/bar',
+                    code='direct-file-system-access',
+                    message='The use of direct file system access is deprecated: dbfs://mnt/foo/bar',
                     start_line=17,
                     start_col=19,
                     end_line=17,
                     end_col=39,
                 ),
                 Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: dbfs:/...',
+                    code='direct-file-system-access-in-sql-query',
+                    message='The use of direct file system access is deprecated: dbfs:/...',
                     start_line=22,
                     start_col=0,
                     end_line=22,
                     end_col=1024,
                 ),
                 Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: /mnt/...',
+                    code='direct-file-system-access-in-sql-query',
+                    message='The use of direct file system access is deprecated: /mnt/...',
                     start_line=27,
                     start_col=0,
                     end_line=27,
                     end_col=1024,
                 ),
                 Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: /a/b/c',
+                    code='direct-file-system-access-in-sql-query',
+                    message='The use of direct file system access is deprecated: /a/b/c',
                     start_line=31,
                     start_col=0,
                     end_line=31,
                     end_col=1024,
                 ),
                 Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: /...',
+                    code='direct-file-system-access-in-sql-query',
+                    message='The use of direct file system access is deprecated: /...',
                     start_line=35,
                     start_col=0,
                     end_line=35,
                     end_col=1024,
                 ),
                 Deprecation(
-                    code='dbfs-read-from-sql-query',
-                    message='The use of DBFS is deprecated: /dbfs/...',
+                    code='direct-file-system-access-in-sql-query',
+                    message='The use of direct file system access is deprecated: /dbfs/...',
                     start_line=39,
                     start_col=0,
                     end_line=39,

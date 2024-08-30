@@ -1,7 +1,21 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.linters.dfsa import DFSAPyLinter, DFSASQLLinter
+from databricks.labs.ucx.source_code.linters.dfsa import DFSAPyLinter, DFSASQLLinter, DFSA_PATTERNS
+
+
+"""see https://github.com/databrickslabs/ucx/issues/2350"""
+@pytest.mark.parametrize(
+    "path, matches", [
+        ("/mnt/foo/bar",True),
+        ("dbfs:/mnt/foo/bar",True),
+        ("s3a://bucket1/folder1", True),
+        ("/dbfs/mnt/foo/bar",True),
+        ("/tmp/foo", False),
+    ])
+def test_matches_dfs_pattern(path, matches):
+    matched = any(pattern.matches(path) for pattern in DFSA_PATTERNS)
+    assert matches == matched
 
 
 @pytest.mark.parametrize(
@@ -16,7 +30,7 @@ from databricks.labs.ucx.source_code.linters.dfsa import DFSAPyLinter, DFSASQLLi
     ],
 )
 def test_detects_dfsa_paths(code, expected):
-    linter = DFSAPyLinter(CurrentSessionState())
+    linter = DFSAPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = list(linter.lint(code))
     for advice in advices:
         assert isinstance(advice, Advice)
@@ -46,7 +60,7 @@ for system in systems:
     ],
 )
 def test_dfsa_usage_linter(code, expected):
-    linter = DFSAPyLinter(CurrentSessionState())
+    linter = DFSAPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = linter.lint(code)
     count = 0
     for advice in advices:
