@@ -537,7 +537,7 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
-    assert len(target_principals) == 0, f"Missing grant for user {user.user_name}"
+    assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
     assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
