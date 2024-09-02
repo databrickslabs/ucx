@@ -104,20 +104,6 @@ def sync_workspace_info(a: AccountClient):
     ctx.account_workspaces.sync_workspace_info()
 
 
-@ucx.command
-def upload(
-    file: Path | str,
-    w: WorkspaceClient,
-    run_as_collection: bool = False,
-    a: AccountClient | None = None,
-):
-    """Upload a file to the (collection of) workspace(s)"""
-    file = Path(file)
-    logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
-    for ctx in _get_workspace_contexts(w, a, run_as_collection):
-        ctx.installation.upload(file.name, file.read_bytes())
-
-
 @ucx.command(is_account=True)
 def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
     """Report compatibility of all workspaces available in the account"""
@@ -545,6 +531,20 @@ def join_collection(a: AccountClient, workspace_ids: str):
     account_installer = AccountInstaller(a)
     w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
     account_installer.join_collection(w_ids)
+
+
+@ucx.command
+def upload(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
+    """Upload a file to the (collection of) workspace(s)"""
+    file = Path(file)
+    logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
+    for ctx in _get_workspace_contexts(w, a, run_as_collection):
+        ctx.installation.upload(file.name, file.read_bytes())
 
 
 @ucx.command
