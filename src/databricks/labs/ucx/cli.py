@@ -538,12 +538,11 @@ def upload(
     file: Path | str,
     w: WorkspaceClient,
     run_as_collection: bool = False,
-    a: AccountClient | None = None,
 ):
     """Upload a file to the (collection of) workspace(s)"""
     file = Path(file)
     logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
-    contexts = _get_workspace_contexts(w, a, run_as_collection)
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection)
     for ctx in contexts:
         ctx.installation.upload(file.name, file.read_bytes())
     if len(contexts) > 0:
