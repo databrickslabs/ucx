@@ -570,16 +570,15 @@ def download(
             try:
                 # Installation does not have a download method
                 csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
-                new_header = csv_binary.readline()
+                csv_header_next = csv_binary.readline()
                 if csv_header is None:
-                    csv_header = new_header
+                    csv_header = csv_header_next
                     f.write(csv_header)
-                    f.write(csv_binary.read())
-                elif csv_header == new_header:
+                elif csv_header == csv_header_next:
                     f.write(b"\n")
-                    f.write(csv_binary.read())
                 else:
                     raise ValueError("CSV files have different headers")
+                f.write(csv_binary.read())
             except NotFound:
                 logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
     if csv_header is None:
