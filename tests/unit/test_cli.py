@@ -142,7 +142,7 @@ def workspace_clients(ws1, ws2) -> list[WorkspaceClient]:
 
 
 @pytest.fixture
-def acc_client(acc_client: AccountClient, workspace_clients: list[WorkspaceClient]) -> AccountClient:
+def acc_client(acc_client: Mock, workspace_clients: list[WorkspaceClient]) -> Mock:
     acc_client.workspaces.get.side_effect = lambda workspace_id: Workspace(workspace_id=workspace_id)
 
     def get_workspace_client(workspace: Workspace) -> WorkspaceClient:
