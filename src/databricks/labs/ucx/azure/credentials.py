@@ -5,7 +5,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest
-from databricks.sdk.errors.platform import InvalidParameterValue
+from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied, NotFound
 from databricks.sdk.service.catalog import (
     AzureManagedIdentityRequest,
     AzureServicePrincipal,
@@ -264,19 +264,29 @@ class ServicePrincipalMigration(SecretsMixin):
                     f"Service principal '{spn.permission_mapping.principal}' accesses storage account "
                     f"'{spn.permission_mapping.prefix}' with non-Allow network configuration"
                 )
+            try:
 
-            storage_credential_info = self._storage_credential_manager.create_with_client_secret(spn)
-            validation_results = self._storage_credential_manager.validate(
-                storage_credential_info,
-                spn.permission_mapping.prefix,
-            )
-            execution_result.append(validation_results)
+                storage_credential_info = self._storage_credential_manager.create_with_client_secret(spn)
+                validation_results = self._storage_credential_manager.validate(
+                    storage_credential_info,
+                    spn.permission_mapping.prefix,
+                )
+                execution_result.append(validation_results)
+            except (PermissionDenied, NotFound, BadRequest) as e:
+                logger.error(
+                    "Error creating storage credentials. Please check error message and try again."
+                    "Rolling back storage credential that are created."
+                )
+                self._resource_permissions.delete_storage_credential(execution_result)
+                raise e
         return execution_result
 
-    def _create_storage_credentials_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
+    def _create_storage_credentials_for_storage_accounts(
+        self,
+    ) -> list[StorageCredentialValidationResult]:
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
-        execution_results = []
+        execution_results: list[StorageCredentialValidationResult] = []
         for access_connector, url in access_connectors:
             storage_credential_info = self._ws.storage_credentials.create(
                 access_connector.name,
@@ -288,6 +298,15 @@ class ServicePrincipalMigration(SecretsMixin):
                 validation_results = self._storage_credential_manager.validate(storage_credential_info, url)
             except BadRequest:
                 logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
+            except (PermissionDenied, NotFound):
+                logger.error(
+                    "Error creating access connectors. Please review the error message and resolve the issue before "
+                    "trying again. "
+                    "Removing successfully created storage credentials."
+                )
+                self._resource_permissions.delete_storage_credential(*execution_results)
+                delete_access_connectors = [access_connector for access_connector, _ in access_connectors]
+                self._resource_permissions.delete_access_connectors(*delete_access_connectors)
             else:
                 execution_results.append(validation_results)
 
@@ -298,7 +317,7 @@ class ServicePrincipalMigration(SecretsMixin):
             "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
             "account."
         )
-        ac_results = []
+        ac_results: list[StorageCredentialValidationResult] = []
         if plan_confirmed:
             ac_results = self._create_storage_credentials_for_storage_accounts()
 

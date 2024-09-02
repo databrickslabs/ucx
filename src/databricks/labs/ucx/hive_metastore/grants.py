@@ -1,14 +1,14 @@
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
-from dataclasses import dataclass
-from functools import partial
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, replace
+from functools import partial, cached_property
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist, NotFound
+from databricks.sdk.errors import ResourceDoesNotExist, NotFound, DatabricksError
 from databricks.sdk.service.catalog import (
     ExternalLocationInfo,
     SchemaInfo,
@@ -19,6 +19,7 @@ from databricks.sdk.service.catalog import (
 )
 from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -36,8 +37,11 @@ from databricks.labs.ucx.hive_metastore.locations import (
     Mount,
     Mounts,
 )
+from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -592,7 +596,7 @@ class PrincipalACL:
             grants.update(cluster_usage)
         return list(grants)
 
-    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
+    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]) -> str | None:
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
             return None
@@ -715,3 +719,136 @@ class PrincipalACL:
             if location.url == location_url:
                 return location.name
         return None
+
+
+class MigrateGrants:
+    def __init__(
+        self,
+        sql_backend: SqlBackend,
+        group_manager: GroupManager,
+        grant_loaders: list[Callable[[], Iterable[Grant]]],
+    ):
+        self._sql_backend = sql_backend
+        self._group_manager = group_manager
+        self._grant_loaders = grant_loaders
+
+    def apply(self, src: Table, uc_table_key: str) -> bool:
+        for grant in self._match_grants(src):
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
+            if acl_migrate_sql is None:
+                logger.warning(f"failed-to-migrate: Cannot identify UC grant for {src.kind} {uc_table_key}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
+            try:
+                self._sql_backend.execute(acl_migrate_sql)
+            except DatabricksError as e:
+                logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {uc_table_key}: {e}")
+        return True
+
+    @cached_property
+    def _workspace_to_account_group_names(self) -> dict[str, str]:
+        return {g.name_in_workspace: g.name_in_account for g in self._group_manager.snapshot()}
+
+    @cached_property
+    def _grants(self) -> list[Grant]:
+        grants = []
+        for loader in self._grant_loaders:
+            for grant in loader():
+                grants.append(grant)
+        return grants
+
+    def _match_grants(self, table: Table) -> list[Grant]:
+        matched_grants = []
+        for grant in self._grants:
+            if grant.database != table.database:
+                continue
+            if table.name not in (grant.table, grant.view):
+                continue
+            grant = self._replace_account_group(grant)
+            matched_grants.append(grant)
+        return matched_grants
+
+    def _replace_account_group(self, grant: Grant) -> Grant:
+        target_principal = self._workspace_to_account_group_names.get(grant.principal)
+        if not target_principal:
+            return grant
+        return replace(grant, principal=target_principal)
+
+
+class ACLMigrator:
+    def __init__(
+        self,
+        tables_crawler: TablesCrawler,
+        workspace_info: WorkspaceInfo,
+        migration_status_refresher: MigrationStatusRefresher,
+        migrate_grants: MigrateGrants,
+    ):
+        self._table_crawler = tables_crawler
+        self._workspace_info = workspace_info
+        self._migration_status_refresher = migration_status_refresher
+        self._migrate_grants = migrate_grants
+
+    def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
+        workspace_name = self._workspace_info.current()
+        tables = self._table_crawler.snapshot()
+        if not tables:
+            logger.info("No tables found to acl")
+            return
+        if hms_fed:
+            tables_to_migrate = self._get_hms_fed_tables(tables, target_catalog if target_catalog else workspace_name)
+        else:
+            tables_to_migrate = self._get_migrated_tables(tables)
+        self._migrate_acls(tables_to_migrate)
+
+    def _get_migrated_tables(self, tables: list[Table]) -> list[TableToMigrate]:
+        # gets all the migrated table to apply ACLs to
+        tables_to_migrate = []
+        seen_tables = self._migration_status_refresher.get_seen_tables()
+        reverse_seen_tables = {v: k for k, v in seen_tables.items()}
+        for table in tables:
+            if table.key not in reverse_seen_tables:
+                logger.warning(f"Table {table.key} not found in migration status. Skipping.")
+                continue
+            dst_table_parts = reverse_seen_tables[table.key].split(".")
+            if len(dst_table_parts) != 3:
+                logger.warning(
+                    f"Invalid table name {reverse_seen_tables[table.key]} found in migration status. Skipping."
+                )
+                continue
+            rule = Rule(
+                self._workspace_info.current(),
+                dst_table_parts[0],
+                table.database,
+                dst_table_parts[1],
+                table.name,
+                dst_table_parts[2],
+            )
+            table_to_migrate = TableToMigrate(table, rule)
+            tables_to_migrate.append(table_to_migrate)
+        return tables_to_migrate
+
+    def _get_hms_fed_tables(self, tables: list[Table], target_catalog) -> list[TableToMigrate]:
+        # if it is hms_fed acl migration, migrate all the acls for tables in the provided catalog
+        tables_to_migrate = []
+        for table in tables:
+            rule = Rule(
+                self._workspace_info.current(),
+                target_catalog,
+                table.database,
+                table.database,
+                table.name,
+                table.name,
+            )
+            table_to_migrate = TableToMigrate(table, rule)
+            tables_to_migrate.append(table_to_migrate)
+        return tables_to_migrate
+
+    def _migrate_acls(self, tables_in_scope: list[TableToMigrate]) -> None:
+        tasks = []
+        for table in tables_in_scope:
+            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table_key))
+        Threads.strict("migrate grants", tasks)
+
+    def _is_migrated(self, schema: str, table: str) -> bool:
+        index = self._migration_status_refresher.index()
+        return index.is_migrated(schema, table)

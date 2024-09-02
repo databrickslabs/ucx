@@ -25,6 +25,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -627,7 +628,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _fetcher(self) -> Iterable[MigratedGroup]:
         state = []
-        for row in self._backend.fetch(f"SELECT * FROM {self.full_name}"):
+        for row in self._backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             state.append(MigratedGroup(*row))
 
         if not self._include_group_names:

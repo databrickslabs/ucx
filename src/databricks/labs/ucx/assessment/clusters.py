@@ -25,9 +25,11 @@ from databricks.labs.ucx.assessment.crawlers import (
     INIT_SCRIPT_LOCAL_PATH,
     azure_sp_conf_present_check,
     spark_version_compatibility,
+    is_mlr,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,8 @@ class CheckClusterMixin(CheckInitScriptMixin):
             failures.append("No isolation shared clusters not supported in UC")
         if cluster.data_security_mode in unsupported_cluster_types:
             failures.append(f"cluster type not supported : {cluster.data_security_mode.value}")
+        if cluster.data_security_mode == DataSecurityMode.NONE and is_mlr(cluster.spark_version):
+            failures.append("Shared Machine Learning Runtime clusters are not supported in UC")
 
         return failures
 
@@ -174,7 +178,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[ClusterInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ClusterInfo(*row)
 
 
@@ -229,5 +233,5 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         return self._snapshot(self._try_fetch, self._crawl)
 
     def _try_fetch(self) -> Iterable[PolicyInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PolicyInfo(*row)

@@ -15,10 +15,12 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     file_loader = FileLoader()
     allow_list = KnownList()
     session_state = CurrentSessionState()
+    import_file_resolver = ImportFileResolver(file_loader, allow_list)
     dependency_resolver = DependencyResolver(
         PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
+        import_file_resolver,
+        import_file_resolver,
         mock_path_lookup,
     )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)

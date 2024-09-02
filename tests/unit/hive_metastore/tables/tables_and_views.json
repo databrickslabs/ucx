@@ -88,7 +88,10 @@
     "db": "db1",
     "table": "v14",
     "view_text": "select * from db1.v12"
+  },
+  {
+    "db": "db1",
+    "table": "v15",
+    "view_text": "select * from db1.v1, db1.t1"
   }
-
-
 ]

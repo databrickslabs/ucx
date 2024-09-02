@@ -52,6 +52,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     assert all_tables[view.full_name].object_type == "VIEW"
     assert all_tables[view.full_name].view_text == "SELECT 2+2 AS four"
     assert all_tables[view.full_name].what == What.VIEW
+    assert tables.load_one(view.schema_name, view.name).what == What.VIEW
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

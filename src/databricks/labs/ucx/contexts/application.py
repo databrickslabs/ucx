@@ -31,6 +31,8 @@ from databricks.labs.ucx.hive_metastore.grants import (
     GrantsCrawler,
     PrincipalACL,
     AwsACL,
+    MigrateGrants,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -241,13 +243,32 @@ class GlobalContext(abc.ABC):
     def tables_migrator(self):
         return TablesMigrator(
             self.tables_crawler,
-            self.grants_crawler,
             self.workspace_client,
             self.sql_backend,
             self.table_mapping,
-            self.group_manager,
             self.migration_status_refresher,
-            self.principal_acl,
+            self.migrate_grants,
+        )
+
+    @cached_property
+    def acl_migrator(self):
+        return ACLMigrator(
+            self.tables_crawler,
+            self.workspace_info,
+            self.migration_status_refresher,
+            self.migrate_grants,
+        )
+
+    @cached_property
+    def migrate_grants(self):
+        grant_loaders = [
+            self.grants_crawler.snapshot,
+            self.principal_acl.get_interactive_cluster_grants,
+        ]
+        return MigrateGrants(
+            self.sql_backend,
+            self.group_manager,
+            grant_loaders,
         )
 
     @cached_property
@@ -393,7 +414,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        return DependencyResolver(self.pip_resolver, self.notebook_resolver, self.file_resolver, self.path_lookup)
+        return DependencyResolver(
+            self.pip_resolver, self.notebook_resolver, self.file_resolver, self.file_resolver, self.path_lookup
+        )
 
     @cached_property
     def workflow_linter(self):

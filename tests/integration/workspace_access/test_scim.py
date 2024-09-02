@@ -24,7 +24,7 @@ def test_some_entitlements(
 ):
     ws_group = make_group()
     acc_group = make_acc_group()
-    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
     ws.groups.patch(
         ws_group.id,

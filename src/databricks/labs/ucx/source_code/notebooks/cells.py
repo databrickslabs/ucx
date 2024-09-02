@@ -25,7 +25,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
-    DbutilsLinter,
+    DbutilsPyLinter,
     ImportSource,
     NotebookRunCall,
     UnresolvedPath,
@@ -470,7 +470,7 @@ class PythonCodeAnalyzer:
         problems: list[DependencyProblem] = []
         tree = Tree.normalize_and_parse(self._python_code)
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        run_calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
         import_sources: list[ImportSource]
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)

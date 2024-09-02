@@ -171,6 +171,7 @@ def mock_workspace_client(
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    ws.get_workspace_id.return_value = 123
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
@@ -200,7 +201,9 @@ def mock_workspace_client(
             ]
         ),
     }
-    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    ws.workspace.download.side_effect = lambda file_name, *, format=None: io.StringIO(
+        download_yaml[os.path.basename(file_name)]
+    )
     return ws
 
 

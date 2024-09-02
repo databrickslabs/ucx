@@ -11,6 +11,7 @@ from databricks.labs.ucx.framework.crawlers import (
     Dataclass,
     DataclassInstance,
 )
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -131,7 +132,7 @@ class PermissionManager(CrawlerBase[Permissions]):
 
     def cleanup(self):
         logger.info(f"Cleaning up inventory table {self.full_name}")
-        self._exec(f"DROP TABLE IF EXISTS {self.full_name}")
+        self._exec(f"DROP TABLE IF EXISTS {escape_sql_identifier(self.full_name)}")
         logger.info("Inventory table cleanup complete")
 
     def _save(self, items: Sequence[Permissions]):

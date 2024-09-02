@@ -37,7 +37,7 @@ def test_udfs_returning_error_when_describing():
 
 def test_tables_crawler_should_filter_by_database():
     rows = {
-        "SHOW USER FUNCTIONS FROM hive_metastore.database": SHOW_FUNCTIONS[("hive_metastore.database.function1",),],
+        "SHOW USER FUNCTIONS FROM `hive_metastore`.`database`": SHOW_FUNCTIONS[("hive_metastore.database.function1",),],
     }
     backend = MockBackend(rows=rows)
     udf_crawler = UdfsCrawler(backend, "default", ["database"])

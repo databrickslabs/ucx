@@ -148,7 +148,7 @@ class Assessment(Workflow):
         who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
 
         It looks in:
-          - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
+          - the list of all the global init scripts are saved in the `$inventory.global_init_scripts` table."""
         ctx.global_init_scripts_crawler.snapshot()
 
     @job_task

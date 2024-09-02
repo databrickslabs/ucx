@@ -26,6 +26,16 @@ CANT_FIND_UCX_MSG = (
 )
 
 
+def get_contexts(
+    w: WorkspaceClient, a: AccountClient | None = None, run_as_collection: bool = False, **named_parameters
+) -> list[WorkspaceContext]:
+    if not a:
+        a = AccountClient(product='ucx', product_version=__version__)
+    account_installer = AccountInstaller(a)
+    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
+    return workspace_contexts
+
+
 @ucx.command
 def workflows(w: WorkspaceClient):
     """Show deployed workflows and their state"""
@@ -81,7 +91,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     ctx = WorkspaceContext(w)
     if table:
-        return ctx.table_mapping.skip_table(schema, table)
+        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
 
@@ -99,6 +109,14 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
+def validate_table_locations(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """Validate if the table locations are overlapping in a workspace and across workspaces"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.validate_table_locations()
 
 
 @ucx.command(is_account=True)
@@ -151,17 +169,10 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
-    if run_as_collection:
-        if not a:
-            a = AccountClient(product='ucx', product_version=__version__)
-        account_installer = AccountInstaller(a)
-        workspaces_context = account_installer.get_workspace_contexts(w.get_workspace_id())
-        # if running the cmd as a collection, dont wait for each assessment job to finish as that will take long time
-        skip_job_status = True
-    else:
-        skip_job_status = False
-        workspaces_context = [WorkspaceContext(w)]
-    for ctx in workspaces_context:
+    workspace_contexts = get_contexts(w, a, run_as_collection)
+    # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
+    skip_job_status = bool(run_as_collection)
+    for ctx in workspace_contexts:
         logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
         deployed_workflows = ctx.deployed_workflows
         if not deployed_workflows.validate_step("assessment"):
@@ -190,8 +201,8 @@ def validate_groups_membership(w: WorkspaceClient):
 def revert_migrated_tables(
     w: WorkspaceClient,
     prompts: Prompts,
-    schema: str,
-    table: str,
+    schema: str | None = None,
+    table: str | None = None,
     *,
     delete_managed: bool = False,
     ctx: WorkspaceContext | None = None,
@@ -203,9 +214,9 @@ def revert_migrated_tables(
             return
     if not ctx:
         ctx = WorkspaceContext(w)
-    revert = ctx.tables_migrator.print_revert_report(delete_managed=delete_managed)
+    revert = ctx.tables_migrator.print_revert_report(schema=schema, table=table, delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        ctx.tables_migrator.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        ctx.tables_migrator.revert_migrated_tables(schema=schema, table=table, delete_managed=delete_managed)
 
 
 @ucx.command
@@ -284,21 +295,34 @@ def create_uber_principal(
 
 
 @ucx.command
-def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
+def principal_prefix_access(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass subscription_id for azure and aws_profile for aws."""
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_resource_permissions.save_spn_permissions()
-    if ctx.is_aws:
-        instance_role_path = ctx.aws_resource_permissions.save_instance_profile_permissions()
-        logger.info(f"Instance profile and bucket info saved {instance_role_path}")
-        logger.info("Generating UC roles and bucket permission info")
-        return ctx.aws_resource_permissions.save_uc_compatible_roles()
+    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_azure:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.azure_resource_permissions.save_spn_permissions()
+        return
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            instance_role_path = workspace_ctx.aws_resource_permissions.save_instance_profile_permissions()
+            logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+            logger.info("Generating UC roles and bucket permission info")
+            workspace_ctx.aws_resource_permissions.save_uc_compatible_roles()
+        return
     raise ValueError("Unsupported cloud provider")
 
 
@@ -469,6 +493,21 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             f", do you want to run the migrate-external-tables-ctas workflow?"
         ):
             deployed_workflows.run_workflow("migrate-external-tables-ctas")
+
+
+@ucx.command
+def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **named_parameters):
+    """
+    Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
+    """
+    if ctx is None:
+        ctx = WorkspaceContext(w)
+    ctx.acl_migrator.migrate_acls(
+        target_catalog=named_parameters.get("target_catalog"),
+        legacy_table_acl=True,
+        principal=True,
+        hms_fed=named_parameters.get("hms_fed", False),
+    )
 
 
 @ucx.command

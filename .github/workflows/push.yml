@@ -79,7 +79,7 @@ jobs:
           DATABRICKS_TOKEN: any
 
       - name: Reformat SQL queries
-        run: databricks labs lsql fmt
+        run: databricks labs lsql fmt --normalize-case false
 
       - name: Fail on differences
         run: |
