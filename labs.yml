@@ -44,7 +44,6 @@ commands:
     description: upload workspace config to all workspaces in the account where ucx is installed
 
   - name: upload
-    is_account_level: true
     description: upload file to all workspaces in the account where ucx is installed
     flags:
       - name: file
