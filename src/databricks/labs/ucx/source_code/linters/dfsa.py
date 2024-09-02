@@ -148,9 +148,7 @@ class DfsaPyLinter(PythonLinter):
             yield advisory
 
 
-class DbfsUsageSqlLinter(SqlLinter):
-    def __init__(self):
-        self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
+class DfsaSqlLinter(SqlLinter):
 
     @staticmethod
     def name() -> str:
