@@ -802,6 +802,12 @@ def test_join_collection():
     w.workspace.download.assert_not_called()
 
 
+def test_download_raises_value_error_if_not_downloading_a_csv(ws1):
+    with pytest.raises(ValueError) as e:
+        download(Path("test.txt"), ws1)
+    assert "Command only supported for CSV files" in str(e)
+
+
 @pytest.mark.parametrize("run_as_collection", [False, True])
 def test_download_calls_workspace_download(tmp_path, workspace_clients, acc_client, run_as_collection):
     if not run_as_collection:
