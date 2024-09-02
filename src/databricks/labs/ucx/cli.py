@@ -352,9 +352,6 @@ def delete_missing_principals(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
-    single_role: bool = False,
-    role_name="UC_ROLE",
-    policy_name="UC_POLICY",
     **named_parameters,
 ):
     """Not supported for Azure.
@@ -364,9 +361,7 @@ def delete_missing_principals(
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
     if ctx.is_aws:
-        return ctx.iam_role_creation.delete_missing_principal(
-            prompts, single_role=single_role, role_name=role_name, policy_name=policy_name
-        )
+        return ctx.iam_role_creation.delete_uc_roles(prompts)
     raise ValueError("Unsupported cloud provider")
 
 

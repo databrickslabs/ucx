@@ -53,6 +53,7 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    delete_missing_principals,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -742,3 +743,14 @@ def test_join_collection():
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
     join_collection(a, "123")
     w.workspace.download.assert_not_called()
+
+
+def test_delete_principals(ws):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    resource_permissions = create_autospec(AWSResourcePermissions)
+    resource_permissions.delete_uc_role.return_value = []
+    ctx = WorkspaceContext(ws).replace(aws_resource_permissions=resource_permissions, workspace_client=ws)
+    prompts = MockPrompts({"Select the list of roles *": "0"})
+    delete_missing_principals(ws, prompts, ctx)
+    assert resource_permissions.delete_uc_role.assert_called_once

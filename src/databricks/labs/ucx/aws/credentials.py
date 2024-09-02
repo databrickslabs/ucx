@@ -244,16 +244,16 @@ class IamRoleCreation:
             storage_credential
             for storage_credential in storage_credentials
             if storage_credential.aws_iam_role is not None
-            and storage_credential.aws_iam_role.role_arn in selected_roles
+            and uc_role_dict[storage_credential.aws_iam_role.role_arn] in selected_roles
         ]
         for credential in matching_credentials:
             print(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role}")
-        if prompts.confirm(
+        if len(matching_credentials) == 0 or prompts.confirm(
             "The above storage credential will be impacted on deleting the selected IAM roles,"
             " Are you sure you want to confirm"
         ):
 
             logger.info("Deleting UCX created roles...")
-            for role in selected_roles:
-                logger.info(f"Deleting role {role.role_name}.")
-                self._resource_permissions.delete_uc_role(role)
+            for role_name in selected_roles:
+                logger.info(f"Deleting role {role_name}.")
+                self._resource_permissions.delete_uc_role(role_name)

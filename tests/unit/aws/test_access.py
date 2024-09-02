@@ -820,3 +820,63 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
     assert len(roles) == 1
     assert len(roles[0].paths) == 2
     external_locations.snapshot.assert_called_once()
+
+
+def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, locations):
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    aws.delete_role.return_value = []
+    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, locations)
+    mock_ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
+        )
+    ]
+    role_creation = IamRoleCreation(installation_multiple_roles, mock_ws, aws_resource_permissions)
+    prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
+    role_creation.delete_uc_roles(prompts)
+    assert aws.delete_role.assert_called
+
+
+def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, locations):
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    aws.delete_role.return_value = []
+    aws_resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, locations)
+    mock_ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
+        )
+    ]
+    role_creation = IamRoleCreation(installation_no_roles, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = [AWSRole("", "uc-role1", "123", "arn:aws:iam::12345:role/uc-role1")]
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket1",
+            )
+        ]
+    ]
+    aws.list_role_policies.return_value = ["Policy1"]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+    prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
+    role_creation.delete_uc_roles(prompts)
+    assert aws.delete_role.assert_called_once
+
+
+def test_delete_role(mock_ws, installation_no_roles):
+    def command_call(_: str):
+        return 0, '{"account":"1234"}', ""
+
+    aws = AWSResources("profile", command_call)
+    locations = create_autospec(ExternalLocations)
+    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, locations)
+    resource_permissions.delete_uc_role("uc_role_1")
