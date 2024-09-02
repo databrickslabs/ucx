@@ -820,3 +820,17 @@ def test_download_calls_workspace_download(workspace_clients, acc_client, run_as
             f"/Users/foo/.ucx/test.csv",
             format=ExportFormat.AUTO,
         )
+
+
+def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
+    expected = (
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table"
+        "\ntest,test,test,test,test,test"
+        "\ntest,test,test,test,test,test"
+    )
+    mapping_path = tmp_path / "mapping.csv"
+
+    download(mapping_path, workspace_clients[0], run_as_collection=True, a=acc_client,)
+
+    content = mapping_path.read_text()
+    assert content == expected
