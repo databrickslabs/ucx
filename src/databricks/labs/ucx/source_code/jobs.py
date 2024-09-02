@@ -20,7 +20,7 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
-from databricks.labs.ucx.source_code.base import CurrentSessionState, is_a_notebook, LocatedAdvice
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -28,8 +28,10 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     SourceContainer,
     WrappingLoader,
+    DependencyGraphWalker,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -389,9 +391,9 @@ class WorkflowLinter:
         return problems
 
     def _lint_task(self, task: jobs.Task, job: jobs.Job, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
-        dependency: Dependency = WorkflowTask(self._ws, task, job)
+        root_dependency: Dependency = WorkflowTask(self._ws, task, job)
         # we can load it without further preparation since the WorkflowTask is merely a wrapper
-        container = dependency.load(self._path_lookup)
+        container = root_dependency.load(self._path_lookup)
         assert isinstance(container, WorkflowTaskContainer)
         session_state = CurrentSessionState(
             data_security_mode=container.data_security_mode,
@@ -399,41 +401,43 @@ class WorkflowLinter:
             spark_conf=container.spark_conf,
             dbr_version=container.runtime_version,
         )
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup, session_state)
+        graph = DependencyGraph(root_dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
         if problems:
             for problem in problems:
                 source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
                 yield LocatedAdvice(problem.as_advisory(), source_path)
             return
-        for dependency in graph.root_dependencies:
-            root = dependency.path  # since it's a root
-            yield from self._lint_one(task, dependency, graph, root, session_state, linted_paths)
+        walker = LintingWalker(
+            graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
+        )
+        yield from walker
 
-    def _lint_one(
+
+class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+
+    def __init__(
         self,
-        task: jobs.Task,
-        dependency: Dependency,
         graph: DependencyGraph,
-        root_path: Path,
-        session_state: CurrentSessionState,
         linted_paths: set[Path],
+        path_lookup: PathLookup,
+        key: str,
+        session_state: CurrentSessionState,
+        migration_index: MigrationIndex,
+    ):
+        super().__init__(graph, linted_paths, path_lookup)
+        self._key = key
+        self._session_state = session_state
+        self._migration_index = migration_index
+
+    def _log_walk_one(self, dependency: Dependency):
+        logger.info(f'Linting {self._key} dependency: {dependency}')
+
+    def _process_dependency(
+        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
     ) -> Iterable[LocatedAdvice]:
-        if dependency.path in linted_paths:
-            return
-        linted_paths.add(dependency.path)
-        logger.info(f'Linting {task.task_key} dependency: {dependency}')
-        if dependency.path.is_file() or is_a_notebook(dependency.path):
-            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
-            ctx = LinterContext(self._migration_index, session_state)
-            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
-            # FileLinter will determine which file/notebook linter to use
-            linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
-            for advice in linter.lint():
-                yield LocatedAdvice(advice, dependency.path)
-        maybe_graph = graph.locate_dependency(dependency.path)
-        # problems have already been reported while building the graph
-        if maybe_graph.graph:
-            child_graph = maybe_graph.graph
-            for child_dependency in child_graph.local_dependencies:
-                yield from self._lint_one(task, child_dependency, child_graph, root_path, session_state, linted_paths)
+        ctx = LinterContext(self._migration_index, self._session_state)
+        # FileLinter determines which file/notebook linter to use
+        linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
+        for advice in linter.lint():
+            yield LocatedAdvice(advice, dependency.path)

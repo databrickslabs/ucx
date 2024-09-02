@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
-from databricks.labs.blueprint.paths import WorkspacePath
+from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -136,6 +137,35 @@ class Linter:
     def lint(self, code: str) -> Iterable[Advice]: ...
 
 
+class SqlLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        try:
+            expressions = parse_sql(code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self.lint_expression(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
+            yield self.sql_parse_failure(code)
+
+    @staticmethod
+    def sql_parse_failure(code: str):
+        return Failure(
+            code='sql-parse-error',
+            message=f"SQL expression is not supported yet: {code}",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=0,
+            start_col=0,
+            end_line=0,
+            end_col=1024,
+        )
+
+    @abstractmethod
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]: ...
+
+
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
@@ -201,13 +231,14 @@ class CurrentSessionState:
             return None
 
 
-class SequentialLinter(Linter):
-    def __init__(self, linters: list[Linter]):
+class SqlSequentialLinter(SqlLinter):
+
+    def __init__(self, linters: list[SqlLinter]):
         self._linters = linters
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]:
         for linter in self._linters:
-            yield from linter.lint(code)
+            yield from linter.lint_expression(expression)
 
 
 class PythonSequentialLinter(Linter):

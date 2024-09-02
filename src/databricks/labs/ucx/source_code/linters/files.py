@@ -7,6 +7,7 @@ import sys
 from typing import TextIO
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -27,6 +28,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
     InheritedContext,
+    DependencyGraphWalker,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,40 +143,32 @@ class LocalCodeLinter:
         is_dir = path.is_dir()
         loader = self._folder_loader if is_dir else self._file_loader
         path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
-        dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(dependency, None, self._dependency_resolver, path_lookup, self._session_state)
-        container = dependency.load(path_lookup)
+        root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
+        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
+        container = root_dependency.load(path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
+        context_factory = self._context_factory
+        session_state = self._session_state
+
+        class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+
+            def _process_dependency(
+                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+            ) -> Iterable[LocatedAdvice]:
+                ctx = context_factory()
+                # FileLinter will determine which file/notebook linter to use
+                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
+                for advice in linter.lint():
+                    yield LocatedAdvice(advice, dependency.path)
+
         if linted_paths is None:
             linted_paths = set()
-        for dependency in graph.root_dependencies:
-            root = dependency.path  # since it's a root
-            yield from self._lint_one(dependency, graph, root, linted_paths)
-
-    def _lint_one(
-        self, dependency: Dependency, graph: DependencyGraph, root_path: Path, linted_paths: set[Path]
-    ) -> Iterable[LocatedAdvice]:
-        if dependency.path in linted_paths:
-            return
-        linted_paths.add(dependency.path)
-        if dependency.path.is_file() or is_a_notebook(dependency.path):
-            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
-            ctx = self._context_factory()
-            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
-            # FileLinter will determine which file/notebook linter to use
-            linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
-            for advice in linter.lint():
-                yield advice.for_path(dependency.path)
-        maybe_graph = graph.locate_dependency(dependency.path)
-        # problems have already been reported while building the graph
-        if maybe_graph.graph:
-            child_graph = maybe_graph.graph
-            for child_dependency in child_graph.local_dependencies:
-                yield from self._lint_one(child_dependency, child_graph, root_path, linted_paths)
+        walker = LintingWalker(graph, linted_paths, self._path_lookup)
+        yield from walker
 
 
 class LocalFileMigrator:
