@@ -108,7 +108,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
 """,
     }
 
-    def download(path: str, *, format: ExportFormat | None = None) -> io.StringIO | io.BytesIO:
+    def mock_download(path: str, *, format: ExportFormat | None = None) -> io.StringIO | io.BytesIO:
         _ = format
         if path not in state:
             raise NotFound(path)
@@ -120,7 +120,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
     workspace_client.get_workspace_id.return_value = workspace_id
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
-    workspace_client.workspace.download.side_effect = download
+    workspace_client.workspace.download.side_effect = mock_download
     workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
