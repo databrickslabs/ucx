@@ -565,8 +565,8 @@ def download(
     contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
     csv_binaries = []
     for ctx in contexts:
+        remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
         try:
-            remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
             # Installation does not have an download method
             csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
             csv_binaries.append(csv_binary)
