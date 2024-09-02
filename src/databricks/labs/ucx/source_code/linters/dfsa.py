@@ -12,7 +12,8 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
     PythonLinter,
-    SqlLinter, DFSA,
+    SqlLinter,
+    DFSA,
 )
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue

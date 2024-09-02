@@ -1,6 +1,7 @@
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.source_code.base import DFSA
+from databricks.labs.ucx.source_code.dfsa_crawler import DfsaCrawler
 
 
 def test_crawler_appends_dfsas():
@@ -11,4 +12,3 @@ def test_crawler_appends_dfsas():
         crawler.append(dfsa)
     rows = backend.rows_written_for(crawler.full_name, "append")
     assert len(rows) == 3
-

@@ -15,6 +15,8 @@ from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
