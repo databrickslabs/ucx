@@ -567,7 +567,8 @@ def download(
         # Installation does not have an upload method
         remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
         try:
-            csv_binaries.append(ctx.workspace_client.workspace.download(remote_file_name))
+            csv_binary = ctx.workspace_client.workspace.download(remote_file_name)
+            csv_binaries.append(csv_binary)
         except NotFound:
             logger.warning(f"File {remote_file_name} not found in {ctx.workspace_client.config.host}")
     if len(csv_binaries) == 0:
