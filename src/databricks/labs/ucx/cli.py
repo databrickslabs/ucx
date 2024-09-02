@@ -563,25 +563,29 @@ def download(
     if not file.suffix == ".csv":
         raise ValueError("Command only supported for CSV files")
     contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
-    csv_binaries = []
-    for ctx in contexts:
-        remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
-        try:
-            # Installation does not have an download method
-            csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
-            csv_binaries.append(csv_binary)
-        except NotFound:
-            logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
-    if len(csv_binaries) == 0:
-        logger.warn(f"No file(s) to download found")
-        return
+    csv_header = None
     with file.open("wb") as f:
-        f.write(csv_binaries[0].read())
-        for csv_binary in csv_binaries[1:]:
-            csv_binary.readline()  # Skip header
-            f.write(b"\n")
-            f.write(csv_binary.read())
-    logger.info(f"Finished downloading {file}")
+        for ctx in contexts:
+            remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
+            try:
+                # Installation does not have an download method
+                csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
+                new_header = csv_binary.readline()
+                if csv_header is None:
+                    csv_header = new_header
+                    f.write(csv_header)
+                    f.write(csv_binary.read())
+                elif csv_header == new_header:
+                    f.write(b"\n")
+                    f.write(csv_binary.read())
+                else:
+                    raise ValueError("CSV files have different headers")
+            except NotFound:
+                logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
+    if csv_header is None:
+        logger.warn(f"No file(s) to download found")
+    else:
+        logger.info(f"Finished downloading {file}")
 
 
 @ucx.command
