@@ -579,6 +579,7 @@ def download(
         f.write(csv_binaries[0].read())
         for csv_binary in csv_binaries[1:]:
             csv_binary.readline()  # Skip header
+            f.write(b"\n")
             f.write(csv_binary.read())
     logger.info(f"Finished downloading {file}")
 
