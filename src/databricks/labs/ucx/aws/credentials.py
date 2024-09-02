@@ -236,9 +236,24 @@ class IamRoleCreation:
         if len(uc_roles) == 0:
             self._resource_permissions.save_uc_compatible_roles()
             uc_roles = self._resource_permissions.load_uc_compatible_roles()
-        uc_role_dict = {role.role_name: role.role_name for role in uc_roles}
+        storage_credentials = self._ws.storage_credentials.list()
+
+        uc_role_dict = {role.role_arn: role.role_name for role in uc_roles}
         selected_roles = prompts.multiple_choice_from_dict("Select the list of roles created by UCX", uc_role_dict)
-        logger.info("Deleting UCX created roles...")
-        for role in selected_roles:
-            logger.info(f"Deleting role {role.role_name}.")
-            self._resource_permissions.delete_uc_role(role)
+        matching_credentials = [
+            storage_credential
+            for storage_credential in storage_credentials
+            if storage_credential.aws_iam_role is not None
+            and storage_credential.aws_iam_role.role_arn in selected_roles
+        ]
+        for credential in matching_credentials:
+            print(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role}")
+        if prompts.confirm(
+            "The above storage credential will be impacted on deleting the selected IAM roles,"
+            " Are you sure you want to confirm"
+        ):
+
+            logger.info("Deleting UCX created roles...")
+            for role in selected_roles:
+                logger.info(f"Deleting role {role.role_name}.")
+                self._resource_permissions.delete_uc_role(role)
