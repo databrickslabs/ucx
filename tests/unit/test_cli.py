@@ -840,6 +840,19 @@ def test_download_warns_if_file_not_found(caplog, ws1, acc_client):
     assert "No file(s) to download found" in caplog.messages
 
 
+def test_download_deletes_empty_file(tmp_path, ws1, acc_client):
+    ws1.workspace.download.side_effect = NotFound("test.csv")
+    mapping_path = tmp_path / "mapping.csv"
+
+    download(
+        mapping_path,
+        ws1,
+        run_as_collection=False,
+        a=acc_client,
+    )
+    assert not mapping_path.is_file()
+
+
 def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
     expected = (
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table"
