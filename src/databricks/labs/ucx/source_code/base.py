@@ -334,3 +334,30 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         logger.warning(f"Could not read file {path}")
         return False
     return file_header == magic_header
+
+
+@dataclass
+class DFSA:
+    """A DFSA is a record describing a Direct File System Access"""
+
+    UNKNOWN = "unknown"
+
+    source_type: str
+    source_id: str
+    path: str
+    is_read: bool
+    is_write: bool
+
+    @property
+    def key(self) -> str:
+        return f"{self.source_type}.{self.source_id}.{self.path}".lower()  # TODO for now
+
+    @property
+    def safe_sql_key(self) -> str:
+        return escape_sql_identifier(self.key)
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, DFSA) and self.key == other.key

@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
     PythonLinter,
-    SqlLinter,
+    SqlLinter, DFSA,
 )
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -54,13 +54,6 @@ DFSA_PATTERNS = [
     DFSAPattern("/mnt/", []),
     RootPattern("/", ["Volumes/", "Workspace/", "tmp/"]),
 ]
-
-
-@dataclass
-class DFSA:
-    """A DFSA is a record describing a Direct File System Access"""
-
-    path: str
 
 
 @dataclass
