@@ -39,27 +39,29 @@ def test_detects_dfsa_paths(code, expected):
         assert isinstance(advice, Advice)
     assert len(advices) == expected
 
+
 @pytest.mark.parametrize(
     "code, expected",
     [
         ("load_data('/dbfs/mnt/data')", 1),
-    ("load_data('/data')", 1),
-    ("load_data('/dbfs/mnt/data', '/data')", 2),
+        ("load_data('/data')", 1),
+        ("load_data('/dbfs/mnt/data', '/data')", 2),
         ("# load_data('/dbfs/mnt/data', '/data')", 0),
         ('spark.read.parquet("/mnt/foo/bar")', 1),
         ('spark.read.parquet("dbfs:/mnt/foo/bar")', 1),
         ('spark.read.parquet("dbfs://mnt/foo/bar")', 1),
         ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 1),
-        ("""
+        (
+            """
 DBFS1="dbfs:/mnt/foo/bar1"
 systems=[DBFS1, "dbfs:/mnt/foo/bar2"]
 for system in systems:
     spark.read.parquet(system)
 """,
-                2,
-            ),
-        ],
-    )
+            2,
+        ),
+    ],
+)
 def test_dfsa_usage_linter(code, expected):
     linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = linter.lint(code)
