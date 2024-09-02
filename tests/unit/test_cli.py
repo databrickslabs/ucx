@@ -16,7 +16,7 @@ from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ImportFormat, ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ExportFormat, ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -31,6 +31,7 @@ from databricks.labs.ucx.cli import (
     create_missing_principals,
     create_table_mapping,
     create_uber_principal,
+    download,
     ensure_assessment_run,
     installations,
     join_collection,
@@ -798,3 +799,18 @@ def test_join_collection():
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
     join_collection(a, "123")
     w.workspace.download.assert_not_called()
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_download_calls_workspace_download(tmp_path, workspace_clients, acc_client, run_as_collection):
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    test_file = tmp_path / "test.csv"
+
+    download(test_file, workspace_clients[0], run_as_collection=run_as_collection, a=acc_client)
+
+    for ws in workspace_clients:
+        ws.workspace.download.assert_called_with(
+            f"/Users/foo/.ucx/{test_file.name}",
+            format=ExportFormat.AUTO,
+        )
