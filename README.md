@@ -100,6 +100,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`validate-table-locations` command](#validate-table-locations-command)
   * [`cluster-remap` command](#cluster-remap-command)
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
+  * [`upload` command](#upload-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
