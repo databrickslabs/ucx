@@ -105,7 +105,7 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command
-def upload(file: Path, w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
+def upload(file: Path | str, w: WorkspaceClient = None, run_as_collection: bool = False, a: AccountClient | None = None):
     """Upload a file to the (collection of) workspace(s)"""
     file = Path(file)
     logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
