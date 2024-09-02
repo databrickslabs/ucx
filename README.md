@@ -1409,6 +1409,17 @@ By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
 
+## `upload` command
+
+```text
+$ databricks labs ucx upload --file <file_path> --run-as-collection True
+21:31:29 WARNING [d.labs.ucx] The schema of CSV files is NOT validated, ensure it is correct
+21:31:29 INFO [d.labs.ucx] Finished uploading: <file_path>
+```
+
+Upload a file to a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when uploading the same file to multiple workspace.
+
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
 
