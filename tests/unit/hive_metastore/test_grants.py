@@ -1,9 +1,13 @@
+import logging
+from unittest.mock import create_autospec
+
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
 def test_type_and_key_table():
@@ -467,3 +471,30 @@ def test_crawler_should_filter_databases():
     grants = list(crawler.snapshot())
     assert len(grants) == 3
     assert 'SHOW TABLES FROM `hive_metastore`.`database_one`' in sql_backend.queries
+
+
+def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
+    group_manager = create_autospec(GroupManager)
+    table = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
+
+    def grant_loader() -> list[Grant]:
+        return [
+            Grant(
+                principal="user",
+                action_type="READ_METADATA",
+                catalog=table.catalog,
+                database=table.database,
+                table=table.name,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        MockBackend(),
+        group_manager,
+        [grant_loader],
+    )
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.grants"):
+        migrate_grants.apply(table, f"uc.{table.database}.{table.name}")
+    assert "failed-to-migrate: Cannot identify UC grant for hive metastore grant READ_METADATA on TABLE uc.database.table" in caplog.text
+    group_manager.assert_not_called()
