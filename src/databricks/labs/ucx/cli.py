@@ -583,7 +583,7 @@ def download(
             except NotFound:
                 logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
     if csv_header is None:
-        logger.warn(f"No file(s) to download found")
+        logger.warning("No file(s) to download found")
     else:
         logger.info(f"Finished downloading {file}")
 

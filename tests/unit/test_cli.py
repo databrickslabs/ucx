@@ -814,11 +814,16 @@ def test_download_calls_workspace_download(workspace_clients, acc_client, run_as
     if not run_as_collection:
         workspace_clients = [workspace_clients[0]]
 
-    download(Path("test.csv"), workspace_clients[0], run_as_collection=run_as_collection, a=acc_client,)
+    download(
+        Path("test.csv"),
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
 
     for ws in workspace_clients:
         ws.workspace.download.assert_called_with(
-            f"/Users/foo/.ucx/test.csv",
+            "/Users/foo/.ucx/test.csv",
             format=ExportFormat.AUTO,
         )
 
@@ -826,7 +831,12 @@ def test_download_calls_workspace_download(workspace_clients, acc_client, run_as
 def test_download_warns_if_file_not_found(caplog, ws1, acc_client):
     ws1.workspace.download.side_effect = NotFound("test.csv")
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.cli"):
-        download(Path("test.csv"), ws1, run_as_collection=False, a=acc_client,)
+        download(
+            Path("test.csv"),
+            ws1,
+            run_as_collection=False,
+            a=acc_client,
+        )
     assert "File not found for https://localhost: /Users/foo/.ucx/test.csv" in caplog.messages
     assert "No file(s) to download found" in caplog.messages
 
@@ -839,7 +849,12 @@ def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
     )
     mapping_path = tmp_path / "mapping.csv"
 
-    download(mapping_path, workspace_clients[0], run_as_collection=True, a=acc_client,)
+    download(
+        mapping_path,
+        workspace_clients[0],
+        run_as_collection=True,
+        a=acc_client,
+    )
 
     content = mapping_path.read_text()
     assert content == expected
