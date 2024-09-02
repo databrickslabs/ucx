@@ -561,7 +561,7 @@ def download(
     file = Path(file)
     if not file.suffix == ".csv":
         raise ValueError("Command only supported for CSV files")
-    contexts = get_contexts(w, run_as_collection=run_as_collection, a=a)
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
     csv_binaries = []
     for ctx in contexts:
         # Installation does not have an upload method
