@@ -571,7 +571,7 @@ def download(
             csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
             csv_binaries.append(csv_binary)
         except NotFound:
-            logger.warning(f"File {remote_file_name} not found in {ctx.workspace_client.config.host}")
+            logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
     if len(csv_binaries) == 0:
         logger.warn(f"No file(s) to download found")
         return
