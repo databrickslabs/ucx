@@ -30,7 +30,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     NotebookRunCall,
     UnresolvedPath,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")

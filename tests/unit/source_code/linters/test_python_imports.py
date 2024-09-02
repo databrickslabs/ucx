@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, D
 from databricks.labs.ucx.source_code.linters.files import FileLoader
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter, ImportSource, SysPathChange
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.cells import PythonCodeAnalyzer
 
 

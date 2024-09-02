@@ -35,7 +35,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     UnresolvedPath,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
