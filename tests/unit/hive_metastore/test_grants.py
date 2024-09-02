@@ -496,5 +496,8 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.grants"):
         migrate_grants.apply(table, f"uc.{table.database}.{table.name}")
-    assert "failed-to-migrate: Hive metastore grant 'READ_METADATA' cannot be mapped to UC grant for TABLE 'uc.database.table'" in caplog.text
+    assert (
+        "failed-to-migrate: Hive metastore grant 'READ_METADATA' cannot be mapped to UC grant for TABLE 'uc.database.table'"
+        in caplog.text
+    )
     group_manager.assert_not_called()
