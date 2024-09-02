@@ -872,11 +872,11 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     assert aws.delete_role.assert_called_once
 
 
-def test_delete_role(mock_ws, installation_no_roles):
+def test_delete_role(mock_ws, installation_no_roles, backend):
     def command_call(_: str):
         return 0, '{"account":"1234"}', ""
 
     aws = AWSResources("profile", command_call)
-    locations = create_autospec(ExternalLocations)
-    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, locations)
+    external_locations = ExternalLocations(mock_ws, backend, 'ucx')
+    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
