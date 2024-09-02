@@ -108,8 +108,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
 """,
     }
 
-    def mock_download(path: str, *, format: ExportFormat | None = None) -> io.StringIO | io.BytesIO:
-        _ = format
+    def mock_download(path: str, **_) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
         if ".csv" in path or ".log" in path:
