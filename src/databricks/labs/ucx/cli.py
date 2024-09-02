@@ -568,7 +568,7 @@ def download(
         for ctx in contexts:
             remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
             try:
-                # Installation does not have an download method
+                # Installation does not have a download method
                 csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
                 new_header = csv_binary.readline()
                 if csv_header is None:
