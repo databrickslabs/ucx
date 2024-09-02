@@ -809,15 +809,14 @@ def test_download_raises_value_error_if_not_downloading_a_csv(ws1):
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])
-def test_download_calls_workspace_download(tmp_path, workspace_clients, acc_client, run_as_collection):
+def test_download_calls_workspace_download(workspace_clients, acc_client, run_as_collection):
     if not run_as_collection:
         workspace_clients = [workspace_clients[0]]
-    test_file = tmp_path / "test.csv"
 
-    download(test_file, workspace_clients[0], run_as_collection=run_as_collection, a=acc_client)
+    download(Path("test.csv"), workspace_clients[0], run_as_collection=run_as_collection, a=acc_client,)
 
     for ws in workspace_clients:
         ws.workspace.download.assert_called_with(
-            f"/Users/foo/.ucx/{test_file.name}",
+            f"/Users/foo/.ucx/test.csv",
             format=ExportFormat.AUTO,
         )
