@@ -48,6 +48,8 @@ commands:
     flags:
       - name: file
         description: The file to upload
+      - name: run-as-collection
+        description: Run the command for the collection of workspace with ucx installed. Default is False.
 
   - name: report-account-compatibility
     is_account_level: true
