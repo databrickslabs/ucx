@@ -551,6 +551,37 @@ def upload(
 
 
 @ucx.command
+def download(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,  # Only used while testing
+):
+    """Download and merge a CSV file from the ucx installation in a (collection of) workspace(s)"""
+    file = Path(file)
+    if not file.suffix == ".csv":
+        raise ValueError("Command only supported for CSV files")
+    contexts = get_contexts(w, run_as_collection=run_as_collection, a=a)
+    csv_binaries = []
+    for ctx in contexts:
+        # Installation does not have an upload method
+        remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
+        try:
+            csv_binaries.append(ctx.workspace_client.workspace.download(remote_file_name))
+        except NotFound:
+            logger.warning(f"File {remote_file_name} not found in {ctx.workspace_client.config.host}")
+    if len(csv_binaries) == 0:
+        logger.warn(f"No file(s) to download found")
+        return
+    with file.open("wb") as f:
+        f.write(csv_binaries[0].read())
+        for csv_binary in csv_binaries[1:]:
+            csv_binary.readline()  # Skip header
+            f.write(csv_binary.read())
+    logger.info(f"Finished downloading {file}")
+
+
+@ucx.command
 def lint_local_code(
     w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
 ):
