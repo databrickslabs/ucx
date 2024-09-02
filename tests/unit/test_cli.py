@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import time
 from pathlib import Path
 from unittest.mock import create_autospec, patch, Mock
@@ -820,6 +821,13 @@ def test_download_calls_workspace_download(workspace_clients, acc_client, run_as
             f"/Users/foo/.ucx/test.csv",
             format=ExportFormat.AUTO,
         )
+
+
+def test_download_warns_if_file_not_found(caplog, ws1, acc_client):
+    ws1.workspace.download.side_effect = NotFound("test.csv")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.cli"):
+        download(Path("test.csv"), ws1, run_as_collection=False, a=acc_client,)
+    assert "File not found for https://localhost: /Users/foo/.ucx/test.csv" in caplog.text
 
 
 def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
