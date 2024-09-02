@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, 
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
 
@@ -321,9 +321,11 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
-    assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
+    assert (
+        view1_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}`"
+    )
     view2_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view2.name}").view_definition
-    assert view2_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_view1.name}"
+    assert view2_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_view1.name}`"
     view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
     assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
 
@@ -370,30 +372,76 @@ def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catalog):
-    src_schema1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_schema2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    table_to_migrate = runtime_ctx.make_table(schema_name=src_schema1.name)
-    table_databricks_dataset = runtime_ctx.make_table(
-        schema_name=src_schema1.name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
+    # using lists to avoid MyPi 'too-many-variables' error
+    src_schemas = [
+        runtime_ctx.make_schema(catalog_name="hive_metastore"),
+        runtime_ctx.make_schema(catalog_name="hive_metastore"),
+    ]
+    src_tables = [
+        runtime_ctx.make_table(schema_name=src_schemas[0].name),  # table to migrate
+        runtime_ctx.make_table(
+            schema_name=src_schemas[0].name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
+        ),  # table databricks dataset
+        runtime_ctx.make_table(schema_name=src_schemas[0].name),  # table to skip
+        runtime_ctx.make_table(schema_name=src_schemas[1].name),  # table in skipped database
+    ]
+    src_tables.extend(
+        [
+            runtime_ctx.make_table(
+                schema_name=src_schemas[0].name,
+                ctas=f"SELECT * FROM {src_tables[0].full_name}",
+                view=True,
+            ),  # view to migrate
+            runtime_ctx.make_table(
+                schema_name=src_schemas[0].name,
+                ctas=f"SELECT * FROM {src_tables[2].full_name}",
+                view=True,
+            ),  # view to skip
+            runtime_ctx.make_table(
+                schema_name=src_schemas[1].name,
+                ctas=f"SELECT * FROM {src_tables[3].full_name}",
+                view=True,
+            ),  # view in schema to skip
+        ]
     )
-    table_to_skip = runtime_ctx.make_table(schema_name=src_schema1.name)
-    table_in_skipped_database = runtime_ctx.make_table(schema_name=src_schema2.name)
 
     dst_catalog = make_catalog()
-    dst_schema1 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
-    dst_schema2 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+    dst_schemas = [
+        runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name) for src_schema in src_schemas
+    ]
 
     rules = [
-        Rule.from_src_dst(table_to_migrate, dst_schema1),
-        Rule.from_src_dst(table_to_skip, dst_schema1),
-        Rule.from_src_dst(table_databricks_dataset, dst_schema1),
-        Rule.from_src_dst(table_in_skipped_database, dst_schema2),
+        Rule.from_src_dst(src_tables[0], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[1], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[2], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[3], dst_schemas[1]),
+        Rule.from_src_dst(src_tables[4], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[5], dst_schemas[0]),
+        Rule.from_src_dst(src_tables[6], dst_schemas[1]),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     table_mapping = runtime_ctx.table_mapping
-    table_mapping.skip_table(src_schema1.name, table_to_skip.name)
-    table_mapping.skip_schema(src_schema2.name)
-    assert len(table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)) == 1
+    table = Table(
+        "hive_metastore",
+        src_schemas[0].name,
+        src_tables[2].name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+    )
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[2].name, load_table=lambda *_: table)
+    table = Table(
+        "hive_metastore",
+        src_schemas[0].name,
+        src_tables[5].name,
+        object_type="UNKNOWN",
+        table_format="UNKNOWN",
+        view_text="SELECT 1",
+    )
+    table_mapping.skip_table_or_view(src_schemas[0].name, src_tables[5].name, load_table=lambda *_: table)
+    table_mapping.skip_schema(src_schemas[1].name)
+    tables_to_migrate = table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)
+    full_names = set(tm.src.full_name for tm in tables_to_migrate)
+    assert full_names == {src_tables[0].full_name, src_tables[4].full_name}
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -478,17 +526,19 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert target_table_grants.privilege_assignments[0].principal == user.user_name
-    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
+    assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
+    assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
@@ -511,7 +561,7 @@ def test_migrate_external_tables_with_principal_acl_azure(
         user_name=user_with_cluster_access.user_name,
         group_name=group_with_cluster_access.display_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -552,7 +602,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -579,7 +629,7 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
         permission_level=PermissionLevel.CAN_USE,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -662,7 +712,7 @@ def test_migrate_external_tables_with_spn_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         service_principal_name=spn_with_mount_access,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False

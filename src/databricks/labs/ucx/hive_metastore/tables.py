@@ -96,6 +96,10 @@ class Table:
     def safe_sql_key(self) -> str:
         return escape_sql_identifier(self.key)
 
+    @property
+    def full_name(self) -> str:
+        return f"{self.catalog}.{self.database}.{self.name}"
+
     def __hash__(self):
         return hash(self.key)
 
@@ -352,6 +356,12 @@ class TablesCrawler(CrawlerBase):
         if not self._include_database:
             return [row[0] for row in self._fetch("SHOW DATABASES")]
         return self._include_database
+
+    def load_one(self, schema_name: str, table_name: str) -> Table | None:
+        query = f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE database='{schema_name}' AND name='{table_name}' LIMIT 1"
+        for row in self._fetch(query):
+            return Table(*row)
+        return None
 
     @staticmethod
     def _parse_table_props(tbl_props: str) -> dict:

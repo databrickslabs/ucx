@@ -9,9 +9,19 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
-from databricks.sdk.service.catalog import AwsIamRoleResponse, ExternalLocationInfo, StorageCredentialInfo
+from databricks.sdk.service.catalog import (
+    AwsIamRoleResponse,
+    ExternalLocationInfo,
+    StorageCredentialInfo,
+    MetastoreAssignment,
+)
 from databricks.sdk.service.compute import InstanceProfile, Policy
-from databricks.sdk.service.sql import EndpointConfPair, GetWorkspaceWarehouseConfigResponse
+from databricks.sdk.service.sql import (
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponse,
+    SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+    GetWorkspaceWarehouseConfigResponseSecurityPolicy,
+)
 
 from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -49,7 +59,7 @@ def installation_single_role():
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
                     "privilege": "WRITE_FILES",
-                    "resource_path": "s3://BUCKETX/*",
+                    "resource_path": "s3://BUCKETX",
                 }
             ]
         }
@@ -246,12 +256,13 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     aws_resource_permissions.create_uber_principal(prompts)
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
     mock_ws.cluster_policies.edit.assert_called_with(
-        'foo', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     mock_ws.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=None,
         instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
 
 
@@ -281,13 +292,47 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws_resource_permissions.create_uber_principal(prompts)
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
     mock_ws.cluster_policies.edit.assert_called_with(
-        'foo', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+        'foo', name='Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
     mock_ws.warehouses.set_workspace_warehouse_config.assert_called_with(
         data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")],
         instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
         sql_configuration_parameters=None,
+        security_policy=SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE,
     )
+
+
+@pytest.mark.parametrize(
+    "get_security_policy, set_security_policy",
+    [
+        (
+            GetWorkspaceWarehouseConfigResponseSecurityPolicy.DATA_ACCESS_CONTROL,
+            SetWorkspaceWarehouseConfigRequestSecurityPolicy.DATA_ACCESS_CONTROL,
+        ),
+        (GetWorkspaceWarehouseConfigResponseSecurityPolicy.NONE, SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE),
+    ],
+)
+def test_create_uber_principal_set_warehouse_config_security_policy(
+    mock_ws, mock_installation, backend, get_security_policy, set_security_policy
+):
+    mock_ws.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        security_policy=get_security_policy
+    )
+
+    instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
+    aws = create_autospec(AWSResources)
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
+
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        aws,
+        ExternalLocations(mock_ws, backend, "ucx"),
+    )
+    aws_resource_permissions.create_uber_principal(MockPrompts({".*": "yes"}))
+
+    assert mock_ws.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
 def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations):
@@ -310,6 +355,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
+    mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
@@ -318,7 +364,13 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
     assert aws.create_uc_role.assert_called
     assert (
-        call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'}, None, None)
+        call(
+            'UC_ROLE_123123',
+            'UC_POLICY',
+            {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'},
+            None,
+            None,
+        )
         in aws.put_role_policy.call_args_list
     )
 
@@ -330,14 +382,14 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-    assert call('UC_ROLE_1') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_2') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     assert (
-        call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        call('UC_ROLE_BUCKET1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
         in aws.put_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        call('UC_ROLE_BUCKET2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 

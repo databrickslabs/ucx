@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
+from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -19,8 +19,8 @@ from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.files import LocalFile
+from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -28,9 +28,11 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     SourceContainer,
     WrappingLoader,
+    DependencyGraphWalker,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -73,6 +75,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._task = task
         self._job = job
         self._ws = ws
+        self._cache = WorkspaceCache(ws)
         self._named_parameters: dict[str, str] | None = {}
         self._parameters: list[str] | None = []
         self._spark_conf: dict[str, str] | None = {}
@@ -124,7 +127,7 @@ class WorkflowTaskContainer(SourceContainer):
         parsed_path = parse.urlparse(path)
         match parsed_path.scheme:
             case "":
-                return WorkspacePath(self._ws, path)
+                return self._cache.get_path(path)
             case "dbfs":
                 return DBFSPath(self._ws, parsed_path.path)
             case other:
@@ -187,17 +190,17 @@ class WorkflowTaskContainer(SourceContainer):
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         # Notebooks can't be on DBFS.
-        path = WorkspacePath(self._ws, notebook_path)
+        path = self._cache.get_path(notebook_path)
         return graph.register_notebook(path, False)
 
     def _register_spark_python_task(self, graph: DependencyGraph):
         if not self._task.spark_python_task:
             return []
         self._parameters = self._task.spark_python_task.parameters
-        notebook_path = self._task.spark_python_task.python_file
-        logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
-        path = self._as_path(notebook_path)
-        return graph.register_notebook(path, False)
+        python_file = self._task.spark_python_task.python_file
+        logger.info(f'Discovering {self._task.task_key} entrypoint: {python_file}')
+        path = self._as_path(python_file)
+        return graph.register_file(path)
 
     @staticmethod
     def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:
@@ -262,7 +265,7 @@ class WorkflowTaskContainer(SourceContainer):
             if library.notebook.path:
                 notebook_path = library.notebook.path
                 # Notebooks can't be on DBFS.
-                path = WorkspacePath(self._ws, notebook_path)
+                path = self._cache.get_path(notebook_path)
                 # the notebook is the root of the graph, so there's no context to inherit
                 yield from graph.register_notebook(path, inherit_context=False)
             if library.jar:
@@ -368,28 +371,29 @@ class WorkflowLinter:
         assert job.settings is not None
         assert job.settings.name is not None
         assert job.settings.tasks is not None
+        linted_paths: set[Path] = set()
         for task in job.settings.tasks:
-            for path, advice in self._lint_task(task, job):
-                absolute_path = path.absolute().as_posix() if path != self._UNKNOWN else 'UNKNOWN'
+            for advice in self._lint_task(task, job, linted_paths):
+                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,
                     task_key=task.task_key,
                     path=absolute_path,
-                    code=advice.code,
-                    message=advice.message,
-                    start_line=advice.start_line,
-                    start_col=advice.start_col,
-                    end_line=advice.end_line,
-                    end_col=advice.end_col,
+                    code=advice.advice.code,
+                    message=advice.advice.message,
+                    start_line=advice.advice.start_line,
+                    start_col=advice.advice.start_col,
+                    end_line=advice.advice.end_line,
+                    end_col=advice.advice.end_col,
                 )
                 problems.append(job_problem)
         return problems
 
-    def _lint_task(self, task: jobs.Task, job: jobs.Job):
-        dependency: Dependency = WorkflowTask(self._ws, task, job)
+    def _lint_task(self, task: jobs.Task, job: jobs.Job, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
+        root_dependency: Dependency = WorkflowTask(self._ws, task, job)
         # we can load it without further preparation since the WorkflowTask is merely a wrapper
-        container = dependency.load(self._path_lookup)
+        container = root_dependency.load(self._path_lookup)
         assert isinstance(container, WorkflowTaskContainer)
         session_state = CurrentSessionState(
             data_security_mode=container.data_security_mode,
@@ -397,30 +401,43 @@ class WorkflowLinter:
             spark_conf=container.spark_conf,
             dbr_version=container.runtime_version,
         )
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup, session_state)
+        graph = DependencyGraph(root_dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
         if problems:
             for problem in problems:
                 source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
-                yield source_path, problem
+                yield LocatedAdvice(problem.as_advisory(), source_path)
             return
-        ctx = LinterContext(self._migration_index, session_state)
-        for dependency in graph.all_dependencies:
-            logger.info(f'Linting {task.task_key} dependency: {dependency}')
-            container = dependency.load(graph.path_lookup)
-            if not container:
-                continue
-            if isinstance(container, Notebook):
-                yield from self._lint_notebook(container, ctx, session_state)
-            if isinstance(container, LocalFile):
-                yield from self._lint_file(container, ctx, session_state)
+        walker = LintingWalker(
+            graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
+        )
+        yield from walker
 
-    def _lint_file(self, file: LocalFile, ctx: LinterContext, session_state: CurrentSessionState):
-        linter = FileLinter(ctx, self._path_lookup, session_state, file.path)
-        for advice in linter.lint():
-            yield file.path, advice
 
-    def _lint_notebook(self, notebook: Notebook, ctx: LinterContext, session_state: CurrentSessionState):
-        linter = NotebookLinter(ctx, self._path_lookup, session_state, notebook)
+class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+
+    def __init__(
+        self,
+        graph: DependencyGraph,
+        linted_paths: set[Path],
+        path_lookup: PathLookup,
+        key: str,
+        session_state: CurrentSessionState,
+        migration_index: MigrationIndex,
+    ):
+        super().__init__(graph, linted_paths, path_lookup)
+        self._key = key
+        self._session_state = session_state
+        self._migration_index = migration_index
+
+    def _log_walk_one(self, dependency: Dependency):
+        logger.info(f'Linting {self._key} dependency: {dependency}')
+
+    def _process_dependency(
+        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+    ) -> Iterable[LocatedAdvice]:
+        ctx = LinterContext(self._migration_index, self._session_state)
+        # FileLinter determines which file/notebook linter to use
+        linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
         for advice in linter.lint():
-            yield notebook.path, advice
+            yield LocatedAdvice(advice, dependency.path)

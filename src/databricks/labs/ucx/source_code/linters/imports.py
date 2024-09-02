@@ -91,7 +91,7 @@ class NotebookRunCall(NodeBase):
         for path in paths:
             dbutils.notebook.run(path)
         """
-        arg = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
+        arg = DbutilsPyLinter.get_dbutils_notebook_run_path_arg(self.node)
         try:
             all_inferred = InferredValue.infer_from_node(arg, session_state)
             return self._get_notebook_paths(all_inferred)
@@ -113,7 +113,7 @@ class NotebookRunCall(NodeBase):
         return has_unresolved, paths
 
 
-class DbutilsLinter(PythonLinter):
+class DbutilsPyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state

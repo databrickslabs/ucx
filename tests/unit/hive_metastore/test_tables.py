@@ -57,7 +57,7 @@ def test_sql_managed_non_delta():
                 location="dbfs:/location/table",
             ),
             "new_catalog.db.managed_table",
-            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;",
+            "CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`managed_table` DEEP CLONE `catalog`.`db`.`managed_table`;",
         ),
         (
             Table(
@@ -69,7 +69,7 @@ def test_sql_managed_non_delta():
                 location="dbfs:/mnt/location/table",
             ),
             "new_catalog.db.managed_table",
-            "SYNC TABLE new_catalog.db.managed_table FROM catalog.db.managed_table;",
+            "SYNC TABLE `new_catalog`.`db`.`managed_table` FROM `catalog`.`db`.`managed_table`;",
         ),
         (
             Table(
@@ -81,7 +81,7 @@ def test_sql_managed_non_delta():
                 view_text="SELECT * FROM table",
             ),
             "new_catalog.db.view",
-            "CREATE VIEW IF NOT EXISTS new_catalog.db.view AS SELECT * FROM table;",
+            "CREATE VIEW IF NOT EXISTS `new_catalog`.`db`.`view` AS SELECT * FROM table;",
         ),
         (
             Table(
@@ -93,7 +93,7 @@ def test_sql_managed_non_delta():
                 location="s3a://foo/bar",
             ),
             "new_catalog.db.external_table",
-            "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;",
+            "SYNC TABLE `new_catalog`.`db`.`external_table` FROM `catalog`.`db`.`external_table`;",
         ),
     ],
 )
@@ -107,11 +107,11 @@ def test_uc_sql(table, target, query):
 
 
 def test_tables_returning_error_when_describing():
-    errors = {"DESCRIBE TABLE EXTENDED hive_metastore.database.table1": "error"}
+    errors = {"DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`": "error"}
     rows = {
         "SHOW DATABASES": [("database",)],
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        "DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`": [
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
             (
@@ -130,7 +130,7 @@ def test_tables_returning_error_when_describing():
 
 
 def test_tables_returning_error_when_show_tables(caplog):
-    errors = {"SHOW TABLES FROM hive_metastore.database": "SCHEMA_NOT_FOUND"}
+    errors = {"SHOW TABLES FROM `hive_metastore`.`database`": "SCHEMA_NOT_FOUND"}
     rows = {"SHOW DATABASES": [("database",)]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tables_crawler = TablesCrawler(backend, "default")
@@ -235,8 +235,8 @@ def test_table_what(table, what):
 
 def test_tables_crawler_should_filter_by_database():
     rows = {
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        "SHOW TABLES FROM hive_metastore.database_2": [("", "table1", "")],
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        "SHOW TABLES FROM `hive_metastore`.`database_2`": [("", "table1", "")],
     }
     backend = MockBackend(rows=rows)
     tables_crawler = TablesCrawler(backend, "default", ["database"])
@@ -244,10 +244,10 @@ def test_tables_crawler_should_filter_by_database():
     assert len(results) == 2
     assert sorted(backend.queries) == sorted(
         [
-            'SELECT * FROM hive_metastore.default.tables',
-            'SHOW TABLES FROM hive_metastore.database',
-            'DESCRIBE TABLE EXTENDED hive_metastore.database.table1',
-            'DESCRIBE TABLE EXTENDED hive_metastore.database.table2',
+            'SELECT * FROM `hive_metastore`.`default`.`tables`',
+            'SHOW TABLES FROM `hive_metastore`.`database`',
+            'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`',
+            'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`',
         ]
     )
 
@@ -255,8 +255,8 @@ def test_tables_crawler_should_filter_by_database():
 def test_is_partitioned_flag():
     rows = {
         "SHOW DATABASES": [("database",)],
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        'DESCRIBE TABLE EXTENDED hive_metastore.database.table1': [
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`': [
             ("column1", "string", "null"),
             ("column2", "string", "null"),
             ("# Partition Information", "", ""),
@@ -265,7 +265,7 @@ def test_is_partitioned_flag():
             ("Provider", "delta", ""),
             ("Type", "table", ""),
         ],
-        'DESCRIBE TABLE EXTENDED hive_metastore.database.table2': [
+        'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`': [
             ("column1", "string", "null"),
             ("column2", "string", "null"),
             ("Provider", "delta", ""),

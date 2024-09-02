@@ -242,14 +242,14 @@ class TableMove:
                 self._execute(drop_table)
         else:
             create_sql = str(next(self._fetch(f"SHOW CREATE TABLE {escape_sql_identifier(from_table_name)}"))[0])
-            logger.info(f"Dropping source table {from_table_name}")
-            self._execute(drop_table)
             create_table_sql = create_sql.replace(
                 f"CREATE TABLE {escape_sql_identifier(from_table_name)}",
                 f"CREATE TABLE {escape_sql_identifier(to_table_name)}",
             )
             logger.info(f"Creating table {to_table_name}")
             self._execute(create_table_sql)
+            logger.info(f"Dropping source table {from_table_name}")
+            self._execute(drop_table)
 
     def _create_alias_view(self, from_table_name, to_table_name):
         create_view_sql = (

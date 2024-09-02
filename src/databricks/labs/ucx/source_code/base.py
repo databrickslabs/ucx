@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
-from databricks.labs.blueprint.paths import WorkspacePath
+from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -112,7 +113,7 @@ class LocatedAdvice:
         if default is not None:
             path = default
         path = path.relative_to(base)
-        return f"{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
+        return f"./{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
 
 
 class Advisory(Advice):
@@ -134,6 +135,35 @@ class Convention(Advice):
 class Linter:
     @abstractmethod
     def lint(self, code: str) -> Iterable[Advice]: ...
+
+
+class SqlLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        try:
+            expressions = parse_sql(code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self.lint_expression(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
+            yield self.sql_parse_failure(code)
+
+    @staticmethod
+    def sql_parse_failure(code: str):
+        return Failure(
+            code='sql-parse-error',
+            message=f"SQL expression is not supported yet: {code}",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=0,
+            start_col=0,
+            end_line=0,
+            end_col=1024,
+        )
+
+    @abstractmethod
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]: ...
 
 
 class PythonLinter(Linter):
@@ -201,13 +231,14 @@ class CurrentSessionState:
             return None
 
 
-class SequentialLinter(Linter):
-    def __init__(self, linters: list[Linter]):
+class SqlSequentialLinter(SqlLinter):
+
+    def __init__(self, linters: list[SqlLinter]):
         self._linters = linters
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]:
         for linter in self._linters:
-            yield from linter.lint(code)
+            yield from linter.lint_expression(expression)
 
 
 class PythonSequentialLinter(Linter):
@@ -293,11 +324,13 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     language = file_language(path)
     if not language:
         return False
-    if content is None:
-        try:
-            content = path.read_text(guess_encoding(path))
-        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-            logger.warning(f"Could not read file {path}")
-            return False
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
-    return content.startswith(magic_header)
+    if content is not None:
+        return content.startswith(magic_header)
+    try:
+        with path.open('rt', encoding=guess_encoding(path)) as f:
+            file_header = f.read(len(magic_header))
+    except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+        logger.warning(f"Could not read file {path}")
+        return False
+    return file_header == magic_header

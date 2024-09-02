@@ -47,7 +47,7 @@ def test_move_tables_invalid_to_schema(caplog):
 def test_move_tables_not_found_table_error(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
-    backend = MockBackend(fails_on_first={"SHOW CREATE TABLE SrcC.SrcS.table1": '[TABLE_OR_VIEW_NOT_FOUND]'})
+    backend = MockBackend(fails_on_first={"SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": '[TABLE_OR_VIEW_NOT_FOUND]'})
 
     client.tables.list.return_value = [
         TableInfo(
@@ -215,7 +215,7 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
     ]
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
             ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
         ]
     }
@@ -276,7 +276,7 @@ def test_move_all_tables(del_table: bool):
             name="view1",
             full_name="SrcC.SrcS.view1",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`table1`",
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -284,7 +284,7 @@ def test_move_all_tables(del_table: bool):
             name="view2",
             full_name="SrcC.SrcS.view2",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`table1`",
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -292,7 +292,7 @@ def test_move_all_tables(del_table: bool):
             name="view3",
             full_name="SrcC.SrcS.view3",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`table1`",
         ),
     ]
 
@@ -316,11 +316,13 @@ def test_move_all_tables(del_table: bool):
         return TableInfo()
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table2": [
-            ["CREATE TABLE SrcC.SrcS.table2 (name string) LOCATION 's3://bucket/path'"]
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table2`": [
+            ["CREATE TABLE `SrcC`.`SrcS`.`table2` (name string) LOCATION 's3://bucket/path'"]
         ],
-        r"SELECT \(SELECT COUNT\(\*\) FROM TgtC.TgtS.table1\)=\(SELECT COUNT\(\*\) FROM SrcC.SrcS.table1\)": [["true"]],
-        r"SELECT \(SELECT COUNT\(\*\) FROM TgtC.TgtS.`table-5`\)=\(SELECT COUNT\(\*\) FROM SrcC.SrcS.`table-5`\)": [
+        r"SELECT \(SELECT COUNT\(\*\) FROM `TgtC`.`TgtS`.`table1`\)=\(SELECT COUNT\(\*\) FROM `SrcC`.`SrcS`.`table1`\)": [
+            ["true"]
+        ],
+        r"SELECT \(SELECT COUNT\(\*\) FROM `TgtC`.`TgtS`.`table-5`\)=\(SELECT COUNT\(\*\) FROM `SrcC`.`SrcS`.`table-5`\)": [
             ["false"]
         ],
     }
@@ -332,30 +334,23 @@ def test_move_all_tables(del_table: bool):
     table_move = TableMove(client, backend)
     table_move.move("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=del_table)
     expected_queries = [
-        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.`table-5` DEEP CLONE SrcC.SrcS.`table-5`",
-        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.table1 DEEP CLONE SrcC.SrcS.table1",
-        "CREATE TABLE TgtC.TgtS.table2 (name string) LOCATION 's3://bucket/path'",
-        "CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.table1",
-        "CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.table1",
-        "DROP TABLE SrcC.SrcS.table1",
-        "DROP TABLE SrcC.SrcS.table2",
-        "DROP VIEW SrcC.SrcS.view1",
-        "DROP VIEW SrcC.SrcS.view2",
-        "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.`table-5`)=(SELECT COUNT(*) FROM SrcC.SrcS.`table-5`)",
-        "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.table1)=(SELECT COUNT(*) FROM SrcC.SrcS.table1)",
-        "SHOW CREATE TABLE SrcC.SrcS.table2",
+        "CREATE TABLE IF NOT EXISTS `TgtC`.`TgtS`.`table-5` DEEP CLONE `SrcC`.`SrcS`.`table-5`",
+        "CREATE TABLE IF NOT EXISTS `TgtC`.`TgtS`.`table1` DEEP CLONE `SrcC`.`SrcS`.`table1`",
+        "CREATE TABLE `TgtC`.`TgtS`.`table2` (name string) LOCATION 's3://bucket/path'",
+        "CREATE VIEW `TgtC`.`TgtS`.`view1` AS SELECT * FROM `SrcC`.`SrcS`.`table1`",
+        "CREATE VIEW `TgtC`.`TgtS`.`view2` AS SELECT * FROM `SrcC`.`SrcS`.`table1`",
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table2`",
+        "DROP TABLE `SrcC`.`SrcS`.`table2`",
     ]
-    if not del_table:
-        expected_queries.remove("DROP TABLE SrcC.SrcS.table1")
-        expected_queries.remove("DROP VIEW SrcC.SrcS.view1")
-        expected_queries.remove("DROP VIEW SrcC.SrcS.view2")
-        expected_queries.remove(
-            "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.`table-5`)=(SELECT COUNT(*) FROM SrcC.SrcS.`table-5`)"
-        )
-        expected_queries.remove(
-            "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.table1)=(SELECT COUNT(*) FROM SrcC.SrcS.table1)"
-        )
-    assert expected_queries == sorted(backend.queries)
+    if del_table:
+        expected_queries += [
+            "DROP TABLE `SrcC`.`SrcS`.`table1`",
+            "DROP VIEW `SrcC`.`SrcS`.`view1`",
+            "DROP VIEW `SrcC`.`SrcS`.`view2`",
+            "SELECT (SELECT COUNT(*) FROM `TgtC`.`TgtS`.`table-5`)=(SELECT COUNT(*) FROM `SrcC`.`SrcS`.`table-5`)",
+            "SELECT (SELECT COUNT(*) FROM `TgtC`.`TgtS`.`table1`)=(SELECT COUNT(*) FROM `SrcC`.`SrcS`.`table1`)",
+        ]
+    assert sorted(expected_queries) == sorted(backend.queries)
 
 
 def test_alias_all_tables():
@@ -389,7 +384,7 @@ def test_alias_all_tables():
             name="view1",
             full_name="SrcC.SrcS.view1",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.another_table1 WHERE field1=value",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`another_table1` WHERE field1=value",
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -397,7 +392,7 @@ def test_alias_all_tables():
             name="view2",
             full_name="SrcC.SrcS.view2",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.another_table2 WHERE field2=value",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`another_table2` WHERE field2=value",
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -405,7 +400,7 @@ def test_alias_all_tables():
             name="view3",
             full_name="SrcC.SrcS.view3",
             table_type=TableType.VIEW,
-            view_definition="SELECT * FROM SrcC.SrcS.table1",
+            view_definition="SELECT * FROM `SrcC`.`SrcS`.`table1`",
         ),
     ]
 
@@ -439,10 +434,10 @@ def test_alias_all_tables():
     table_move.alias_tables("SrcC", "SrcS", "*", "TgtC", "TgtS")
 
     assert [
-        'CREATE VIEW TgtC.TgtS.table1 AS SELECT * FROM SrcC.SrcS.table1',
-        'CREATE VIEW TgtC.TgtS.table2 AS SELECT * FROM SrcC.SrcS.table2',
-        'CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.another_table1 WHERE field1=value',
-        'CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.another_table2 WHERE field2=value',
+        'CREATE VIEW `TgtC`.`TgtS`.`table1` AS SELECT * FROM `SrcC`.`SrcS`.`table1`',
+        'CREATE VIEW `TgtC`.`TgtS`.`table2` AS SELECT * FROM `SrcC`.`SrcS`.`table2`',
+        'CREATE VIEW `TgtC`.`TgtS`.`view1` AS SELECT * FROM `SrcC`.`SrcS`.`another_table1` WHERE field1=value',
+        'CREATE VIEW `TgtC`.`TgtS`.`view2` AS SELECT * FROM `SrcC`.`SrcS`.`another_table2` WHERE field2=value',
     ] == sorted(backend.queries)
 
 
@@ -469,8 +464,8 @@ def test_move_one_table_without_dropping_source():
     perm_none = PermissionsList(None)
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
+            ["CREATE TABLE `SrcC`.`SrcS`.`table1` (name string)"],
         ]
     }
 
@@ -482,9 +477,9 @@ def test_move_one_table_without_dropping_source():
     table_move.move("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert [
-        "CREATE TABLE TgtC.TgtS.table1 (name string)",
-        "DROP TABLE SrcC.SrcS.table1",
-        "SHOW CREATE TABLE SrcC.SrcS.table1",
+        "CREATE TABLE `TgtC`.`TgtS`.`table1` (name string)",
+        "DROP TABLE `SrcC`.`SrcS`.`table1`",
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`",
     ] == sorted(backend.queries)
 
 
@@ -504,8 +499,8 @@ def test_move_apply_grants():
     perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string) LOCATION 's3://bucket/path'"],
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
+            ["CREATE TABLE `SrcC`.`SrcS`.`table1` (name string) LOCATION 's3://bucket/path'"],
         ]
     }
 
@@ -517,9 +512,9 @@ def test_move_apply_grants():
     table_move.move("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert [
-        "CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
-        "DROP TABLE SrcC.SrcS.table1",
-        "SHOW CREATE TABLE SrcC.SrcS.table1",
+        "CREATE TABLE `TgtC`.`TgtS`.`table1` (name string) LOCATION 's3://bucket/path'",
+        "DROP TABLE `SrcC`.`SrcS`.`table1`",
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`",
     ] == sorted(backend.queries)
     client.grants.update.assert_called_with(
         SecurableType.TABLE,
@@ -544,8 +539,8 @@ def test_alias_apply_grants():
     perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+        "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
+            ["CREATE TABLE `SrcC`.`SrcS`.`table1` (name string)"],
         ]
     }
 
@@ -556,7 +551,7 @@ def test_alias_apply_grants():
     table_move = TableMove(client, backend)
     table_move.alias_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS")
 
-    assert ["CREATE VIEW TgtC.TgtS.table1 AS SELECT * FROM SrcC.SrcS.table1"] == sorted(backend.queries)
+    assert ["CREATE VIEW `TgtC`.`TgtS`.`table1` AS SELECT * FROM `SrcC`.`SrcS`.`table1`"] == sorted(backend.queries)
     client.grants.update.assert_called_with(
         SecurableType.TABLE, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
     )

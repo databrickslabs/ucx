@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -54,19 +55,24 @@ class TableSizeCrawler(CrawlerBase):
 
     def _try_fetch(self) -> Iterable[TableSize]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {self.full_name}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield TableSize(*row)
 
     def _safe_get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
         try:
             # refresh table statistics to avoid stale stats in HMS
-            self._backend.execute(f"ANALYZE table {table_full_name} compute STATISTICS NOSCAN")
+            self._backend.execute(f"ANALYZE table {escape_sql_identifier(table_full_name)} compute STATISTICS NOSCAN")
             # pylint: disable-next=protected-access
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
         except Exception as e:  # pylint: disable=broad-exception-caught
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e) or "[DELTA_TABLE_NOT_FOUND]" in str(e):
                 logger.warning(f"Failed to evaluate {table_full_name} table size. Table not found.")
+                return None
+            if "[DELTA_INVALID_FORMAT]" in str(e):
+                logger.warning(
+                    f"Unable to read Delta table {table_full_name}, please check table structure and try again."
+                )
                 return None
             if "[DELTA_MISSING_TRANSACTION_LOG]" in str(e):
                 logger.warning(f"Delta table {table_full_name} is corrupted: missing transaction log.")

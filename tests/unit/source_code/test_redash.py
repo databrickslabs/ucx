@@ -3,11 +3,12 @@ from unittest.mock import create_autospec, call
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 
-from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization, QueryOptions
+from databricks.sdk.service.sql import LegacyQuery, Dashboard, Widget, LegacyVisualization, QueryOptions
 
 from databricks.labs.ucx.source_code.redash import Redash
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import UpdateQueryRequestQuery
 from databricks.sdk.errors import PermissionDenied, NotFound
 
 
@@ -15,14 +16,14 @@ from databricks.sdk.errors import PermissionDenied, NotFound
 def redash_ws():
     workspace_client = create_autospec(WorkspaceClient)
     workspace_client.workspace.get_status.side_effect = NotFound("error")
-    workspace_client.queries.create.return_value = Query(id="123")
+    workspace_client.queries.create.return_value = LegacyQuery(id="123")
     workspace_client.dashboards.list.return_value = [
         Dashboard(
             id="1",
             widgets=[
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -32,8 +33,8 @@ def redash_ws():
                     )
                 ),
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -49,8 +50,8 @@ def redash_ws():
             tags=[Redash.MIGRATED_TAG],
             widgets=[
                 Widget(
-                    visualization=Visualization(
-                        query=Query(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
@@ -58,8 +59,12 @@ def redash_ws():
                         )
                     )
                 ),
-                Widget(visualization=Visualization(query=Query(id="2", query="SELECT"))),
-                Widget(visualization=Visualization(query=Query(id="3", query="SELECT", tags=[Redash.MIGRATED_TAG]))),
+                Widget(visualization=LegacyVisualization(query=LegacyQuery(id="2", query="SELECT"))),
+                Widget(
+                    visualization=LegacyVisualization(
+                        query=LegacyQuery(id="3", query="SELECT", tags=[Redash.MIGRATED_TAG])
+                    )
+                ),
             ],
         ),
         Dashboard(id="3", tags=[]),
@@ -69,8 +74,8 @@ def redash_ws():
         tags=[Redash.MIGRATED_TAG],
         widgets=[
             Widget(
-                visualization=Visualization(
-                    query=Query(
+                visualization=LegacyVisualization(
+                    query=LegacyQuery(
                         id="1",
                         name="test_query",
                         query="SELECT * FROM old.things",
@@ -108,10 +113,14 @@ def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation):
             'tags': ['test_tag'],
         },
     )
+    query = UpdateQueryRequestQuery(
+        query_text="SELECT * FROM old.things",
+        tags=[Redash.MIGRATED_TAG, 'test_tag'],
+    )
     redash_ws.queries.update.assert_called_with(
         "1",
-        query='SELECT * FROM old.things',
-        tags=[Redash.MIGRATED_TAG, 'test_tag'],
+        update_mask="query_text,tags",
+        query=query,
     )
 
 
@@ -123,25 +132,33 @@ def test_migrate_all_dashboards_error(redash_ws, empty_index, redash_installatio
 
 
 def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, caplog):
-    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
+    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards("2")
-    redash_ws.queries.update.assert_called_with("1", query="original_query", tags=None)
+    query = UpdateQueryRequestQuery(query_text="original_query")
+    redash_ws.queries.update.assert_called_with(
+        "1",
+        update_mask="query_text,tags",
+        query=query,
+    )
     redash_ws.queries.update.side_effect = PermissionDenied("error")
     redash.revert_dashboards("2")
     assert "Cannot restore" in caplog.text
 
 
 def test_revert_dashboards(redash_ws, empty_index, redash_installation):
-    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
+    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards()
-    redash_ws.queries.update.assert_has_calls(
-        [
-            call("1", query="original_query", tags=None),
-            call("3", query="original_query", tags=["test_tag"]),
-        ]
-    )
+    calls = [
+        call("1", update_mask="query_text,tags", query=UpdateQueryRequestQuery(query_text="original_query")),
+        call(
+            "3",
+            update_mask="query_text,tags",
+            query=UpdateQueryRequestQuery(query_text="original_query", tags=["test_tag"]),
+        ),
+    ]
+    redash_ws.queries.update.assert_has_calls(calls)
 
 
 def test_get_queries_from_dashboard(redash_ws):
@@ -153,10 +170,10 @@ def test_get_queries_from_dashboard(redash_ws):
         id="1",
         widgets=[
             Widget(),
-            Widget(visualization=Visualization()),
+            Widget(visualization=LegacyVisualization()),
             Widget(
-                visualization=Visualization(
-                    query=Query(
+                visualization=LegacyVisualization(
+                    query=LegacyQuery(
                         id="1",
                         name="test_query",
                         query="SELECT * FROM old.things",

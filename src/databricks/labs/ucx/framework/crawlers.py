@@ -6,6 +6,8 @@ from typing import ClassVar, Generic, Protocol, TypeVar
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +55,7 @@ class CrawlerBase(ABC, Generic[Result]):
         Delete the content of the inventory table.
         The next call to `snapshot` will re-populate the table.
         """
-        self._exec(f"DELETE FROM {self.full_name}")
+        self._exec(f"TRUNCATE TABLE {escape_sql_identifier(self.full_name)}")
 
     @staticmethod
     def _valid(name: str) -> str:

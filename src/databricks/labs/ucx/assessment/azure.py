@@ -45,7 +45,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         self._ws = ws
 
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
             yield AzureServicePrincipalInfo(*row)
 
     def _crawl(self) -> Iterable[AzureServicePrincipalInfo]:

@@ -8,7 +8,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
-from databricks.sdk.errors.platform import InvalidParameterValue
+from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
     AzureManagedIdentityResponse,
@@ -19,6 +19,8 @@ from databricks.sdk.service.catalog import (
     ValidationResultOperation,
     ValidationResultResult,
 )
+from databricks.labs.blueprint.parallel import ManyError
+
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.assessment.azure import (
@@ -340,7 +342,7 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
 
 
 @pytest.fixture
-def sp_migration(installation, credential_manager):
+def sp_migrations(installation, credential_manager):
     ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
@@ -358,19 +360,24 @@ def sp_migration(installation, credential_manager):
     access_connector_id = AzureResource(
         "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
     )
-    azurerm.create_or_update_access_connector.return_value = AccessConnector(
-        id=access_connector_id,
-        name=f"ac-{storage_account.name}",
-        location=storage_account.location,
-        provisioning_state="Succeeded",
-        identity_type="SystemAssigned",
-        principal_id="test",
-        tenant_id="test",
-    )
+    azurerm.create_or_update_access_connector.side_effect = [
+        AccessConnector(
+            id=access_connector_id,
+            name=f"ac-{storage_account.name}",
+            location=storage_account.location,
+            provisioning_state="Succeeded",
+            identity_type="SystemAssigned",
+            principal_id="test",
+            tenant_id="test",
+        )
+    ]
 
-    external_location = ExternalLocation(f"abfss://things@{storage_account.name}.dfs.core.windows.net/folder1", 1)
+    external_location = [
+        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://things@labsazurethings2.dfs.core.windows.net/folder1", 1),
+    ]
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [external_location]
+    external_locations.snapshot.return_value = external_location
 
     arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
 
@@ -383,7 +390,7 @@ def sp_migration(installation, credential_manager):
         AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
     ]
 
-    return ServicePrincipalMigration(installation, ws, arp, sp_crawler, credential_manager)
+    return ServicePrincipalMigration(installation, ws, arp, sp_crawler, credential_manager), azurerm, ws
 
 
 @pytest.mark.parametrize(
@@ -393,13 +400,14 @@ def sp_migration(installation, credential_manager):
         (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 0),
     ],
 )
-def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated):
+def test_read_secret_value_decode(sp_migrations, secret_bytes_value, num_migrated):
     # due to abuse of fixtures and the way fixtures are shared in PyTest,
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
     # pylint: disable-next=protected-access
-    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
+    sp_migration, _, ws = sp_migrations
+    ws.secrets.get_secret.return_value = secret_bytes_value
 
     prompts = MockPrompts(
         {
@@ -410,13 +418,14 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
     assert len(sp_migration.run(prompts)) == num_migrated
 
 
-def test_read_secret_value_none(sp_migration):
+def test_read_secret_value_none(sp_migrations):
     # due to abuse of fixtures and the way fixtures are shared in PyTest,
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
     # pylint: disable-next=protected-access
-    sp_migration._ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
+    sp_migration, _, ws = sp_migrations
+    ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
@@ -427,14 +436,15 @@ def test_read_secret_value_none(sp_migration):
         sp_migration.run(prompts)
 
 
-def test_read_secret_read_exception(caplog, sp_migration):
+def test_read_secret_read_exception(caplog, sp_migrations):
     caplog.set_level(logging.INFO)
     # due to abuse of fixtures and the way fixtures are shared in PyTest,
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
     # pylint: disable-next=protected-access
-    sp_migration._ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
+    sp_migration, _, ws = sp_migrations
+    ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 
     prompts = MockPrompts(
         {
@@ -447,7 +457,7 @@ def test_read_secret_read_exception(caplog, sp_migration):
     assert re.search(r"removed on the backend: .*", caplog.text)
 
 
-def test_print_action_plan(caplog, sp_migration):
+def test_print_action_plan(caplog, sp_migrations):
     caplog.set_level(logging.INFO)
     ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
@@ -460,7 +470,7 @@ def test_print_action_plan(caplog, sp_migration):
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
-
+    sp_migration, _, ws = sp_migrations
     sp_migration.run(prompts)
 
     log_pattern = r"Service Principal name: .* application_id: .* privilege .* on location .*"
@@ -471,7 +481,7 @@ def test_print_action_plan(caplog, sp_migration):
     assert False, "Action plan is not logged"
 
 
-def test_run_without_confirmation(sp_migration):
+def test_run_without_confirmation(sp_migrations):
     ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
@@ -482,18 +492,18 @@ def test_run_without_confirmation(sp_migration):
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
-
+    sp_migration, _, _ = sp_migrations
     assert sp_migration.run(prompts) == []
 
 
-def test_run(installation, sp_migration):
+def test_run(installation, sp_migrations):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
-
+    sp_migration, _, _ = sp_migrations
     sp_migration.run(prompts)
     installation.assert_file_written(
         "azure_service_principal_migration_result.csv",
@@ -508,7 +518,7 @@ def test_run(installation, sp_migration):
     )
 
 
-def test_run_warning_non_allow_network_configuration(installation, sp_migration, caplog):
+def test_run_warning_non_allow_network_configuration(installation, sp_migrations, caplog):
     """The user should be warned when a network configuration is not 'Allow'"""
     prompts = MockPrompts(
         {
@@ -521,7 +531,7 @@ def test_run_warning_non_allow_network_configuration(installation, sp_migration,
         "At least one Azure Service Principal accesses a storage account with non-Allow default network",
         "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration",
     )
-
+    sp_migration, _, _ = sp_migrations
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
         sp_migration.run(prompts)
 
@@ -529,16 +539,61 @@ def test_run_warning_non_allow_network_configuration(installation, sp_migration,
         assert any(expected_message in message for message in caplog.messages), f"Message not logged {expected_message}"
 
 
-def test_create_access_connectors_for_storage_accounts(sp_migration):
+def test_create_access_connectors_for_storage_accounts(sp_migrations):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
         }
     )
-
+    sp_migration, _, _ = sp_migrations
     validation_results = sp_migration.run(prompts)
 
     assert len(validation_results) == 1
     assert validation_results[0].name.startswith("ac")
     assert len(validation_results[0].failures) == 0
+
+
+def test_create_access_connectors_for_storage_accounts_rollback(sp_migrations):
+    sp_migration, azurerm, _ = sp_migrations
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+        }
+    )
+    storage_accounts = [
+        StorageAccount(
+            id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings"),
+            name="labsazurethings",
+            location="westeu",
+            default_network_action="Allow",
+        ),
+        StorageAccount(
+            id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings2"),
+            name="labsazurethings2",
+            location="westeu",
+            default_network_action="Allow",
+        ),
+    ]
+    azurerm.storage_accounts.return_value = storage_accounts
+    access_connector = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azurerm.create_or_update_access_connector.side_effect = [
+        AccessConnector(
+            id=access_connector,
+            name="ac-labsazurethings",
+            location="westeu",
+            provisioning_state="Succeeded",
+            identity_type="SystemAssigned",
+            principal_id="test",
+            tenant_id="test",
+        ),
+        PermissionDenied(),
+    ]
+
+    with pytest.raises(ManyError):
+        sp_migration.run(prompts)
+
+    azurerm.delete_access_connector.assert_called_once()
