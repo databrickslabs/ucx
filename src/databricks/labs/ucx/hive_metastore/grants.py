@@ -344,8 +344,8 @@ class GrantsCrawler(CrawlerBase[Grant]):
             anonymous_function=anonymous_function,
         )
         grants = []
+        expected_grant_object_type = self._grants_reported_as.get(on_type, on_type)
         try:
-            expected_grant_object_type = self._grants_reported_as.get(on_type, on_type)
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
                 # Sometimes we get grants for other objects we didn't ask for. For example, listing DATABASE grants
