@@ -13,10 +13,9 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
 )
-from databricks.labs.ucx.source_code.linters.dfsa import DFSA_PATTERNS
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 
 
 logger = logging.getLogger(__name__)

@@ -35,7 +35,8 @@ from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     UnresolvedPath,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.python.python_analyzer import MagicLine
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -43,7 +44,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     NOTEBOOK_HEADER,
     RunCell,
     PythonCell,
-    MagicLine,
     RunCommand,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
