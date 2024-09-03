@@ -73,7 +73,9 @@ jobs:
         uses: databricks/setup-cli@main
 
       - name: Install LSQL
-        run: databricks labs install lsql
+        run: |
+          databricks labs install lsql
+          databricks labs lsql --version
         env:  # this is a temporary hack
           DATABRICKS_HOST: any
           DATABRICKS_TOKEN: any
