@@ -570,26 +570,23 @@ def download(
             remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
             try:
                 # Installation does not have a download method
-                # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
-                input_ = BytesIO()
-                data = (
-                    ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
-                    .read()
-                    .rstrip(b"\n")
-                )
-                input_.write(data)
-                input_.seek(0)  # Go back to the beginning of the file
-                csv_header_next = input_.readline()
-                if csv_header is None:
-                    csv_header = csv_header_next
-                    output.write(csv_header)
-                elif csv_header == csv_header_next:
-                    output.write(b"\n")
-                else:
-                    raise ValueError("CSV files have different headers")
-                output.write(input_.read())
+                data = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
             except NotFound:
                 logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
+                continue
+            # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
+            input_ = BytesIO()
+            input_.write(data.rstrip(b"\n"))
+            input_.seek(0)  # Go back to the beginning of the file
+            csv_header_next = input_.readline()
+            if csv_header is None:
+                csv_header = csv_header_next
+                output.write(csv_header)
+            elif csv_header == csv_header_next:
+                output.write(b"\n")
+            else:
+                raise ValueError("CSV files have different headers")
+            output.write(input_.read())
     if csv_header is None:
         logger.warning("No file(s) to download found")
     if file.is_file() and file.stat().st_size == 0:
