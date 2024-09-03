@@ -491,4 +491,3 @@ class PipCommand(MagicCommand):
         code = code.replace("\\\n", " ")
         lexer = shlex.split(code, posix=True)
         return list(lexer)
-

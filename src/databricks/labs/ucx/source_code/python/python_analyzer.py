@@ -278,4 +278,3 @@ def magic_command_factory(func: Callable[[str, NodeNG], MagicCommand | None]):
         return func(command, node)
 
     return inner
-
