@@ -33,7 +33,7 @@ def test_matches_dfsa_pattern(path, matches):
     ],
 )
 def test_detects_dfsa_paths(code, expected):
-    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DfsaPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = list(linter.lint(code))
     for advice in advices:
         assert isinstance(advice, Advice)
@@ -63,7 +63,7 @@ for system in systems:
     ],
 )
 def test_dfsa_usage_linter(code, expected):
-    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DfsaPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = linter.lint(code)
     count = 0
     for advice in advices:
