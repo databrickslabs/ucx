@@ -574,8 +574,7 @@ def download(
             except NotFound:
                 logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
                 continue
-            # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
-            input_ = BytesIO()
+            input_ = BytesIO()  # BytesIO supports .readline() to read the header, where StreamingResponse does not
             input_.write(data.rstrip(b"\n"))
             input_.seek(0)  # Go back to the beginning of the file
             csv_header_next = input_.readline()
