@@ -843,7 +843,6 @@ def test_download_warns_if_file_not_found(caplog, ws1, acc_client):
 def test_download_deletes_empty_file(tmp_path, ws1, acc_client):
     ws1.workspace.download.side_effect = NotFound("test.csv")
     mapping_path = tmp_path / "mapping.csv"
-
     download(
         mapping_path,
         ws1,
