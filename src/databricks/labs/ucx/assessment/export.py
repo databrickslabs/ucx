@@ -30,17 +30,10 @@ class Exporter:
 
         # List all SQL files in the directory, excluding those with 'count' in their names
         sql_files = [
-            file for file in ucx_main_queries_path.iterdir() if file.suffix == ".sql" and "count" not in file.name
+            file for file in ucx_main_queries_path.iterdir() if file.suffix == ".sql"
         ]
 
-        ucx_main_queries = [
-            {
-                "name": "01_1_permissions",
-                "query": f"SELECT * FROM {schema}.permissions",
-            },
-            {"name": "02_2_ucx_grants", "query": f"SELECT * FROM {schema}.grants;"},
-            {"name": "03_3_groups", "query": f"SELECT * FROM {schema}.groups;"},
-        ]
+        ucx_main_queries = []
 
         for sql_file in sql_files:
             content = sql_file.read_text()
