@@ -419,13 +419,13 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
     def __init__(
         self,
         graph: DependencyGraph,
-        linted_paths: set[Path],
+        walked_paths: set[Path],
         path_lookup: PathLookup,
         key: str,
         session_state: CurrentSessionState,
         migration_index: MigrationIndex,
     ):
-        super().__init__(graph, linted_paths, path_lookup)
+        super().__init__(graph, walked_paths, path_lookup)
         self._key = key
         self._session_state = session_state
         self._migration_index = migration_index
