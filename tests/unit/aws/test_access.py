@@ -872,11 +872,16 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     aws.delete_role.assert_called_once()
 
 
-def test_delete_role(mock_ws, installation_no_roles, backend):
-    def command_call(_: str):
+def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
         return 0, '{"account":"1234"}', ""
 
     aws = AWSResources("profile", command_call)
     external_locations = ExternalLocations(mock_ws, backend, 'ucx')
     resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
+    assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls
