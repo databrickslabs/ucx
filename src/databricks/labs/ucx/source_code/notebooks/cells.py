@@ -24,7 +24,7 @@ from databricks.labs.ucx.source_code.python.python_analyzer import (
     PythonCodeAnalyzer,
     MagicCommand,
     MagicNode,
-    register_magic_command_factory,
+    magic_command_factory,
 )
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
@@ -400,8 +400,9 @@ class CellLanguage(Enum):
 
 class RunCommand(MagicCommand):
 
-    @classmethod
-    def factory(cls, command: str, node: NodeNG) -> MagicCommand | None:
+    @staticmethod
+    @magic_command_factory
+    def factory(command: str, node: NodeNG) -> MagicCommand | None:
         if command.startswith("%run"):
             return RunCommand(node, command)
         return None
@@ -443,13 +444,11 @@ class RunCommand(MagicCommand):
         return container.build_inherited_context(context.parent, child_path)
 
 
-register_magic_command_factory(RunCommand.factory)
-
-
 class PipCommand(MagicCommand):
 
-    @classmethod
-    def factory(cls, command: str, node: NodeNG) -> MagicCommand | None:
+    @staticmethod
+    @magic_command_factory
+    def factory(command: str, node: NodeNG) -> MagicCommand | None:
         if command.startswith("%pip") or command.startswith("!pip"):
             return PipCommand(node, command)
         return None
@@ -493,5 +492,3 @@ class PipCommand(MagicCommand):
         lexer = shlex.split(code, posix=True)
         return list(lexer)
 
-
-register_magic_command_factory(PipCommand.factory)
