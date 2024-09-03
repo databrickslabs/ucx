@@ -186,45 +186,64 @@ def test_crawler_crawl():
                 ("database_one",),
                 ("database_two",),
             ],
-            "SHOW TABLES FROM `hive_metastore`.`database_one`": SHOW_TABLES[
+            "SHOW TABLES FROM `hive_metastore`\\.`database_one`": SHOW_TABLES[
                 ("database_one", "table_one", "true"),
                 ("database_one", "table_two", "true"),
             ],
-            "SELECT * FROM `hive_metastore`.`schema`.`tables`": UCX_TABLES[
-                ("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None),
-                ("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"),
-                ("foo", None, None, "type", "CATALOG", None, None),
+            "DESCRIBE TABLE EXTENDED `hive_metastore`\\.`database_one`\\.`table_one`": DESCRIBE_TABLE[
+                ("Catalog", "foo", "ignored"),
+                ("Type", "TABLE", "ignored"),
+                ("Provider", "", "ignored"),
+                ("View Text", "SELECT * FROM table", "ignored"),
             ],
-            "DESCRIBE TABLE EXTENDED `hive_metastore`.`database_one`.*": DESCRIBE_TABLE[
+            "DESCRIBE TABLE EXTENDED `hive_metastore`\\.`database_one`\\.`table_two`": DESCRIBE_TABLE[
                 ("Catalog", "foo", "ignored"),
                 ("Type", "TABLE", "ignored"),
                 ("Provider", "", "ignored"),
                 ("Location", "/foo/bar/test", "ignored"),
-                ("View Text", "SELECT * FROM table", "ignored"),
             ],
-            "SHOW GRANTS ON .*": SHOW_GRANTS[
-                ("princ1", "SELECT", "TABLE", "ignored"),
-                ("princ1", "SELECT", "VIEW", "ignored"),
-                ("princ1", "USE", "CATALOG$", "ignored"),
+            "SHOW GRANTS ON CATALOG `hive_metastore`": SHOW_GRANTS[("princ1", "USE", "CATALOG$", "hive_metastore"),],
+            "SHOW GRANTS ON VIEW `hive_metastore`\\.`database_one`\\.`table_one`": SHOW_GRANTS[
+                ("princ2", "SELECT", "TABLE", "table_one"),
+            ],
+            "SHOW GRANTS ON TABLE `hive_metastore`\\.`database_one`\\.`table_two`": SHOW_GRANTS[
+                ("princ3", "SELECT", "TABLE", "table_two"),
             ],
         }
     )
+    expected_grants = {
+        Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
+        Grant(
+            principal="princ2",
+            catalog="hive_metastore",
+            database="database_one",
+            view="table_one",
+            action_type="SELECT",
+        ),
+        Grant(
+            principal="princ3",
+            catalog="hive_metastore",
+            database="database_one",
+            table="table_two",
+            action_type="SELECT",
+        ),
+    }
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = list(crawler.snapshot())
-    assert len(grants) == 3
+    assert len(grants) == len(expected_grants) and set(grants) == expected_grants
 
 
 def test_crawler_udf_crawl():
     sql_backend = MockBackend(
         rows={
             "SHOW DATABASES": SHOW_DATABASES[("database_one",),],
-            "SHOW USER FUNCTIONS FROM `hive_metastore`.`database_one`": SHOW_FUNCTIONS[
+            "SHOW USER FUNCTIONS FROM `hive_metastore`\\.`database_one`": SHOW_FUNCTIONS[
                 ("hive_metastore.database_one.function_one",),
                 ("hive_metastore.database_one.function_two",),
             ],
-            "DESCRIBE FUNCTION EXTENDED `hive_metastore`.`database_one`.*": DESCRIBE_FUNCTION[
+            "DESCRIBE FUNCTION EXTENDED `hive_metastore`\\.`database_one`.*": DESCRIBE_FUNCTION[
                 ("Type: SCALAR",),
                 ("Input: p INT",),
                 ("Returns: FLOAT",),
@@ -233,38 +252,37 @@ def test_crawler_udf_crawl():
                 ("Body: 1",),
                 ("ignore",),
             ],
-            "SHOW GRANTS ON .*": SHOW_GRANTS[("princ1", "SELECT", "FUNCTION", "ignored"),],
+            "SHOW GRANTS ON FUNCTION `hive_metastore`\\.`database_one`.`function_one`": SHOW_GRANTS[
+                ("princ1", "SELECT", "FUNCTION", "function_one"),
+            ],
+            "SHOW GRANTS ON FUNCTION `hive_metastore`\\.`database_one`.`function_two`": SHOW_GRANTS[
+                ("princ2", "SELECT", "FUNCTION", "function_two"),
+            ],
         }
     )
+    expected_grants = {
+        Grant(
+            principal="princ1",
+            catalog="hive_metastore",
+            database="database_one",
+            udf="function_one",
+            action_type="SELECT",
+        ),
+        Grant(
+            principal="princ2",
+            catalog="hive_metastore",
+            database="database_one",
+            udf="function_two",
+            action_type="SELECT",
+        ),
+    }
 
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = list(crawler.snapshot())
 
-    assert len(grants) == 2
-    assert Grant(
-        principal="princ1",
-        action_type="SELECT",
-        catalog="hive_metastore",
-        database="database_one",
-        table=None,
-        view=None,
-        udf="function_one",
-        any_file=False,
-        anonymous_function=False,
-    ) == next(g for g in grants if g.udf == "function_one")
-    assert Grant(
-        principal="princ1",
-        action_type="SELECT",
-        catalog="hive_metastore",
-        database="database_one",
-        table=None,
-        view=None,
-        udf="function_two",
-        any_file=False,
-        anonymous_function=False,
-    ) == next(g for g in grants if g.udf == "function_two")
+    assert len(grants) == len(expected_grants) and set(grants) == expected_grants
 
 
 def test_crawler_snapshot_when_no_data():
@@ -438,32 +456,33 @@ def test_udf_grants_returning_error_when_describing():
 def test_crawler_should_filter_databases():
     sql_backend = MockBackend(
         rows={
-            "SHOW TABLES FROM `hive_metastore`.`database_one`": SHOW_TABLES[
-                ("database_one", "table_one", "true"),
-                ("database_one", "table_two", "true"),
-            ],
-            "SELECT * FROM `hive_metastore`.`schema`.`tables`": UCX_TABLES[
-                ("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None),
-                ("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"),
-                ("foo", None, None, "type", "CATALOG", None, None),
-            ],
-            "DESCRIBE TABLE EXTENDED `hive_metastore`.`database_one`.*": DESCRIBE_TABLE[
+            "SHOW TABLES FROM `hive_metastore`\\.`database_one`": SHOW_TABLES[("database_one", "table_one", "true"),],
+            "DESCRIBE TABLE EXTENDED `hive_metastore`\\.`database_one`\\.`table_one`": DESCRIBE_TABLE[
                 ("Catalog", "foo", "ignored"),
                 ("Type", "TABLE", "ignored"),
                 ("Provider", "", "ignored"),
                 ("Location", "/foo/bar/test", "ignored"),
-                ("View Text", "SELECT * FROM table", "ignored"),
             ],
-            "SHOW GRANTS ON .*": SHOW_GRANTS[
-                ("princ1", "SELECT", "TABLE", "ignored"),
-                ("princ1", "SELECT", "VIEW", "ignored"),
-                ("princ1", "USE", "CATALOG$", "ignored"),
+            "SHOW GRANTS ON CATALOG `hive_metastore`": SHOW_GRANTS[("princ1", "USE", "CATALOG$", "hive_metastore"),],
+            "SHOW GRANTS ON TABLE `hive_metastore`\\.`database_one`\\.`table_one`": SHOW_GRANTS[
+                ("princ2", "SELECT", "TABLE", "table_one"),
             ],
         }
     )
+    expected_grants = {
+        Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
+        Grant(
+            principal="princ2",
+            catalog="hive_metastore",
+            database="database_one",
+            table="table_one",
+            action_type="SELECT",
+        ),
+    }
+
     table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
     udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
     crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
     grants = list(crawler.snapshot())
-    assert len(grants) == 3
-    assert 'SHOW TABLES FROM `hive_metastore`.`database_one`' in sql_backend.queries
+
+    assert len(grants) == len(expected_grants) and set(grants) == expected_grants
