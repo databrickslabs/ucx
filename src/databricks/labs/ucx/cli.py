@@ -355,8 +355,9 @@ def delete_missing_principals(
     **named_parameters,
 ):
     """Not supported for Azure.
-    For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
-    By default, it will create a  role per S3 location. Set the optional single_role parameter to True to create a single role for all S3 locations.
+    For AWS, this command identifies all the UC roles that are created through the create-missing-principals cmd.
+    It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected roles
+    are used by any storage credential and prompts to confirm if roles should still be deleted.
     """
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)

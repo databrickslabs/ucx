@@ -869,7 +869,7 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     ]
     prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
     role_creation.delete_uc_roles(prompts)
-    assert aws.delete_role.assert_called_once
+    aws.delete_role.assert_called_once()
 
 
 def test_delete_role(mock_ws, installation_no_roles, backend):

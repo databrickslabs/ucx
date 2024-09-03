@@ -231,23 +231,25 @@ class IamRoleCreation:
         self._resource_permissions.create_uc_roles(iam_list)
         self._resource_permissions.save_uc_compatible_roles()
 
-    def delete_uc_roles(self, prompts: Prompts):
+    def delete_uc_roles(self, prompts: Prompts) -> None:
         uc_roles = self._resource_permissions.load_uc_compatible_roles()
         if len(uc_roles) == 0:
             self._resource_permissions.save_uc_compatible_roles()
             uc_roles = self._resource_permissions.load_uc_compatible_roles()
         storage_credentials = self._ws.storage_credentials.list()
 
-        uc_role_dict = {role.role_arn: role.role_name for role in uc_roles}
-        selected_roles = prompts.multiple_choice_from_dict("Select the list of roles created by UCX", uc_role_dict)
+        uc_role_mapping = {role.role_arn: role.role_name for role in uc_roles}
+        selected_roles = prompts.multiple_choice_from_dict("Select the list of roles created by UCX", uc_role_mapping)
         matching_credentials = [
             storage_credential
             for storage_credential in storage_credentials
             if storage_credential.aws_iam_role is not None
-            and uc_role_dict[storage_credential.aws_iam_role.role_arn] in selected_roles
+            and uc_role_mapping[storage_credential.aws_iam_role.role_arn] in selected_roles
         ]
+        if len(matching_credentials) == 0:
+            logger.info("No storage credential using the selected UC roles, proceeding to delete.")
         for credential in matching_credentials:
-            print(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role}")
+            logger.info(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role}")
         if len(matching_credentials) == 0 or prompts.confirm(
             "The above storage credential will be impacted on deleting the selected IAM roles,"
             " Are you sure you want to confirm"
