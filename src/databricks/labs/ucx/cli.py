@@ -571,6 +571,7 @@ def download(
             remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
             try:
                 # Installation does not have a download method
+                # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
                 input_ = BytesIO()
                 bytes = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
                 input_.write(bytes)
