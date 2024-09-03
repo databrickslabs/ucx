@@ -560,7 +560,7 @@ def download(
 ):
     """Download and merge a CSV file from the ucx installation in a (collection of) workspace(s)"""
     file = Path(file)
-    if not file.suffix == ".csv":
+    if file.suffix != ".csv":
         raise ValueError("Command only supported for CSV files")
     contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
     csv_header = None
