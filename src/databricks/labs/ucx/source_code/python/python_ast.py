@@ -141,7 +141,7 @@ class Tree:
         # because each node points to the correct parent (practically, the tree is now only a list of statements)
         return tree
 
-    def append_globals(self, globs: dict[str, list[NodeNG]]) -> None:
+    def append_globals(self, globs: dict[str, list[Expr]]) -> None:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
@@ -161,27 +161,55 @@ class Tree:
             self_module.body.append(node)
 
     def is_from_module(self, module_name: str) -> bool:
-        # if this is the call's root node, check it against the required module
-        if isinstance(self._node, Name):
-            if self._node.name == module_name:
-                return True
-            root = self.root
-            if not isinstance(root, Module):
-                return False
-            for value in root.globals.get(self._node.name, []):
-                if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
-                    continue
-                if Tree(value.parent.value).is_from_module(module_name):
-                    return True
+        return self._is_from_module(module_name, set())
+
+    def _is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        if self._node in visited:
+            logger.debug(f"Recursion encountered while traversing node {self._node.as_string()}")
             return False
-        # walk up intermediate calls such as spark.range(...)
+        visited.add(self._node)
+        return self._node_is_from_module(module_name, visited)
+
+    def _node_is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        if isinstance(self._node, Name):
+            return self._name_is_from_module(module_name, visited)
         if isinstance(self._node, Call):
-            return isinstance(self._node.func, Attribute) and Tree(self._node.func.expr).is_from_module(module_name)
+            return self._call_is_from_module(module_name, visited)
         if isinstance(self._node, Attribute):
-            return Tree(self._node.expr).is_from_module(module_name)
+            return self._attribute_is_from_module(module_name, visited)
         if isinstance(self._node, Const):
-            return Tree(self._node.parent).is_from_module(module_name)
+            return self._const_is_from_module(module_name, visited)
         return False
+
+    def _name_is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        assert isinstance(self._node, Name)
+        # if this is the call's root node, check it against the required module
+        if self._node.name == module_name:
+            return True
+        root = self.root
+        if not isinstance(root, Module):
+            return False
+        for value in root.globals.get(self._node.name, []):
+            if not isinstance(value, AssignName) or not isinstance(value.parent, Assign):
+                continue
+            if _LocalTree(value.parent.value).is_from_module_visited(module_name, visited):
+                return True
+        return False
+
+    def _call_is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        assert isinstance(self._node, Call)
+        # walk up intermediate calls such as spark.range(...)
+        return isinstance(self._node.func, Attribute) and _LocalTree(self._node.func.expr).is_from_module_visited(
+            module_name, visited
+        )
+
+    def _attribute_is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        assert isinstance(self._node, Attribute)
+        return _LocalTree(self._node.expr).is_from_module_visited(module_name, visited)
+
+    def _const_is_from_module(self, module_name: str, visited: set[NodeNG]) -> bool:
+        assert isinstance(self._node, Const)
+        return _LocalTree(self._node.parent).is_from_module_visited(module_name, visited)
 
     def has_global(self, name: str) -> bool:
         if not isinstance(self.node, Module):
@@ -230,7 +258,7 @@ class Tree:
         assert start != 0
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't renumber {type(self.node).__name__}")
-        root: Module = self.node
+        root: Module = cast(Module, self.node)
         # for now renumber in place to avoid the complexity of rebuilding the tree with clones
 
         def renumber_node(node: NodeNG, offset: int) -> None:
@@ -247,6 +275,12 @@ class Tree:
             num_lines = 1 + (node.end_lineno - node.lineno if node.end_lineno else 0)
             start = start + num_lines if start > 0 else start - num_lines
         return self
+
+
+class _LocalTree(Tree):
+
+    def is_from_module_visited(self, name: str, visited_nodes: set[NodeNG]) -> bool:
+        return self._is_from_module(name, visited_nodes)
 
 
 class TreeHelper(ABC):
