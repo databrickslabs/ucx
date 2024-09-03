@@ -203,25 +203,31 @@ def test_crawler_crawl():
                 ("Location", "/foo/bar/test", "ignored"),
             ],
             "SHOW GRANTS ON CATALOG `hive_metastore`": SHOW_GRANTS[("princ1", "USE", "CATALOG$", "hive_metastore"),],
+            "SHOW GRANTS ON DATABASE `hive_metastore`\\.`database_one`": SHOW_GRANTS[
+                ("princ2", "OWN", "DATABASE", "database_one"),
+                # Enumerating database grants can include some grants for the catalog.
+                ("princ1", "SELECT", "CATALOG$", None),
+            ],
             "SHOW GRANTS ON VIEW `hive_metastore`\\.`database_one`\\.`table_one`": SHOW_GRANTS[
-                ("princ2", "SELECT", "TABLE", "table_one"),
+                ("princ3", "SELECT", "TABLE", "table_one"),
             ],
             "SHOW GRANTS ON TABLE `hive_metastore`\\.`database_one`\\.`table_two`": SHOW_GRANTS[
-                ("princ3", "SELECT", "TABLE", "table_two"),
+                ("princ4", "SELECT", "TABLE", "table_two"),
             ],
         }
     )
     expected_grants = {
         Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
+        Grant(principal="princ2", catalog="hive_metastore", database="database_one", action_type="OWN"),
         Grant(
-            principal="princ2",
+            principal="princ3",
             catalog="hive_metastore",
             database="database_one",
             view="table_one",
             action_type="SELECT",
         ),
         Grant(
-            principal="princ3",
+            principal="princ4",
             catalog="hive_metastore",
             database="database_one",
             table="table_two",
