@@ -283,17 +283,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
             principal_permissions[grant.principal].add(grant.action_type)
         return principal_permissions
 
-    # The reported ObjectType for grants doesn't necessary match the type of grants we asked for. This maps
-    # those that aren't themselves.
-    _grants_reported_as = {
-        # SHOW type: RESULT type
-        "SCHEMA": "DATABASE",
-        "CATALOG": "CATALOG$",
-        "VIEW": "TABLE",
-        "ANY FILE": "ANY_FILE",
-        "ANONYMOUS FUNCTION": "ANONYMOUS_FUNCTION",
-    }
-
     def grants(
         self,
         *,
@@ -343,14 +332,10 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        expected_grant_object_type = self._grants_reported_as.get(on_type, on_type)
         grants = []
         try:
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
-                (principal, action_type, object_type, _) = row
-                # This seems to be here to help unit tests that don't sufficiently narrow the target of mocked queries. -ajs
-                if object_type != expected_grant_object_type:
-                    continue
+                (principal, action_type, _, _) = row
                 # we have to return concrete list, as with yield we're executing
                 # everything on the main thread.
                 grant = Grant(
