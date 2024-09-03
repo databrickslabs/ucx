@@ -113,6 +113,168 @@ main(f'--config=/Workspace{config_file}',
 """
 
 
+EXPORT_UCX_NOTEBOOK = """
+# Databricks notebook source
+# MAGIC %md
+# MAGIC ##### Exporter of UCX assessment results
+# MAGIC ##### Instructions:
+# MAGIC 1. Execute using an all-purpose cluster with Databricks Runtime 14 or higher.
+# MAGIC 1. Hit **Run all** button and wait for completion.
+# MAGIC 1. Go to the bottom of the notebook and click the Download UCX Results button.
+# MAGIC
+# MAGIC ##### Important:
+# MAGIC Please note that this is only meant to serve as example code.
+# MAGIC This is not official **Databricks** or **Databricks Labs UCX** code.
+# MAGIC
+# MAGIC Example code developed by **Databricks Shared Technical Services team**.
+
+# COMMAND ----------
+
+# DBTITLE 1,Installing Packages
+# MAGIC %pip install {remote_wheel} -q -q -q
+# MAGIC %pip install xlsxwriter -q -q -q
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Import Libraries
+# Standard library imports
+import os
+import re
+import shutil
+import json
+from typing import List, Dict
+from ast import literal_eval
+from concurrent.futures import ThreadPoolExecutor
+
+# Third-party library imports
+import pandas as pd
+import xlsxwriter
+
+# Databricks imports
+from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+import databricks.labs.ucx.queries.assessment.main as queries
+
+# Resource management
+import importlib.resources as resources
+
+# COMMAND ----------
+
+# DBTITLE 1,UCX Assessment Export
+class Exporter:
+    # File and Path Constants
+    _FILE_NAME = "ucx_assessment_results.xlsx"
+    _TMP_PATH = "/Workspace/Applications/ucx/ucx_results/"
+    _DOWNLOAD_PATH = "/dbfs/FileStore/ucx_results"
+
+    # Workspace Configuration
+    _WORKSPACE_HOST = f"https://{spark.conf.get('spark.databricks.workspaceUrl')}"
+    _WORKSPACE_ID = spark.conf.get(
+        "spark.databricks.clusterUsageTags.clusterOwnerOrgId"
+    )
+
+    # Result File Path
+    _RESULTS_FILE = (
+        f"{_WORKSPACE_HOST}/files/ucx_results/{_FILE_NAME}?o={_WORKSPACE_ID}"
+    )
+
+    # Named Parameters
+    _NAMED_PARAMS = {"config": "/Workspace{config_file}"}
+
+    def __init__(self) -> None:
+        self._ctx = RuntimeContext(self._NAMED_PARAMS)
+
+    def _get_ucx_main_queries(self) -> List[Dict[str, str]]:
+        '''Retrieve and construct the main UCX queries.'''
+        pattern = r"\\b.inventory\\b"
+        schema = self._ctx.inventory_database
+
+        sql_files = [
+            file.name
+            for file in resources.files(queries).iterdir()
+            if file.suffix == ".sql" and "count" not in file.name
+        ]
+
+        ucx_main_queries = [
+            {
+                "name": "01_1_permissions",
+                "query": f"SELECT * FROM {schema}.permissions",
+            },
+            {"name": "02_2_ucx_grants", "query": f"SELECT * FROM {schema}.grants;"},
+            {"name": "03_3_groups", "query": f"SELECT * FROM {schema}.groups;"},
+        ]
+
+        for sql_file in sql_files:
+            with resources.as_file(resources.files(queries) / sql_file) as file_path:
+                content = file_path.read_text()
+                modified_content = re.sub(
+                    pattern, f" {schema}", content, flags=re.IGNORECASE
+                )
+                query_name = sql_file[:-4]
+                ucx_main_queries.append({"name": query_name, "query": modified_content})
+
+        return ucx_main_queries
+
+    def _cleanup(self) -> None:
+        '''Move the temporary results file to the download path and clean up the temp directory.'''
+        shutil.move(
+            os.path.join(self._TMP_PATH, self._FILE_NAME),
+            os.path.join(self._DOWNLOAD_PATH, self._FILE_NAME),
+        )
+        shutil.rmtree(self._TMP_PATH)
+
+    def _prepare_directories(self) -> None:
+        '''Ensure that the necessary directories exist.'''
+        os.makedirs(self._TMP_PATH, exist_ok=True)
+        os.makedirs(self._DOWNLOAD_PATH, exist_ok=True)
+
+    def _execute_query(self, result: Dict[str, str], writer: pd.ExcelWriter) -> None:
+        '''Execute a SQL query and write the result to an Excel sheet.'''
+        pattern = r'^\\d+_\\d+_(.*)'
+        match = re.search(pattern, result["name"])
+        if match:
+            sheet_name = match.group(1)
+            sdf = spark.sql(result["query"])
+            if sdf.count() > 0:
+                df = sdf.toPandas()
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    def _render_export(self) -> None:
+        '''Render an HTML link for downloading the results.'''
+        html_content = f'''
+                <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform 0.3s ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style><div class="export-container"><h2>Export Results</h2><a href='{self._RESULTS_FILE}' target='_blank' download>Download UCX Results </a></div>
+        '''
+        displayHTML(html_content)
+
+    def export_results(self) -> None:
+        '''Main method to export results to an Excel file.'''
+        self._prepare_directories()
+        results = self._get_ucx_main_queries()
+        try:
+            with pd.ExcelWriter(
+                os.path.join(self._TMP_PATH, self._FILE_NAME), engine="xlsxwriter"
+            ) as writer:
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    futures = [
+                        executor.submit(self._execute_query, result, writer)
+                        for result in results
+                    ]
+                    for future in futures:
+                        future.result()
+
+            self._cleanup()
+            self._render_export()
+
+        except Exception as e:
+            print(f"Error exporting results: {e}")
+
+# COMMAND ----------
+
+# DBTITLE 1,Automate UCX Data Export
+Exporter().export_results()
+"""
+
+
 class DeployedWorkflows:
     def __init__(self, ws: WorkspaceClient, install_state: InstallState, verify_timeout: timedelta):
         self._ws = ws
@@ -486,6 +648,7 @@ class WorkflowsDeployment(InstallationMixin):
 
         self._install_state.save()
         self._create_debug(remote_wheels)
+        self._create_export(remote_wheels)
         self._create_readme()
 
     @property
@@ -727,7 +890,7 @@ class WorkflowsDeployment(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="main",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD,
                         spark_conf=self._job_cluster_spark_conf("main"),
                         custom_tags={"ResourceClass": "SingleNode"},
                         num_workers=0,
@@ -785,6 +948,10 @@ class WorkflowsDeployment(InstallationMixin):
             remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
+
+    def _create_export(self, remote_wheels: list[str]):
+        content = EXPORT_UCX_NOTEBOOK.format(remote_wheel=remote_wheels, config_file=self._config_file).encode("utf8")
+        self._installation.upload('EXPORT_UCX_RESULTS.py', content)
 
 
 class MaxedStreamHandler(logging.StreamHandler):
