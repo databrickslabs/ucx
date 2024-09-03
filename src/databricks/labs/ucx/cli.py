@@ -573,7 +573,11 @@ def download(
                 # Installation does not have a download method
                 # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
                 input_ = BytesIO()
-                bytes = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
+                bytes = (
+                    ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
+                    .read()
+                    .rstrip(b"\n")
+                )
                 input_.write(bytes)
                 input_.seek(0)  # Go back to the beginning of the file
                 csv_header_next = input_.readline()
