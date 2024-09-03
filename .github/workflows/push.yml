@@ -75,7 +75,7 @@ jobs:
       - name: Install LSQL
         run: |
           databricks labs install lsql
-          databricks labs lsql --version
+          databricks labs installed
         env:  # this is a temporary hack
           DATABRICKS_HOST: any
           DATABRICKS_TOKEN: any
