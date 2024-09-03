@@ -343,8 +343,8 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        grants = []
         expected_grant_object_type = self._grants_reported_as.get(on_type, on_type)
+        grants = []
         try:
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
