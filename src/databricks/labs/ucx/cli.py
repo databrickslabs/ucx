@@ -1,3 +1,4 @@
+from io import BytesIO
 import json
 import webbrowser
 from pathlib import Path
@@ -7,6 +8,7 @@ from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.core import StreamingResponse
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.__about__ import __version__
@@ -564,21 +566,24 @@ def download(
         raise ValueError("Command only supported for CSV files")
     contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
     csv_header = None
-    with file.open("wb") as f:
+    with file.open("wb") as output:
         for ctx in contexts:
             remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
             try:
                 # Installation does not have a download method
-                csv_binary = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
-                csv_header_next = csv_binary.readline()
+                input_ = BytesIO()
+                bytes = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
+                input_.write(bytes)
+                input_.seek(0)  # Go back to the beginning of the file
+                csv_header_next = input_.readline()
                 if csv_header is None:
                     csv_header = csv_header_next
-                    f.write(csv_header)
+                    output.write(csv_header)
                 elif csv_header == csv_header_next:
-                    f.write(b"\n")
+                    output.write(b"\n")
                 else:
                     raise ValueError("CSV files have different headers")
-                f.write(csv_binary.read())
+                output.write(input_.read())
             except NotFound:
                 logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
     if csv_header is None:
