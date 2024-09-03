@@ -8,7 +8,6 @@ from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.core import StreamingResponse
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.__about__ import __version__
@@ -573,12 +572,12 @@ def download(
                 # Installation does not have a download method
                 # BytesIO allows to .readline() for the header and handle the StreamingResponse from the download
                 input_ = BytesIO()
-                bytes = (
+                data = (
                     ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO)
                     .read()
                     .rstrip(b"\n")
                 )
-                input_.write(bytes)
+                input_.write(data)
                 input_.seek(0)  # Go back to the beginning of the file
                 csv_header_next = input_.readline()
                 if csv_header is None:
