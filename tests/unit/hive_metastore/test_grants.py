@@ -485,4 +485,5 @@ def test_crawler_should_filter_databases():
     crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
     grants = list(crawler.snapshot())
 
+    assert "SHOW DATABASES" not in sql_backend.queries
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
