@@ -221,7 +221,7 @@ class CommonUtils:
             ]
             uc_roles_mapping = [
                 AWSRoleAction(
-                    self._env_or_skip("TEST_STORAGE_CREDENTIAL"),
+                    self._env_or_skip("TEST_AWS_STORAGE_ROLE"),
                     's3',
                     'WRITE_FILES',
                     f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',

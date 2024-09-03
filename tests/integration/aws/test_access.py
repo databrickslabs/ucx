@@ -1,5 +1,6 @@
 import dataclasses
 import json
+from pathlib import Path
 
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.service.catalog import AwsIamRoleRequest
@@ -118,11 +119,13 @@ def test_create_external_location_validate_acl(
     profile = env_or_skip("AWS_PROFILE")
     aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.with_dummy_resource_permission()
+    path = env_or_skip("TEST_MOUNT_CONTAINER")
     aws_cli_ctx.sql_backend.save_table(
         f"{inventory_schema}.external_locations",
         [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}", 1),],
         ExternalLocation,
     )
+    external_location_name = "_".join(Path(path.lower()).parts[1:])
     cluster = make_cluster(
         single_node=True,
         data_security_mode=DataSecurityMode.NONE,
@@ -153,7 +156,7 @@ def test_create_external_location_validate_acl(
     try:
         external_location_migration.run()
         permissions = ws.grants.get(
-            SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=cluster_user.user_name
+            SecurableType.EXTERNAL_LOCATION, external_location_name, principal=cluster_user.user_name
         )
         expected_aws_permission = PrivilegeAssignment(
             principal=cluster_user.user_name,
@@ -166,6 +169,7 @@ def test_create_external_location_validate_acl(
             Privilege.CREATE_EXTERNAL_VOLUME,
             Privilege.READ_FILES,
         ]
+        ws.external_locations.delete(external_location_name)
         ws.grants.update(
             SecurableType.EXTERNAL_LOCATION,
             env_or_skip("TEST_A_LOCATION"),
