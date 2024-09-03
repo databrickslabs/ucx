@@ -229,11 +229,13 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
     assert registered_notebooks == [expected_path_instance]
 
 
-def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
+def test_workflow_linter_lint_job_logs_problems(
+    dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler, caplog
+):
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index)
+    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler)
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test-task", libraries=libraries)

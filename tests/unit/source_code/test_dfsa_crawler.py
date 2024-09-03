@@ -7,8 +7,9 @@ from databricks.labs.ucx.source_code.dfsa_crawler import DfsaCrawler
 def test_crawler_appends_dfsas():
     backend = MockBackend()
     crawler = DfsaCrawler(backend, "schema")
-    for path in ("a", "b", "c"):
-        dfsa = DFSA(source_type="SOURCE", source_id="ID", path=path, is_read=False, is_write=False)
-        crawler.append(dfsa)
+    dfsas = list(
+        DFSA(source_type="SOURCE", source_id="ID", path=path, is_read=False, is_write=False) for path in ("a", "b", "c")
+    )
+    crawler.append(dfsas)
     rows = backend.rows_written_for(crawler.full_name, "append")
     assert len(rows) == 3

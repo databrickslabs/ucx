@@ -4,8 +4,8 @@ from abc import ABC
 from collections.abc import Iterable
 
 from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
-from sqlglot import Expression
-from sqlglot.expressions import Table
+from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
+from sqlglot.expressions import Alter, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -146,6 +146,15 @@ class DfsaPyLinter(PythonLinter):
             )
             yield advisory
 
+    def collect_dfsas(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DFSA]:
+        tree = Tree.new_module()
+        if inherited_tree:
+            tree.append_tree(inherited_tree)
+        tree.append_tree(Tree.normalize_and_parse(python_code))
+        visitor = _DetectDfsaVisitor(self._session_state, self._prevent_spark_duplicates)
+        visitor.visit(tree.node)
+        yield from visitor.dfsa_nodes
+
 
 class DfsaSqlLinter(SqlLinter):
 
@@ -153,23 +162,68 @@ class DfsaSqlLinter(SqlLinter):
     def name() -> str:
         return 'dfsa-query'
 
-    def lint_expression(self, expression: Expression):
-        for table in expression.find_all(Table):
-            # Check table names for direct file system access
-            yield from self._check_dfsa(table)
-
-    def _check_dfsa(self, table: Table) -> Iterable[Advice]:
-        """
-        Check if the table is a DBFS table or reference in some way
-        and yield a deprecation message if it is
-        """
-        if any(pattern.matches(table.name) for pattern in DFSA_PATTERNS):
+    def lint_expression(self, expression: SqlExpression):
+        for dfsa in self._collect_dfsas(expression):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
-                message=f"The use of direct filesystem references is deprecated: {table.name}",
+                message=f"The use of direct filesystem references is deprecated: {dfsa.path}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
                 end_line=0,
                 end_col=1024,
             )
+
+    def collect_dfsas(self, sql_code: str):
+        try:
+            expressions = parse_sql(sql_code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self._collect_dfsas(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
+
+    @classmethod
+    def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DFSA]:
+        yield from cls._collect_dfsas_from_literals(expression)
+        yield from cls._collect_dfsas_from_identifiers(expression)
+
+    @classmethod
+    def _collect_dfsas_from_literals(cls, expression: SqlExpression) -> Iterable[DFSA]:
+        for literal in expression.find_all(Literal):
+            if not isinstance(literal.this, str):
+                logger.warning(f"Can't interpret {type(literal.this).__name__}")
+            yield from cls._collect_dfsa_from_node(literal, literal.this)
+
+    @classmethod
+    def _collect_dfsas_from_identifiers(cls, expression: SqlExpression) -> Iterable[DFSA]:
+        for identifier in expression.find_all(Identifier):
+            if not isinstance(identifier.this, str):
+                logger.warning(f"Can't interpret {type(identifier.this).__name__}")
+            yield from cls._collect_dfsa_from_node(identifier, identifier.this)
+
+    @classmethod
+    def _collect_dfsa_from_node(cls, expression: SqlExpression, path: str) -> Iterable[DFSA]:
+        if any(pattern.matches(path) for pattern in DFSA_PATTERNS):
+            is_read = cls._is_read(expression)
+            is_write = cls._is_write(expression)
+            yield DFSA(source_type=DFSA.UNKNOWN, source_id=DFSA.UNKNOWN, path=path, is_read=is_read, is_write=is_write)
+
+    @classmethod
+    def _is_read(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, Select)
+
+    @classmethod
+    def _is_write(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, (Create, Alter, Drop, Insert, Delete))
+
+    @classmethod
+    def _walk_up(cls, expression: SqlExpression | None) -> SqlExpression | None:
+        if expression is None:
+            return None
+        if isinstance(expression, (Create, Alter, Drop, Insert, Delete, Select)):
+            return expression
+        return cls._walk_up(expression.parent)

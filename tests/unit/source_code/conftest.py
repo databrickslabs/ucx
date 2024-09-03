@@ -1,9 +1,12 @@
 import pytest
 
+from databricks.labs.lsql.backends import MockBackend
+
 from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatus,
 )
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.dfsa_crawler import DfsaCrawler
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -55,3 +58,8 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
+
+
+@pytest.fixture
+def mock_dfsa_crawler() -> DfsaCrawler:
+    return DfsaCrawler(MockBackend(), "schema")

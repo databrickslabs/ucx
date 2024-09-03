@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.source_code.base import DFSA
 from databricks.labs.lsql.backends import SqlBackend
@@ -15,5 +17,5 @@ class DfsaCrawler(CrawlerBase):
         """
         super().__init__(backend, "hive_metastore", schema, "direct_file_system_access", DFSA)
 
-    def append(self, dfsa: DFSA):
-        self._append_records([dfsa])
+    def append(self, dfsas: Sequence[DFSA]):
+        self._append_records(dfsas)

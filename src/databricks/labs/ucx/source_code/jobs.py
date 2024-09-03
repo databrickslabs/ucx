@@ -16,11 +16,20 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
-from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice
+from databricks.labs.ucx.source_code.base import (
+    CurrentSessionState,
+    LocatedAdvice,
+    DFSA,
+    is_a_notebook,
+    file_language,
+    guess_encoding,
+)
+from databricks.labs.ucx.source_code.dfsa_crawler import DfsaCrawler
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -31,8 +40,9 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphWalker,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.dfsa import DfsaSqlLinter, DfsaPyLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -320,12 +330,14 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
+        dfsa_crawler: DfsaCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
+        self._dfsa_crawler = dfsa_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -412,6 +424,9 @@ class WorkflowLinter:
             graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
         )
         yield from walker
+        collector = DfsaCollector(graph, set(), self._path_lookup, session_state)
+        dfsas = list(dfsa for dfsa in collector)
+        self._dfsa_crawler.append(dfsas)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
@@ -441,3 +456,72 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
+
+
+class DfsaCollector(DependencyGraphWalker[DFSA]):
+
+    def __init__(
+        self,
+        graph: DependencyGraph,
+        walked_paths: set[Path],
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+    ):
+        super().__init__(graph, walked_paths, path_lookup)
+        self._session_state = session_state
+
+    def _process_dependency(
+        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+    ) -> Iterable[DFSA]:
+        language = file_language(dependency.path)
+        if not language:
+            logger.warning(f"Unknown language for {dependency.path}")
+            return
+        source = dependency.path.read_text(guess_encoding(dependency.path))
+        if is_a_notebook(dependency.path):
+            yield from self._collect_from_notebook(source, language, dependency.path, inherited_tree)
+        elif dependency.path.is_file():
+            yield from self._collect_from_source(source, language, dependency.path, inherited_tree)
+
+    def _collect_from_notebook(
+        self, source: str, language: Language, path: Path, inherited_tree: Tree | None
+    ) -> Iterable[DFSA]:
+        notebook = Notebook.parse(path, source, language)
+        for cell in notebook.cells:
+            for dfsa in self._collect_from_source(cell.original_code, cell.language.language, path, inherited_tree):
+                yield DFSA(
+                    source_type="NOTEBOOK",
+                    source_id=str(path),
+                    path=dfsa.path,
+                    is_read=dfsa.is_read,
+                    is_write=dfsa.is_write,
+                )
+            if cell.language.language is Language.PYTHON:
+                if inherited_tree is None:
+                    inherited_tree = Tree.new_module()
+                tree = Tree.normalize_and_parse(cell.original_code)
+                inherited_tree.append_tree(tree)
+
+    def _collect_from_source(
+        self, source: str, language: Language, path: Path, inherited_tree: Tree | None
+    ) -> Iterable[DFSA]:
+        iterable: Iterable[DFSA] | None = None
+        if language is Language.SQL:
+            iterable = self._collect_from_sql(source)
+        if language is Language.PYTHON:
+            iterable = self._collect_from_python(source, inherited_tree)
+        if iterable is None:
+            logger.warning(f"Language {language.name} not supported yet!")
+            return
+        for dfsa in iterable:
+            yield DFSA(
+                source_type="FILE", source_id=str(path), path=dfsa.path, is_read=dfsa.is_read, is_write=dfsa.is_write
+            )
+
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DFSA]:
+        linter = DfsaPyLinter(self._session_state, prevent_spark_duplicates=False)
+        yield from linter.collect_dfsas(source, inherited_tree)
+
+    def _collect_from_sql(self, source: str) -> Iterable[DFSA]:
+        linter = DfsaSqlLinter()
+        yield from linter.collect_dfsas(source)
