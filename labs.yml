@@ -272,3 +272,11 @@ commands:
         description: The file to upload
       - name: run-as-collection
         description: Run the command for the collection of workspace with ucx installed. Default is False.
+
+  - name: download
+    description: download file from all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to download
+      - name: run-as-collection
+        description: Run the command for the collection of workspace with ucx installed. Default is False.
