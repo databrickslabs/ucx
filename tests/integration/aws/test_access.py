@@ -116,16 +116,16 @@ def test_create_external_location_validate_acl(
     env_or_skip,
     inventory_schema,
 ):
-    profile = env_or_skip("AWS_PROFILE")
     aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.with_dummy_resource_permission()
-    path = env_or_skip("TEST_MOUNT_CONTAINER")
     aws_cli_ctx.sql_backend.save_table(
         f"{inventory_schema}.external_locations",
-        [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}", 1),],
+        [
+            ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}", 1),
+        ],
         ExternalLocation,
     )
-    external_location_name = "_".join(Path(path.lower()).parts[1:])
+    external_location_name = "_".join(Path(env_or_skip("TEST_MOUNT_CONTAINER").lower()).parts[1:])
     cluster = make_cluster(
         single_node=True,
         data_security_mode=DataSecurityMode.NONE,
@@ -138,12 +138,11 @@ def test_create_external_location_validate_acl(
         user_name=cluster_user.user_name,
     )
     external_location = ExternalLocations(ws, sql_backend, inventory_schema)
-    aws = AWSResources(profile)
-    account_id = aws.validate_connection().get("Account")
+    account_id = aws_cli_ctx.aws.validate_connection().get("Account")
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
         ws,
-        aws,
+        aws_cli_ctx.aws,
         external_location,
         account_id,
     )

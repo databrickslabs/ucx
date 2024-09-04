@@ -567,6 +567,10 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
     def aws_profile():
         return env_or_skip("AWS_PROFILE")
 
+    @property
+    def aws():
+        return AWSResources(aws_profile())
+
     def aws_resource_permissions():
         return AWSResourcePermissions(
             installation_ctx.installation,
