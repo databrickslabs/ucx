@@ -526,9 +526,8 @@ class FasterTableScanCrawler(CrawlerBase):
             return ""
         formatted_items: list[str] = []
         for each_property in properties_list:
-            # pylint: disable=protected-access
-            key = each_property._1()
-            value = each_property._2()
+            key = each_property.productElement(0)
+            value = each_property.productElement(1)
 
             redacted_key = "*******"
 
