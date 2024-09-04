@@ -528,19 +528,24 @@ def test_xxx(graph):
         ),
     ],
 )
-def test_workflow_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_read, is_write,
-                                                     mock_path_lookup, simple_dependency_resolver, empty_index, mock_dfsa_crawler):
+def test_workflow_linter_collects_dfsas_from_queries(
+    name,
+    query,
+    dfsa_paths,
+    is_read,
+    is_write,
+    mock_path_lookup,
+    simple_dependency_resolver,
+    empty_index,
+    mock_dfsa_crawler,
+):
     ws = create_autospec(WorkspaceClient)
     query = Query.from_dict({"parent_path": "workspace", "display_name": name, "query_text": query})
     response = ListQueryObjectsResponseQuery.from_dict(query.as_dict())
     ws.queries.list.return_value = iter([response])
-    linter = WorkflowLinter(ws, simple_dependency_resolver, mock_path_lookup,
-                            empty_index, mock_dfsa_crawler)
+    linter = WorkflowLinter(ws, simple_dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler)
     dfsas = linter.collect_dfsas_from_queries()
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
     assert not any(dfsa for dfsa in dfsas if dfsa.source_type != "QUERY")
     assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
-
-
-
