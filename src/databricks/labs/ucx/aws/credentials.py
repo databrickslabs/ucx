@@ -240,6 +240,9 @@ class IamRoleCreation:
 
         uc_role_mapping = {role.role_arn: role.role_name for role in uc_roles}
         selected_roles = prompts.multiple_choice_from_dict("Select the list of roles created by UCX", uc_role_mapping)
+        if len(selected_roles) == 0:
+            logger.info("No roles selected...")
+            return
         matching_credentials = [
             storage_credential
             for storage_credential in storage_credentials
