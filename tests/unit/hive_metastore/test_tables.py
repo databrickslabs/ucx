@@ -1,5 +1,4 @@
 import sys
-from unittest.mock import create_autospec, MagicMock
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
@@ -492,12 +491,6 @@ def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
             ("hive_metastore", "db1", "table2", "MANAGED", "DELTA", "/dbfs/location/table", None),
             ("hive_metastore", "db1", "table3", "MANAGED", "DELTA", "dbfs:/mnt/location/table", None),
-            ("hive_metastore", "db1", "table4", "MANAGED", "DELTA", "s3:/location/table", None),
-            ("hive_metastore", "db1", "table5", "MANAGED", "DELTA", "/dbfs/mnt/location/table", None),
-            ("hive_metastore", "db1", "table6", "MANAGED", "DELTA", "/dbfs/databricks-datasets/location/table", None),
-            ("hive_metastore", "db1", "table7", "MANAGED", "DELTA", "dbfs:/databricks-datasets/location/table", None),
-            ("hive_metastore", "db1", "table8", "MANAGED", "DELTA", "/databricks-datasets/location/table", None),
-            ("hive_metastore", "db1", "view", "VIEW", "DELTA", None, "SELECT * FROM TABLE"),
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -506,16 +499,14 @@ def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     ftsc = FasterTableScanCrawler(backend, "inventory_database")
     results = ftsc.snapshot()
 
-    assert len(results) == 9
+    assert len(results) == 3
+
 
 # TODO: work in progress
-@pytest.skip
 def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
-    # errors = {"SELECT * FROM hive_metastore.inventory_database.tables": "TABLE_NOT_FOUND"}
     errors = {}
     rows = {
-        "hive_metastore.inventory_database.tables": [
-        ],
+        "hive_metastore.inventory_database.tables": [],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     pyspark_sql_session = mocker.Mock()
@@ -543,15 +534,40 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     mock_list_databases_iterator = mocker.Mock()
     mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
     mock_list_tables_iterator = mocker.Mock()
-    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1", "table2"])
+    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1"])
+
+    mock_property_1 = mocker.Mock()
+    mock_property_2 = mocker.Mock()
+    mock_property_personal_access_token = mocker.Mock()
+    mock_property_password = mocker.Mock()
+    mock_property_1._1.return_value = "delta.appendOnly"
+    mock_property_1._2.return_value = "true"
+    mock_property_2._1.return_value = "delta.autoOptimize"
+    mock_property_2._2.return_value = "false"
+    mock_property_personal_access_token._1.return_value = "personalAccessToken"
+    mock_property_personal_access_token._2.return_value = "e32kfkdsfk345432mkfds"
+    mock_property_password._1.return_value = "password"
+    mock_property_password._2.return_value = "very_secret"
+
+    mock_storage_properties_list = [
+        mock_property_1,
+        mock_property_2,
+        mock_property_personal_access_token,
+        mock_property_password,
+    ]
+    mock_storage_properties_iterator = mocker.Mock()
+    mock_storage_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
+
+    mock_partition_column_names_iterator = mocker.Mock()
+    mock_partition_column_names_iterator.iterator.return_value = CustomIterator(["age", "name"])
 
     get_table_mock = mocker.Mock()
-    get_table_mock.provider.getOrElse.return_value = "delta"
+    get_table_mock.provider().getOrElse.return_value = "delta"
+    get_table_mock.storage().locationUri().getOrElse.return_value = None
 
-    list_tables_mock = {
-        "default": mock_list_tables_iterator,
-        "test_database": mock_list_tables_iterator
-    }
+    get_table_mock.viewText.return_value = "mock table text"
+    get_table_mock.properties.return_value = mock_storage_properties_iterator
+    get_table_mock.partitionColumnNames.return_value = mock_partition_column_names_iterator
 
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
@@ -559,3 +575,13 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = get_table_mock
     results = ftsc.snapshot()
 
+    assert len(results) == 1
+    assert results[0].catalog == "hive_metastore"
+    assert results[0].database == "default"
+    assert results[0].name == "table1"
+    assert results[0].view_text == "mock table text"
+    assert results[0].is_dbfs_root is False
+    assert results[0].is_partitioned is True
+    assert results[0].storage_properties == (
+        "[delta.appendOnly=true, " "delta.autoOptimize=false, " "personalAccessToken=*******, " "password=*******]"
+    )

@@ -481,6 +481,7 @@ class FasterTableScanCrawler(CrawlerBase):
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
         self._spark = SparkSession.builder.getOrCreate()
 
@@ -536,9 +537,9 @@ class FasterTableScanCrawler(CrawlerBase):
             view_text = raw_table.viewText()
 
             # get properties
-            properties_list = self._iterator(raw_table.properties())
+            properties_list = list(self._iterator(raw_table.properties()))
 
-            if len(list(properties_list)) < 0:
+            if len(properties_list) == 0:
                 storage_properties = None
             else:
                 formatted_items: list[str] = []
@@ -552,11 +553,11 @@ class FasterTableScanCrawler(CrawlerBase):
                         value = redacted_key
                     elif value is None:
                         value = "None"
+
+                    formatted_items.append(f"{key}={value}")
                 storage_properties = f"[{', '.join(formatted_items)}]"
 
-            # TODO: add all properties to the table object
             partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
-            print(f"Partition Column Names: {partition_column_names}")
             is_partitioned = len(partition_column_names) > 0
 
             return Table(
@@ -573,7 +574,6 @@ class FasterTableScanCrawler(CrawlerBase):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
-
 
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
