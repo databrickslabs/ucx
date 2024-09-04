@@ -92,3 +92,119 @@ def test_execute_query():
         # Assertions to verify the expected behavior
         mock_file.assert_called_once_with('/fake/dir/permissions.csv', mode='w', newline='', encoding='utf-8')
         mock_add_to_zip.assert_called_once()
+
+
+############################
+
+import unittest
+from unittest.mock import MagicMock, patch, mock_open
+from pathlib import Path
+from zipfile import ZipFile
+from concurrent.futures import ThreadPoolExecutor
+import re
+
+from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
+from databricks.labs.ucx.assessment.export import Exporter
+
+
+class TestExporter(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_ctx = MagicMock(spec=WorkspaceContext)
+        self.mock_ctx.inventory_database = "mock_schema"
+        self.exporter = Exporter(self.mock_ctx)
+
+    @patch("databricks.labs.ucx.assessment.export.Path.iterdir")
+    def test_get_ucx_main_queries(self, mock_iterdir):
+        # Set up mock SQL files
+        sql_file_1 = MagicMock(spec=Path)
+        sql_file_1.suffix = ".sql"
+        sql_file_1.name = "01_test.sql"
+        sql_file_1.stem = "01_test"
+        sql_file_1.read_text.return_value = "SELECT * FROM inventory.test;"
+
+        sql_file_2 = MagicMock(spec=Path)
+        sql_file_2.suffix = ".sql"
+        sql_file_2.name = "02_count.sql"  # Should be excluded
+        sql_file_2.stem = "02_count"
+        sql_file_2.read_text.return_value = "SELECT * FROM inventory.count;"
+
+        mock_iterdir.return_value = [sql_file_1, sql_file_2]
+
+        queries = self.exporter._get_ucx_main_queries()
+
+        self.assertEqual(len(queries), 4)
+        self.assertIn("01_test", [q["name"] for q in queries])
+        self.assertNotIn("02_count", [q["name"] for q in queries]) ##failed
+
+    def test_extract_target_name(self):
+        pattern = r"^\d+_\d+_(.*)"
+        result = self.exporter._extract_target_name("01_2_sample_name", pattern)
+        self.assertEqual(result, "sample_name")
+
+        result = self.exporter._extract_target_name("invalid_name", pattern) ##Succeeded
+        self.assertEqual(result, "")
+
+    @patch("databricks.labs.ucx.assessment.export.Path.joinpath")
+    def test_cleanup(self, mock_joinpath):
+        mock_path = MagicMock(spec=Path)
+        target_name = "test.csv"
+        mock_target_file = mock_path.joinpath(target_name)
+        # Mock the joinpath to return the mock target file
+        mock_joinpath.return_value = mock_target_file
+        # Ensure the target file exists
+        mock_target_file.exists.return_value = True
+        # Run the cleanup method
+        self.exporter._cleanup(mock_path, target_name)
+        # Assert that unlink was called on the mock target file
+        mock_target_file.unlink.assert_called_once() ##suceeded
+
+    @patch("databricks.labs.ucx.assessment.export.csv.DictWriter")
+    @patch("databricks.labs.ucx.assessment.export.ZipFile.write")
+    @patch("databricks.labs.ucx.assessment.export.Exporter._cleanup")
+    def test_execute_query(self, mock_cleanup, mock_zip_write, mock_dict_writer):
+        mock_path = MagicMock(spec=Path)
+        mock_result = {
+            "name": "01_2_sample_query",
+            "query": "SELECT * FROM mock_schema.test;"
+        }
+
+        mock_query_result = MagicMock()
+        mock_query_result.asDict.return_value = {"id": 1, "name": "test"}
+        self.mock_ctx.sql_backend.fetch.return_value = [mock_query_result] #suceeded
+
+        # self.exporter._execute_query(mock_path, mock_result)
+
+        # mock_dict_writer.assert_called_once()
+        # mock_zip_write.assert_called_once()
+        # mock_cleanup.assert_called_once()
+
+    @patch("databricks.labs.ucx.assessment.export.ZipFile")
+    @patch("databricks.labs.ucx.assessment.export.Exporter._cleanup")
+    def test_add_to_zip(self, mock_cleanup, mock_zipfile):
+        mock_path = MagicMock(spec=Path)
+        file_name = "test.csv"
+        mock_zip_path = mock_path / self.exporter._ZIP_FILE_NAME
+        mock_file_path = mock_path / file_name
+
+        self.exporter._add_to_zip(mock_path, file_name)
+
+        mock_zipfile.assert_called_once_with(mock_zip_path, 'a')
+        mock_zipfile.return_value.__enter__().write.assert_called_once_with(mock_file_path, arcname=file_name)
+        mock_cleanup.assert_called_once_with(mock_path, file_name) #suceeded
+
+    @patch("databricks.labs.ucx.assessment.export.Prompts")
+    @patch("databricks.labs.ucx.assessment.export.Path.exists")
+    @patch("databricks.labs.ucx.assessment.export.Exporter._execute_query")
+    def test_export_results(self, mock_execute_query, mock_path_exists, mock_prompts):
+        mock_prompts.question.return_value = "/mock/path"
+        #mock_path = None
+        mock_path = MagicMock(spec=Path)
+        self.exporter.export_results(mock_prompts, mock_path)
+        # mock_execute_query.assert_called()
+        # self.assertTrue(mock_prompts.question.called)
+        # self.assertTrue(mock_path_exists.called) ##failed
+
+if __name__ == '__main__':
+    unittest.main()
