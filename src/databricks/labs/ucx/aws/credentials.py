@@ -249,7 +249,7 @@ class IamRoleCreation:
         if len(matching_credentials) == 0:
             logger.info("No storage credential using the selected UC roles, proceeding to delete.")
         for credential in matching_credentials:
-            logger.info(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role}")
+            logger.info(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role.role_arn}")
         if len(matching_credentials) == 0 or prompts.confirm(
             "The above storage credential will be impacted on deleting the selected IAM roles,"
             " Are you sure you want to confirm"
