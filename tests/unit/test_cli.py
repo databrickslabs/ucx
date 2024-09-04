@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import time
 from pathlib import Path
 from unittest.mock import create_autospec, patch, Mock
@@ -17,7 +18,7 @@ from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ImportFormat, ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ExportFormat, ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -32,6 +33,7 @@ from databricks.labs.ucx.cli import (
     create_missing_principals,
     create_table_mapping,
     create_uber_principal,
+    download,
     ensure_assessment_run,
     installations,
     join_collection,
@@ -108,7 +110,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
 """,
     }
 
-    def download(path: str) -> io.StringIO | io.BytesIO:
+    def mock_download(path: str, **_) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
         if ".csv" in path or ".log" in path:
@@ -119,7 +121,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
     workspace_client.get_workspace_id.return_value = workspace_id
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
-    workspace_client.workspace.download = download
+    workspace_client.workspace.download.side_effect = mock_download
     workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
@@ -808,11 +810,80 @@ def test_join_collection():
     w.workspace.download.assert_not_called()
 
 
-def test_delete_principals(ws):
-    ws.config.is_azure = False
-    ws.config.is_aws = True
+def test_download_raises_value_error_if_not_downloading_a_csv(ws1):
+    with pytest.raises(ValueError) as e:
+        download(Path("test.txt"), ws1)
+    assert "Command only supported for CSV files" in str(e)
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_download_calls_workspace_download(tmp_path, workspace_clients, acc_client, run_as_collection):
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+
+    download(
+        tmp_path / "test.csv",
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+
+    for ws in workspace_clients:
+        ws.workspace.download.assert_called_with(
+            "/Users/foo/.ucx/test.csv",
+            format=ExportFormat.AUTO,
+        )
+
+
+def test_download_warns_if_file_not_found(caplog, ws1, acc_client):
+    ws1.workspace.download.side_effect = NotFound("test.csv")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.cli"):
+        download(
+            Path("test.csv"),
+            ws1,
+            run_as_collection=False,
+            a=acc_client,
+        )
+    assert "File not found for https://localhost: /Users/foo/.ucx/test.csv" in caplog.messages
+    assert "No file(s) to download found" in caplog.messages
+
+
+def test_download_deletes_empty_file(tmp_path, ws1, acc_client):
+    ws1.workspace.download.side_effect = NotFound("test.csv")
+    mapping_path = tmp_path / "mapping.csv"
+    download(
+        mapping_path,
+        ws1,
+        run_as_collection=False,
+        a=acc_client,
+    )
+    assert not mapping_path.is_file()
+
+
+def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
+    expected = (
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table"
+        "\ntest,test,test,test,test,test"
+        "\ntest,test,test,test,test,test"
+    )
+    mapping_path = tmp_path / "mapping.csv"
+
+    download(
+        mapping_path,
+        workspace_clients[0],
+        run_as_collection=True,
+        a=acc_client,
+    )
+
+    content = mapping_path.read_text()
+    assert content == expected
+
+
+def test_delete_principals(ws1):
+    ws1.config.is_azure = False
+    ws1.config.is_aws = True
     role_creation = create_autospec(IamRoleCreation)
-    ctx = WorkspaceContext(ws).replace(iam_role_creation=role_creation, workspace_client=ws)
+    ctx = WorkspaceContext(ws1).replace(iam_role_creation=role_creation, workspace_client=ws1)
     prompts = MockPrompts({"Select the list of roles *": "0"})
-    delete_missing_principals(ws, prompts, ctx)
+    delete_missing_principals(ws1, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
