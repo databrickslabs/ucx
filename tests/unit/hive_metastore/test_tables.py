@@ -503,6 +503,7 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
     assert expected_log in caplog.text
 
 
+
 def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     errors = {}
     rows = {
@@ -522,6 +523,19 @@ def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
 
 
 def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
+    def create_product_element_mock(key, value):
+        def product_element_side_effect(index):
+            if index == 0:
+                return key
+            elif index == 1:
+                return value
+            else:
+                raise IndexError(f"Invalid index: {index}")
+
+        mock = mocker.Mock()
+        mock.productElement.side_effect = product_element_side_effect
+        return mock
+
     errors = {}
     rows = {
         "hive_metastore.inventory_database.tables": [],
@@ -536,20 +550,10 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     mock_list_tables_iterator = mocker.Mock()
     mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1"])
 
-    mock_property_1 = mocker.Mock()
-    mock_property_2 = mocker.Mock()
-    mock_property_pat = mocker.Mock()
-    mock_property_password = mocker.Mock()
-
-    # pylint: disable=protected-access
-    mock_property_1._1.return_value = "delta.appendOnly"
-    mock_property_1._2.return_value = "true"
-    mock_property_2._1.return_value = "delta.autoOptimize"
-    mock_property_2._2.return_value = "false"
-    mock_property_pat._1.return_value = "personalAccessToken"
-    mock_property_pat._2.return_value = "e32kfkdsfk345432mkfds"
-    mock_property_password._1.return_value = "password"
-    mock_property_password._2.return_value = "very_secret"
+    mock_property_1 = create_product_element_mock("delta.appendOnly", "true")
+    mock_property_2 = create_product_element_mock("delta.autoOptimize", "false")
+    mock_property_pat = create_product_element_mock("personalAccessToken", "e32kfkasdas")
+    mock_property_password = create_product_element_mock("password", "very_secret")
 
     mock_storage_properties_list = [
         mock_property_1,
@@ -574,8 +578,8 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     # pylint: disable=protected-access
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
-
     ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = get_table_mock
+
     results = ftsc.snapshot()
 
     assert len(results) == 1
