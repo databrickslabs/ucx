@@ -971,9 +971,10 @@ def inventory_schema(make_schema):
 @pytest.fixture
 def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
+        # Warning: As of 2024-09-04 there is no way to mark this catalog for protection against the watchdog.
+        # Ref: https://github.com/databrickslabs/watchdog/blob/cdc97afdac1567e89d3b39d938f066fd6267b3ba/scan/objects/uc.go#L68
         name = f"ucx_C{make_random(4)}".lower()
         sql_backend.execute(f"CREATE CATALOG {name}")
-        sql_backend.execute(f"ALTER CATALOG {name} SET TAGS ('RemoveAfter' = '{get_test_purge_time()}')'")
         catalog_info = ws.catalogs.get(name)
         return catalog_info
 
