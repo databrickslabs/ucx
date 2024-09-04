@@ -521,7 +521,6 @@ def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     assert len(results) == 3
 
 
-# TODO: work in progress
 def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     errors = {}
     rows = {

@@ -516,7 +516,7 @@ class FasterTableScanCrawler(CrawlerBase):
     def _list_tables(self, database: str) -> list[str]:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-exception-caught
             logger.warning(f"Failed to list tables in {database}: {err}")
             return []
 
@@ -549,19 +549,13 @@ class FasterTableScanCrawler(CrawlerBase):
         # pylint: disable=too-many-try-statements
         try:
             raw_table = self._external_catalog.getTable(database, table)
-            table_format = raw_table.provider().getOrElse(None)
-            if not table_format:
-                table_format = "UNKNOWN"
+            table_format = raw_table.provider().getOrElse(None) or "UNKNOWN"
             location_uri = raw_table.storage().locationUri().getOrElse(None)
             if location_uri:
                 location_uri = location_uri.toString()
             view_text = raw_table.viewText()
-
-            # get properties
             storage_properties = self._format_properties_list(list(self._iterator(raw_table.properties())))
-
-            partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
-            is_partitioned = len(partition_column_names) > 0
+            is_partitioned = len(list(self._iterator(raw_table.partitionColumnNames()))) > 0
 
             return Table(
                 catalog='hive_metastore',
@@ -579,8 +573,7 @@ class FasterTableScanCrawler(CrawlerBase):
             return None
 
     def _crawl(self) -> Iterable[Table]:
-        """Crawls and lists tables within the specified catalog and database.
-        """
+        """Crawls and lists tables within the specified catalog and database."""
         tasks = []
         catalog = "hive_metastore"
         databases = self._all_databases()
