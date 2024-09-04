@@ -503,7 +503,6 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
     assert expected_log in caplog.text
 
 
-
 def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
     errors = {}
     rows = {
@@ -527,10 +526,9 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
         def product_element_side_effect(index):
             if index == 0:
                 return key
-            elif index == 1:
+            if index == 1:
                 return value
-            else:
-                raise IndexError(f"Invalid index: {index}")
+            raise IndexError(f"Invalid index: {index}")
 
         mock = mocker.Mock()
         mock.productElement.side_effect = product_element_side_effect
