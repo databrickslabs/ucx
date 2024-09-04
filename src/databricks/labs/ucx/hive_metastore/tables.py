@@ -521,9 +521,9 @@ class FasterTableScanCrawler(CrawlerBase):
             return []
 
     @staticmethod
-    def _format_properties_list(properties_list: list[str]) -> str | None:
+    def _format_properties_list(properties_list: list[str]) -> str:
         if len(properties_list) == 0:
-            return None
+            return []
         formatted_items: list[str] = []
         for each_property in properties_list:
             # pylint: disable=protected-access
