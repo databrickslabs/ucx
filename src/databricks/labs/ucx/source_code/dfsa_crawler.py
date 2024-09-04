@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Sequence, Iterable
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.source_code.base import DFSA
@@ -25,4 +25,8 @@ class DfsaCrawler(CrawlerBase):
             self._append_records(dfsas)
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
+
+    def snapshot(self) -> Iterable[DFSA]:
+        sql = f"SELECT * FROM {self.full_name}"
+        yield from self._backend.fetch(sql)
 

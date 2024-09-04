@@ -154,6 +154,9 @@ display(spark.read.parquet("/mnt/something"))
     last_messages = caplog.messages[-1].split("\n")
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
+    dfsas = simple_ctx.dfsa_crawler.snapshot()
+    assert len(list(dfsas)) == 2
+
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
     simple_ctx,
