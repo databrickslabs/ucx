@@ -513,12 +513,32 @@ class FasterTableScanCrawler(CrawlerBase):
             return list(self._iterator(self._external_catalog.listDatabases()))
         return self._include_database
 
-    def _list_tables(self, database: str) -> list[str] | None:
+    def _list_tables(self, database: str) -> list[str]:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:
             logger.warning(f"Failed to list tables in {database}: {err}")
+            return []
+
+    @staticmethod
+    def _format_properties_list(properties_list: list[str]) -> str | None:
+        if len(properties_list) == 0:
             return None
+        formatted_items: list[str] = []
+        for each_property in properties_list:
+            # pylint: disable=protected-access
+            key = each_property._1()
+            value = each_property._2()
+
+            redacted_key = "*******"
+
+            if key == "personalAccessToken" or key.lower() == "password":
+                value = redacted_key
+            elif value is None:
+                value = "None"
+
+            formatted_items.append(f"{key}={value}")
+        return f"[{', '.join(formatted_items)}]"
 
     def _describe(self, catalog, database, table) -> Table | None:
         """Fetches metadata like table type, data format, external table location,
@@ -537,26 +557,8 @@ class FasterTableScanCrawler(CrawlerBase):
             view_text = raw_table.viewText()
 
             # get properties
-            properties_list = list(self._iterator(raw_table.properties()))
-
-            if len(properties_list) == 0:
-                storage_properties = None
-            else:
-                formatted_items: list[str] = []
-                for each_property in properties_list:
-                    # pylint: disable=protected-access
-                    key = each_property._1()
-                    value = each_property._2()
-
-                    redacted_key = "*******"
-
-                    if key == "personalAccessToken" or key.lower() == "password":
-                        value = redacted_key
-                    elif value is None:
-                        value = "None"
-
-                    formatted_items.append(f"{key}={value}")
-                storage_properties = f"[{', '.join(formatted_items)}]"
+            storage_properties = self._format_properties_list(
+                list(self._iterator(raw_table.storage().properties())))
 
             partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
             is_partitioned = len(partition_column_names) > 0
@@ -573,7 +575,7 @@ class FasterTableScanCrawler(CrawlerBase):
                 is_partitioned=is_partitioned,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(f"Couldn't fetch information for table {full_name} : {e}")
+            logger.warning(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
     def _crawl(self) -> Iterable[Table]:
@@ -602,5 +604,5 @@ class FasterTableScanCrawler(CrawlerBase):
                         tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather("describing tables in ", tasks)
         if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} errors while scanning tables in ")
+            logger.warning(f"Detected {len(errors)} errors while scanning tables in ")
         return catalog_tables

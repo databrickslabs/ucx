@@ -527,10 +527,10 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     rows = {
         "hive_metastore.inventory_database.tables": [],
     }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
-    ftsc = FasterTableScanCrawler(backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     mock_list_databases_iterator = mocker.Mock()
     mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
