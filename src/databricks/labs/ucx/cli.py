@@ -348,7 +348,14 @@ def create_missing_principals(
 
 
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_credentials(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """For Azure, this command prompts to i) create UC storage credentials for the access connectors with a
     managed identity created for each storage account present in the ADLS Gen2 locations, the access connectors are
     granted Storage Blob Data Contributor permissions on their corresponding storage account, to prepare for adopting to
@@ -364,13 +371,19 @@ def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceCont
     Please review the file and delete the Roles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.service_principal_migration.run(prompts)
-    if ctx.is_aws:
-        return ctx.iam_role_migration.run(prompts)
-    raise ValueError("Unsupported cloud provider")
+    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_azure:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.service_principal_migration.run(prompts)
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_migration.run(prompts)
+    if w.config.is_gcp:
+        raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command

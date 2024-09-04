@@ -356,7 +356,10 @@ def test_save_storage_and_principal_gcp(ws):
         principal_prefix_access(ws, ctx=ctx)
 
 
-def test_migrate_credentials_azure(ws):
+def test_migrate_credentials_azure(ws, acc_client):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    ws.config.is_gcp = False
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
     azure_resources = create_autospec(AzureResources)
@@ -366,22 +369,28 @@ def test_migrate_credentials_azure(ws):
         azure_subscription_id='test',
         azure_resources=azure_resources,
     )
-    migrate_credentials(ws, prompts, ctx=ctx)
+    migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
 
-def test_migrate_credentials_aws(ws):
+def test_migrate_credentials_aws(ws, acc_client):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
-    migrate_credentials(ws, prompts, ctx=ctx)
+    migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws):
+def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws, acc_client):
     """The storage credential limit is 200, so we should raise a warning when we hit that limit."""
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    ws.config.is_gcp = False
     azure_resources = create_autospec(AzureResources)
     external_locations = create_autospec(ExternalLocations)
     storage_accounts_mock, external_locations_mock = [], []
@@ -411,7 +420,7 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
         azure_resources=azure_resources,
         external_locations=external_locations,
     )
-    migrate_credentials(ws, prompts, ctx=ctx)
+    migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
     azure_resources.storage_accounts.assert_called()
 
@@ -430,10 +439,13 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
     storage_accounts_mock.append(storage_account)
     external_locations_mock.append(external_location)
     with pytest.raises(RuntimeWarning):
-        migrate_credentials(ws, prompts, ctx=ctx)
+        migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
 
 
-def test_migrate_credentials_limit_aws(ws):
+def test_migrate_credentials_limit_aws(ws, acc_client):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     external_locations = create_autospec(ExternalLocations)
 
@@ -458,7 +470,7 @@ def test_migrate_credentials_limit_aws(ws):
     AWSResourcePermissions.load_uc_compatible_roles = Mock()
     AWSResourcePermissions.load_uc_compatible_roles.return_value = aws_role_actions_mock
     ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources, external_locations=external_locations)
-    migrate_credentials(ws, prompts, ctx=ctx)
+    migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
 
     external_locations_mock.append(ExternalLocation(location="s3://labsawsbucket/201", table_count=25))
@@ -471,7 +483,7 @@ def test_migrate_credentials_limit_aws(ws):
         )
     )
     with pytest.raises(RuntimeWarning):
-        migrate_credentials(ws, prompts, ctx=ctx)
+        migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
 
 
 def test_create_master_principal_not_azure(ws):
