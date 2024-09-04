@@ -207,7 +207,7 @@ def test_lint_local_code(simple_ctx):
 
 
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
-def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order):
+def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order) -> None:
     # order in which we consider files influences the algorithm so we check all order
     parent_local_path = (
         Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "parent-child-context"
@@ -241,6 +241,7 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx,
         dependency, None, simple_ctx.dependency_resolver, simple_ctx.path_lookup, CurrentSessionState()
     )
     container = dependency.load(simple_ctx.path_lookup)
+    assert container
     container.build_dependency_graph(root_graph)
     roots = root_graph.root_dependencies
     assert len(roots) == 1
