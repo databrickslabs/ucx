@@ -348,7 +348,8 @@ class GrantsCrawler(CrawlerBase[Grant]):
         try:
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
-                # This seems to be here to help unit tests that don't sufficiently narrow the target of mocked queries. -ajs
+                # Sometimes we get grants for other objects we didn't ask for. For example, listing DATABASE grants
+                # may also enumerate grants on the associated CATALOG.
                 if object_type != expected_grant_object_type:
                     continue
                 # we have to return concrete list, as with yield we're executing
