@@ -90,7 +90,9 @@ class Functional:
     def all(cls) -> list[Functional]:
         # child notebooks can only be linted in context, where they inherit globals from parent notebooks
         # to avoid linting them as standalone notebooks, we name them with '_' prefix, which we skip
-        return [Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")]
+        return list(Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")) + list(
+            Functional(path) for path in cls._location.glob('**/*.sql') if not path.name.startswith("_")
+        )
 
     @classmethod
     def test_id(cls, sample: Functional) -> str:
@@ -249,7 +251,7 @@ def test_functional_with_parent(
 
 @pytest.mark.skip(reason="Used for troubleshooting failing tests")
 def test_one_functional(mock_path_lookup, simple_dependency_resolver, extended_test_index):
-    path = mock_path_lookup.resolve(Path("functional/file-access/create_location.py"))
+    path = mock_path_lookup.resolve(Path("functional/file-access/sql-notebook-with-embedded-python.sql"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)
     sample.verify(path_lookup, simple_dependency_resolver, extended_test_index)
