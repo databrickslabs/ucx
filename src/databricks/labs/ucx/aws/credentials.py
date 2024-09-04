@@ -244,12 +244,14 @@ class IamRoleCreation:
             storage_credential
             for storage_credential in storage_credentials
             if storage_credential.aws_iam_role is not None
-            and uc_role_mapping[storage_credential.aws_iam_role.role_arn] in selected_roles
+            and uc_role_mapping.get(storage_credential.aws_iam_role.role_arn) in selected_roles
         ]
+
+        for credential in matching_credentials:
+            if credential.aws_iam_role is not None:
+                logger.info(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role.role_arn}")
         if len(matching_credentials) == 0:
             logger.info("No storage credential using the selected UC roles, proceeding to delete.")
-        for credential in matching_credentials:
-            logger.info(f"Storage credential: {credential.name} IAM Role: {credential.aws_iam_role.role_arn}")
         if len(matching_credentials) == 0 or prompts.confirm(
             "The above storage credential will be impacted on deleting the selected IAM roles,"
             " Are you sure you want to confirm"
