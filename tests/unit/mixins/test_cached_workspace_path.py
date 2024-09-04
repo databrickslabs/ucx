@@ -12,7 +12,7 @@ from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.source_code.base import guess_encoding
 
 
-class TestWorkspaceCache(WorkspaceCache):
+class _WorkspaceCacheFriend(WorkspaceCache):
 
     @property
     def data_cache(self):
@@ -20,7 +20,7 @@ class TestWorkspaceCache(WorkspaceCache):
 
 
 def test_path_like_returns_cached_instance():
-    cache = TestWorkspaceCache(mock_workspace_client())
+    cache = _WorkspaceCacheFriend(mock_workspace_client())
     parent = cache.get_path("path")
     child = parent / "child"
     _cache = getattr(child, "_cache")
@@ -31,7 +31,7 @@ def test_iterdir_returns_cached_instances():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.DIRECTORY)
     ws.workspace.list.return_value = list(ObjectInfo(object_type=ObjectType.FILE, path=s) for s in ("a", "b", "c"))
-    cache = TestWorkspaceCache(ws)
+    cache = _WorkspaceCacheFriend(ws)
     parent = cache.get_path("dir")
     assert parent.is_dir()
     for child in parent.iterdir():
