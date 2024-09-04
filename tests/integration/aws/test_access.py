@@ -149,3 +149,14 @@ def test_create_external_location_validate_acl(
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_aws_permissions, principal=cluster_user.user_name)],
         )
+
+
+def test_delete_uc_roles(ws, aws_cli_ctx, sql_backend, inventory_schema):
+    #ws.storage_credentials.list()
+    sql_backend.save_table(
+        f"{inventory_schema}.external_locations",
+        [ExternalLocation("s3://bucket1/FOLDER1", 1)],
+        ExternalLocation,
+    )
+    prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
+    #aws_cli_ctx.iam_role_creation.delete_uc_roles(prompts)
