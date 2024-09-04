@@ -271,5 +271,10 @@ class MagicCommand(ABC):
 _FACTORIES: list[Callable[[str, NodeNG], MagicCommand | None]] = []
 
 
-def register_magic_command_factory(factory: Callable[[str, NodeNG], MagicCommand | None]):
-    _FACTORIES.append(factory)
+def magic_command_factory(func: Callable[[str, NodeNG], MagicCommand | None]):
+    _FACTORIES.append(func)
+
+    def inner(command: str, node: NodeNG) -> MagicCommand | None:
+        return func(command, node)
+
+    return inner
