@@ -405,7 +405,6 @@ def test_read_secret_value_decode(sp_migrations, secret_bytes_value, num_migrate
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
-    # pylint: disable-next=protected-access
     sp_migration, _, ws = sp_migrations
     ws.secrets.get_secret.return_value = secret_bytes_value
 
@@ -423,7 +422,6 @@ def test_read_secret_value_none(sp_migrations):
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
-    # pylint: disable-next=protected-access
     sp_migration, _, ws = sp_migrations
     ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
     prompts = MockPrompts(
@@ -442,7 +440,6 @@ def test_read_secret_read_exception(caplog, sp_migrations):
     # we need to access the protected attribute to keep the test small.
     # this test also reveals a design flaw in test code and perhaps in
     # the code under test as well.
-    # pylint: disable-next=protected-access
     sp_migration, _, ws = sp_migrations
     ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 

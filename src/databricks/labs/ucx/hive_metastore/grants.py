@@ -348,7 +348,8 @@ class GrantsCrawler(CrawlerBase[Grant]):
         try:
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
-                # This seems to be here to help unit tests that don't sufficiently narrow the target of mocked queries. -ajs
+                # Sometimes we get grants for other objects we didn't ask for. For example, listing DATABASE grants
+                # may also enumerate grants on the associated CATALOG.
                 if object_type != expected_grant_object_type:
                     continue
                 # we have to return concrete list, as with yield we're executing
@@ -736,7 +737,10 @@ class MigrateGrants:
         for grant in self._match_grants(src):
             acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
             if acl_migrate_sql is None:
-                logger.warning(f"failed-to-migrate: Cannot identify UC grant for {src.kind} {uc_table_key}. Skipping.")
+                logger.warning(
+                    f"failed-to-migrate: Hive metastore grant '{grant.action_type}' cannot be mapped to UC grant for "
+                    f"{src.kind} '{uc_table_key}'. Skipping."
+                )
                 continue
             logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
             try:
