@@ -1049,7 +1049,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         elif non_delta:
             table_type = TableType.EXTERNAL  # pylint: disable=redefined-variable-type
             data_source_format = DataSourceFormat.JSON
-            storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}_{get_purge_suffix()}"
+            # DBFS locations are not purged; no suffix necessary.
+            storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
             # Modified, otherwise it will identify the table as a DB Dataset
             ddl = (
                 f"{ddl} USING json location '{storage_location}' as SELECT * FROM "
