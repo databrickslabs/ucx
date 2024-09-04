@@ -51,7 +51,7 @@ DFSA_PATTERNS = [
     DFSAPattern("abfs:/", []),
     DFSAPattern("abfss:/", []),
     DFSAPattern("hdfs:/", []),
-    DFSAPattern("/mnt/", []),
+    # "/mnt/" is detected by the below pattern,
     RootPattern("/", ["Volumes/", "Workspace/", "tmp/"]),
 ]
 
