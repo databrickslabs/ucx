@@ -7,6 +7,25 @@ from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
 
 
+class CustomIterator:
+    def __init__(self, values):
+        self._values = iter(values)
+        self._has_next = True
+
+    def hasNext(self):  # pylint: disable=invalid-name
+        try:
+            self._next_value = next(self._values)
+            self._has_next = True
+        except StopIteration:
+            self._has_next = False
+        return self._has_next
+
+    def next(self):
+        if self._has_next:
+            return self._next_value
+        raise StopIteration
+
+
 def test_is_delta_true():
     delta_table = Table(catalog="catalog", database="db", name="table", object_type="type", table_format="DELTA")
     assert delta_table.is_delta
@@ -513,24 +532,6 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
     ftsc = FasterTableScanCrawler(backend, "inventory_database")
 
-    class CustomIterator:
-        def __init__(self, values):
-            self._values = iter(values)
-            self._has_next = True
-
-        def hasNext(self):
-            try:
-                self._next_value = next(self._values)
-                self._has_next = True
-            except StopIteration:
-                self._has_next = False
-            return self._has_next
-
-        def next(self):
-            if self._has_next:
-                return self._next_value
-            raise StopIteration
-
     mock_list_databases_iterator = mocker.Mock()
     mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
     mock_list_tables_iterator = mocker.Mock()
@@ -538,37 +539,40 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
 
     mock_property_1 = mocker.Mock()
     mock_property_2 = mocker.Mock()
-    mock_property_personal_access_token = mocker.Mock()
+    mock_property_pat = mocker.Mock()
     mock_property_password = mocker.Mock()
+
+    # pylint: disable=protected-access
     mock_property_1._1.return_value = "delta.appendOnly"
     mock_property_1._2.return_value = "true"
     mock_property_2._1.return_value = "delta.autoOptimize"
     mock_property_2._2.return_value = "false"
-    mock_property_personal_access_token._1.return_value = "personalAccessToken"
-    mock_property_personal_access_token._2.return_value = "e32kfkdsfk345432mkfds"
+    mock_property_pat._1.return_value = "personalAccessToken"
+    mock_property_pat._2.return_value = "e32kfkdsfk345432mkfds"
     mock_property_password._1.return_value = "password"
     mock_property_password._2.return_value = "very_secret"
 
     mock_storage_properties_list = [
         mock_property_1,
         mock_property_2,
-        mock_property_personal_access_token,
+        mock_property_pat,
         mock_property_password,
     ]
-    mock_storage_properties_iterator = mocker.Mock()
-    mock_storage_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
+    mock_properties_iterator = mocker.Mock()
+    mock_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
 
-    mock_partition_column_names_iterator = mocker.Mock()
-    mock_partition_column_names_iterator.iterator.return_value = CustomIterator(["age", "name"])
+    mock_partition_col_iterator = mocker.Mock()
+    mock_partition_col_iterator.iterator.return_value = CustomIterator(["age", "name"])
 
     get_table_mock = mocker.Mock()
     get_table_mock.provider().getOrElse.return_value = "delta"
     get_table_mock.storage().locationUri().getOrElse.return_value = None
 
     get_table_mock.viewText.return_value = "mock table text"
-    get_table_mock.properties.return_value = mock_storage_properties_iterator
-    get_table_mock.partitionColumnNames.return_value = mock_partition_column_names_iterator
+    get_table_mock.properties.return_value = mock_properties_iterator
+    get_table_mock.partitionColumnNames.return_value = mock_partition_col_iterator
 
+    # pylint: disable=protected-access
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
 

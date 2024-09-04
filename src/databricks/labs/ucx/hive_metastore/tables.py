@@ -501,12 +501,12 @@ class FasterTableScanCrawler(CrawlerBase):
 
     @cached_property
     def _external_catalog(self):
-        return self._spark._jsparkSession.sharedState().externalCatalog()
+        return self._spark._jsparkSession.sharedState().externalCatalog()  # pylint: disable=protected-access
 
     def _iterator(self, result: typing.Any) -> Iterator:
-        it = result.iterator()
-        while it.hasNext():
-            yield it.next()
+        iterator = result.iterator()
+        while iterator.hasNext():
+            yield iterator.next()
 
     def _all_databases(self) -> list[str]:
         if not self._include_database:
@@ -544,6 +544,7 @@ class FasterTableScanCrawler(CrawlerBase):
             else:
                 formatted_items: list[str] = []
                 for each_property in properties_list:
+                    # pylint: disable=protected-access
                     key = each_property._1()
                     value = each_property._2()
 
