@@ -8,6 +8,7 @@ from databricks.sdk.errors import DatabricksError
 
 logger = logging.getLogger(__name__)
 
+
 class DfsaCrawler(CrawlerBase):
 
     def __init__(self, backend: SqlBackend, schema: str):
@@ -29,4 +30,3 @@ class DfsaCrawler(CrawlerBase):
     def snapshot(self) -> Iterable[DFSA]:
         sql = f"SELECT * FROM {self.full_name}"
         yield from self._backend.fetch(sql)
-
