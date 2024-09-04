@@ -16,6 +16,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.sql import Query, ListQueryObjectsResponse, ListQueryObjectsResponseQuery
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -374,6 +375,30 @@ class WorkflowLinter:
             problem_messages = "\n".join([problem.as_message() for problem in problems])
             logger.warning(f"Found job problems:\n{problem_messages}")
         return problems
+
+    def collect_dfsas_from_queries(self) -> Iterable[DFSA]:
+        dfsas = list(self._collect_dfsas_from_queries())
+        self._dfsa_crawler.append(dfsas)
+        return dfsas
+    
+    def _collect_dfsas_from_queries(self) -> Iterable[DFSA]:
+        queries = self._ws.queries.list()
+        for query in queries:
+            yield from self._collect_from_query(query)
+
+    @classmethod
+    def _collect_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DFSA]:
+        if query.query_text is None:
+            return
+        linter = DfsaSqlLinter()
+        for dfsa in linter.collect_dfsas(query.query_text):
+            yield DFSA(
+                source_type="QUERY",
+                source_id=query.display_name or "<anonymous>",
+                path=dfsa.path,
+                is_read=dfsa.is_read,
+                is_write=dfsa.is_write,
+            )
 
     _UNKNOWN = Path('<UNKNOWN>')
 
