@@ -1077,7 +1077,6 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             # managed table
             table_type = TableType.MANAGED
             data_source_format = DataSourceFormat.DELTA
-            # TODO: Do we need a purge suffix to protect this location? Either comment on why not, or add it in.
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
