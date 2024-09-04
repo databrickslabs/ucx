@@ -521,7 +521,7 @@ class FasterTableScanCrawler(CrawlerBase):
             return []
 
     @staticmethod
-    def _format_properties_list(properties_list: list[str]) -> str:
+    def _format_properties_list(properties_list: list) -> str:
         if len(properties_list) == 0:
             return ""
         formatted_items: list[str] = []
@@ -546,6 +546,7 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog and database.
         """
         full_name = f"{catalog}.{database}.{table}"
+        # pylint: disable=too-many-try-statements
         try:
             raw_table = self._external_catalog.getTable(database, table)
             table_format = raw_table.provider().getOrElse(None)
@@ -557,8 +558,7 @@ class FasterTableScanCrawler(CrawlerBase):
             view_text = raw_table.viewText()
 
             # get properties
-            storage_properties = self._format_properties_list(
-                list(self._iterator(raw_table.properties())))
+            storage_properties = self._format_properties_list(list(self._iterator(raw_table.properties())))
 
             partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
             is_partitioned = len(partition_column_names) > 0
@@ -580,22 +580,11 @@ class FasterTableScanCrawler(CrawlerBase):
 
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
-
-        After performing initial scan of all tables, starts making parallel
-        DESCRIBE TABLE EXTENDED queries for every table.
-
-        Production tasks would most likely be executed through `tables.scala`
-        within `crawl_tables` task due to `spark.sharedState.externalCatalog`
-        lower-level APIs not requiring a roundtrip to storage, which is not
-        possible for Azure storage with credentials supplied through Spark
-        conf (see https://github.com/databrickslabs/ucx/issues/249).
-
-        See also https://github.com/databrickslabs/ucx/issues/247
         """
         tasks = []
         catalog = "hive_metastore"
         databases = self._all_databases()
-        for database in databases:
+        for database in databases:  # pylint: disable=too-many-nested-blocks
             logger.info(f"Scanning {database}")
             table_names = [partial(self._list_tables, database)]
             for table_batch in Threads.strict('listing tables', table_names):
