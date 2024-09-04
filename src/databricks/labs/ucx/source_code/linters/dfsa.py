@@ -146,7 +146,7 @@ class DfsaPyLinter(PythonLinter):
             )
             yield advisory
 
-    def collect_dfsas(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DFSA]:
+    def collect_dfsas(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DFSANode]:
         tree = Tree.new_module()
         if inherited_tree:
             tree.append_tree(inherited_tree)

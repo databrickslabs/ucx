@@ -16,7 +16,6 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -41,6 +40,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.dfsa import DfsaSqlLinter, DfsaPyLinter
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -477,18 +477,19 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
         if not language:
             logger.warning(f"Unknown language for {dependency.path}")
             return
+        cell_language = CellLanguage.of_language(language)
         source = dependency.path.read_text(guess_encoding(dependency.path))
         if is_a_notebook(dependency.path):
-            yield from self._collect_from_notebook(source, language, dependency.path, inherited_tree)
+            yield from self._collect_from_notebook(source, cell_language, dependency.path, inherited_tree)
         elif dependency.path.is_file():
-            yield from self._collect_from_source(source, language, dependency.path, inherited_tree)
+            yield from self._collect_from_source(source, cell_language, dependency.path, inherited_tree)
 
     def _collect_from_notebook(
-        self, source: str, language: Language, path: Path, inherited_tree: Tree | None
+        self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DFSA]:
-        notebook = Notebook.parse(path, source, language)
+        notebook = Notebook.parse(path, source, language.language)
         for cell in notebook.cells:
-            for dfsa in self._collect_from_source(cell.original_code, cell.language.language, path, inherited_tree):
+            for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
                 yield DFSA(
                     source_type="NOTEBOOK",
                     source_id=str(path),
@@ -496,19 +497,19 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
                     is_read=dfsa.is_read,
                     is_write=dfsa.is_write,
                 )
-            if cell.language.language is Language.PYTHON:
+            if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
                 tree = Tree.normalize_and_parse(cell.original_code)
                 inherited_tree.append_tree(tree)
 
     def _collect_from_source(
-        self, source: str, language: Language, path: Path, inherited_tree: Tree | None
+        self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DFSA]:
         iterable: Iterable[DFSA] | None = None
-        if language is Language.SQL:
+        if language is CellLanguage.SQL:
             iterable = self._collect_from_sql(source)
-        if language is Language.PYTHON:
+        if language is CellLanguage.PYTHON:
             iterable = self._collect_from_python(source, inherited_tree)
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
@@ -520,7 +521,8 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DFSA]:
         linter = DfsaPyLinter(self._session_state, prevent_spark_duplicates=False)
-        yield from linter.collect_dfsas(source, inherited_tree)
+        for dfsa_node in linter.collect_dfsas(source, inherited_tree):
+            yield dfsa_node.dfsa
 
     def _collect_from_sql(self, source: str) -> Iterable[DFSA]:
         linter = DfsaSqlLinter()
