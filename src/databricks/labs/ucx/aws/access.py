@@ -299,13 +299,11 @@ class AWSResourcePermissions:
     def _create_uber_instance_profile(self, iam_role_name: str, iam_policy_name: str, s3_paths: set[str]):
         # Add role to instance profile - they have the same name
         if (
-            not (self._aws_resources.create_migration_role(iam_role_name))
-            or not (self._aws_resources.create_instance_profile(iam_role_name))
-            or not (self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name))
-            or not (
-                self._aws_resources.put_role_policy(
-                    iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
-                )
+            not self._aws_resources.create_migration_role(iam_role_name)
+            or not self._aws_resources.create_instance_profile(iam_role_name)
+            or not self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name)
+            or not self._aws_resources.put_role_policy(
+                iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
             )
         ):
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
@@ -363,9 +361,6 @@ class AWSResourcePermissions:
         except PermissionError:
             logger.error(f"Failed to assign instance profile to cluster policy {iam_role_name}")
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
-
-    def _delete_iam_role(self, role_name):
-        self._aws_resources.delete_role(role_name)
 
     def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
         if single_role:
