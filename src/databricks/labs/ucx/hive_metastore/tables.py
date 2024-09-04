@@ -558,7 +558,7 @@ class FasterTableScanCrawler(CrawlerBase):
 
             # get properties
             storage_properties = self._format_properties_list(
-                list(self._iterator(raw_table.storage().properties())))
+                list(self._iterator(raw_table.properties())))
 
             partition_column_names = list(self._iterator(raw_table.partitionColumnNames()))
             is_partitioned = len(partition_column_names) > 0
