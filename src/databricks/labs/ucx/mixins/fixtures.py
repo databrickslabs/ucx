@@ -1333,6 +1333,7 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
         location; the mounted location is made with fixture setup already.
     """
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    # DBFS locations are not purged; no suffix necessary.
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}-{get_purge_suffix()}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     return new_mounted_location
