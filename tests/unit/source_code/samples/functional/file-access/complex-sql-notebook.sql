@@ -5,7 +5,7 @@
 -- COMMAND ----------
 -- DBTITLE 1,A Python cell that references DBFS
 -- MAGIC %python
--- ucx[dbfs-usage:+1:7:+1:18] Deprecated file system path: dbfs:/...
+-- ucx[dbfs-usage:+1:7:+1:18] Impossible file system path: dbfs:/...
 -- MAGIC DBFS = "dbfs:/..."
 -- ucx[dbfs-usage:+1:7:+1:18] Deprecated file system path: /dbfs/mnt
 -- MAGIC DBFS = "/dbfs/mnt"

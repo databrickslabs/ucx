@@ -3,7 +3,7 @@
 
 -- COMMAND ----------
 
--- ucx[dbfs-read-from-sql-query:+0:0:+0:1024] The use of DBFS is deprecated: dbfs:/mnt/whatever
+-- ucx[dbfs-read-from-sql-query:+3:0:+3:1024] The use of DBFS is deprecated: dbfs:/mnt/whatever
 SELECT * FROM csv.`dbfs:/mnt/whatever`
 
 
