@@ -1160,7 +1160,10 @@ def make_udf(
             schema_name = schema.name
 
         if name is None:
-            name = f"ucx_t{make_random(4).lower()}_{get_purge_suffix()}"
+            name = f"ucx_t{make_random(4).lower()}"
+
+        # Note: the Watchdog does not explicitly scan for functions; they are purged along with their parent schema.
+        # As such the function can't be marked (and doesn't need to be if the schema as marked) for purge protection.
 
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         if hive_udf:
