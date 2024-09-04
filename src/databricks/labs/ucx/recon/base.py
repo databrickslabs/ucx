@@ -11,15 +11,15 @@ class TableIdentifier:
 
     @property
     def catalog_escaped(self):
-        return f"`{self.catalog}`"
+        return f"`{self.catalog.replace('`','``')}`"
 
     @property
     def schema_escaped(self):
-        return f"`{self.schema}`"
+        return f"`{self.schema.replace('`','``')}`"
 
     @property
     def table_escaped(self):
-        return f"`{self.table}`"
+        return f"`{self.table.replace('`','``')}`"
 
     @property
     def fqn_escaped(self):
