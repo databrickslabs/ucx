@@ -215,7 +215,7 @@ class Tree:
                 globs[key] = nodes_in_scope
         return globs
 
-    def line_count(self):
+    def line_count(self) -> int:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't count lines from {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
