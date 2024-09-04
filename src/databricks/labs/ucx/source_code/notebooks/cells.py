@@ -20,12 +20,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphContext,
     InheritedContext,
 )
-from databricks.labs.ucx.source_code.python.python_analyzer import (
-    PythonCodeAnalyzer,
-    MagicCommand,
-    MagicNode,
-    magic_command_factory,
-)
+from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAnalyzer
+from databricks.labs.ucx.source_code.notebooks.magic import MagicNode, MagicCommand, magic_command_factory
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
