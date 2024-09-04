@@ -1182,7 +1182,7 @@ def make_udf(
             full_name=full_name,
         )
 
-        logger.info(f"Function {udf_info.full_name} crated")
+        logger.info(f"Function {udf_info.full_name} created")
         return udf_info
 
     def remove(udf_info: FunctionInfo):
