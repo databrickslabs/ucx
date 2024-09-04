@@ -320,9 +320,6 @@ class Mounts(CrawlerBase[Mount]):
                 deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
-    def inventorize_mounts(self):
-        self._append_records(self._list_mounts())
-
     def _list_mounts(self) -> Iterable[Mount]:
         mounts = []
         for mount_point, source, _ in self._dbutils.fs.mounts():

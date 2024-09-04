@@ -75,7 +75,7 @@ def test_location_trie_tables():
     assert c_node.tables == tables
 
 
-def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
+def test_mounts_inventory_should_contain_mounts_without_encryption_type():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
@@ -86,7 +86,7 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     assert [
         Row(name="mp_1", source="path_1"),
@@ -95,7 +95,7 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
-def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_type():
+def test_mounts_inventory_should_contain_deduped_mounts_without_encryption_type():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
@@ -106,7 +106,7 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     assert [
         Row(name="mp_1", source="path_1"),
@@ -114,7 +114,7 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
     ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
-def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
+def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_names():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("/Volume", "DbfsReserved", "info_1"),
@@ -129,7 +129,7 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volu
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     expected = [
         Row(name="/Volume", source="DbfsReserved"),
