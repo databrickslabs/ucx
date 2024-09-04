@@ -90,8 +90,9 @@ class Functional:
     def all(cls) -> list[Functional]:
         # child notebooks can only be linted in context, where they inherit globals from parent notebooks
         # to avoid linting them as standalone notebooks, we name them with '_' prefix, which we skip
-        return list(Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")) \
-                + list(Functional(path) for path in cls._location.glob('**/*.sql') if not path.name.startswith("_"))
+        return list(Functional(path) for path in cls._location.glob('**/*.py') if not path.name.startswith("_")) + list(
+            Functional(path) for path in cls._location.glob('**/*.sql') if not path.name.startswith("_")
+        )
 
     @classmethod
     def test_id(cls, sample: Functional) -> str:
