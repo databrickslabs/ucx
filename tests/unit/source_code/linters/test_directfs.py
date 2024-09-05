@@ -37,7 +37,7 @@ def test_matches_dfsa_pattern(path, matches):
     ],
 )
 def test_detects_dfsa_paths(code, expected):
-    linter = DirectFsAccessPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DirectFsAccessPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = list(linter.lint(code))
     for advice in advices:
         assert isinstance(advice, Advice)
@@ -58,7 +58,7 @@ def test_detects_dfsa_paths(code, expected):
     ],
 )
 def test_directfs_linter(code, expected):
-    linter = DirectFsAccessPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DirectFsAccessPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = linter.lint(code)
     count = 0
     for advice in advices:

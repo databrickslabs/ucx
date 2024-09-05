@@ -58,8 +58,6 @@ DIRECT_FS_ACCESS_PATTERNS = [
 
 @dataclass
 class DirectFsAccess:
-    """A DFSA is a record describing a Direct File System Access"""
-
     path: str
 
 
@@ -75,11 +73,11 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
     against a list of known deprecated paths.
     """
 
-    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates: bool) -> None:
+    def __init__(self, session_state: CurrentSessionState, prevent_spark_duplicates: bool) -> None:
         self._session_state = session_state
         self._directfs_nodes: list[DirectFsAccessNode] = []
         self._reported_locations: set[tuple[int, int]] = set()
-        self._allow_spark_duplicates = allow_spark_duplicates
+        self._prevent_spark_duplicates = prevent_spark_duplicates
 
     def visit_call(self, node: Call):
         for arg in node.args:
@@ -104,11 +102,14 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         if self._already_reported(source_node, inferred):
             return
         # avoid duplicate advices that are reported by SparkSqlPyLinter
-        if Tree(source_node).is_from_module("spark") and not self._allow_spark_duplicates:
+        if self._prevent_spark_duplicates and Tree(source_node).is_from_module("spark"):
             return
         value = inferred.as_string()
-        if any(pattern.matches(value) for pattern in DIRECT_FS_ACCESS_PATTERNS):
-            self._directfs_nodes.append(DirectFsAccessNode(DirectFsAccess(value), source_node))
+        for pattern in DIRECT_FS_ACCESS_PATTERNS:
+            if not pattern.matches(value):
+                continue
+            dfsa = DirectFsAccess(path=value)
+            self.directfs_nodes.append(DirectFsAccessNode(dfsa, source_node))
             self._reported_locations.add((source_node.lineno, source_node.col_offset))
 
     def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
@@ -122,15 +123,15 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
 
 class DirectFsAccessPyLinter(PythonLinter):
 
-    def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates=False):
+    def __init__(self, session_state: CurrentSessionState, prevent_spark_duplicates=True):
         self._session_state = session_state
-        self._allow_spark_duplicates = allow_spark_duplicates
+        self._prevent_spark_duplicates = prevent_spark_duplicates
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         """
         Lints the code looking for file system paths that are deprecated
         """
-        visitor = _DetectDirectFsAccessVisitor(self._session_state, self._allow_spark_duplicates)
+        visitor = _DetectDirectFsAccessVisitor(self._session_state, self._prevent_spark_duplicates)
         visitor.visit(tree.node)
         for directfs_node in visitor.directfs_nodes:
             advisory = Deprecation.from_node(
