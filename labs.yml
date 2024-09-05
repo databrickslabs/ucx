@@ -151,6 +151,14 @@ commands:
       - name: single-role
         description: (Optional) Create a single role for all S3 locations. (default:False)
 
+  - name: delete-missing-principals
+    description: For AWS, this command identifies all the UC roles that are created through the create-missing-principals
+      cmd. It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected
+      roles are used by any storage credential and prompts to confirm if roles should still be deleted.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
       used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,

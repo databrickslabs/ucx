@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
 )
-from databricks.labs.ucx.source_code.linters.dbfs import DbfsUsageSqlLinter, DBFSUsagePyLinter
+from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
@@ -40,12 +40,12 @@ class LinterContext:
             python_fixers.append(SparkSqlPyLinter(from_table, index, session_state))
 
         python_linters += [
-            DBFSUsagePyLinter(session_state),
+            DirectFsAccessPyLinter(session_state),
             DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
             SparkConnectPyLinter(session_state),
             DbutilsPyLinter(session_state),
         ]
-        sql_linters.append(DbfsUsageSqlLinter())
+        sql_linters.append(DirectFsAccessSqlLinter())
 
         self._linters: dict[Language, list[SqlLinter] | list[PythonLinter]] = {
             Language.PYTHON: python_linters,

@@ -7,6 +7,7 @@ from unittest.mock import create_autospec, patch, Mock
 import pytest
 import yaml
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
@@ -53,6 +54,7 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    delete_missing_principals,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -748,3 +750,13 @@ def test_join_collection():
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
     join_collection(a, "123")
     w.workspace.download.assert_not_called()
+
+
+def test_delete_principals(ws):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    role_creation = create_autospec(IamRoleCreation)
+    ctx = WorkspaceContext(ws).replace(iam_role_creation=role_creation, workspace_client=ws)
+    prompts = MockPrompts({"Select the list of roles *": "0"})
+    delete_missing_principals(ws, prompts, ctx)
+    role_creation.delete_uc_roles.assert_called_once()
