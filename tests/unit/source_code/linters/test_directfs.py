@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.linters.dfsa import DfsaPyLinter, DfsaSqlLinter, DFSA_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_PATTERNS, DirectFsPyLinter, DirectFsSqlLinter
 
 
 @pytest.mark.parametrize(
@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.linters.dfsa import DfsaPyLinter, DfsaSqlLi
 )
 def test_matches_dfsa_pattern(path, matches):
     """see https://github.com/databrickslabs/ucx/issues/2350"""
-    matched = any(pattern.matches(path) for pattern in DFSA_PATTERNS)
+    matched = any(pattern.matches(path) for pattern in DIRECT_FS_PATTERNS)
     assert matches == matched
 
 
@@ -33,7 +33,7 @@ def test_matches_dfsa_pattern(path, matches):
     ],
 )
 def test_detects_dfsa_paths(code, expected):
-    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DirectFsPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = list(linter.lint(code))
     for advice in advices:
         assert isinstance(advice, Advice)
@@ -63,7 +63,7 @@ for system in systems:
     ],
 )
 def test_dfsa_usage_linter(code, expected):
-    linter = DfsaPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
+    linter = DirectFsPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = linter.lint(code)
     count = 0
     for advice in advices:
@@ -73,7 +73,7 @@ def test_dfsa_usage_linter(code, expected):
 
 
 def test_dfsa_name():
-    linter = DfsaPyLinter(CurrentSessionState())
+    linter = DirectFsPyLinter(CurrentSessionState())
     assert linter.name() == "dfsa-usage"
 
 
@@ -87,7 +87,7 @@ def test_dfsa_name():
     ],
 )
 def test_non_dfsa_triggers_nothing(query):
-    ftf = DfsaSqlLinter()
+    ftf = DirectFsSqlLinter()
     assert not list(ftf.lint(query))
 
 
@@ -109,7 +109,7 @@ def test_non_dfsa_triggers_nothing(query):
     ],
 )
 def test_dfsa_tables_trigger_messages_param(query: str, table: str):
-    ftf = DfsaSqlLinter()
+    ftf = DirectFsSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Deprecation(
@@ -130,7 +130,7 @@ def test_dfsa_tables_trigger_messages_param(query: str, table: str):
     ],
 )
 def test_dfsa_queries_failure(query: str):
-    ftf = DfsaSqlLinter()
+    ftf = DirectFsSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
@@ -145,5 +145,5 @@ def test_dfsa_queries_failure(query: str):
 
 
 def test_dfsa_queries_name():
-    ftf = DfsaSqlLinter()
+    ftf = DirectFsSqlLinter()
     assert ftf.name() == 'dfsa-query'

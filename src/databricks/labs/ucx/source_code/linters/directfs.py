@@ -20,7 +20,7 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 logger = logging.getLogger(__name__)
 
 
-class DFSAPattern(ABC):
+class DirectFsPattern(ABC):
 
     def __init__(self, prefix: str, allowed_roots: list[str]):
         self._prefix = prefix
@@ -33,43 +33,43 @@ class DFSAPattern(ABC):
         return any(value.startswith(f"{self._prefix}/{root}") for root in self._allowed_roots)
 
 
-class RootPattern(DFSAPattern):
+class RootPattern(DirectFsPattern):
 
     def _matches_allowed_root(self, value: str):
         return any(value.startswith(f"/{root}") for root in self._allowed_roots)
 
 
 # the below aims to implement https://docs.databricks.com/en/files/index.html
-DFSA_PATTERNS = [
-    DFSAPattern("dbfs:/", []),
-    DFSAPattern("file:/", ["Workspace/", "tmp/"]),
-    DFSAPattern("s3:/", []),
-    DFSAPattern("s3n:/", []),
-    DFSAPattern("s3a:/", []),
-    DFSAPattern("wasb:/", []),
-    DFSAPattern("wasbs:/", []),
-    DFSAPattern("abfs:/", []),
-    DFSAPattern("abfss:/", []),
-    DFSAPattern("hdfs:/", []),
+DIRECT_FS_PATTERNS = [
+    DirectFsPattern("dbfs:/", []),
+    DirectFsPattern("file:/", ["Workspace/", "tmp/"]),
+    DirectFsPattern("s3:/", []),
+    DirectFsPattern("s3n:/", []),
+    DirectFsPattern("s3a:/", []),
+    DirectFsPattern("wasb:/", []),
+    DirectFsPattern("wasbs:/", []),
+    DirectFsPattern("abfs:/", []),
+    DirectFsPattern("abfss:/", []),
+    DirectFsPattern("hdfs:/", []),
     # "/mnt/" is detected by the below pattern,
     RootPattern("/", ["Volumes/", "Workspace/", "tmp/"]),
 ]
 
 
 @dataclass
-class DFSA:
+class DirectFsAccess:
     """A DFSA is a record describing a Direct File System Access"""
 
     path: str
 
 
 @dataclass
-class DFSANode:
-    dfsa: DFSA
+class DirectFsNode:
+    dfsa: DirectFsAccess
     node: NodeNG
 
 
-class _DetectDfsaVisitor(TreeVisitor):
+class _DetectDirectFsVisitor(TreeVisitor):
     """
     Visitor that detects file system paths in Python code and checks them
     against a list of known deprecated paths.
@@ -77,7 +77,7 @@ class _DetectDfsaVisitor(TreeVisitor):
 
     def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates: bool) -> None:
         self._session_state = session_state
-        self._dfsa_nodes: list[DFSANode] = []
+        self._directfs_nodes: list[DirectFsNode] = []
         self._reported_locations: set[tuple[int, int]] = set()
         self._allow_spark_duplicates = allow_spark_duplicates
 
@@ -107,8 +107,8 @@ class _DetectDfsaVisitor(TreeVisitor):
         if Tree(source_node).is_from_module("spark") and not self._allow_spark_duplicates:
             return
         value = inferred.as_string()
-        if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
-            self._dfsa_nodes.append(DFSANode(DFSA(value), source_node))
+        if any(pattern.matches(value) for pattern in DIRECT_FS_PATTERNS):
+            self._directfs_nodes.append(DirectFsNode(DirectFsAccess(value), source_node))
             self._reported_locations.add((source_node.lineno, source_node.col_offset))
 
     def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
@@ -116,11 +116,11 @@ class _DetectDfsaVisitor(TreeVisitor):
         return any((node.lineno, node.col_offset) in self._reported_locations for node in all_nodes)
 
     @property
-    def dfsa_nodes(self):
-        return self._dfsa_nodes
+    def directfs_nodes(self):
+        return self._directfs_nodes
 
 
-class DfsaPyLinter(PythonLinter):
+class DirectFsPyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState, allow_spark_duplicates=False):
         self._session_state = session_state
@@ -137,18 +137,18 @@ class DfsaPyLinter(PythonLinter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        visitor = _DetectDfsaVisitor(self._session_state, self._allow_spark_duplicates)
+        visitor = _DetectDirectFsVisitor(self._session_state, self._allow_spark_duplicates)
         visitor.visit(tree.node)
-        for dfsa_node in visitor.dfsa_nodes:
+        for directfs_node in visitor.directfs_nodes:
             advisory = Deprecation.from_node(
                 code='direct-filesystem-access',
-                message=f"The use of direct filesystem references is deprecated: {dfsa_node.dfsa.path}",
-                node=dfsa_node.node,
+                message=f"The use of direct filesystem references is deprecated: {directfs_node.dfsa.path}",
+                node=directfs_node.node,
             )
             yield advisory
 
 
-class DfsaSqlLinter(SqlLinter):
+class DirectFsSqlLinter(SqlLinter):
 
     @staticmethod
     def name() -> str:
@@ -164,7 +164,7 @@ class DfsaSqlLinter(SqlLinter):
         Check if the table is a DBFS table or reference in some way
         and yield a deprecation message if it is
         """
-        if any(pattern.matches(table.name) for pattern in DFSA_PATTERNS):
+        if any(pattern.matches(table.name) for pattern in DIRECT_FS_PATTERNS):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
                 message=f"The use of direct filesystem references is deprecated: {table.name}",

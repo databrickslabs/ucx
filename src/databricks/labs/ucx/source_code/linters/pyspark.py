@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
 )
-from databricks.labs.ucx.source_code.linters.dfsa import DFSA_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
@@ -201,7 +201,7 @@ class DirectFilesystemAccessMatcher(Matcher):
                 logger.debug(f"Could not infer value of {table_arg.as_string()}")
                 continue
             value = inferred.as_string()
-            if any(pattern.matches(value) for pattern in DFSA_PATTERNS):
+            if any(pattern.matches(value) for pattern in DIRECT_FS_PATTERNS):
                 yield Deprecation.from_node(
                     code='direct-filesystem-access',
                     message=f"The use of direct filesystem references is deprecated: {value}",
