@@ -286,12 +286,10 @@ $ python tests/integration/source_code/message_codes.py
 cannot-autofix-table-reference
 catalog-api-in-shared-clusters
 changed-result-format-in-uc
-dbfs-read-from-sql-query
-dbfs-usage
+direct-filesystem-access
+direct-filesystem-access-in-sql-query
 default-format-changed-in-dbr8
 dependency-not-found
-direct-filesystem-access
-implicit-dbfs-usage
 jvm-access-in-shared-clusters
 legacy-context-in-shared-clusters
 not-supported
