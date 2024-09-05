@@ -64,12 +64,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
       * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
       * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`dbfs-read-from-sql-query`](#dbfs-read-from-sql-query)
-      * [`dbfs-usage`](#dbfs-usage)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
+      * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
       * [`default-format-changed-in-dbr8`](#default-format-changed-in-dbr8)
       * [`dependency-not-found`](#dependency-not-found)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
-      * [`implicit-dbfs-usage`](#implicit-dbfs-usage)
       * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
       * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
       * [`not-supported`](#not-supported)
@@ -766,24 +764,32 @@ you need to make sure that `do_stuff_with_table` can handle the new format.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `dbfs-read-from-sql-query`
+#### `direct-filesystem-access-in-sql-query`
 
-DBFS access is not allowed in Unity Catalog, so if you have code like this:
+Direct filesystem access is deprecated in Unity Catalog.
+DBFS is no longer supported, so if you have code like this:
 
 ```python
-df = spark.sql("SELECT * FROM parquet.`/mnt/foo/path/to/file`")
+df = spark.sql("SELECT * FROM parquet.`/mnt/foo/path/to/parquet.file`")
 ```
 
 you need to change it to use UC tables.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `dbfs-usage`
+#### `direct-filesystem-access`
 
-DBFS does not work in Unity Catalog, so if you have code like this:
+Direct filesystem access is deprecated in Unity Catalog.
+DBFS is no longer supported, so if you have code like this:
 
 ```python
-display(spark.read.csv('/mnt/things/e/f/g'))
+display(spark.read.csv('/mnt/things/data.csv'))
+```
+
+or this:
+
+```python
+display(spark.read.csv('s3://bucket/folder/data.csv'))
 ```
 
 You need to change it to use UC tables or UC volumes.
@@ -798,31 +804,7 @@ means an error in the user code.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `direct-filesystem-access`
-
-It's not allowed to access the filesystem directly in Unity Catalog, so if you have code like this:
-
-```python
-spark.read.csv("s3://bucket/path")
-```
-
-you need to change it to use UC tables or UC volumes.
-
-[[back to top](#databricks-labs-ucx)]
-
-#### `implicit-dbfs-usage`
-
-The use of DBFS is not allowed in Unity Catalog, so if you have code like this:
-
-```python
-display(spark.read.csv('/mnt/things/e/f/g'))
-```
-
-you need to change it to use UC tables or UC volumes.
-
-[[back to top](#databricks-labs-ucx)]
-
-#### `jvm-access-in-shared-clusters`
+### `jvm-access-in-shared-clusters`
 
 You cannot access Spark Driver JVM on Unity Catalog clusters in Shared Access mode. If you have code like this:
 

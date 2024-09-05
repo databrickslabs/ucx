@@ -346,8 +346,8 @@ for i in range(10):
             """spark.read.load("/bucket/path")""",
             [
                 Deprecation(
-                    code='implicit-dbfs-usage',
-                    message="The use of default dbfs: references is deprecated: /bucket/path",
+                    code='direct-filesystem-access',
+                    message="The use of direct filesystem references is deprecated: /bucket/path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -559,12 +559,23 @@ FS_FUNCTIONS = [
 
 
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
-def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
+def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
     sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
-    code = f"""spark.{fs_function}("/bucket/path")"""
+    code = f"""spark.{fs_function}("/Workspace/bucket/path")"""
+    advisories = list(sqf.lint(code))
+    assert not advisories
+
+
+@pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
+def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function):
+    session_state = CurrentSessionState()
+    ftf = FromTableSqlLinter(empty_index, session_state)
+    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    # ls function calls have to be from dbutils.fs, or we ignore them
+    code = f"""spark.{fs_function}("/Volumes/bucket/path")"""
     advisories = list(sqf.lint(code))
     assert not advisories
 
