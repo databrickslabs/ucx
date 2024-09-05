@@ -57,7 +57,7 @@ def test_detects_dfsa_paths(code, expected):
         ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 1),
     ],
 )
-def test_dfsa_usage_linter(code, expected):
+def test_directfs_linter(code, expected):
     linter = DirectFsAccessPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = linter.lint(code)
     count = 0

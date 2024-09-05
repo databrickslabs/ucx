@@ -339,7 +339,7 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
 
 
 @dataclass
-class DFSA:
+class DirectFsAccess:
     """A DFSA is a record describing a Direct File System Access"""
 
     UNKNOWN = "unknown"
@@ -362,4 +362,4 @@ class DFSA:
         return hash(self.key)
 
     def __eq__(self, other) -> bool:
-        return isinstance(other, DFSA) and self.key == other.key
+        return isinstance(other, DirectFsAccess) and self.key == other.key
