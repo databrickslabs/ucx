@@ -277,6 +277,33 @@ Before every commit, apply the consistent styleguide and formatting of the code,
 make fmt test
 ```
 
+## Getting overview of linter message codes
+
+To get an overview of the linter message codes, run the following command:
+
+```shell
+$ python tests/integration/source_code/message_codes.py
+cannot-autofix-table-reference
+catalog-api-in-shared-clusters
+changed-result-format-in-uc
+direct-filesystem-access
+direct-filesystem-access-in-sql-query
+default-format-changed-in-dbr8
+dependency-not-found
+jvm-access-in-shared-clusters
+legacy-context-in-shared-clusters
+not-supported
+notebook-run-cannot-compute-value
+python-udf-in-shared-clusters
+rdd-in-shared-clusters
+spark-logging-in-shared-clusters
+sql-parse-error
+sys-path-cannot-compute-value
+table-migrated-to-uc
+to-json-in-shared-clusters
+unsupported-magic-line
+```
+
 ## First contribution
 
 Here are the example steps to submit your first contribution:

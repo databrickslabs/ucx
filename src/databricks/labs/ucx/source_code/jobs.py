@@ -24,12 +24,12 @@ from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     LocatedAdvice,
-    DFSA,
     is_a_notebook,
     file_language,
     guess_encoding,
+    DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.dfsa_crawler import DfsaCrawler
+from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -40,7 +40,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphWalker,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.dfsa import DfsaSqlLinter, DfsaPyLinter
+from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
@@ -331,14 +331,14 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
-        dfsa_crawler: DfsaCrawler,
+        directfs_crawler: DirectFsAccessCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
-        self._dfsa_crawler = dfsa_crawler
+        self._directfs_crawler = directfs_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -451,7 +451,7 @@ class WorkflowLinter:
         yield from walker
         collector = DfsaCollector(graph, set(), self._path_lookup, session_state)
         dfsas = list(dfsa for dfsa in collector)
-        self._dfsa_crawler.append(dfsas)
+        self._directfs_crawler.append(dfsas)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
@@ -483,7 +483,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class DfsaCollector(DependencyGraphWalker[DFSA]):
+class DfsaCollector(DependencyGraphWalker[DirectFsAccess]):
 
     def __init__(
         self,
@@ -497,7 +497,7 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
 
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-    ) -> Iterable[DFSA]:
+    ) -> Iterable[DirectFsAccess]:
         language = file_language(dependency.path)
         if not language:
             logger.warning(f"Unknown language for {dependency.path}")
@@ -511,11 +511,11 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
 
     def _collect_from_notebook(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DFSA]:
+    ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield DFSA(
+                yield DirectFsAccess(
                     source_type="NOTEBOOK",
                     source_id=str(path),
                     path=dfsa.path,
@@ -530,8 +530,8 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
 
     def _collect_from_source(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DFSA]:
-        iterable: Iterable[DFSA] | None = None
+    ) -> Iterable[DirectFsAccess]:
+        iterable: Iterable[DirectFsAccess] | None = None
         if language is CellLanguage.SQL:
             iterable = self._collect_from_sql(source)
         if language is CellLanguage.PYTHON:
@@ -540,15 +540,15 @@ class DfsaCollector(DependencyGraphWalker[DFSA]):
             logger.warning(f"Language {language.name} not supported yet!")
             return
         for dfsa in iterable:
-            yield DFSA(
+            yield DirectFsAccess(
                 source_type="FILE", source_id=str(path), path=dfsa.path, is_read=dfsa.is_read, is_write=dfsa.is_write
             )
 
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DFSA]:
-        linter = DfsaPyLinter(self._session_state, prevent_spark_duplicates=False)
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
+        linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
         for dfsa_node in linter.collect_dfsas(source, inherited_tree):
             yield dfsa_node.dfsa
 
-    def _collect_from_sql(self, source: str) -> Iterable[DFSA]:
-        linter = DfsaSqlLinter()
+    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
+        linter = DirectFsAccessSqlLinter()
         yield from linter.collect_dfsas(source)

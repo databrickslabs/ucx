@@ -13,10 +13,10 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DFSA,
+    DirectFsAccess,
 )
+from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessNode, DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
-from databricks.labs.ucx.source_code.linters.dfsa import DFSA_PATTERNS, DFSANode
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 
@@ -212,7 +212,7 @@ class DirectFilesystemAccessMatcher(Matcher):
                 node=dfsa_node.node,
             )
 
-    def _for_table_arg(self, node: NodeNG) -> Iterable[DFSANode]:
+    def _for_table_arg(self, node: NodeNG) -> Iterable[DirectFsAccessNode]:
         if not isinstance(node, Call):
             return
         table_arg_node = self._get_table_arg(node)
@@ -222,15 +222,15 @@ class DirectFilesystemAccessMatcher(Matcher):
             table_arg = inferred.as_string()
             if not table_arg:
                 continue
-            if any(pattern.matches(table_arg) for pattern in DFSA_PATTERNS):
-                dfsa = DFSA(
-                    source_type=DFSA.UNKNOWN,
-                    source_id=DFSA.UNKNOWN,
+            if any(pattern.matches(table_arg) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+                dfsa = DirectFsAccess(
+                    source_type=DirectFsAccess.UNKNOWN,
+                    source_id=DirectFsAccess.UNKNOWN,
                     path=table_arg,
                     is_read=self.is_read or False,
                     is_write=self.is_write or False,
                 )
-                yield DFSANode(dfsa, node)
+                yield DirectFsAccessNode(dfsa, node)
                 continue
 
     def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
