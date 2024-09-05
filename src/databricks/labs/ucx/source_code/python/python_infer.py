@@ -21,7 +21,7 @@ from astroid.typing import InferenceErrorInfo  # type: ignore
 from astroid.exceptions import InferenceError  # type: ignore
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 logger = logging.getLogger(__name__)
 
