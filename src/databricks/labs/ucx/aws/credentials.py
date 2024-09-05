@@ -243,12 +243,13 @@ class IamRoleCreation:
         if len(selected_roles) == 0:
             logger.info("No roles selected...")
             return
-        matching_credentials = [
-            storage_credential
-            for storage_credential in storage_credentials
-            if storage_credential.aws_iam_role is not None
-            and uc_role_mapping.get(storage_credential.aws_iam_role.role_arn) in selected_roles
-        ]
+        matching_credentials = []
+        for storage_credential in storage_credentials:
+            if (
+                storage_credential.aws_iam_role is not None
+                and uc_role_mapping.get(storage_credential.aws_iam_role.role_arn) in selected_roles
+            ):
+                matching_credentials.append(storage_credential)
 
         for credential in matching_credentials:
             if credential.aws_iam_role is not None:

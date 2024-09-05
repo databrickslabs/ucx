@@ -869,7 +869,6 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
 def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, locations):
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
-    aws.delete_role.return_value = []
     aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, locations)
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
@@ -881,7 +880,8 @@ def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, location
     role_creation = IamRoleCreation(installation_multiple_roles, mock_ws, aws_resource_permissions)
     prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
     role_creation.delete_uc_roles(prompts)
-    assert aws.delete_role.assert_called
+    calls = [call("uc-role1"), call("uc-rolex")]
+    assert aws.delete_role.mock_calls == calls
 
 
 def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, locations):
@@ -913,7 +913,8 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     ]
     prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
     role_creation.delete_uc_roles(prompts)
-    aws.delete_role.assert_called_once()
+    calls = [call("uc-role1")]
+    assert aws.delete_role.mock_calls == calls
 
 
 def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
