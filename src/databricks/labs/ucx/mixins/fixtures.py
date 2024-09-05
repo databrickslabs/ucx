@@ -33,11 +33,13 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.ml import ModelTag
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedModelInput,
     ServedModelInputWorkloadSize,
     ServingEndpointDetailed,
+    EndpointTag,
 )
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -120,7 +122,7 @@ def fresh_wheel_file(tmp_path) -> Path:
 @pytest.fixture
 def wsfs_wheel(ws, fresh_wheel_file, make_random):
     my_user = ws.current_user.me().user_name
-    workspace_location = f"/Users/{my_user}/wheels/{make_random(10)}"
+    workspace_location = f"/Users/{my_user}/wheels/{make_random(10)}-{get_purge_suffix()}"
     ws.workspace.mkdirs(workspace_location)
 
     wsfs_wheel = f"{workspace_location}/{fresh_wheel_file.name}"
@@ -582,7 +584,7 @@ def make_notebook(ws, make_random):
         overwrite: bool = False,
     ) -> str:
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}-{get_purge_suffix()}"
         elif isinstance(path, pathlib.Path):
             path = str(path)
         if content is None:
@@ -609,7 +611,7 @@ def make_directory(ws, make_random):
 def make_repo(ws, make_random):
     def create(*, url=None, provider=None, path=None, **kwargs):
         if path is None:
-            path = f"/Repos/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+            path = f"/Repos/{ws.current_user.me().user_name}/sdk-{make_random(4)}-{get_purge_suffix()}"
         if url is None:
             url = "https://github.com/shreyas-goenka/empty-repo.git"
         if provider is None:
@@ -760,9 +762,10 @@ def make_experiment(ws, make_random):
         **kwargs,
     ):
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}"
+            path = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}-{get_purge_suffix()}"
         if experiment_name is None:
-            experiment_name = f"sdk-{make_random(4)}"
+            # The purge suffix is needed here as well, just in case the path was supplied.
+            experiment_name = f"sdk-{make_random(4)}-{get_purge_suffix()}"
 
         try:
             ws.workspace.mkdirs(path)
@@ -842,6 +845,11 @@ def make_model(ws, make_random):
     ):
         if model_name is None:
             model_name = f"sdk-{make_random(4)}"
+        remove_after_tag = ModelTag(key="RemoveAfter", value=get_test_purge_time())
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
 
         created_model = ws.model_registry.create_model(model_name, **kwargs)
         model = ws.model_registry.get_model(created_model.registered_model.name)
@@ -854,7 +862,7 @@ def make_model(ws, make_random):
 def make_pipeline(ws, make_random, make_notebook):
     def create(**kwargs) -> pipelines.CreatePipelineResponse:
         if "name" not in kwargs:
-            kwargs["name"] = f"sdk-{make_random(4)}"
+            kwargs["name"] = f"sdk-{make_random(4)}-{get_purge_suffix()}"
         if "libraries" not in kwargs:
             kwargs["libraries"] = [pipelines.PipelineLibrary(notebook=pipelines.NotebookLibrary(path=make_notebook()))]
         if "clusters" not in kwargs:
@@ -863,9 +871,7 @@ def make_pipeline(ws, make_random, make_notebook):
                     node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                     label="default",
                     num_workers=1,
-                    custom_tags={
-                        "cluster_type": "default",
-                    },
+                    custom_tags={"cluster_type": "default", "RemoveAfter": get_test_purge_time()},
                 )
             ]
         return ws.pipelines.create(continuous=False, **kwargs)
@@ -965,6 +971,8 @@ def inventory_schema(make_schema):
 @pytest.fixture
 def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
+        # Warning: As of 2024-09-04 there is no way to mark this catalog for protection against the watchdog.
+        # Ref: https://github.com/databrickslabs/watchdog/blob/cdc97afdac1567e89d3b39d938f066fd6267b3ba/scan/objects/uc.go#L68
         name = f"ucx_C{make_random(4)}".lower()
         sql_backend.execute(f"CREATE CATALOG {name}")
         catalog_info = ws.catalogs.get(name)
@@ -1042,6 +1050,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         elif non_delta:
             table_type = TableType.EXTERNAL  # pylint: disable=redefined-variable-type
             data_source_format = DataSourceFormat.JSON
+            # DBFS locations are not purged; no suffix necessary.
             storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
             # Modified, otherwise it will identify the table as a DB Dataset
             ddl = (
@@ -1151,7 +1160,10 @@ def make_udf(
             schema_name = schema.name
 
         if name is None:
-            name = f"ucx_T{make_random(4)}".lower()
+            name = f"ucx_t{make_random(4).lower()}"
+
+        # Note: the Watchdog does not explicitly scan for functions; they are purged along with their parent schema.
+        # As such the function can't be marked (and doesn't need to be if the schema as marked) for purge protection.
 
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         if hive_udf:
@@ -1173,7 +1185,7 @@ def make_udf(
             full_name=full_name,
         )
 
-        logger.info(f"Function {udf_info.full_name} crated")
+        logger.info(f"Function {udf_info.full_name} created")
         return udf_info
 
     def remove(udf_info: FunctionInfo):
@@ -1192,7 +1204,7 @@ def make_udf(
 def make_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
     def create() -> LegacyQuery:
         table = make_table()
-        query_name = f"ucx_query_Q{make_random(4)}"
+        query_name = f"ucx_query_Q{make_random(4)}_{get_purge_suffix()}"
         query = ws.queries_legacy.create(
             name=query_name,
             description="TEST QUERY FOR UCX",
@@ -1256,6 +1268,7 @@ def make_serving_endpoint(ws, make_random, make_model):
                     )
                 ]
             ),
+            tags=[EndpointTag(key="RemoveAfter", value=get_test_purge_time())],
         )
         return endpoint
 
@@ -1328,7 +1341,8 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
         location; the mounted location is made with fixture setup already.
     """
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    # DBFS locations are not purged; no suffix necessary.
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}-{get_purge_suffix()}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     return new_mounted_location
 
@@ -1377,7 +1391,7 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
             },
         )
 
-        dashboard_name = f"ucx_D{make_random(4)}"
+        dashboard_name = f"ucx_D{make_random(4)}_{get_purge_suffix()}"
         dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
         assert dashboard.id is not None
         ws.dashboard_widgets.create(
@@ -1445,10 +1459,10 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip):
     }
 
     def create(display_name: str = "") -> SDKDashboard:
-        if len(display_name) == 0:
-            display_name = f"created_by_ucx_{make_random()}"
-        else:
+        if display_name:
             display_name = f"{display_name} ({make_random()})"
+        else:
+            display_name = f"created_by_ucx_{make_random()}_{get_purge_suffix()}"
         dashboard = ws.lakeview.create(
             display_name,
             serialized_dashboard=json.dumps(serialized_dashboard),
