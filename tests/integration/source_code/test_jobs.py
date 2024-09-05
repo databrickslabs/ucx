@@ -154,7 +154,7 @@ display(spark.read.parquet("/mnt/something"))
     last_messages = caplog.messages[-1].split("\n")
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
-    dfsas = simple_ctx.dfsa_crawler.snapshot()
+    dfsas = simple_ctx.directfs_access_crawler.snapshot()
     assert len(list(dfsas)) == 2
 
 
