@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from zipfile import ZipFile
 from concurrent.futures import ThreadPoolExecutor
-
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 
@@ -14,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 class Exporter:
     # File and Path Constants
-    _ZIP_FILE_NAME = "ucx_asseassment_results.zip"
-    _UCX_MAIN_QUERIES_PATH = "src/databricks/labs/ucx/queries/assessment/main"
+    _ZIP_FILE_NAME = "ucx_assessment_results.zip"
+    # project_root = Path(__file__).parent.parent.parent.parent
+    # _get_ucx_main_queries = project_root / "labs/ucx/queries/assessment/main"
 
     def __init__(self, ctx: WorkspaceContext):
         self._ctx = ctx
@@ -24,14 +24,11 @@ class Exporter:
         """Retrieve and construct the main UCX queries."""
         pattern = r"\b.inventory\b"
         schema = self._ctx.inventory_database
-
-        # Create Path object for the UCX_MAIN_QUERIES_PATH
-        ucx_main_queries_path = Path(self._UCX_MAIN_QUERIES_PATH)
+        project_root = Path(__file__).parent.parent.parent.parent
+        ucx_main_queries_path = project_root / "labs/ucx/queries/assessment/main"
 
         # List all SQL files in the directory, excluding those with 'count' in their names
-        sql_files = [
-            file for file in ucx_main_queries_path.iterdir() if file.suffix == ".sql"
-        ]
+        sql_files = [file for file in ucx_main_queries_path.iterdir() if file.suffix == ".sql"]
 
         ucx_main_queries = []
 
@@ -105,6 +102,8 @@ class Exporter:
                 validate=lambda p_: Path(p_).exists(),
             )
             path = Path(response)
+        else:
+            logger.info(f"Using the provided path: {path}")
         try:
             logger.info(f"Exporting UCX Assessment (Main) results to {path}")
             with ThreadPoolExecutor(max_workers=4) as executor:
