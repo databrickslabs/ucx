@@ -1,19 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch, mock_open
 from pathlib import Path
-
-# from tempfile import TemporaryDirectory
-# import os
-# from zipfile import ZipFile
-# import re
-
-
 from databricks.labs.ucx.assessment.export import Exporter
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-
-
-# from databricks.sdk import WorkspaceClient
-
 
 class TestExporter(unittest.TestCase):
 
