@@ -378,11 +378,11 @@ def migrate_credentials(
         for workspace_ctx in workspace_contexts:
             logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
             workspace_ctx.service_principal_migration.run(prompts)
-    if w.config.is_aws:
+    elif w.config.is_aws:
         for workspace_ctx in workspace_contexts:
             logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
             workspace_ctx.iam_role_migration.run(prompts)
-    if w.config.is_gcp:
+    else:
         raise ValueError("Unsupported cloud provider")
 
 

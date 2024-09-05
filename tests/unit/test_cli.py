@@ -358,8 +358,6 @@ def test_save_storage_and_principal_gcp(ws):
 
 def test_migrate_credentials_azure(ws, acc_client):
     ws.config.is_azure = True
-    ws.config.is_aws = False
-    ws.config.is_gcp = False
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
     azure_resources = create_autospec(AzureResources)
@@ -377,7 +375,6 @@ def test_migrate_credentials_azure(ws, acc_client):
 def test_migrate_credentials_aws(ws, acc_client):
     ws.config.is_azure = False
     ws.config.is_aws = True
-    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
@@ -389,8 +386,6 @@ def test_migrate_credentials_aws(ws, acc_client):
 def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credential_limit(ws, acc_client):
     """The storage credential limit is 200, so we should raise a warning when we hit that limit."""
     ws.config.is_azure = True
-    ws.config.is_aws = False
-    ws.config.is_gcp = False
     azure_resources = create_autospec(AzureResources)
     external_locations = create_autospec(ExternalLocations)
     storage_accounts_mock, external_locations_mock = [], []
@@ -445,7 +440,6 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
 def test_migrate_credentials_limit_aws(ws, acc_client):
     ws.config.is_azure = False
     ws.config.is_aws = True
-    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     external_locations = create_autospec(ExternalLocations)
 
