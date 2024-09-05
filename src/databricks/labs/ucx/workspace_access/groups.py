@@ -6,7 +6,6 @@ from abc import abstractmethod
 from collections.abc import Iterable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
-from itertools import islice
 from typing import ClassVar
 
 from databricks.labs.blueprint.limiter import rate_limited
