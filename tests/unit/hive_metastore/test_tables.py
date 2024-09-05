@@ -503,25 +503,28 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
     assert expected_log in caplog.text
 
 
-def test_fast_table_scan_crawler_already_crawled(caplog, mocker):
+def test_fast_table_scan_crawler_already_crawled(mocker):
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
     errors = {}
     rows = {
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
             ("hive_metastore", "db1", "table2", "MANAGED", "DELTA", "/dbfs/location/table", None),
             ("hive_metastore", "db1", "table3", "MANAGED", "DELTA", "dbfs:/mnt/location/table", None),
         ],
     }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    pyspark_sql_session = mocker.Mock()
-    sys.modules["pyspark.sql.session"] = pyspark_sql_session
-    ftsc = FasterTableScanCrawler(backend, "inventory_database")
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
     results = ftsc.snapshot()
-
     assert len(results) == 3
 
 
 def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
     def create_product_element_mock(key, value):
         def product_element_side_effect(index):
             if index == 0:
@@ -539,8 +542,6 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
         "hive_metastore.inventory_database.tables": [],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    pyspark_sql_session = mocker.Mock()
-    sys.modules["pyspark.sql.session"] = pyspark_sql_session
     ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     mock_list_databases_iterator = mocker.Mock()
