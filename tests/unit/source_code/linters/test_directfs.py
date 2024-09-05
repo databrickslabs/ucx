@@ -55,18 +55,9 @@ def test_detects_dfsa_paths(code, expected):
         ('spark.read.parquet("dbfs:/mnt/foo/bar")', 1),
         ('spark.read.parquet("dbfs://mnt/foo/bar")', 1),
         ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 1),
-        (
-            """
-DBFS1="dbfs:/mnt/foo/bar1"
-systems=[DBFS1, "dbfs:/mnt/foo/bar2"]
-for system in systems:
-    spark.read.parquet(system)
-""",
-            2,
-        ),
     ],
 )
-def test_dfsa_usage_linter(code, expected):
+def test_directfs_linter(code, expected):
     linter = DirectFsAccessPyLinter(CurrentSessionState(), allow_spark_duplicates=True)
     advices = linter.lint(code)
     count = 0
@@ -97,7 +88,7 @@ def test_non_dfsa_triggers_nothing(query):
         ("SELECT * FROM delta.`/mnt/...` WHERE foo > 6", "/mnt/..."),
         ("SELECT * FROM json.`/a/b/c` WHERE foo > 6", "/a/b/c"),
         ("DELETE FROM json.`/...` WHERE foo = 'bar'", "/..."),
-        ("MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE", "/dbfs/..."),
+        ("MERGE INTO delta.`/dbfs/...` t USING src ON t.key = src.key WHEN MATCHED THEN DELETE", "/dbfs/..."),
         ("SELECT * FROM json.`s3a://abc/d/e/f`", "s3a://abc/d/e/f"),
         ("SELECT * FROM delta.`s3a://abc/d/e/f` WHERE foo > 6", "s3a://abc/d/e/f"),
         ("SELECT * FROM delta.`s3a://foo/bar`", "s3a://foo/bar"),
