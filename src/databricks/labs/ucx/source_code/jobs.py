@@ -376,23 +376,23 @@ class WorkflowLinter:
             logger.warning(f"Found job problems:\n{problem_messages}")
         return problems
 
-    def collect_dfsas_from_queries(self) -> Iterable[DFSA]:
+    def collect_dfsas_from_queries(self) -> Iterable[DirectFsAccess]:
         dfsas = list(self._collect_dfsas_from_queries())
-        self._dfsa_crawler.append(dfsas)
+        self._directfs_crawler.append(dfsas)
         return dfsas
 
-    def _collect_dfsas_from_queries(self) -> Iterable[DFSA]:
+    def _collect_dfsas_from_queries(self) -> Iterable[DirectFsAccess]:
         queries = self._ws.queries.list()
         for query in queries:
             yield from self._collect_from_query(query)
 
     @classmethod
-    def _collect_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DFSA]:
+    def _collect_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccess]:
         if query.query_text is None:
             return
-        linter = DfsaSqlLinter()
+        linter = DirectFsAccessSqlLinter()
         for dfsa in linter.collect_dfsas(query.query_text):
-            yield DFSA(
+            yield DirectFsAccess(
                 source_type="QUERY",
                 source_id=query.display_name or "<anonymous>",
                 path=dfsa.path,
