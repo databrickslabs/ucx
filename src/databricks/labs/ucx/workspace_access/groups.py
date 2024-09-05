@@ -433,8 +433,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._verify_timeout = verify_timeout
 
     def has_groups(self) -> bool:
-        first_element = islice(self.snapshot(), 1)
-        return bool(list(first_element))
+        return len(self.snapshot()) > 0
 
     def rename_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
