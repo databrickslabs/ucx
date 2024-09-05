@@ -348,6 +348,25 @@ def create_missing_principals(
 
 
 @ucx.command
+def delete_missing_principals(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    **named_parameters,
+):
+    """Not supported for Azure.
+    For AWS, this command identifies all the UC roles that are created through the create-missing-principals cmd.
+    It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected roles
+    are used by any storage credential and prompts to confirm if roles should still be deleted.
+    """
+    if not ctx:
+        ctx = WorkspaceContext(w, named_parameters)
+    if ctx.is_aws:
+        return ctx.iam_role_creation.delete_uc_roles(prompts)
+    raise ValueError("Unsupported cloud provider")
+
+
+@ucx.command
 def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters):
     """For Azure, this command prompts to i) create UC storage credentials for the access connectors with a
     managed identity created for each storage account present in the ADLS Gen2 locations, the access connectors are
