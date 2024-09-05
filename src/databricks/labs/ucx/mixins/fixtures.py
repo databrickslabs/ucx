@@ -1249,7 +1249,10 @@ def make_serving_endpoint(ws, make_random, make_model):
             EndpointCoreConfigInput(
                 served_models=[
                     ServedModelInput(
-                        model.name, "1", workload_size=ServedModelInputWorkloadSize.SMALL, scale_to_zero_enabled=True
+                        model_name=model.name,
+                        model_version="1",
+                        scale_to_zero_enabled=True,
+                        workload_size=ServedModelInputWorkloadSize.SMALL,
                     )
                 ]
             ),
