@@ -10,6 +10,7 @@ import sqlglot
 from sqlglot import expressions
 from sqlglot.expressions import LocationProperty
 from sqlglot.errors import ParseError
+from py4j.protocol import Py4JJavaError  # type: ignore
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -469,7 +470,7 @@ class TablesCrawler(CrawlerBase):
             # This make the integration test more robust as many test schemas are being created and deleted quickly.
             logger.warning(f"Schema {catalog}.{database} no longer existed")
             return None
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Py4JJavaError as e:
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
 
@@ -516,7 +517,7 @@ class FasterTableScanCrawler(CrawlerBase):
     def _list_tables(self, database: str) -> list[str]:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
-        except Exception as err:  # pylint: disable=broad-exception-caught
+        except Py4JJavaError as err:
             logger.warning(f"Failed to list tables in {database}: {err}")
             return []
 
@@ -567,6 +568,9 @@ class FasterTableScanCrawler(CrawlerBase):
                 storage_properties=storage_properties,
                 is_partitioned=is_partitioned,
             )
+        except Py4JJavaError as err:
+            logger.warning(f"Couldn't fetch information for table {full_name} : {err}")
+            return None
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Couldn't fetch information for table {full_name} : {e}")
             return None
