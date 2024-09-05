@@ -546,15 +546,12 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog and database.
         """
         full_name = f"{catalog}.{database}.{table}"
-        # pylint: disable=too-many-try-statements
         try:
             raw_table = self._external_catalog.getTable(database, table)
             table_format = raw_table.provider().getOrElse(None) or "UNKNOWN"
             location_uri = raw_table.storage().locationUri().getOrElse(None)
             if location_uri:
                 location_uri = location_uri.toString()
-            view_text = raw_table.viewText()
-            storage_properties = self._format_properties_list(list(self._iterator(raw_table.properties())))
             is_partitioned = len(list(self._iterator(raw_table.partitionColumnNames()))) > 0
 
             return Table(
@@ -564,8 +561,8 @@ class FasterTableScanCrawler(CrawlerBase):
                 object_type=raw_table.tableType().name(),
                 table_format=table_format,
                 location=location_uri,
-                view_text=view_text,
-                storage_properties=storage_properties,
+                view_text=raw_table.viewText(),
+                storage_properties=self._format_properties_list(list(self._iterator(raw_table.properties()))),
                 is_partitioned=is_partitioned,
             )
         except Py4JJavaError as err:
