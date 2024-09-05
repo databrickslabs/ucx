@@ -60,6 +60,28 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
     * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
   * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
+    * [Linter message codes](#linter-message-codes)
+      * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
+      * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
+      * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
+      * [`dbfs-read-from-sql-query`](#dbfs-read-from-sql-query)
+      * [`dbfs-usage`](#dbfs-usage)
+      * [`default-format-changed-in-dbr8`](#default-format-changed-in-dbr8)
+      * [`dependency-not-found`](#dependency-not-found)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
+      * [`implicit-dbfs-usage`](#implicit-dbfs-usage)
+      * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+      * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
+      * [`not-supported`](#not-supported)
+      * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+      * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
+      * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
+      * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
+      * [`sql-parse-error`](#sql-parse-error)
+      * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
+      * [`table-migrated-to-uc`](#table-migrated-to-uc)
+      * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
+      * [`unsupported-magic-line`](#unsupported-magic-line)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -675,6 +697,286 @@ Once the workflow completes, the output will be stored in `$inventory_database.w
 in the Migration dashboard.
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
+
+[[back to top](#databricks-labs-ucx)]
+
+### Linter message codes
+
+Here's the detailed explanation of the linter message codes:
+
+#### `cannot-autofix-table-reference`
+
+This indicates that the linter has found a table reference that cannot be automatically fixed. The user must manually
+update the table reference to point to the correct table in Unity Catalog. This mostly occurs, when table name is
+computed dynamically, and it's too complex for our static code analysis to detect it. We detect this problem anywhere
+where table name could be used: `spark.sql`, `spark.catalog.*`, `spark.table`, `df.write.*` and many more. Code examples
+that trigger this problem:
+
+```python
+spark.table(f"foo_{some_table_name}")
+# ..
+df = spark.range(10)
+df.write.saveAsTable(f"foo_{some_table_name}")
+# .. or even
+df.write.insertInto(f"foo_{some_table_name}")
+```
+
+Here the `some_table_name` variable is not defined anywhere in the visible scope. Though, the analyser would
+successfully detect table name if it is defined:
+
+```python
+some_table_name = 'bar'
+spark.table(f"foo_{some_table_name}")
+```
+
+We even detect string constants when coming either from `dbutils.widgets.get` (via job named parameters) or through
+loop variables. If `old.things` table is migrated to `brand.new.stuff` in Unity Catalog, the following code will
+trigger two messages: [`table-migrated-to-uc`](#table-migrated-to-uc) for the first query, as the contents are clearly
+analysable, and `cannot-autofix-table-reference` for the second query.
+
+```python
+# ucx[table-migrated-to-uc:+4:4:+4:20] Table old.things is migrated to brand.new.stuff in Unity Catalog
+# ucx[cannot-autofix-table-reference:+3:4:+3:20] Can't migrate table_name argument in 'spark.sql(query)' because its value cannot be computed
+table_name = f"table_{index}"
+for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
+    spark.sql(query).collect()
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `catalog-api-in-shared-clusters`
+
+`spark.catalog.*` functions require Databricks Runtime 14.3 LTS or above on Unity Catalog clusters in Shared access
+mode, so of your code has `spark.catalog.tableExists("table")` or `spark.catalog.listDatabases()`, you need to ensure
+that your cluster is running the correct runtime version and data security mode.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `changed-result-format-in-uc`
+
+Calls to these functions would return a list of `<catalog>.<database>.<table>` instead of `<database>.<table>`. So if
+you have code like this:
+
+```python
+for table in spark.catalog.listTables():
+    do_stuff_with_table(table)
+```
+
+you need to make sure that `do_stuff_with_table` can handle the new format.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `dbfs-read-from-sql-query`
+
+DBFS access is not allowed in Unity Catalog, so if you have code like this:
+
+```python
+df = spark.sql("SELECT * FROM parquet.`/mnt/foo/path/to/file`")
+```
+
+you need to change it to use UC tables.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `dbfs-usage`
+
+DBFS does not work in Unity Catalog, so if you have code like this:
+
+```python
+display(spark.read.csv('/mnt/things/e/f/g'))
+```
+
+You need to change it to use UC tables or UC volumes.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `dependency-not-found`
+
+This message indicates that the linter has found a dependency, like Python source file or a notebook, that is not
+available in the workspace. The user must ensure that the dependency is available in the workspace. This usually
+means an error in the user code.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `direct-filesystem-access`
+
+It's not allowed to access the filesystem directly in Unity Catalog, so if you have code like this:
+
+```python
+spark.read.csv("s3://bucket/path")
+```
+
+you need to change it to use UC tables or UC volumes.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `implicit-dbfs-usage`
+
+The use of DBFS is not allowed in Unity Catalog, so if you have code like this:
+
+```python
+display(spark.read.csv('/mnt/things/e/f/g'))
+```
+
+you need to change it to use UC tables or UC volumes.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `jvm-access-in-shared-clusters`
+
+You cannot access Spark Driver JVM on Unity Catalog clusters in Shared Access mode. If you have code like this:
+
+```python
+spark._jspark._jvm.com.my.custom.Name()
+```
+
+or like this:
+
+```python
+log4jLogger = sc._jvm.org.apache.log4j
+LOGGER = log4jLogger.LogManager.getLogger(__name__)
+```
+
+you need to change it to use Python equivalents.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `legacy-context-in-shared-clusters`
+
+SparkContext (`sc`) is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using SparkSession
+(`spark`). Example code that triggers this message:
+
+```python
+df = spark.createDataFrame(sc.emptyRDD(), schema)
+```
+
+or this:
+
+```python
+sc.parallelize([1, 2, 3])
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `not-supported`
+
+Installing eggs is no longer supported on Databricks 14.0 or higher.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `notebook-run-cannot-compute-value`
+
+Path for `dbutils.notebook.run` cannot be computed and requires adjusting the notebook path.
+It is not clear for automated code analysis where the notebook is located, so you need to simplify the code like:
+
+```python
+b = some_function()
+dbutils.notebook.run(b)
+```
+
+to something like this:
+
+```python
+a = "./leaf1.py"
+dbutils.notebook.run(a)
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `python-udf-in-shared-clusters`
+
+`applyInPandas` requires DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode. Example:
+
+```python
+df.groupby("id").applyInPandas(subtract_mean, schema="id long, v double").show()
+```
+
+Arrow UDFs require DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode.
+
+```python
+@udf(returnType='int', useArrow=True)
+def arrow_slen(s):
+    return len(s)
+```
+
+It is not possible to register Java UDF from Python code on Unity Catalog clusters in Shared access mode. Use a
+`%scala` cell to register the Scala UDF using `spark.udf.register`. Example code that triggers this message:
+
+```python
+spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `rdd-in-shared-clusters`
+
+RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use mapInArrow() or Pandas UDFs instead.
+
+```python
+df.rdd.mapPartitions(myUdf)
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `spark-logging-in-shared-clusters`
+
+Cannot set Spark log level directly from code on Unity Catalog clusters in Shared access mode. Remove the call and set
+the cluster spark conf `spark.log.level` instead:
+
+```python
+sc.setLogLevel("INFO")
+setLogLevel("WARN")
+```
+
+Another example could be:
+
+```python
+log4jLogger = sc._jvm.org.apache.log4j
+LOGGER = log4jLogger.LogManager.getLogger(__name__)
+```
+
+or
+
+```python
+sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `sql-parse-error`
+
+This is a generic message indicating that the SQL query could not be parsed. The user must manually check the SQL query.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `sys-path-cannot-compute-value`
+
+Path for `sys.path.append` cannot be computed and requires adjusting the path. It is not clear for automated code
+analysis where the path is located.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `table-migrated-to-uc`
+
+This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
+that the table is available in Unity Catalog.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `to-json-in-shared-clusters`
+
+`toJson()` is not available on Unity Catalog clusters in Shared access mode. Use `toSafeJson()` on DBR 13.3 LTS or
+above to get a subset of command context information. Example code that triggers this message:
+
+```python
+dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `unsupported-magic-line`
+
+This message indicates the code that could not be analysed by UCX. User must check the code manually.
 
 [[back to top](#databricks-labs-ucx)]
 
