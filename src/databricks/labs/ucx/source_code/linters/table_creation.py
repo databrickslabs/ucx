@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     PythonLinter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 
 
 @dataclass

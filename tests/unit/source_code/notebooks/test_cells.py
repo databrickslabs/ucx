@@ -8,7 +8,8 @@ import yaml
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     PipCell,
@@ -16,7 +17,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     PipCommand,
     PythonCodeAnalyzer,
 )
-from databricks.labs.ucx.source_code.notebooks.cells import MagicLine
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,

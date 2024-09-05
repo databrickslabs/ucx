@@ -12,8 +12,8 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 logger = logging.getLogger(__name__)
 
