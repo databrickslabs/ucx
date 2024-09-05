@@ -1,7 +1,7 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Collection
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial, cached_property
@@ -575,16 +575,27 @@ class FasterTableScanCrawler(CrawlerBase):
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database."""
         tasks = []
+        catalog_tables: Collection[typing.Never] = []
         catalog = "hive_metastore"
         databases = self._all_databases()
-        for database in databases:  # pylint: disable=too-many-nested-blocks
+        for database in databases:
             logger.info(f"Scanning {database}")
-            table_names = [partial(self._list_tables, database)]
-            for table_batch in Threads.strict('listing tables', table_names):
-                if len(table_batch) > 0:
-                    for table in table_batch:
-                        tasks.append(partial(self._describe, catalog, database, table))
+            table_names = self._get_table_names(database)
+            tasks.extend(self._create_describe_tasks(catalog, database, table_names))
         catalog_tables, errors = Threads.gather("describing tables in ", tasks)
         if len(errors) > 0:
             logger.warning(f"Detected {len(errors)} errors while scanning tables in ")
         return catalog_tables
+
+    def _get_table_names(self, database: str) -> list[str]:
+        table_names = []
+        table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
+        for table_batch in table_names_batches:
+            table_names.extend(table_batch)
+        return table_names
+
+    def _create_describe_tasks(self, catalog: str, database: str, table_names: list[str]) -> list[partial]:
+        tasks = []
+        for table in table_names:
+            tasks.append(partial(self._describe, catalog, database, table))
+        return tasks
