@@ -17,7 +17,7 @@ class _DirectFsAccessCrawler(CrawlerBase):
         Initializes a DFSACrawler instance.
 
         Args:
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, table, DirectFsAccess)
