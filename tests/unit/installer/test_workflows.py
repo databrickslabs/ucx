@@ -70,7 +70,7 @@ def test_run_workflow(mock_installation) -> None:
     """Check that run_workflow starts a workflow and waits for it to complete."""
     ws = create_autospec(WorkspaceClient)
     install_state = InstallState.from_installation(mock_installation)
-    workflows = DeployedWorkflows(ws, install_state, verify_timeout=timedelta(seconds=0))
+    workflows = DeployedWorkflows(ws, install_state)
     ws.jobs.run_now.return_value = Run(run_id=456)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
@@ -87,7 +87,7 @@ def test_run_workflow_skip_job_wait(mock_installation) -> None:
     """Check that run_workflow can start a workflow but return immediately instead of waiting for it to complete."""
     ws = create_autospec(WorkspaceClient)
     install_state = InstallState.from_installation(mock_installation)
-    workflows = DeployedWorkflows(ws, install_state, verify_timeout=timedelta(seconds=0))
+    workflows = DeployedWorkflows(ws, install_state)
     ws.jobs.run_now.return_value = Run(run_id=456)
 
     run_id = workflows.run_workflow("test", skip_job_wait=True)
@@ -101,7 +101,7 @@ def test_run_workflow_operation_failed(mock_installation) -> None:
     """Check that run_workflow handles a failing workflow due to an OperationFailed error, including log replication."""
     ws = create_autospec(WorkspaceClient)
     install_state = InstallState.from_installation(mock_installation)
-    workflows = DeployedWorkflows(ws, install_state, verify_timeout=timedelta(seconds=0))
+    workflows = DeployedWorkflows(ws, install_state)
     ws.jobs.run_now.return_value = Run(run_id=456)
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("Simulated workflow failure")
     ws.jobs.get_run.return_value = Run(
@@ -124,7 +124,7 @@ def test_run_workflow_timeout(mock_installation) -> None:
     """Check that run_workflow can handle a workflow takes longer than the timeout, including log replication."""
     ws = create_autospec(WorkspaceClient)
     install_state = InstallState.from_installation(mock_installation)
-    workflows = DeployedWorkflows(ws, install_state, verify_timeout=timedelta(seconds=0))
+    workflows = DeployedWorkflows(ws, install_state)
     ws.jobs.run_now.return_value = Run(run_id=456)
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = TimeoutError("Simulated timeout")
 
