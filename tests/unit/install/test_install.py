@@ -211,7 +211,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    installer = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    installer = DeployedWorkflows(ws, install_state)
     logger = logging.getLogger("databricks.labs.ucx.installer.workflows")
     logger.setLevel(logging.DEBUG)
     with pytest.raises(Unknown) as failure:
@@ -246,7 +246,7 @@ def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(NotFound):
         deployed.run_workflow("assessment")
 
@@ -279,7 +279,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(PermissionDenied) as failure:
         deployed.run_workflow("assessment")
 
@@ -324,7 +324,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(ManyError) as failure:
         deployed.run_workflow("assessment")
 
@@ -826,9 +826,9 @@ def test_repair_run(ws, mocker, mock_installation_with_jobs):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
 
 
 def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
@@ -847,9 +847,9 @@ def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
     ws.jobs.list_runs.repair_run = None
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
 
     assert "job is not in FAILED state" in caplog.text
 
@@ -871,10 +871,10 @@ def test_repair_run_no_job_id(ws, mock_installation, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert 'Skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
@@ -884,10 +884,10 @@ def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert "Skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
@@ -896,10 +896,10 @@ def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert "Skipping assessment: Workflow does not exists" in caplog.messages
 
 
@@ -920,9 +920,9 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
     assert "Please try after sometime" in caplog.text
 
 
@@ -968,9 +968,8 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, state, expect
             start_time=1704114000000,
         )
     ]
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = base
     status = deployed.latest_job_status()
     assert len(status) == 1
@@ -999,9 +998,8 @@ def test_latest_job_status_success_with_time(mock_datetime, ws, mock_installatio
             start_time=start_time,
         )
     ]
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = base
     faked_now = datetime(2024, 1, 1, 14, 0, 0)
     mock_datetime.now.return_value = faked_now
@@ -1035,10 +1033,9 @@ def test_latest_job_status_list(ws):
         ],
         [],  # the last job has no runs
     ]
-    timeout = timedelta(seconds=1)
     installation = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
     install_state = InstallState.from_installation(installation)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = deployed.latest_job_status()
     assert len(status) == 3
@@ -1051,9 +1048,8 @@ def test_latest_job_status_list(ws):
 
 
 def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = ""
     status = deployed.latest_job_status()
     assert len(status) == 1
@@ -1061,9 +1057,8 @@ def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
 
 
 def test_latest_job_status_exception(ws, mock_installation_with_jobs):
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     status = deployed.latest_job_status()
     assert len(status) == 0
@@ -1580,7 +1575,7 @@ def test_validate_step(ws, result_state, expected):
         }
     )
     install_state = InstallState.from_installation(installation)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = [
         BaseRun(
             job_id=123,

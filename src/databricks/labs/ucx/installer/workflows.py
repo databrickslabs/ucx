@@ -174,7 +174,7 @@ class DeployedWorkflows:
                 f"Completed {step} job run {run_id} duration: {duration or 'N/A'} ({start_time or 'N/A'} thru {end_time or 'N/A'})"
             )
 
-    def repair_run(self, workflow, verify_timeout: timedelta):
+    def repair_run(self, workflow, verify_timeout: timedelta = timedelta(minutes=2)):
         try:
             job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
