@@ -3,6 +3,7 @@ import itertools
 import logging
 import shutil
 import tempfile
+import time
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -426,11 +427,15 @@ class WorkflowLinter:
             graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
         )
         yield from walker
+        assessment_start = int(time.mktime(time.gmtime()))
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
+        assessment_end = int(time.mktime(time.gmtime()))
         dfsas: list[DirectFsAccess] = []
-        job_name = "<anonymous>" if job.settings is None else job.settings.name
+        assert job.settings is not None  # as already done in _lint_job
+        job_name = job.settings.name
         for dfsa in collector:
             dfsa = dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
+            dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
             dfsas.append(dfsa)
         self._directfs_crawlers.for_paths().append(dfsas)
 
@@ -499,9 +504,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             src_id = str(path)
             src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace_source(
-                    source_type="NOTEBOOK", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
-                )
+                yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -523,9 +526,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         src_lineage = self.lineage_str
         src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
-            yield dfsa.replace_source(
-                source_type="FILE", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
-            )
+            yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)

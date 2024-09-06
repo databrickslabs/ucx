@@ -346,17 +346,17 @@ class DirectFsAccess:
     path: str
     is_read: bool
     is_write: bool
-    source_type: str = UNKNOWN
     source_id: str = UNKNOWN
-    source_lineage: str = UNKNOWN
     source_timestamp: int = -1
+    source_lineage: str = UNKNOWN
     job_id: int = -1
     job_name: str = UNKNOWN
     task_key: str = UNKNOWN
+    assessment_start_timestamp: int = -1
+    assessment_end_timestamp: int = -1
 
     def replace_source(
         self,
-        source_type: str | None = None,
         source_id: str | None = None,
         source_lineage: str | None = None,
         source_timestamp: int | None = None,
@@ -365,13 +365,14 @@ class DirectFsAccess:
             path=self.path,
             is_read=self.is_read,
             is_write=self.is_write,
-            source_type=source_type or self.source_type,
             source_id=source_id or self.source_id,
-            source_lineage=source_lineage or self.source_lineage,
             source_timestamp=source_timestamp or self.source_timestamp,
+            source_lineage=source_lineage or self.source_lineage,
             job_id=self.job_id,
             job_name=self.job_name,
             task_key=self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
         )
 
     def replace_job_infos(
@@ -384,11 +385,27 @@ class DirectFsAccess:
             path=self.path,
             is_read=self.is_read,
             is_write=self.is_write,
-            source_type=self.source_type,
             source_id=self.source_id,
-            source_lineage=self.source_lineage,
             source_timestamp=self.source_timestamp,
+            source_lineage=self.source_lineage,
             job_id=job_id or self.job_id,
             job_name=job_name or self.job_name,
             task_key=task_key or self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
+        )
+
+    def replace_assessment_infos(self, assessment_start: int | None = None, assessment_end: int | None = None):
+        return DirectFsAccess(
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_id=self.source_id,
+            source_timestamp=self.source_timestamp,
+            source_lineage=self.source_lineage,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
+            assessment_end_timestamp=assessment_end or self.assessment_start_timestamp,
         )

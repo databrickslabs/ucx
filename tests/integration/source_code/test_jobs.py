@@ -165,6 +165,8 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.job_id == j.job_id
         assert dfsa.job_name == j.job_name
         assert dfsa.task_key in task_keys
+        assert dfsa.assessment_start_timestamp != -1
+        assert dfsa.assessment_end_timestamp != -1
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
