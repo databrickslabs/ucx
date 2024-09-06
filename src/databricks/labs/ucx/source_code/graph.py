@@ -593,6 +593,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._graph = graph
         self._walked_paths = walked_paths
         self._path_lookup = path_lookup
+        self._lineage: list[Dependency] = []
 
     def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:
@@ -604,6 +605,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
         if dependency.path in self._walked_paths:
             return
+        self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
         if dependency.path.is_file() or is_a_notebook(dependency.path):
@@ -616,6 +618,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
                 child_graph = maybe_graph.graph
                 for child_dependency in child_graph.local_dependencies:
                     yield from self._iter_one(child_dependency, child_graph, root_path)
+        self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency):
         logger.debug(f'Analyzing dependency: {dependency}')
