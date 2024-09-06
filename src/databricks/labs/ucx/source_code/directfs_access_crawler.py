@@ -38,12 +38,12 @@ class _DirectFsAccessCrawler(CrawlerBase):
 
 class DirectFsAccessCrawlers:
 
-    def __init__(self, backend: SqlBackend, schema: str):
-        self._backend = backend
+    def __init__(self, sql_backend: SqlBackend, schema: str):
+        self._sql_backend = sql_backend
         self._schema = schema
 
     def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._backend, self._schema, "direct_file_system_access_in_paths")
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_paths")
 
     def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._backend, self._schema, "direct_file_system_access_in_queries")
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_queries")
