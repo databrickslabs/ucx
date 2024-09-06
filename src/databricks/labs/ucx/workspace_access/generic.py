@@ -360,9 +360,6 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
                 language=raw.get("language", None),
             )
 
-    def snapshot(self) -> Iterable[WorkspaceObjectInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield WorkspaceObjectInfo(

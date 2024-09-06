@@ -70,9 +70,6 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             if cluster.init_scripts:
                 failures.extend(self._check_cluster_init_script(cluster.init_scripts, "pipeline cluster"))
 
-    def snapshot(self) -> Iterable[PipelineInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[PipelineInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PipelineInfo(*row)
