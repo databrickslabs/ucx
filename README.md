@@ -789,7 +789,7 @@ display(spark.read.csv('/mnt/things/data.csv'))
 or this:
 
 ```python
-display(spark.read.csv('s3:/bucket/folder/data.csv'))
+display(spark.read.csv('s3://bucket/folder/data.csv'))
 ```
 
 You need to change it to use UC tables or UC volumes.

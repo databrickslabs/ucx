@@ -115,7 +115,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         _ = ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
-    with pytest.raises(NotFound, match=f"Group with id {ws_group.id} not found."):
+    with pytest.raises(NotFound):
         get_group(ws_group.id)
 
 

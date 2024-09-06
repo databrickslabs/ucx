@@ -409,6 +409,12 @@ class AWSResources:
             f" --role-name {role_name}"
         )
         self._run_json_command(f"iam delete-instance-profile --instance-profile-name {instance_profile_name}")
+        self.delete_role(role_name)
+
+    def delete_role(self, role_name: str):
+        role_policies = self.list_role_policies(role_name)
+        for policy in role_policies:
+            self._run_json_command(f"iam delete-role-policy --role-name {role_name} --policy-name {policy}")
         self._run_json_command(f"iam delete-role --role-name {role_name}")
 
     def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str) -> bool:

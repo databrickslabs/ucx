@@ -5,6 +5,7 @@ from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
     DirectFsAccessSqlLinter,
     DirectFsAccessPyLinter,
+    DirectFsAccessSqlLinter,
 )
 
 
