@@ -8,6 +8,7 @@ from databricks.sdk.errors import DatabricksError
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
 from databricks.labs.ucx.recon.base import (
@@ -142,5 +143,5 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         return round(abs(source_row_count - target_row_count) / source_row_count * 100)
 
     def _try_fetch(self) -> Iterable[ReconResult]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ReconResult(*row)

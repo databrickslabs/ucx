@@ -21,6 +21,7 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
         ("a-b.c.d", "`a-b`.`c`.`d`"),
         ("a.b-c.d", "`a`.`b-c`.`d`"),
         ("a.b.c-d", "`a`.`b`.`c-d`"),
+        ("a.b.c`d", "`a`.`b`.`c``d`"),
         ("✨.🍰.✨", "`✨`.`🍰`.`✨`"),
         ("", ""),
     ],
