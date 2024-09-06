@@ -427,7 +427,11 @@ class WorkflowLinter:
         )
         yield from walker
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
-        dfsas = list(dfsa for dfsa in collector)
+        dfsas: list[DirectFsAccess] = []
+        job_name = "<anonymous>" if job.settings is None else job.settings.name
+        for dfsa in collector:
+            dfsa = dfsa.replace(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
+            dfsas.append(dfsa)
         self._directfs_crawlers.for_paths().append(dfsas)
 
 

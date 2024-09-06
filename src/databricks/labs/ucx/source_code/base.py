@@ -350,7 +350,11 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_lineage: str = UNKNOWN
     source_timestamp: int = -1
+    job_id: int = -1
+    job_name: str = UNKNOWN
+    task_key: str = UNKNOWN
 
+    # pylint: disable=too-many-arguments
     def replace(
         self,
         path: str | None = None,
@@ -360,6 +364,9 @@ class DirectFsAccess:
         source_id: str | None = None,
         source_lineage: str | None = None,
         source_timestamp: int | None = None,
+        job_id: int | None = None,
+        job_name: str | None = None,
+        task_key: str | None = None,
     ):
         return DirectFsAccess(
             path=path or self.path,
@@ -369,4 +376,7 @@ class DirectFsAccess:
             source_id=source_id or self.source_id,
             source_lineage=source_lineage or self.source_lineage,
             source_timestamp=source_timestamp or self.source_timestamp,
+            job_id=job_id or self.job_id,
+            job_name=job_name or self.job_name,
+            task_key=task_key or self.task_key,
         )

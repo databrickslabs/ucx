@@ -158,12 +158,13 @@ display(spark.read.parquet("/mnt/something"))
     assert len(dfsas) == 2
     task_keys = set(task.task_key for task in j.settings.tasks)
     for dfsa in dfsas:
-        assert dfsa.job_id == j.job_id
-        assert dfsa.task_key in task_keys
         assert dfsa.source_type != DirectFsAccess.UNKNOWN
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
         assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
         assert dfsa.source_timestamp != -1
+        assert dfsa.job_id == j.job_id
+        assert dfsa.job_name == j.job_name
+        assert dfsa.task_key in task_keys
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
