@@ -156,7 +156,10 @@ display(spark.read.parquet("/mnt/something"))
 
     dfsas = list(simple_ctx.directfs_access_crawlers.for_paths().snapshot())
     assert len(dfsas) == 2
+    task_keys = set(task.task_key for task in j.settings.tasks)
     for dfsa in dfsas:
+        assert dfsa.job_id == j.job_id
+        assert dfsa.task_key in task_keys
         assert dfsa.source_type != DirectFsAccess.UNKNOWN
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
         assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
