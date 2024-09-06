@@ -58,8 +58,3 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
-
-
-@pytest.fixture
-def mock_dfsa_crawlers() -> DirectFsAccessCrawlers:
-    return DirectFsAccessCrawlers(MockBackend(), "schema")

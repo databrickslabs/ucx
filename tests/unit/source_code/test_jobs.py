@@ -10,6 +10,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineRespons
 
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
@@ -230,12 +231,13 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
 
 
 def test_workflow_linter_lint_job_logs_problems(
-    dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawlers, caplog
+    dependency_resolver, mock_path_lookup, empty_index, caplog
 ):
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawlers)
+    crawlers = create_autospec(DirectFsAccessCrawlers)
+    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, crawlers)
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test-task", libraries=libraries)
