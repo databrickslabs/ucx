@@ -80,9 +80,6 @@ class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScript
                 global_init_script_info.success = 0
             yield global_init_script_info
 
-    def snapshot(self) -> Iterable[GlobalInitScriptInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[GlobalInitScriptInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield GlobalInitScriptInfo(*row)

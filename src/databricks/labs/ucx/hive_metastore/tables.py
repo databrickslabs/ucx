@@ -357,15 +357,6 @@ class TablesCrawler(CrawlerBase):
             return [row[0] for row in self._fetch("SHOW DATABASES")]
         return self._include_database
 
-    def snapshot(self) -> list[Table]:
-        """
-        Takes a snapshot of tables in the specified catalog and database.
-
-        Returns:
-            list[Table]: A list of Table objects representing the snapshot of tables.
-        """
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
-
     def load_one(self, schema_name: str, table_name: str) -> Table | None:
         query = f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE database='{schema_name}' AND name='{table_name}' LIMIT 1"
         for row in self._fetch(query):
@@ -386,7 +377,7 @@ class TablesCrawler(CrawlerBase):
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)
 
-    def _try_load(self) -> Iterable[Table]:
+    def _try_fetch(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Table(*row)
