@@ -491,8 +491,13 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
         for cell in notebook.cells:
+            src_timestamp = int(path.stat().st_mtime)
+            src_id = str(path)
+            src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace(source_type="NOTEBOOK", source_id=str(path), source_lineage=self.lineage_str)
+                yield dfsa.replace(
+                    source_type="NOTEBOOK", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
+                )
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -510,8 +515,13 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
             return
+        src_id = str(path)
+        src_lineage = self.lineage_str
+        src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
-            yield dfsa.replace(source_type="FILE", source_id=str(path), source_lineage=self.lineage_str)
+            yield dfsa.replace(
+                source_type="FILE", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
+            )
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)

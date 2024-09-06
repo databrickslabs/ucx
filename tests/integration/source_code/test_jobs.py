@@ -154,12 +154,13 @@ display(spark.read.parquet("/mnt/something"))
     last_messages = caplog.messages[-1].split("\n")
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
-    dfsas = list(simple_ctx.directfs_access_crawler.snapshot())
+    dfsas = list(simple_ctx.directfs_access_crawlers.for_paths().snapshot())
     assert len(dfsas) == 2
     for dfsa in dfsas:
         assert dfsa.source_type != DirectFsAccess.UNKNOWN
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
         assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
+        assert dfsa.source_timestamp != -1
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(

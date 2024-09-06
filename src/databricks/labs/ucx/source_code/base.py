@@ -346,6 +346,7 @@ class DirectFsAccess:
     source_type: str
     source_id: str
     source_lineage: str
+    source_timestamp: int
     path: str
     is_read: bool
     is_write: bool
@@ -355,6 +356,7 @@ class DirectFsAccess:
         source_type: str | None = None,
         source_id: str | None = None,
         source_lineage: str | None = None,
+        source_timestamp: int | None = None,
         path: str | None = None,
         is_read: bool | None = None,
         is_write: bool | None = None,
@@ -363,6 +365,7 @@ class DirectFsAccess:
             source_type=source_type or self.source_type,
             source_id=source_id or self.source_id,
             source_lineage=source_lineage or self.source_lineage,
+            source_timestamp=source_timestamp or self.source_timestamp,
             path=path or self.path,
             is_read=is_read or self.is_read,
             is_write=is_write or self.is_write,
