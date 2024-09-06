@@ -1311,6 +1311,15 @@ Once the [`assessment` workflow](#assessment-workflow) finished successfully, an
 run this command to have Unity Catalog external locations created. The candidate locations to be created are extracted from guess_external_locations
 task in the assessment job. You can run [`validate-external-locations` command](#validate-external-locations-command) to check the candidate locations.
 
+Location ACL:
+migrate-locations cmd also applies any location ACL from existing cluster.
+For Azure it checks if there are any interactive cluster or sql warehouse
+which has service principals configured to access storage. It maps the storage account to the external location created and grants CREATE_EXTERNAL_TABLE,
+CREATE_EXTERNAL_VOLUME and READ_FILES permission on the location to all the user who have access to the interactive cluster or sql warehouse
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles to the storage account
+and grants CREATE_EXTERNAL_TABLE, CREATE_EXTERNAL_VOLUME and READ_FILES permission on the location to all the user who have access to the interactive cluster
+or sql warehouse
+
 Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
 
 [[back to top](#databricks-labs-ucx)]
