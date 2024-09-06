@@ -13,9 +13,8 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessNode, DIRECT_FS_ACCESS_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper

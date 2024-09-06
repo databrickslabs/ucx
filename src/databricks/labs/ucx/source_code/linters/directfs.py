@@ -58,11 +58,6 @@ DIRECT_FS_ACCESS_PATTERNS = [
 
 
 @dataclass
-class DirectFsAccess:
-    path: str
-
-
-@dataclass
 class DirectFsAccessNode:
     dfsa: DirectFsAccess
     node: NodeNG

@@ -3,7 +3,6 @@ import pytest
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
-    DirectFsAccessSqlLinter,
     DirectFsAccessPyLinter,
     DirectFsAccessSqlLinter,
 )
