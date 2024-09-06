@@ -28,7 +28,7 @@ from databricks.labs.ucx.source_code.base import (
     guess_encoding,
     DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -330,14 +330,14 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
-        directfs_crawler: DirectFsAccessCrawler,
+        directfs_crawlers: DirectFsAccessCrawlers,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
-        self._directfs_crawler = directfs_crawler
+        self._directfs_crawlers = directfs_crawlers
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -426,7 +426,7 @@ class WorkflowLinter:
         yield from walker
         collector = DfsaCollector(graph, set(), self._path_lookup, session_state)
         dfsas = list(dfsa for dfsa in collector)
-        self._directfs_crawler.append(dfsas)
+        self._directfs_crawlers.for_paths().append(dfsas)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):

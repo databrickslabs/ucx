@@ -10,9 +10,9 @@ from databricks.labs.ucx.source_code.base import DirectFsAccess
 logger = logging.getLogger(__name__)
 
 
-class DirectFsAccessCrawler(CrawlerBase):
+class _DirectFsAccessCrawler(CrawlerBase):
 
-    def __init__(self, backend: SqlBackend, schema: str):
+    def __init__(self, backend: SqlBackend, schema: str, table: str):
         """
         Initializes a DFSACrawler instance.
 
@@ -20,7 +20,7 @@ class DirectFsAccessCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "direct_file_system_access", DirectFsAccess)
+        super().__init__(backend, "hive_metastore", schema, table, DirectFsAccess)
 
     def append(self, dfsas: Sequence[DirectFsAccess]):
         try:
@@ -31,3 +31,16 @@ class DirectFsAccessCrawler(CrawlerBase):
     def snapshot(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {self.full_name}"
         yield from self._backend.fetch(sql)
+
+
+class DirectFsAccessCrawlers:
+
+    def __init__(self, backend: SqlBackend, schema: str):
+        self._backend = backend
+        self._schema = schema
+
+    def for_paths(self) -> _DirectFsAccessCrawler:
+        return _DirectFsAccessCrawler(self._backend, self._schema, "direct_file_system_access_in_paths")
+
+    def for_queries(self) -> _DirectFsAccessCrawler:
+        return _DirectFsAccessCrawler(self._backend, self._schema, "direct_file_system_access_in_queries")
