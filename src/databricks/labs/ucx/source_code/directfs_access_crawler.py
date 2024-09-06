@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Sequence, Iterable
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
@@ -28,9 +28,12 @@ class _DirectFsAccessCrawler(CrawlerBase):
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
-    def snapshot(self) -> Iterable[DirectFsAccess]:
+    def _try_fetch(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {self.full_name}"
         yield from self._backend.fetch(sql)
+
+    def _crawl(self) -> Iterable[Result]:
+        return []
 
 
 class DirectFsAccessCrawlers:
