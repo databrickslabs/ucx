@@ -442,7 +442,6 @@ class WorkflowsDeployment(InstallationMixin):
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
-        verify_timeout: timedelta,
         tasks: list[Task],
     ):
         self._config = config
@@ -451,7 +450,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
