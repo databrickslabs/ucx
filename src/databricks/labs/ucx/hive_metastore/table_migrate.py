@@ -165,6 +165,7 @@ class TablesMigrator:
         try:
             self._backend.execute(view_migrate_sql)
             self._backend.execute(self._sql_alter_to(src_view.src, src_view.rule.as_uc_table_key))
+            self._backend.execute(self._sql_add_comment(src_view.src, src_view.rule.as_uc_table_key))
             self._backend.execute(
                 self._sql_alter_from(src_view.src, src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
             )
@@ -227,6 +228,7 @@ class TablesMigrator:
         try:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_add_comment(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
@@ -242,6 +244,7 @@ class TablesMigrator:
         try:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_add_comment(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
@@ -263,6 +266,7 @@ class TablesMigrator:
         try:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_add_comment(src_table, rule.as_uc_table_key))
             self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
@@ -401,6 +405,9 @@ class TablesMigrator:
 
     def _sql_alter_to(self, table: Table, target_table_key: str):
         return f"ALTER {table.kind} {escape_sql_identifier(table.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
+
+    def _sql_add_comment(self, table: Table, target_table_key: str):
+        return f"COMMENT ON {table.kind} {escape_sql_identifier(table.key)} IS 'This {table.kind.lower()} is deprecated. Please use `{target_table_key}` instead of `{table.key}`.';"
 
     def _sql_alter_from(self, table: Table, target_table_key: str, ws_id: int):
         source = table.location if table.is_table_in_mount else table.key
