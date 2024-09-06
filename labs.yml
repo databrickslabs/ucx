@@ -265,6 +265,3 @@ commands:
 
   - name: export
     description: export widget data from the assessment
-    flags:
-      - name: stuff
-        description: more stuff

@@ -240,7 +240,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def export(self):
-        return Exporter(self.sql_backend, self.dashboard_id)
+        return Exporter(self)
 
     @cached_property
     def tables_migrator(self):
