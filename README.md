@@ -1316,8 +1316,8 @@ migrate-locations cmd also applies any location ACL from existing cluster.
 For Azure it checks if there are any interactive cluster or sql warehouse
 which has service principals configured to access storage. It maps the storage account to the external location created and grants CREATE_EXTERNAL_TABLE,
 CREATE_EXTERNAL_VOLUME and READ_FILES permission on the location to all the user who have access to the interactive cluster or sql warehouse
-For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles to the storage account
-and grants CREATE_EXTERNAL_TABLE, CREATE_EXTERNAL_VOLUME and READ_FILES permission on the location to all the user who have access to the interactive cluster
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles to the bucket. It then
+maps the bucket to the external locations created and grants CREATE_EXTERNAL_TABLE, CREATE_EXTERNAL_VOLUME and READ_FILES permission on the location to all the user who have access to the interactive cluster
 or sql warehouse
 
 Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
@@ -1383,7 +1383,14 @@ databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
 This command is supposed to be run before migrating tables to UC using [table migration process](#Table-Migration).
-
+Catalog & Schema ACL:
+create-catalogs-schemas cmd also applies any catalog and schema ACL from existing clusters.
+For Azure it checks if there are any interactive cluster or sql warehouse which has service principals configured to access storage.
+It maps the storage account to the tables which has external location on those storage account created and grants USAGE access to
+the schema and catalog if at least one such table is migrated to it.
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
+to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants USAGE access to
+the schema and catalog if at least one such table is migrated to it.
 [[back to top](#databricks-labs-ucx)]
 
 ## `migrate-tables` command
@@ -1396,6 +1403,15 @@ Anytime after [`create-table-mapping` command](#create-table-mapping-command) is
 
 This command kicks off the [table migration](#Table-Migration) process. It triggers the `migrate-tables` workflow,
 and if there are HiveSerDe tables detected, prompt whether to trigger the `migrate-external-hiveserde-tables-in-place-experimental` workflow.
+
+Table and View ACL:
+migrate-tables cmd also applies any table and view ACL from existing clusters.
+For Azure it checks if there are any interactive cluster or sql warehouse which has service principals configured to access storage.
+It maps the storage account to the tables which has external location on those storage account created and grants either SELECT permission if
+the service principal only has read access on the storage account and ALL_PRIVILEGES if the service principal has write access on the storage account
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
+to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants either SELECT permission if
+the instance profile only has read access on the bucket and ALL_PRIVILEGES if the instance profile has write access on the bucket.
 
 [[back to top](#databricks-labs-ucx)]
 
