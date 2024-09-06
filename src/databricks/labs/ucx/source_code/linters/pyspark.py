@@ -13,9 +13,8 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     CurrentSessionState,
     PythonLinter,
-    DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessNode, DIRECT_FS_ACCESS_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
@@ -204,34 +203,18 @@ class DirectFilesystemAccessMatcher(Matcher):
     def lint(
         self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
     ) -> Iterator[Advice]:
-
-        for dfsa_node in self._for_table_arg(node):
-            yield Deprecation.from_node(
-                code='direct-filesystem-access',
-                message=f"The use of direct filesystem references is deprecated: {dfsa_node.dfsa.path}",
-                node=dfsa_node.node,
-            )
-
-    def _for_table_arg(self, node: NodeNG) -> Iterable[DirectFsAccessNode]:
-        if not isinstance(node, Call):
-            return
-        table_arg_node = self._get_table_arg(node)
-        for inferred in InferredValue.infer_from_node(table_arg_node):
+        table_arg = self._get_table_arg(node)
+        for inferred in InferredValue.infer_from_node(table_arg):
             if not inferred.is_inferred():
+                logger.debug(f"Could not infer value of {table_arg.as_string()}")
                 continue
-            table_arg = inferred.as_string()
-            if not table_arg:
-                continue
-            if any(pattern.matches(table_arg) for pattern in DIRECT_FS_ACCESS_PATTERNS):
-                dfsa = DirectFsAccess(
-                    source_type=DirectFsAccess.UNKNOWN,
-                    source_id=DirectFsAccess.UNKNOWN,
-                    path=table_arg,
-                    is_read=self.is_read or False,
-                    is_write=self.is_write or False,
+            value = inferred.as_string()
+            if any(pattern.matches(value) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+                yield Deprecation.from_node(
+                    code='direct-filesystem-access',
+                    message=f"The use of direct filesystem references is deprecated: {value}",
+                    node=node,
                 )
-                yield DirectFsAccessNode(dfsa, node)
-                continue
 
     def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
