@@ -114,10 +114,9 @@ main(f'--config=/Workspace{config_file}',
 
 
 class DeployedWorkflows:
-    def __init__(self, ws: WorkspaceClient, install_state: InstallState, verify_timeout: timedelta):
+    def __init__(self, ws: WorkspaceClient, install_state: InstallState):
         self._ws = ws
         self._install_state = install_state
-        self._verify_timeout = verify_timeout
 
     def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
@@ -175,9 +174,9 @@ class DeployedWorkflows:
                 f"Completed {step} job run {run_id} duration: {duration or 'N/A'} ({start_time or 'N/A'} thru {end_time or 'N/A'})"
             )
 
-    def repair_run(self, workflow):
+    def repair_run(self, workflow, verify_timeout: timedelta):
         try:
-            job_id, run_id = self._repair_workflow(workflow)
+            job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
@@ -323,9 +322,9 @@ class DeployedWorkflows:
             return " ".join(time_parts)
         return "less than 1 second ago"
 
-    def _repair_workflow(self, workflow):
+    def _repair_workflow(self, workflow, verify_timeout):
         job_id, latest_job_run = self._latest_job_run(workflow)
-        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=verify_timeout)
         retried_check = retry_on_attribute_error(self._get_result_state)
         state_value = retried_check(job_id)
         logger.info(f"The status for the latest run is {state_value}")
