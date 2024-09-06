@@ -576,6 +576,8 @@ class WorkflowsDeployment(InstallationMixin):
             return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
         return conf_from_installation
 
+    # Workflow creation might fail on an InternalError with no message
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._install_state.jobs:
             try:
