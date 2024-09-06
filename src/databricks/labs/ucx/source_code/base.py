@@ -16,7 +16,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -340,26 +339,31 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
 
 @dataclass
 class DirectFsAccess:
-    """A DFSA is a record describing a Direct File System Access"""
+    """A record describing a Direct File System Access"""
 
     UNKNOWN = "unknown"
 
     source_type: str
     source_id: str
+    source_lineage: str
     path: str
     is_read: bool
     is_write: bool
 
-    @property
-    def key(self) -> str:
-        return f"{self.source_type}.{self.source_id}.{self.path}".lower()  # TODO for now
-
-    @property
-    def safe_sql_key(self) -> str:
-        return escape_sql_identifier(self.key)
-
-    def __hash__(self) -> int:
-        return hash(self.key)
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, DirectFsAccess) and self.key == other.key
+    def replace(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        source_lineage: str | None = None,
+        path: str | None = None,
+        is_read: bool | None = None,
+        is_write: bool | None = None,
+    ):
+        return DirectFsAccess(
+            source_type=source_type or self.source_type,
+            source_id=source_id or self.source_id,
+            source_lineage=source_lineage or self.source_lineage,
+            path=path or self.path,
+            is_read=is_read or self.is_read,
+            is_write=is_write or self.is_write,
+        )

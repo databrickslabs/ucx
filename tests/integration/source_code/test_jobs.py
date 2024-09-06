@@ -20,7 +20,7 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
@@ -154,8 +154,12 @@ display(spark.read.parquet("/mnt/something"))
     last_messages = caplog.messages[-1].split("\n")
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
-    dfsas = simple_ctx.directfs_access_crawler.snapshot()
-    assert len(list(dfsas)) == 2
+    dfsas = list(simple_ctx.directfs_access_crawler.snapshot())
+    assert len(dfsas) == 2
+    for dfsa in dfsas:
+        assert dfsa.source_type != DirectFsAccess.UNKNOWN
+        assert dfsa.source_id != DirectFsAccess.UNKNOWN
+        assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(

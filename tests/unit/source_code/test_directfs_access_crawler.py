@@ -8,7 +8,9 @@ def test_crawler_appends_dfsas():
     backend = MockBackend()
     crawler = DirectFsAccessCrawlers(backend, "schema").for_paths()
     dfsas = list(
-        DirectFsAccess(source_type="SOURCE", source_id="ID", path=path, is_read=False, is_write=False)
+        DirectFsAccess(
+            source_type="SOURCE", source_id="ID", source_lineage="LINEAGE", path=path, is_read=False, is_write=False
+        )
         for path in ("a", "b", "c")
     )
     crawler.append(dfsas)

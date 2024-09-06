@@ -289,12 +289,13 @@ class DependencyGraphContext:
     session_state: CurrentSessionState
 
 
-class Dependency(abc.ABC):
+class Dependency:
 
-    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True, lineage_str: str | None = None):
         self._loader = loader
         self._path = path
         self._inherits_context = inherits_context
+        self._lineage_str = lineage_str or '"' + self._path.as_posix() + '"'
 
     @property
     def path(self) -> Path:
@@ -315,6 +316,10 @@ class Dependency(abc.ABC):
 
     def __repr__(self):
         return f"Dependency<{self.path}>"
+
+    @property
+    def lineage_str(self):
+        return self._lineage_str
 
 
 class SourceContainer(abc.ABC):
@@ -627,3 +632,8 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
     ) -> Iterable[T]: ...
+
+    @property
+    def lineage_str(self):
+        parts = [dependency.lineage_str for dependency in self._lineage]
+        return "->".join(parts)

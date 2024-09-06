@@ -109,6 +109,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
             dfsa = DirectFsAccess(
                 source_type=DirectFsAccess.UNKNOWN,
                 source_id=DirectFsAccess.UNKNOWN,
+                source_lineage=DirectFsAccess.UNKNOWN,
                 path=value,
                 is_read=True,
                 is_write=False,
@@ -206,6 +207,7 @@ class DirectFsAccessSqlLinter(SqlLinter):
             yield DirectFsAccess(
                 source_type=DirectFsAccess.UNKNOWN,
                 source_id=DirectFsAccess.UNKNOWN,
+                source_lineage=DirectFsAccess.UNKNOWN,
                 path=path,
                 is_read=is_read,
                 is_write=is_write,

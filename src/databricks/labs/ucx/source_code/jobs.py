@@ -68,8 +68,10 @@ class JobProblem:
 
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
+        # concat job and task for lineage, see DependencyGraphWalker.lineage_str
+        lineage_str = f'"job:{job.job_id}"->"task:{task.task_key}"'
         loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
-        super().__init__(loader, Path(f'/jobs/{task.task_key}'), False)
+        super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False, lineage_str=lineage_str)
         self._task = task
         self._job = job
 
@@ -424,7 +426,7 @@ class WorkflowLinter:
             graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
         )
         yield from walker
-        collector = DfsaCollector(graph, set(), self._path_lookup, session_state)
+        collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
         dfsas = list(dfsa for dfsa in collector)
         self._directfs_crawlers.for_paths().append(dfsas)
 
@@ -458,7 +460,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class DfsaCollector(DependencyGraphWalker[DirectFsAccess]):
+class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def __init__(
         self,
@@ -490,13 +492,7 @@ class DfsaCollector(DependencyGraphWalker[DirectFsAccess]):
         notebook = Notebook.parse(path, source, language.language)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield DirectFsAccess(
-                    source_type="NOTEBOOK",
-                    source_id=str(path),
-                    path=dfsa.path,
-                    is_read=dfsa.is_read,
-                    is_write=dfsa.is_write,
-                )
+                yield dfsa.replace(source_type="NOTEBOOK", source_id=str(path), source_lineage=self.lineage_str)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -515,9 +511,7 @@ class DfsaCollector(DependencyGraphWalker[DirectFsAccess]):
             logger.warning(f"Language {language.name} not supported yet!")
             return
         for dfsa in iterable:
-            yield DirectFsAccess(
-                source_type="FILE", source_id=str(path), path=dfsa.path, is_read=dfsa.is_read, is_write=dfsa.is_write
-            )
+            yield dfsa.replace(source_type="FILE", source_id=str(path), source_lineage=self.lineage_str)
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
