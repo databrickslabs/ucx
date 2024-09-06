@@ -354,28 +354,40 @@ class DirectFsAccess:
     job_name: str = UNKNOWN
     task_key: str = UNKNOWN
 
-    # pylint: disable=too-many-arguments
-    def replace(
+    def replace_source(
         self,
-        path: str | None = None,
-        is_read: bool | None = None,
-        is_write: bool | None = None,
         source_type: str | None = None,
         source_id: str | None = None,
         source_lineage: str | None = None,
         source_timestamp: int | None = None,
+    ):
+        return DirectFsAccess(
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_type=source_type or self.source_type,
+            source_id=source_id or self.source_id,
+            source_lineage=source_lineage or self.source_lineage,
+            source_timestamp=source_timestamp or self.source_timestamp,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+        )
+
+    def replace_job_infos(
+        self,
         job_id: int | None = None,
         job_name: str | None = None,
         task_key: str | None = None,
     ):
         return DirectFsAccess(
-            path=path or self.path,
-            is_read=is_read or self.is_read,
-            is_write=is_write or self.is_write,
-            source_type=source_type or self.source_type,
-            source_id=source_id or self.source_id,
-            source_lineage=source_lineage or self.source_lineage,
-            source_timestamp=source_timestamp or self.source_timestamp,
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_type=self.source_type,
+            source_id=self.source_id,
+            source_lineage=self.source_lineage,
+            source_timestamp=self.source_timestamp,
             job_id=job_id or self.job_id,
             job_name=job_name or self.job_name,
             task_key=task_key or self.task_key,

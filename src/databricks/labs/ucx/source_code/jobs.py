@@ -430,7 +430,7 @@ class WorkflowLinter:
         dfsas: list[DirectFsAccess] = []
         job_name = "<anonymous>" if job.settings is None else job.settings.name
         for dfsa in collector:
-            dfsa = dfsa.replace(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
+            dfsa = dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
             dfsas.append(dfsa)
         self._directfs_crawlers.for_paths().append(dfsas)
 
@@ -499,7 +499,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             src_id = str(path)
             src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace(
+                yield dfsa.replace_source(
                     source_type="NOTEBOOK", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
                 )
             if cell.language is CellLanguage.PYTHON:
@@ -523,7 +523,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         src_lineage = self.lineage_str
         src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
-            yield dfsa.replace(
+            yield dfsa.replace_source(
                 source_type="FILE", source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp
             )
 
