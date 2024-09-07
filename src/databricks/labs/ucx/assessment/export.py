@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 class Exporter:
     # File and Path Constants
     _ZIP_FILE_NAME = "ucx_assessment_results.zip"
-    # project_root = Path(__file__).parent.parent.parent.parent
-    # _get_ucx_main_queries = project_root / "labs/ucx/queries/assessment/main"
 
     def __init__(self, ctx: WorkspaceContext):
         self._ctx = ctx

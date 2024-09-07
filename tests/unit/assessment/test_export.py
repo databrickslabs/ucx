@@ -1,8 +1,9 @@
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from databricks.labs.ucx.assessment.export import Exporter
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
+
 
 class TestExporter(unittest.TestCase):
 
@@ -13,8 +14,6 @@ class TestExporter(unittest.TestCase):
 
     def test_get_ucx_main_queries(self):
         # Set up the mock workspace client
-        # ws = mock_workspace_client()
-        # sql_backend = MockBackend()
         # Mock the configuration and installation methods that might be invoked
         ctx = MagicMock(spec=WorkspaceContext)
         ctx.inventory_database = "test_db"
@@ -22,13 +21,10 @@ class TestExporter(unittest.TestCase):
         # Initialize the Exporter with the mocked context
         exporter = Exporter(ctx)
 
-        # _UCX_MAIN_QUERIES_PATH = "src/databricks/labs/ucx/queries/assessment/main"
         project_root = Path(__file__).parent.parent.parent.parent  # Adjust according to your project structure
         _UCX_MAIN_QUERIES_PATH = project_root / "src/databricks/labs/ucx/queries/assessment/main"
         exporter._UCX_MAIN_QUERIES_PATH = _UCX_MAIN_QUERIES_PATH
         # Patch the Path.iterdir method to simulate the presence of SQL files
-        # with patch.object(Path, 'iterdir', return_value=[Path("01_inventory.sql"), Path("02_count_inventory.sql")]), \
-        #    patch('pathlib.Path.read_text', return_value="SELECT * FROM inventory;"):
         queries = exporter._get_ucx_main_queries()
         print("queries", queries)
 
@@ -61,8 +57,6 @@ class TestExporter(unittest.TestCase):
 
         # Assert the query flag is True
         assert query_flag, "'query' with the expected value not found in queries"
-
-        # assert "inventory" not in queries[1]['query'], "The word 'inventory' should be replaced in the query"
 
     def test_extract_target_name(self):
         pattern = r"^\d+_\d+_(.*)"

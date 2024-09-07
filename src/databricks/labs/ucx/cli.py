@@ -16,7 +16,6 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCh
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
-from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.assessment.export import Exporter
 
 ucx = App(__file__)
@@ -516,6 +515,7 @@ def join_collection(a: AccountClient, workspace_ids: str):
     account_installer = AccountInstaller(a)
     w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
     account_installer.join_collection(w_ids)
+
 
 @ucx.command()
 def export(w: WorkspaceClient, prompts: Prompts, path: Path | None = None):
