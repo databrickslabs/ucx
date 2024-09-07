@@ -239,10 +239,6 @@ class GlobalContext(abc.ABC):
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def export(self):
-        return Exporter(self)
-
-    @cached_property
     def tables_migrator(self):
         return TablesMigrator(
             self.tables_crawler,

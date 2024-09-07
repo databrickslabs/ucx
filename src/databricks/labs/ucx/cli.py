@@ -518,11 +518,11 @@ def join_collection(a: AccountClient, workspace_ids: str):
     account_installer.join_collection(w_ids)
 
 @ucx.command()
-def export(w: WorkspaceClient, sbe : SqlBackend, dashboard_id : str, output_file : str):
+def export(w: WorkspaceClient, prompts: Prompts, path: Path | None = None):
     """exports the assessment dashboard"""
     ctx = WorkspaceContext(w)
-    exporter = Exporter(sbe, dashboard_id, output_file)
-    exporter.save()
+    exporter = Exporter(ctx)
+    exporter.export_results(prompts, path)
 
 
 @ucx.command
