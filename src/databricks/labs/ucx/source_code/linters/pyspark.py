@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -12,9 +13,13 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
 )
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
-from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
+from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,12 +42,12 @@ class Matcher(ABC):
 
     @abstractmethod
     def lint(
-        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         """raises Advices by linting the code"""
 
     @abstractmethod
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         """applies recommendations"""
 
     def _get_table_arg(self, node: Call):
@@ -78,7 +83,7 @@ class Matcher(ABC):
 class QueryMatcher(Matcher):
 
     def lint(
-        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if table_arg:
@@ -93,7 +98,7 @@ class QueryMatcher(Matcher):
                 )
 
     @classmethod
-    def _lint_table_arg(cls, from_table: FromTable, call_node: NodeNG, inferred: InferredValue):
+    def _lint_table_arg(cls, from_table: FromTableSqlLinter, call_node: NodeNG, inferred: InferredValue):
         if inferred.is_inferred():
             for advice in from_table.lint(inferred.as_string()):
                 yield advice.replace_from_node(call_node)
@@ -104,7 +109,7 @@ class QueryMatcher(Matcher):
                 node=call_node,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         new_query = from_table.apply(table_arg.value)
@@ -115,7 +120,7 @@ class QueryMatcher(Matcher):
 class TableNameMatcher(Matcher):
 
     def lint(
-        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         table_name = table_arg.as_string().strip("'").strip('"')
@@ -137,7 +142,7 @@ class TableNameMatcher(Matcher):
                 node=node,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         dst = self._find_dest(index, table_arg.value, from_table.schema)
@@ -162,7 +167,7 @@ class ReturnValueMatcher(Matcher):
         )
 
     def lint(
-        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
@@ -171,25 +176,13 @@ class ReturnValueMatcher(Matcher):
             node=node,
         )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
 
 @dataclass
 class DirectFilesystemAccessMatcher(Matcher):
-    _DIRECT_FS_REFS = {
-        "s3a://",
-        "s3n://",
-        "s3://",
-        "wasb://",
-        "wasbs://",
-        "abfs://",
-        "abfss://",
-        "dbfs:/",
-        "hdfs://",
-        "file:/",
-    }
 
     def matches(self, node: NodeNG):
         return (
@@ -200,30 +193,22 @@ class DirectFilesystemAccessMatcher(Matcher):
         )
 
     def lint(
-        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
+        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if not isinstance(table_arg, Const):
-            return
-        if not table_arg.value:
-            return
-        if not isinstance(table_arg.value, str):
-            return
-        if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
-            yield Deprecation.from_node(
-                code='direct-filesystem-access',
-                message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
-                node=node,
-            )
-            return
-        if table_arg.value.startswith("/") and self._check_call_context(node):
-            yield Deprecation.from_node(
-                code='implicit-dbfs-usage',
-                message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
-                node=node,
-            )
+        for inferred in InferredValue.infer_from_node(table_arg):
+            if not inferred.is_inferred():
+                logger.debug(f"Could not infer value of {table_arg.as_string()}")
+                continue
+            value = inferred.as_string()
+            if any(pattern.matches(value) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+                yield Deprecation.from_node(
+                    code='direct-filesystem-access',
+                    message=f"The use of direct filesystem references is deprecated: {value}",
+                    node=node,
+                )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -327,11 +312,11 @@ class SparkMatchers:
         return self._matchers
 
 
-class SparkSql(PythonLinter, Fixer):
+class SparkSqlPyLinter(PythonLinter, Fixer):
 
     _spark_matchers = SparkMatchers()
 
-    def __init__(self, from_table: FromTable, index: MigrationIndex, session_state):
+    def __init__(self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state

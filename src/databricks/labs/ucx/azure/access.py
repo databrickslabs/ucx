@@ -512,8 +512,22 @@ class AzureResourcePermissions:
         thread_name = "Creating access connectors for storage accounts"
         results, errors = Threads.gather(thread_name, tasks)
         if len(errors) > 0:
+            logger.error(
+                "Error creating access connectors. Please review the error message and resolve the issue before trying again. "
+                "Removing successfully created access connectors."
+            )
+            delete_access_connectors = [access_connector for access_connector, _ in results]
+            self.delete_access_connectors(*delete_access_connectors)
             raise ManyError(errors)
         return list(results)
+
+    def delete_storage_credential(self, *storage_credentials: Any):
+        for storage_credential in storage_credentials:
+            self._ws.storage_credentials.delete(storage_credential.name)
+
+    def delete_access_connectors(self, *access_connectors: Any):
+        for access_connector in access_connectors:
+            self._azurerm.delete_access_connector(str(access_connector.id))
 
     def _apply_storage_permission(
         self,

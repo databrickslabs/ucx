@@ -18,8 +18,8 @@ from astroid import (  # type: ignore
 )
 
 from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, PythonLinter
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor
-from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, TreeVisitor
+from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class NotebookRunCall(NodeBase):
         for path in paths:
             dbutils.notebook.run(path)
         """
-        arg = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
+        arg = DbutilsPyLinter.get_dbutils_notebook_run_path_arg(self.node)
         try:
             all_inferred = InferredValue.infer_from_node(arg, session_state)
             return self._get_notebook_paths(all_inferred)
@@ -113,7 +113,7 @@ class NotebookRunCall(NodeBase):
         return has_unresolved, paths
 
 
-class DbutilsLinter(PythonLinter):
+class DbutilsPyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state

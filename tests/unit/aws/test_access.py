@@ -9,7 +9,12 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
-from databricks.sdk.service.catalog import AwsIamRoleResponse, ExternalLocationInfo, StorageCredentialInfo
+from databricks.sdk.service.catalog import (
+    AwsIamRoleResponse,
+    ExternalLocationInfo,
+    StorageCredentialInfo,
+    MetastoreAssignment,
+)
 from databricks.sdk.service.compute import InstanceProfile, Policy
 from databricks.sdk.service.sql import (
     EndpointConfPair,
@@ -202,6 +207,9 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
             {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
         ),
     )
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        instance_profile_arn=None
+    )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
@@ -216,7 +224,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     )
     aws_resource_permissions.create_uber_principal(prompts)
     aws.put_role_policy.assert_called_with(
-        'role1',
+        'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
         {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'},
         None,
@@ -297,6 +305,47 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     )
 
 
+def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locations):
+    cluster_policy = Policy(
+        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
+    )
+    mock_ws.cluster_policies.get.return_value = cluster_policy
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")]
+    )
+
+    command_calls = []
+    instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        if "iam create-role" in cmd:
+            return 1, f'{{"Role":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "iam create-instance-profile" in cmd:
+            return 0, f'{{"InstanceProfile":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "iam get-instance-profile" in cmd:
+            return 0, f'{{"InstanceProfile":{{"Arn":"{instance_profile_arn}"}}}}', ""
+        if "sts get-caller-identity" in cmd:
+            return 0, '{"Account":"123"}', ""
+        return 0, '{"Foo":"Bar"}', ""
+
+    aws = AWSResources("profile", command_call)
+
+    locations = ExternalLocations(mock_ws, backend, "ucx")
+    prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        aws,
+        locations,
+    )
+
+    with pytest.raises(PermissionError):
+        aws_resource_permissions.create_uber_principal(prompts)
+
+    assert len([cmd for cmd in command_calls if "delete-instance-profile" in cmd]) == 1
+
+
 @pytest.mark.parametrize(
     "get_security_policy, set_security_policy",
     [
@@ -350,6 +399,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
+    mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
@@ -358,7 +408,13 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
     assert aws.create_uc_role.assert_called
     assert (
-        call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'}, None, None)
+        call(
+            'UC_ROLE_123123',
+            'UC_POLICY',
+            {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'},
+            None,
+            None,
+        )
         in aws.put_role_policy.call_args_list
     )
 
@@ -370,14 +426,14 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-    assert call('UC_ROLE_1') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_2') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     assert (
-        call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        call('UC_ROLE_BUCKET1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
         in aws.put_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        call('UC_ROLE_BUCKET2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 
@@ -808,3 +864,69 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
     assert len(roles) == 1
     assert len(roles[0].paths) == 2
     external_locations.snapshot.assert_called_once()
+
+
+def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, locations):
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, locations)
+    mock_ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
+        )
+    ]
+    role_creation = IamRoleCreation(installation_multiple_roles, mock_ws, aws_resource_permissions)
+    prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
+    role_creation.delete_uc_roles(prompts)
+    calls = [call("uc-role1"), call("uc-rolex")]
+    assert aws.delete_role.mock_calls == calls
+
+
+def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, locations):
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    aws.delete_role.return_value = []
+    aws_resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, locations)
+    mock_ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            id="1",
+            name="cred1",
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
+        )
+    ]
+    role_creation = IamRoleCreation(installation_no_roles, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = [AWSRole("", "uc-role1", "123", "arn:aws:iam::12345:role/uc-role1")]
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket1",
+            )
+        ]
+    ]
+    aws.list_role_policies.return_value = ["Policy1"]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+    prompts = MockPrompts({"Select the list of roles *": "1", "The above storage credential will be impacted *": "Yes"})
+    role_creation.delete_uc_roles(prompts)
+    calls = [call("uc-role1")]
+    assert aws.delete_role.mock_calls == calls
+
+
+def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"account":"1234"}', ""
+
+    aws = AWSResources("profile", command_call)
+    external_locations = ExternalLocations(mock_ws, backend, 'ucx')
+    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
+    resource_permissions.delete_uc_role("uc_role_1")
+    assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls

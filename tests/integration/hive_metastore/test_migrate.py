@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, 
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
 
@@ -321,9 +321,11 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
-    assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
+    assert (
+        view1_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}`"
+    )
     view2_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view2.name}").view_definition
-    assert view2_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_view1.name}"
+    assert view2_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_view1.name}`"
     view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
     assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
 
@@ -524,17 +526,19 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert target_table_grants.privilege_assignments[0].principal == user.user_name
-    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
+    assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
+    assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
@@ -557,7 +561,7 @@ def test_migrate_external_tables_with_principal_acl_azure(
         user_name=user_with_cluster_access.user_name,
         group_name=group_with_cluster_access.display_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -598,7 +602,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -625,7 +629,7 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
         permission_level=PermissionLevel.CAN_USE,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
@@ -708,7 +712,7 @@ def test_migrate_external_tables_with_spn_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         service_principal_name=spn_with_mount_access,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False

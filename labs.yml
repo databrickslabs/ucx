@@ -132,6 +132,8 @@ commands:
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: create-missing-principals
     description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and
@@ -148,6 +150,14 @@ commands:
         description: (Optional) IAM policy Name to be specified for the UC roles. (default:UC_POLICY)
       - name: single-role
         description: (Optional) Create a single role for all S3 locations. (default:False)
+
+  - name: delete-missing-principals
+    description: For AWS, this command identifies all the UC roles that are created through the create-missing-principals
+      cmd. It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected
+      roles are used by any storage credential and prompts to confirm if roles should still be deleted.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
@@ -173,6 +183,8 @@ commands:
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: create-account-groups
     is_account_level: true

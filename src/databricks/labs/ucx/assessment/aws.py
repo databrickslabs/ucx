@@ -197,7 +197,9 @@ class AWSResources:
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
-            actions = action["Action"]
+            actions = action.get("Action")
+            if not actions:
+                continue
             s3_actions = self._s3_actions(actions)
             if not s3_actions or self.S3_READONLY not in s3_actions:
                 continue
@@ -340,8 +342,17 @@ class AWSResources:
         policy_name: str,
         s3_prefixes: set[str],
         account_id: str,
-        kms_key=None,
+        kms_key: str | None = None,
     ) -> bool:
+        """
+        Create a policy for the given role with the given S3 prefixes, account ID, and KMS key.
+        Args:
+            role_name: the name of the role
+            policy_name: the name of the policy
+            s3_prefixes: s3 prefixes to allow access to
+            account_id: AWS account ID
+            kms_key: (optional) KMS key to be used
+        """
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
             f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
@@ -398,11 +409,17 @@ class AWSResources:
             f" --role-name {role_name}"
         )
         self._run_json_command(f"iam delete-instance-profile --instance-profile-name {instance_profile_name}")
+        self.delete_role(role_name)
+
+    def delete_role(self, role_name: str):
+        role_policies = self.list_role_policies(role_name)
+        for policy in role_policies:
+            self._run_json_command(f"iam delete-role-policy --role-name {role_name} --policy-name {policy}")
         self._run_json_command(f"iam delete-role --role-name {role_name}")
 
-    def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str):
+    def add_role_to_instance_profile(self, instance_profile_name: str, role_name: str) -> bool:
         # there can only be one role associated with iam instance profile
-        self._run_command(
+        return self._run_command(
             f"iam add-role-to-instance-profile --instance-profile-name {instance_profile_name} --role-name {role_name}"
         )
 

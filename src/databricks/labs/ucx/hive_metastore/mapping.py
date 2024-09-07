@@ -59,11 +59,11 @@ class Rule:
         return table.catalog == "hive_metastore" and self.src_schema == table.schema and self.src_table == table.table
 
     @property
-    def as_uc_table_key(self):
+    def as_uc_table_key(self) -> str:
         return f"{self.catalog_name}.{self.dst_schema}.{self.dst_table}"
 
     @property
-    def as_hms_table_key(self):
+    def as_hms_table_key(self) -> str:
         return f"hive_metastore.{self.src_schema}.{self.src_table}"
 
 
@@ -96,8 +96,8 @@ class TableMapping:
         self._recon_tolerance_percent = recon_tolerance_percent
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
-        tables_snapshot = tables.snapshot()
-        if len(tables_snapshot) == 0:
+        tables_snapshot = list(tables.snapshot())
+        if not tables_snapshot:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
             raise ValueError(msg)
         for table in tables_snapshot:

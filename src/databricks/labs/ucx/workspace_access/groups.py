@@ -25,6 +25,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -430,12 +431,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
 
-    def snapshot(self) -> list[MigratedGroup]:
-        return self._snapshot(self._fetcher, self._crawler)
-
-    def has_groups(self) -> bool:
-        return len(self.snapshot()) > 0
-
     def rename_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
@@ -578,7 +573,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             raise ManyError(errors)
 
     def get_migration_state(self) -> MigrationState:
-        return MigrationState(self.snapshot())
+        return MigrationState(list(self.snapshot()))
 
     def delete_original_workspace_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
@@ -625,9 +620,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
-    def _fetcher(self) -> Iterable[MigratedGroup]:
+    def _try_fetch(self) -> Iterable[MigratedGroup]:
         state = []
-        for row in self._backend.fetch(f"SELECT * FROM {self.full_name}"):
+        for row in self._backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             state.append(MigratedGroup(*row))
 
         if not self._include_group_names:
@@ -645,7 +640,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 )
         return new_state
 
-    def _crawler(self) -> Iterable[MigratedGroup]:
+    def _crawl(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         account_groups_in_account = self._account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)

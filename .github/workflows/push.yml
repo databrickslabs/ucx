@@ -73,13 +73,15 @@ jobs:
         uses: databricks/setup-cli@main
 
       - name: Install LSQL
-        run: databricks labs install lsql
+        run: |
+          databricks labs install lsql
+          databricks labs installed
         env:  # this is a temporary hack
           DATABRICKS_HOST: any
           DATABRICKS_TOKEN: any
 
       - name: Reformat SQL queries
-        run: databricks labs lsql fmt
+        run: databricks labs lsql fmt --normalize-case false --exclude tests/unit/source_code/samples/
 
       - name: Fail on differences
         run: |

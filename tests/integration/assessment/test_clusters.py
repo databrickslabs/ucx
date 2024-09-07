@@ -39,6 +39,25 @@ def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_ba
     assert results[0].failures == '["No isolation shared clusters not supported in UC"]'
 
 
+def test_cluster_crawler_mlr_no_isolation(ws, make_cluster, inventory_schema, sql_backend):
+    created_cluster = make_cluster(
+        data_security_mode=DataSecurityMode.NONE, spark_version='15.4.x-cpu-ml-scala2.12', num_workers=1
+    )
+    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    clusters = cluster_crawler.snapshot()
+    results = []
+    for cluster in clusters:
+        if cluster.cluster_id == created_cluster.cluster_id:
+            results.append(cluster)
+
+    assert len(results) == 1
+    expected_failures = (
+        '["No isolation shared clusters not supported in UC",'
+        + ' "Shared Machine Learning Runtime clusters are not supported in UC"]'
+    )
+    assert results[0].failures == expected_failures
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=6))
 def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, make_random):
     policy_1 = f"test_policy_check_{make_random(4)}"

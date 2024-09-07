@@ -1,8 +1,29 @@
+import sys
+
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
+
+
+class CustomIterator:
+    def __init__(self, values):
+        self._values = iter(values)
+        self._has_next = True
+
+    def hasNext(self):  # pylint: disable=invalid-name
+        try:
+            self._next_value = next(self._values)
+            self._has_next = True
+        except StopIteration:
+            self._has_next = False
+        return self._has_next
+
+    def next(self):
+        if self._has_next:
+            return self._next_value
+        raise StopIteration
 
 
 def test_is_delta_true():
@@ -57,7 +78,7 @@ def test_sql_managed_non_delta():
                 location="dbfs:/location/table",
             ),
             "new_catalog.db.managed_table",
-            "CREATE TABLE IF NOT EXISTS new_catalog.db.managed_table DEEP CLONE catalog.db.managed_table;",
+            "CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`managed_table` DEEP CLONE `catalog`.`db`.`managed_table`;",
         ),
         (
             Table(
@@ -69,7 +90,7 @@ def test_sql_managed_non_delta():
                 location="dbfs:/mnt/location/table",
             ),
             "new_catalog.db.managed_table",
-            "SYNC TABLE new_catalog.db.managed_table FROM catalog.db.managed_table;",
+            "SYNC TABLE `new_catalog`.`db`.`managed_table` FROM `catalog`.`db`.`managed_table`;",
         ),
         (
             Table(
@@ -81,7 +102,7 @@ def test_sql_managed_non_delta():
                 view_text="SELECT * FROM table",
             ),
             "new_catalog.db.view",
-            "CREATE VIEW IF NOT EXISTS new_catalog.db.view AS SELECT * FROM table;",
+            "CREATE VIEW IF NOT EXISTS `new_catalog`.`db`.`view` AS SELECT * FROM table;",
         ),
         (
             Table(
@@ -93,7 +114,7 @@ def test_sql_managed_non_delta():
                 location="s3a://foo/bar",
             ),
             "new_catalog.db.external_table",
-            "SYNC TABLE new_catalog.db.external_table FROM catalog.db.external_table;",
+            "SYNC TABLE `new_catalog`.`db`.`external_table` FROM `catalog`.`db`.`external_table`;",
         ),
     ],
 )
@@ -107,11 +128,11 @@ def test_uc_sql(table, target, query):
 
 
 def test_tables_returning_error_when_describing():
-    errors = {"DESCRIBE TABLE EXTENDED hive_metastore.database.table1": "error"}
+    errors = {"DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`": "error"}
     rows = {
         "SHOW DATABASES": [("database",)],
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        "DESCRIBE TABLE EXTENDED hive_metastore.database.table2": [
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        "DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`": [
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
             (
@@ -130,7 +151,7 @@ def test_tables_returning_error_when_describing():
 
 
 def test_tables_returning_error_when_show_tables(caplog):
-    errors = {"SHOW TABLES FROM hive_metastore.database": "SCHEMA_NOT_FOUND"}
+    errors = {"SHOW TABLES FROM `hive_metastore`.`database`": "SCHEMA_NOT_FOUND"}
     rows = {"SHOW DATABASES": [("database",)]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tables_crawler = TablesCrawler(backend, "default")
@@ -235,8 +256,8 @@ def test_table_what(table, what):
 
 def test_tables_crawler_should_filter_by_database():
     rows = {
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        "SHOW TABLES FROM hive_metastore.database_2": [("", "table1", "")],
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        "SHOW TABLES FROM `hive_metastore`.`database_2`": [("", "table1", "")],
     }
     backend = MockBackend(rows=rows)
     tables_crawler = TablesCrawler(backend, "default", ["database"])
@@ -244,10 +265,10 @@ def test_tables_crawler_should_filter_by_database():
     assert len(results) == 2
     assert sorted(backend.queries) == sorted(
         [
-            'SELECT * FROM hive_metastore.default.tables',
-            'SHOW TABLES FROM hive_metastore.database',
-            'DESCRIBE TABLE EXTENDED hive_metastore.database.table1',
-            'DESCRIBE TABLE EXTENDED hive_metastore.database.table2',
+            'SELECT * FROM `hive_metastore`.`default`.`tables`',
+            'SHOW TABLES FROM `hive_metastore`.`database`',
+            'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`',
+            'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`',
         ]
     )
 
@@ -255,8 +276,8 @@ def test_tables_crawler_should_filter_by_database():
 def test_is_partitioned_flag():
     rows = {
         "SHOW DATABASES": [("database",)],
-        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
-        'DESCRIBE TABLE EXTENDED hive_metastore.database.table1': [
+        "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
+        'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`': [
             ("column1", "string", "null"),
             ("column2", "string", "null"),
             ("# Partition Information", "", ""),
@@ -265,7 +286,7 @@ def test_is_partitioned_flag():
             ("Provider", "delta", ""),
             ("Type", "table", ""),
         ],
-        'DESCRIBE TABLE EXTENDED hive_metastore.database.table2': [
+        'DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table2`': [
             ("column1", "string", "null"),
             ("column2", "string", "null"),
             ("Provider", "delta", ""),
@@ -480,3 +501,93 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
 
     assert migrate_sql is None
     assert expected_log in caplog.text
+
+
+def test_fast_table_scan_crawler_already_crawled(mocker):
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "`hive_metastore`.`inventory_database`.`tables`": [
+            ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
+            ("hive_metastore", "db1", "table2", "MANAGED", "DELTA", "/dbfs/location/table", None),
+            ("hive_metastore", "db1", "table3", "MANAGED", "DELTA", "dbfs:/mnt/location/table", None),
+        ],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+    results = ftsc.snapshot()
+    assert len(results) == 3
+
+
+def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    def create_product_element_mock(key, value):
+        def product_element_side_effect(index):
+            if index == 0:
+                return key
+            if index == 1:
+                return value
+            raise IndexError(f"Invalid index: {index}")
+
+        mock = mocker.Mock()
+        mock.productElement.side_effect = product_element_side_effect
+        return mock
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    mock_list_databases_iterator = mocker.Mock()
+    mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
+    mock_list_tables_iterator = mocker.Mock()
+    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1"])
+
+    mock_property_1 = create_product_element_mock("delta.appendOnly", "true")
+    mock_property_2 = create_product_element_mock("delta.autoOptimize", "false")
+    mock_property_pat = create_product_element_mock("personalAccessToken", "e32kfkasdas")
+    mock_property_password = create_product_element_mock("password", "very_secret")
+
+    mock_storage_properties_list = [
+        mock_property_1,
+        mock_property_2,
+        mock_property_pat,
+        mock_property_password,
+    ]
+    mock_properties_iterator = mocker.Mock()
+    mock_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
+
+    mock_partition_col_iterator = mocker.Mock()
+    mock_partition_col_iterator.iterator.return_value = CustomIterator(["age", "name"])
+
+    get_table_mock = mocker.Mock()
+    get_table_mock.provider().getOrElse.return_value = "delta"
+    get_table_mock.storage().locationUri().getOrElse.return_value = None
+
+    get_table_mock.viewText.return_value = "mock table text"
+    get_table_mock.properties.return_value = mock_properties_iterator
+    get_table_mock.partitionColumnNames.return_value = mock_partition_col_iterator
+
+    # pylint: disable=protected-access
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = get_table_mock
+
+    results = ftsc.snapshot()
+
+    assert len(results) == 1
+    assert results[0].catalog == "hive_metastore"
+    assert results[0].database == "default"
+    assert results[0].name == "table1"
+    assert results[0].view_text == "mock table text"
+    assert results[0].is_dbfs_root is False
+    assert results[0].is_partitioned is True
+    assert results[0].storage_properties == (
+        "[delta.appendOnly=true, " "delta.autoOptimize=false, " "personalAccessToken=*******, " "password=*******]"
+    )

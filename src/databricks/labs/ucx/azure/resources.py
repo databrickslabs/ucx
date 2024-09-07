@@ -581,7 +581,7 @@ class AzureResources:
         result = self._mgmt.get(f"{resource_id}/providers/Microsoft.Authorization/roleAssignments", "2022-04-01")
         for role_assignment in result.get("value", []):
             principal_type = role_assignment.get("properties", {}).get("principalType")
-            if not principal_type and principal_type not in principal_types:
+            if not principal_type or principal_type not in principal_types:
                 continue
             assignment = self._role_assignment(role_assignment, resource_id)
             if not assignment:
@@ -761,11 +761,10 @@ class AzureResources:
 
         return access_connector
 
-    def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:
+    def delete_access_connector(self, url: str) -> None:
         """Delete an access connector.
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         self._mgmt.delete(url, api_version="2023-05-01")

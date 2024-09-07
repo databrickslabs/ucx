@@ -122,10 +122,8 @@ def test_job_task_linter_library_installed_cluster(
 
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
     expected_messages = {
-        'second_notebook:3 [dbfs-usage] Deprecated file system path: /mnt/something',
-        'second_notebook:3 [implicit-dbfs-usage] The use of default dbfs: references is deprecated: /mnt/something',
-        'some_file.py:0 [dbfs-usage] Deprecated file system path: /mnt/foo/bar',
-        'some_file.py:0 [implicit-dbfs-usage] The use of default dbfs: references is deprecated: /mnt/foo/bar',
+        'some_file.py:0 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/foo/bar',
+        'second_notebook:3 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/something',
     }
 
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
@@ -149,7 +147,8 @@ display(spark.read.parquet("/mnt/something"))
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    messages = {replace(p, path=Path(p.path).relative_to(entrypoint)).as_message() for p in problems}
+    root = Path(entrypoint.as_posix())
+    messages = {replace(p, path=Path(p.path).relative_to(root)).as_message() for p in problems}
     assert messages == expected_messages
 
     last_messages = caplog.messages[-1].split("\n")
@@ -207,7 +206,7 @@ def test_lint_local_code(simple_ctx):
 
 
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
-def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order):
+def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order) -> None:
     # order in which we consider files influences the algorithm so we check all order
     parent_local_path = (
         Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "parent-child-context"
@@ -241,6 +240,7 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx,
         dependency, None, simple_ctx.dependency_resolver, simple_ctx.path_lookup, CurrentSessionState()
     )
     container = dependency.load(simple_ctx.path_lookup)
+    assert container
     container.build_dependency_graph(root_graph)
     roots = root_graph.root_dependencies
     assert len(roots) == 1
