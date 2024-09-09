@@ -71,13 +71,13 @@ class JobProblem:
 
 class _WorkflowTaskLineage(Lineage):
 
-    def __init__(self, job: jobs.Job, task: jobs.Task):
-        self._job_id = job.job_id
-        self._job_name = job.settings.name
-        self._task_key = task.task_key
+    def __init__(self, job_id: int, job_name: str, task_key: str):
+        self._job_id = job_id
+        self._job_name = job_name
+        self._task_key = task_key
 
     def to_json(self) -> Any:
-        return [ { "job_id": self._job_id, "job_name": self._job_name }, f"task: {self._task_key}" ]
+        return [{"job_id": self._job_id, "job_name": self._job_name}, f"task: {self._task_key}"]
 
 
 class WorkflowTask(Dependency):
@@ -95,7 +95,7 @@ class WorkflowTask(Dependency):
 
     @property
     def lineage(self):
-        return _WorkflowTaskLineage(self._job, self._task)
+        return _WorkflowTaskLineage(self._job.job_id, self._job.settings.name, self._task.task_key)
 
 
 class WorkflowTaskContainer(SourceContainer):

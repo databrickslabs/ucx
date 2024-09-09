@@ -19,8 +19,13 @@ from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, PathLineage, \
-    CompositeLineage
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+    PathLineage,
+    CompositeLineage,
+)
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 
@@ -522,14 +527,14 @@ def test_full_lineage_is_converted_to_json():
     path1 = PathLineage(Path("abc"))
     path2 = PathLineage(Path("xyz"))
     composite = CompositeLineage(path1, path2)
-    task = Task(task_key = "task-key")
-    settings = JobSettings(name = "job-name")
+    task = Task(task_key="task-key")
+    settings = JobSettings(name="job-name")
     job = create_autospec(jobs.Job)
     job.job_id = "job-id"
     job.settings = settings
-    task = WorkflowTask(ws, task, job)
-    lineage = CompositeLineage(task.lineage, composite)
+    wtask = WorkflowTask(ws, task, job)
+    lineage = CompositeLineage(wtask.lineage, composite)
     json_obj = lineage.to_json()
-    s = json.dumps(json_obj)
-    assert '[{"job_id": "job-id", "job_name": "job-name"}, "task: task-key", "abc", "xyz"]' == s
-
+    json_str = json.dumps(json_obj)
+    job.assert_not_called()
+    assert json_str == '[{"job_id": "job-id", "job_name": "job-name"}, "task: task-key", "abc", "xyz"]'
