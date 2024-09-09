@@ -1,12 +1,10 @@
 import pytest
 
-from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatus,
 )
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
