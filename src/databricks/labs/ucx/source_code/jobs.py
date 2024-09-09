@@ -554,7 +554,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         src_id = str(path)
         src_lineage = self.lineage_str
         if isinstance(path, WorkspacePath):
-            # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
             src_timestamp = path._object_info.modified_at
         else:
