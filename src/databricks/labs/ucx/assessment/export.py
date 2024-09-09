@@ -11,7 +11,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 logger = logging.getLogger(__name__)
 
 
-class Exporter:
+class AssessmentExporter:
     # File and Path Constants
     _ZIP_FILE_NAME = "ucx_assessment_results.zip"
 
