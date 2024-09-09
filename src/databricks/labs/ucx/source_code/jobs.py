@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import DBFSPath
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -524,7 +524,12 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
         for cell in notebook.cells:
-            src_timestamp = int(path.stat().st_mtime)
+            if isinstance(path, WorkspacePath):
+                # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
+                # pylint: disable=protected-access
+                src_timestamp = path._object_info.modified_at
+            else:
+                src_timestamp = int(path.stat().st_mtime)
             src_id = str(path)
             src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
@@ -548,7 +553,12 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             return
         src_id = str(path)
         src_lineage = self.lineage_str
-        src_timestamp = int(path.stat().st_mtime)
+        if isinstance(path, WorkspacePath):
+            # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
+            # pylint: disable=protected-access
+            src_timestamp = path._object_info.modified_at
+        else:
+            src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
