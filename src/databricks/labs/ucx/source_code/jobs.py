@@ -527,7 +527,11 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             if isinstance(path, WorkspacePath):
                 # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
                 # pylint: disable=protected-access
-                src_timestamp = path._object_info.modified_at
+                src_timestamp = path._object_info.modified_at or -1
+            elif isinstance(path, DBFSPath):
+                # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+                # pylint: disable=protected-access
+                src_timestamp = path._file_info.modification_time or -1
             else:
                 src_timestamp = int(path.stat().st_mtime)
             src_id = str(path)
@@ -556,7 +560,11 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
-            src_timestamp = path._object_info.modified_at
+            src_timestamp = path._object_info.modified_at or -1
+        elif isinstance(path, DBFSPath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+            # pylint: disable=protected-access
+            src_timestamp = path._file_info.modification_time or -1
         else:
             src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
