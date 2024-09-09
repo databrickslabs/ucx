@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Const, InferenceError, Name, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -11,7 +11,9 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     Fixer,
     CurrentSessionState,
-    PythonLinter, SqlLinter,
+    PythonLinter,
+    SqlLinter,
+    NamedFixer,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -275,7 +277,7 @@ class SparkTableNameMatchers:
         return self._matchers
 
 
-class SparkTableNamePyLinter(PythonLinter, Fixer):
+class SparkTableNamePyLinter(PythonLinter, NamedFixer):
 
     _spark_matchers = SparkTableNameMatchers()
 
@@ -284,9 +286,10 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
         self._index = index
         self._session_state = session_state
 
+    @property
     def name(self) -> str:
         # this is the same fixer, just in a different language context
-        return self._from_table.name()
+        return self._from_table.name
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -296,8 +299,8 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
             assert isinstance(node, Call)
             yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
-    def apply(self, code: str) -> str:
-        tree = Tree.parse(code)
+    def apply(self, _advice_code: str, source_code: str) -> str:
+        tree = Tree.parse(source_code)
         # we won't be doing it like this in production, but for the sake of the example
         for node in tree.walk():
             matcher = self._find_matcher(node)
@@ -318,23 +321,57 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
         return matcher if matcher.matches(node) else None
 
 
-class SparkSqlPyLinter(PythonLinter):
+class SparkSqlPyLinter(PythonLinter, Fixer):
 
-    def __init__(self, sql_linter: SqlLinter):
+    _PREFIX = "spark-sql-"
+
+    def __init__(self, sql_linter: SqlLinter, sql_fixers: list[Fixer]):
         self._sql_linter = sql_linter
+        self._sql_fixers = sql_fixers
+
+    def can_fix(self, advice_code: str) -> bool:
+        return advice_code.startswith(self._PREFIX)
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
-        visitor.visit(tree.node)
-        for call_node in visitor.matched_nodes:
-            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name=None)
+        for call_node, query in self._visit_call_nodes(tree):
             for value in InferredValue.infer_from_node(query):
                 if not value.is_inferred():
                     yield Advisory.from_node(
-                        code='cannot-autofix-table-reference',
+                        code=f"{self._PREFIX}cannot-autofix-table-reference",
                         message=f"Can't migrate table_name argument in '{query.as_string()}' because its value cannot be computed",
-                        node=call_node)
+                        node=call_node,
+                    )
                     continue
                 for advice in self._sql_linter.lint(value.as_string()):
+                    advice = advice.replace(code=f"{self._PREFIX}{advice.code}")
                     yield advice.replace_from_node(call_node)
-        return []
+
+    def _visit_call_nodes(self, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
+        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
+        visitor.visit(tree.node)
+        for call_node in visitor.matched_nodes:
+            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
+            if query is None:
+                continue
+            yield call_node, query
+
+    def apply(self, advice_code: str, source_code: str) -> str:
+        advice_code = advice_code[len(self._PREFIX) :]
+        fixer = self._fixer_for(advice_code)
+        if not fixer:
+            return source_code
+        tree = Tree.normalize_and_parse(source_code)
+        for _call_node, query in self._visit_call_nodes(tree):
+            if not isinstance(query, Const) or not isinstance(query.value, str):
+                continue
+            # TODO avoid applying same fix multiple times
+            # this requires changing 'apply' API in order to check advice fragment location
+            new_query = fixer.apply(advice_code, query.value)
+            query.value = new_query
+        return tree.node.as_string()
+
+    def _fixer_for(self, advice_code: str) -> Fixer | None:
+        for fixer in self._sql_fixers:
+            if fixer.can_fix(advice_code):
+                return fixer
+        return None
