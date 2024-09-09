@@ -234,7 +234,6 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    # pylint: disable=mock-no-usage
     dfsas = create_autospec(DirectFsAccessCrawlers)
     linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, dfsas)
 
@@ -247,6 +246,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         linter.lint_job(1234)
 
+    dfsas.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 
