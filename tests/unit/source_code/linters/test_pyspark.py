@@ -35,7 +35,7 @@ df4.write.saveAsTable(f"{schema}.member_measure")
 def test_spark_sql_no_match(empty_index):
     context = LinterContext(empty_index, CurrentSessionState())
     sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter))
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
 
     old_code = """
 for i in range(10):
@@ -49,54 +49,45 @@ for i in range(10):
 def test_spark_sql_match(migration_index):
     context = LinterContext(migration_index, CurrentSessionState())
     sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter))
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
     python_code = """
 spark.sql("SELECT * FROM old.things")
 spark.sql("SELECT * FROM csv.`s3://bucket/path`")
 """
     advices = list(spark_linter.lint(python_code))
-    assert  [
-            Deprecation(
-                code='table-migrated-to-uc',
-                message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-                start_line=1,
-                start_col=0,
-                end_line=1,
-                end_col=37,
-            ),
-            Deprecation(
-                code='direct-filesystem-access-in-sql-query',
-                message='The use of direct filesystem references is deprecated: s3://bucket/path',
-                start_line=2,
-                start_col=0,
-                end_line=2,
-                end_col=49,
-            ),
-            ] == advices
+    assert [
+        Deprecation(
+            code='spark-sql-table-migrated-to-uc',
+            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            start_line=1,
+            start_col=0,
+            end_line=1,
+            end_col=37,
+        ),
+        Deprecation(
+            code='spark-sql-direct-filesystem-access-in-sql-query',
+            message='The use of direct filesystem references is deprecated: s3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=49,
+        ),
+    ] == advices
 
 
 def test_spark_sql_match_named(migration_index):
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkTableNamePyLinter(ftf, migration_index, session_state)
-
+    context = LinterContext(migration_index, CurrentSessionState())
+    sql_linter = context.linter(Language.SQL)
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
     old_code = """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code)) == [
+    assert list(spark_linter.lint(old_code)) == [
         Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=1,
-            start_col=0,
-            end_line=1,
-            end_col=34,
-        ),
-        Deprecation(
-            code='table-migrated-to-uc',
+            code='spark-sql-table-migrated-to-uc',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
             start_col=13,
@@ -113,22 +104,22 @@ def test_spark_table_return_value_apply(migration_index):
     old_code = """spark.read.csv('s3://bucket/path')
 for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
-    fixed_code = sqf.apply(old_code)
+    fixed_code = sqf.apply("", old_code)
     # no transformations to apply, only lint messages
     assert fixed_code.rstrip() == old_code.rstrip()
 
 
-def test_spark_tablename_fix(migration_index):
+def test_spark_sql_tablename_fix(migration_index):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkTableNamePyLinter(ftf, migration_index, session_state)
+    spark_linter = SparkSqlPyLinter(ftf, [ftf])
 
     old_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    fixed_code = sqf.apply(old_code)
+    fixed_code = spark_linter.apply("spark-sql-table-migrate", old_code)
     assert (
         fixed_code.rstrip()
         == """spark.read.csv('s3://bucket/path')
