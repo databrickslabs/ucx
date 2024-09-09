@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 import shutil
 import tempfile
@@ -8,6 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -37,6 +39,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
     DependencyGraphWalker,
+    Lineage,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -66,12 +69,21 @@ class JobProblem:
         return message
 
 
+class _WorkflowTaskLineage(Lineage):
+
+    def __init__(self, job: jobs.Job, task: jobs.Task):
+        self._job_id = job.job_id
+        self._job_name = job.settings.name
+        self._task_key = task.task_key
+
+    def to_json(self) -> Any:
+        return [ { "job_id": self._job_id, "job_name": self._job_name }, f"task: {self._task_key}" ]
+
+
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
-        # concat job and task for lineage, see DependencyGraphWalker.lineage_str
-        lineage_str = f'"job:{job.job_id}"->"task:{task.task_key}"'
         loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
-        super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False, lineage_str=lineage_str)
+        super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False)
         self._task = task
         self._job = job
 
@@ -80,6 +92,10 @@ class WorkflowTask(Dependency):
 
     def __repr__(self):
         return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
+
+    @property
+    def lineage(self):
+        return _WorkflowTaskLineage(self._job, self._task)
 
 
 class WorkflowTaskContainer(SourceContainer):
@@ -523,10 +539,10 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
+        src_timestamp = int(path.stat().st_mtime)
+        src_id = str(path)
+        src_lineage = json.dumps(self.lineage)
         for cell in notebook.cells:
-            src_timestamp = int(path.stat().st_mtime)
-            src_id = str(path)
-            src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
                 yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
@@ -547,7 +563,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             logger.warning(f"Language {language.name} not supported yet!")
             return
         src_id = str(path)
-        src_lineage = self.lineage_str
+        src_lineage = json.dumps(self.lineage)
         src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)

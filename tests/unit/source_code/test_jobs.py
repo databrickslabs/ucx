@@ -1,11 +1,12 @@
 import io
+import json
 import logging
 import textwrap
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.jobs import Job, SparkPythonTask
+from databricks.sdk.service.jobs import Job, SparkPythonTask, JobSettings, Task
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
@@ -18,8 +19,9 @@ from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, PathLineage, \
+    CompositeLineage
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 
 
@@ -512,3 +514,22 @@ def test_xxx(graph):
     assert workflow_task_container.spark_conf == {"spark.databricks.cluster.profile": "singleNode"}
 
     ws.assert_not_called()
+
+
+def test_full_lineage_is_converted_to_json():
+    ws = create_autospec(WorkspaceClient)
+    ws.assert_not_called()
+    path1 = PathLineage(Path("abc"))
+    path2 = PathLineage(Path("xyz"))
+    composite = CompositeLineage(path1, path2)
+    task = Task(task_key = "task-key")
+    settings = JobSettings(name = "job-name")
+    job = create_autospec(jobs.Job)
+    job.job_id = "job-id"
+    job.settings = settings
+    task = WorkflowTask(ws, task, job)
+    lineage = CompositeLineage(task.lineage, composite)
+    json_obj = lineage.to_json()
+    s = json.dumps(json_obj)
+    assert '[{"job_id": "job-id", "job_name": "job-name"}, "task: task-key", "abc", "xyz"]' == s
+

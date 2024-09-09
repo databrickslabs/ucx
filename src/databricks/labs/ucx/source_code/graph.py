@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import abc
+import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable, Iterator
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Any
 
 from astroid import (  # type: ignore
     NodeNG,
@@ -291,11 +292,10 @@ class DependencyGraphContext:
 
 class Dependency:
 
-    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True, lineage_str: str | None = None):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
         self._path = path
         self._inherits_context = inherits_context
-        self._lineage_str = lineage_str or '"' + self._path.as_posix() + '"'
 
     @property
     def path(self) -> Path:
@@ -318,8 +318,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage_str(self):
-        return self._lineage_str
+    def lineage(self):
+        return PathLineage(self.path)
 
 
 class SourceContainer(abc.ABC):
@@ -589,6 +589,37 @@ class InheritedContext:
         return InheritedContext(tree, self.found)
 
 
+class Lineage(abc.ABC):
+
+    @abc.abstractmethod
+    def to_json(self) -> Any: ...
+
+
+class PathLineage(Lineage):
+
+    def __init__(self, path: Path):
+        self._path = path
+
+    def to_json(self) -> Any:
+        return str(self._path)
+
+
+class CompositeLineage(Lineage):
+
+    def __init__(self, *lineages: Lineage):
+        self._lineages = lineages
+
+    def to_json(self) -> Any:
+        atoms: list[Any] = []
+        for lineage in self._lineages:
+            json = lineage.to_json()
+            if isinstance(json, list):
+                atoms.extend(json)
+            else:
+                atoms.append(json)
+        return atoms
+
+
 T = TypeVar("T")
 
 
@@ -634,6 +665,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage_str(self):
-        parts = [dependency.lineage_str for dependency in self._lineage]
-        return "->".join(parts)
+    def lineage(self):
+        lineages = [dependency.lineage for dependency in self._lineage]
+        return CompositeLineage(lineages)
