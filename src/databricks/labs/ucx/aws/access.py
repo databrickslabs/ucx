@@ -307,7 +307,7 @@ class AWSResourcePermissions:
             )
         ):
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
-            raise PermissionError(f"Failed to create migration role and instance profile {iam_role_name}")
+            raise PermissionDenied(f"Failed to create migration role and instance profile {iam_role_name}")
 
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
