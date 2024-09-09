@@ -1,5 +1,4 @@
 import functools
-import itertools
 import logging
 import shutil
 import tempfile
@@ -353,42 +352,51 @@ class WorkflowLinter:
                 continue
             tasks.append(functools.partial(self.lint_job, job.job_id))
         logger.info(f"Running {tasks} linting tasks in parallel...")
-        job_problems, errors = Threads.gather('linting workflows', tasks)
-        job_problems_flattened = list(itertools.chain(*job_problems))
-        logger.info(f"Saving {len(job_problems_flattened)} linting problems...")
+        job_results, errors = Threads.gather('linting workflows', tasks)
+        job_problems: list[JobProblem] = []
+        job_dfsas: list[DirectFsAccess] = []
+        for problems, dfsas in job_results:
+            job_problems.extend(problems)
+            job_dfsas.extend(dfsas)
+        logger.info(f"Saving {len(job_problems)} linting problems...")
         sql_backend.save_table(
             f'{inventory_database}.workflow_problems',
-            job_problems_flattened,
+            job_problems,
             JobProblem,
             mode='overwrite',
         )
+        self._directfs_crawlers.for_paths().append(job_dfsas)
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> list[JobProblem]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
-            return []
+            return ([], [])
 
-        problems = self._lint_job(job)
+        problems, dfsas = self._lint_job(job)
         if len(problems) > 0:
             problem_messages = "\n".join([problem.as_message() for problem in problems])
             logger.warning(f"Found job problems:\n{problem_messages}")
-        return problems
+        return problems, dfsas
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> list[JobProblem]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         problems: list[JobProblem] = []
+        dfsas: list[DirectFsAccess] = []
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
         assert job.settings.tasks is not None
         linted_paths: set[Path] = set()
         for task in job.settings.tasks:
-            for advice in self._lint_task(task, job, linted_paths):
+            graph, advices, session_state = self._build_task_dependency_graph(task, job)
+            if not advices:
+                advices = self._lint_task(task, graph, session_state, linted_paths)
+            for advice in advices:
                 absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(
                     job_id=job.job_id,
@@ -403,9 +411,17 @@ class WorkflowLinter:
                     end_col=advice.advice.end_col,
                 )
                 problems.append(job_problem)
-        return problems
+            assessment_start = int(time.mktime(time.gmtime()))
+            task_dfsas = self._collect_task_dfsas(task, job, graph, session_state)
+            assessment_end = int(time.mktime(time.gmtime()))
+            for dfsa in task_dfsas:
+                dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
+                dfsas.append(dfsa)
+        return problems, dfsas
 
-    def _lint_task(self, task: jobs.Task, job: jobs.Job, linted_paths: set[Path]) -> Iterable[LocatedAdvice]:
+    def _build_task_dependency_graph(
+        self, task: jobs.Task, job: jobs.Job
+    ) -> tuple[DependencyGraph, Iterable[LocatedAdvice], CurrentSessionState]:
         root_dependency: Dependency = WorkflowTask(self._ws, task, job)
         # we can load it without further preparation since the WorkflowTask is merely a wrapper
         container = root_dependency.load(self._path_lookup)
@@ -418,25 +434,33 @@ class WorkflowLinter:
         )
         graph = DependencyGraph(root_dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
-        if problems:
-            for problem in problems:
-                source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
-                yield LocatedAdvice(problem.as_advisory(), source_path)
-            return
+        located_advices: list[LocatedAdvice] = []
+        for problem in problems:
+            source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
+            located_advices.append(LocatedAdvice(problem.as_advisory(), source_path))
+        return graph, located_advices, session_state
+
+    def _lint_task(
+        self,
+        task: jobs.Task,
+        graph: DependencyGraph,
+        session_state: CurrentSessionState,
+        linted_paths: set[Path],
+    ) -> Iterable[LocatedAdvice]:
         walker = LintingWalker(
             graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
         )
         yield from walker
-        assessment_start = int(time.mktime(time.gmtime()))
+
+    def _collect_task_dfsas(
+        self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
+    ) -> Iterable[DirectFsAccess]:
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
-        assessment_end = int(time.mktime(time.gmtime()))
         dfsas: list[DirectFsAccess] = []
         assert job.settings is not None  # as already done in _lint_job
         job_name = job.settings.name
         for dfsa in collector:
-            dfsa = dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
-            dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
-            dfsas.append(dfsa)
+            yield dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
         self._directfs_crawlers.for_paths().append(dfsas)
 
 
