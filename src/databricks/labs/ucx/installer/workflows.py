@@ -178,18 +178,19 @@ class DeployedWorkflows:
         try:
             job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
-            if run_details.repair_history:
-                latest_repair_run_id = run_details.repair_history[-1].id
-                job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
-                logger.debug(f"Repairing {workflow} job: {job_url}")
-                self._ws.jobs.repair_run(
-                    run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id
-                )
-                webbrowser.open(job_url)
-            else:
-                logger.warning(f"No repair history found for run_id={run_id}")
+            self._handle_repair_run(run_details, job_id, run_id, workflow)
         except TimeoutError:
             logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+
+    def _handle_repair_run(self, run_details, job_id, run_id, workflow):
+        if run_details.repair_history:
+            latest_repair_run_id = run_details.repair_history[-1].id
+            job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
+            logger.debug(f"Repairing {workflow} job: {job_url}")
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
+            webbrowser.open(job_url)
+        else:
+            logger.warning(f"No repair history found for run_id={run_id}")
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
