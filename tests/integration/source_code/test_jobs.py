@@ -69,7 +69,7 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
 def test_job_linter_no_problems(simple_ctx, make_job):
     j = make_job()
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     assert len(problems) == 0
 
@@ -92,7 +92,7 @@ def test_job_task_linter_library_not_installed_cluster(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
@@ -116,7 +116,7 @@ def test_job_task_linter_library_installed_cluster(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
@@ -145,7 +145,7 @@ display(spark.read.parquet("/mnt/something"))
     some_file.write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+        problems, dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     root = Path(entrypoint.as_posix())
     messages = {replace(p, path=Path(p.path).relative_to(root)).as_message() for p in problems}
@@ -154,7 +154,6 @@ display(spark.read.parquet("/mnt/something"))
     last_messages = caplog.messages[-1].split("\n")
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
-    dfsas = list(simple_ctx.directfs_access_crawlers.for_paths().snapshot())
     assert len(dfsas) == 2
     task_keys = set(task.task_key for task in j.settings.tasks)
     for dfsa in dfsas:
@@ -187,14 +186,14 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_notebook(path=notebook, content=b"import greenlet")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
-    problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
 
     library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
@@ -305,7 +304,7 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
     messages = tuple(problem.message for problem in problems)
     expected_messages = (
         "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
@@ -339,7 +338,7 @@ def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
     messages = tuple(problem.message for problem in problems)
     expected_messages = (
         "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
@@ -371,7 +370,7 @@ def test_workflow_linter_lints_job_with_workspace_egg_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
@@ -396,7 +395,7 @@ def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+    problems,_dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
@@ -414,7 +413,7 @@ def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, ma
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
     job_without_ucx_library = make_job(notebook_path=notebook)
 
-    problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) > 0
     allow_list.module_compatibility.assert_called_once_with("databricks.labs.ucx")
@@ -435,7 +434,7 @@ def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, m
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
     job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
 
@@ -463,7 +462,7 @@ def test_job_spark_python_task_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
@@ -484,7 +483,7 @@ def test_job_spark_python_task_linter_unhappy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
@@ -516,7 +515,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     )
     job_with_ucx_library = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
     assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
@@ -542,7 +541,7 @@ def test_job_spark_python_task_workspace_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
 
@@ -565,7 +564,7 @@ def test_job_spark_python_task_dbfs_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
 
@@ -593,7 +592,7 @@ def test_job_spark_python_task_linter_notebook_handling(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     # The notebook being linted has 'import greenlet' in a cell that should be ignored, but will trigger this problem if processed.
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
@@ -618,7 +617,7 @@ def test_job_dlt_task_linter_unhappy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
@@ -643,7 +642,7 @@ def test_job_dlt_task_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
@@ -657,7 +656,7 @@ def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_not
 
     j = make_job(libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert (
         len(
             [
