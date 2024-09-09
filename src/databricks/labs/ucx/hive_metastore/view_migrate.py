@@ -55,7 +55,7 @@ class ViewToMigrate(TableToMigrate):
     def sql_migrate_view(self, index: MigrationIndex) -> str:
         from_table = FromTableSqlLinter(index, CurrentSessionState(self.src.database))
         assert self.src.view_text is not None, 'Expected a view text'
-        migrated_select = from_table.apply(self.src.view_text)
+        migrated_select = from_table.apply("", self.src.view_text)
         statements = sqlglot.parse(migrated_select, read='databricks')
         assert len(statements) == 1, 'Expected a single statement'
         create = statements[0]

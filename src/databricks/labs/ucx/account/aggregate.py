@@ -84,7 +84,7 @@ class AccountAggregate:
                 from_table = FromTableSqlLinter(stub_index, CurrentSessionState(schema=inventory_database))
                 logger.info(f"Querying Schema {inventory_database}")
 
-                workspace_specific_query = from_table.apply(query)
+                workspace_specific_query = from_table.apply("", query)
                 for row in ctx.sql_backend.fetch(workspace_specific_query):
                     yield workspace_id, row
             except NotInstalled:

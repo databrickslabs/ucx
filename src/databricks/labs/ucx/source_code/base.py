@@ -3,7 +3,7 @@ from __future__ import annotations
 import codecs
 import locale
 import logging
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -176,12 +176,22 @@ class PythonLinter(Linter):
     def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
-class Fixer:
+class Fixer(ABC):
+    @abstractmethod
+    def can_fix(self, advice_code: str) -> bool: ...
+
+    @abstractmethod
+    def apply(self, advice_code: str, source_code: str) -> str: ...
+
+
+class NamedFixer(Fixer, ABC):
+
+    @property
     @abstractmethod
     def name(self) -> str: ...
 
-    @abstractmethod
-    def apply(self, code: str) -> str: ...
+    def can_fix(self, advice_code: str) -> bool:
+        return self.name == advice_code
 
 
 # The default schema to use when the schema is not specified in a table reference
