@@ -46,30 +46,26 @@ def test_spark_sql_match(migration_index):
     ftf = FromTableSqlLinter(migration_index, session_state)
     sqf = SparkSqlPyLinter(ftf, migration_index, session_state)
 
-    old_code = """
-spark.read.csv("s3://bucket/path")
-for i in range(10):
-    result = spark.sql("SELECT * FROM old.things").collect()
-    print(len(result))
-"""
-    assert list(sqf.lint(old_code)) == [
-        Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: s3://bucket/path',
-            start_line=1,
-            start_col=0,
-            end_line=1,
-            end_col=34,
-        ),
-        Deprecation(
-            code='table-migrated-to-uc',
-            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=3,
-            start_col=13,
-            end_line=3,
-            end_col=50,
-        ),
-    ]
+    python_code = """spark.sql("SELECT * FROM csv.`s3://bucket/path`").collect()"""
+    advices = list(sqf.lint(python_code))
+    assert  [
+            Deprecation(
+                code='direct-filesystem-access',
+                message='The use of direct filesystem references is deprecated: s3://bucket/path',
+                start_line=1,
+                start_col=0,
+                end_line=1,
+                end_col=34,
+            ),
+            Deprecation(
+                code='table-migrated-to-uc',
+                message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+                start_line=3,
+                start_col=13,
+                end_line=3,
+                end_col=50,
+            ),
+        ] == advices
 
 
 def test_spark_sql_match_named(migration_index):
