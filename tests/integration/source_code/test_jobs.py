@@ -395,7 +395,7 @@ def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
-    problems,_dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
