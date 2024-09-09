@@ -112,7 +112,6 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
 
@@ -147,7 +146,6 @@ def test_install_cluster_override_jobs(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 
@@ -170,7 +168,6 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 
@@ -507,7 +504,6 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
@@ -579,7 +575,6 @@ def test_remove_jobs_no_state(ws):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
@@ -614,7 +609,6 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
@@ -1148,7 +1142,6 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
     workspace_installation = WorkspaceInstallation(
@@ -1181,7 +1174,6 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
     workspace_installation = WorkspaceInstallation(
@@ -1211,9 +1203,7 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
         wheels=wheels,
     )
 
-    install.run(
-        verify_timeout=timedelta(seconds=60),
-    )
+    install.run()
 
     wheels.upload_to_wsfs.assert_called()
 
@@ -1239,9 +1229,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
         wheels=wheels,
     )
 
-    install.run(
-        verify_timeout=timedelta(seconds=10),
-    )
+    install.run()
 
     existing_installation.assert_file_uploaded('logs/README.md')
     wheels.upload_to_wsfs.assert_called()
@@ -1301,7 +1289,6 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
 
@@ -1333,7 +1320,6 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
 
@@ -1546,7 +1532,6 @@ def test_user_not_admin(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 

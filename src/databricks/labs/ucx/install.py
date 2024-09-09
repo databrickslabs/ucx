@@ -175,7 +175,6 @@ class WorkspaceInstaller(WorkspaceContext):
     def run(
         self,
         default_config: WorkspaceConfig | None = None,
-        verify_timeout=timedelta(minutes=2),
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")

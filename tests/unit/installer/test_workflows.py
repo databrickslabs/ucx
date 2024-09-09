@@ -55,7 +55,6 @@ def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installati
         ws,
         wheels,
         product_info,
-        verify_timeout=timedelta(minutes=5),
         tasks=tasks,
     )
     try:
