@@ -179,6 +179,8 @@ class DeployedWorkflows:
             job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
             self._handle_repair_run(run_details, job_id, run_id, workflow)
+        except InvalidParameterValue as e:
+            logger.warning(f"Skipping {workflow}: {e}")
         except TimeoutError:
             logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
 
