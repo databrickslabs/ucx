@@ -30,10 +30,10 @@ def test_graph_visits_package_with_recursive_imports():
     )
     root_path = Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "import-sqlglot.py"
     assert root_path.is_file()
-    container = LocalFile(root_path, "from sqlglot import Expression\n", Language.PYTHON)
-    loader = WrappingLoader(container)
-    dependency = Dependency(loader, root_path, False)
-    graph = DependencyGraph(dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
+    maybe = dependency_resolver.resolve_file(path_lookup, root_path)
+    assert maybe.dependency
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
+    container = maybe.dependency.load(path_lookup)
     container.build_dependency_graph(graph)
     assert len(graph.all_dependencies) > 10
     # visit the graph without a 'visited' set
