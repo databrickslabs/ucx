@@ -783,8 +783,9 @@ class WorkflowsDeployment(InstallationMixin):
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._install_state.jobs.items()
         )
+        remote_wheels_str = " ".join(remote_wheels)
         content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            remote_wheel=remote_wheels_str, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
