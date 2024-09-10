@@ -39,6 +39,8 @@ from databricks.labs.ucx.source_code.graph import (
     WrappingLoader,
     DependencyGraphWalker,
     LineageAtom,
+    Lineage,
+    LineageList,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -68,17 +70,6 @@ class JobProblem:
         return message
 
 
-@dataclass
-class _WorkflowTaskLineageAtom(LineageAtom):
-
-    job_id: int
-    job_name: str
-    task_key: str
-
-    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
-        return [{"job_id": self.job_id, "job_name": self.job_name}, f"task: {self.task_key}"]
-
-
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
         loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
@@ -93,9 +84,11 @@ class WorkflowTask(Dependency):
         return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
 
     @property
-    def lineage(self) -> LineageAtom:
+    def lineage(self) -> Lineage:
         job_name = ("" if self._job.settings is None else self._job.settings.name) or ""
-        return _WorkflowTaskLineageAtom(self._job.job_id or -1, job_name, self._task.task_key)
+        job_lineage = LineageAtom("job", str(self._job.job_id), {"name": job_name})
+        task_lineage = LineageAtom("task", self._task.task_key)
+        return LineageList([job_lineage, task_lineage])
 
 
 class WorkflowTaskContainer(SourceContainer):

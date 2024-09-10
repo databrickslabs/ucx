@@ -317,8 +317,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage(self) -> LineageAtom:
-        return PathLineageAtom(self.path)
+    def lineage(self) -> Lineage:
+        return LineageAtom("path", str(self.path))
 
 
 class SourceContainer(abc.ABC):
@@ -589,34 +589,34 @@ class InheritedContext:
 
 
 @dataclass
-class LineageAtom(abc.ABC):
-
+class Lineage(abc.ABC):
     @abc.abstractmethod
-    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]: ...
+    def as_object(self) -> dict[str, str] | list[dict[str, str]]: ...
 
 
 @dataclass
-class PathLineageAtom(LineageAtom):
+class LineageAtom(Lineage):
+    object_type: str
+    object_id: str
+    other: dict[str, str] | None = None
 
-    path: Path
-
-    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
-        return str(self.path)
+    def as_object(self) -> dict[str, str]:
+        return {"object_type": self.object_type, "object_id": self.object_id, **(self.other or {})}
 
 
 @dataclass
-class CompositeLineageAtom(LineageAtom):
+class LineageList(Lineage):
 
-    lineages: list[LineageAtom]
+    lineages: list[Lineage]
 
-    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
-        atoms: list[str | int | dict[str, str | int]] = []
+    def as_object(self) -> list[dict[str, str]]:
+        atoms: list[dict[str, str]] = []
         for lineage in self.lineages:
-            json = lineage.to_json()
-            if isinstance(json, list):
-                atoms.extend(cast(list[str | int | dict[str, str | int]], json))
+            obj = lineage.as_object()
+            if isinstance(obj, list):
+                atoms.extend(cast(list[dict[str, str]], obj))
             else:
-                atoms.append(cast(str | int | dict[str, str | int], json))
+                atoms.append(cast(dict[str, str], obj))
         return atoms
 
 
@@ -665,6 +665,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage(self) -> LineageAtom:
+    def lineage(self) -> Lineage:
         lineages = [dependency.lineage for dependency in self._lineage]
-        return CompositeLineageAtom(lineages)
+        return LineageList(lineages)
