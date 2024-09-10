@@ -6,9 +6,8 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, InheritedContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList, Compatibility, UNKNOWN
+from databricks.labs.ucx.source_code.known import KnownList
 
 
 def test_dependency_graph_registers_library(mock_path_lookup):
@@ -183,5 +182,3 @@ def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_reso
     assert inference_context.tree is not None
     assert inference_context.tree.has_global("some_table_name")
     assert not inference_context.tree.has_global("other_table_name")
-
-
