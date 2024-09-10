@@ -275,5 +275,5 @@ commands:
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
 
-  - name: export
-    description: export widget data from the assessment
+  - name: export-assessment
+    description: export widget data from the assessment to see tabular data output

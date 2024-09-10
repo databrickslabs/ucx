@@ -16,7 +16,6 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCh
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
-from databricks.labs.ucx.assessment.export import Exporter
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -566,10 +565,10 @@ def join_collection(a: AccountClient, workspace_ids: str):
 
 
 @ucx.command()
-def export(w: WorkspaceClient, prompts: Prompts, path: Path | None = None):
+def export_assessment(w: WorkspaceClient, prompts: Prompts, path: Path | None = None):
     """exports the assessment dashboard"""
     ctx = WorkspaceContext(w)
-    exporter = Exporter(ctx)
+    exporter = ctx.exporter
     exporter.export_results(prompts, path)
 
 

@@ -6,7 +6,9 @@ from pathlib import Path
 from zipfile import ZipFile
 from concurrent.futures import ThreadPoolExecutor
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
+from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.config import WorkspaceConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +17,14 @@ class AssessmentExporter:
     # File and Path Constants
     _ZIP_FILE_NAME = "ucx_assessment_results.zip"
 
-    def __init__(self, ctx: WorkspaceContext):
-        self._ctx = ctx
+    def __init__(self, sql_backend: SqlBackend, config: WorkspaceConfig):
+        self._sql_backend = sql_backend
+        self._WorkspaceConfig = WorkspaceConfig
 
     def _get_ucx_main_queries(self) -> list[dict[str, str]]:
         """Retrieve and construct the main UCX queries."""
         pattern = r"\b.inventory\b"
-        schema = self._ctx.inventory_database
+        schema = "ucx_assessment"  # change this once we reference the sql backend
         project_root = Path(__file__).parent.parent.parent.parent
         ucx_main_queries_path = project_root / "labs/ucx/queries/assessment/main"
 
@@ -60,7 +63,7 @@ class AssessmentExporter:
             file_name = f"{match.group(1)}.csv"
             csv_path = os.path.join(path, file_name)
 
-            query_results = list(self._ctx.sql_backend.fetch(result["query"]))
+            query_results = list(self._sql_backend.fetch(result["query"]))
 
             if query_results:
                 headers = query_results[0].asDict().keys()
