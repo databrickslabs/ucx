@@ -32,6 +32,7 @@ def test_graph_visits_package_with_recursive_imports():
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
     container = maybe.dependency.load(path_lookup)
     container.build_dependency_graph(graph)
+    assert len(graph.all_dependencies) > 10
     # visit the graph without a 'visited' set
     roots = graph.root_dependencies
     assert roots
