@@ -14,6 +14,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 
 
@@ -80,6 +81,10 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def global_init_scripts_crawler(self):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def faster_table_scan_crawler(self):
+        return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
 
     @cached_property
     def tables_in_mounts(self):
