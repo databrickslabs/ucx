@@ -393,7 +393,7 @@ def migrate_credentials(
     Please review the file and delete the Roles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
     if ctx:
         workspace_contexts = [ctx]
     if w.config.is_azure:
