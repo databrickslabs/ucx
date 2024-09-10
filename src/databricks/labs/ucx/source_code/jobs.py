@@ -1,5 +1,4 @@
 import functools
-import json
 import logging
 import shutil
 import tempfile
@@ -539,7 +538,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         else:
             src_timestamp = int(path.stat().st_mtime)
         src_id = str(path)
-        src_lineage = json.dumps(self.lineage)
+        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
                 yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
@@ -571,7 +570,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         else:
             src_timestamp = int(path.stat().st_mtime)
         src_id = str(path)
-        src_lineage = json.dumps(self.lineage)
+        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
