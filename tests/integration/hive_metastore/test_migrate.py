@@ -138,7 +138,11 @@ def test_migrate_external_table(
     make_mounted_location,
 ):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=make_mounted_location)
+    src_external_table = runtime_ctx.make_table(
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+        columns=[ColumnInfo(name="0", type_name=ColumnTypeName.STRING)],  # Test with column that needs escaping
+    )
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")

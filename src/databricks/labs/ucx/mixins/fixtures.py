@@ -1067,7 +1067,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.CSV
             storage_location = external_csv
-            ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
+            ddl = f"{ddl} {schema} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
         elif external_delta is not None:
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.DELTA
