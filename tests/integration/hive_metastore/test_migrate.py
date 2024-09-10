@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
-from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
+from databricks.sdk.service.catalog import ColumnInfo, ColumnTypeName, Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -667,6 +667,7 @@ def test_migrate_table_in_mount(
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
         external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
+        columns=[ColumnInfo(name="0", type_name=ColumnTypeName.STRING)],
     )
     table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
     # TODO: Remove this hack below

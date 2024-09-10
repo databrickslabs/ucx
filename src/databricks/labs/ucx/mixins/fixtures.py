@@ -25,6 +25,7 @@ from databricks.sdk.service.catalog import (
     AwsIamRoleRequest,
     AzureServicePrincipal,
     CatalogInfo,
+    ColumnInfo,
     DataSourceFormat,
     FunctionInfo,
     SchemaInfo,
@@ -1028,6 +1029,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         tbl_properties: dict[str, str] | None = None,
         hiveserde_ddl: str | None = None,
         storage_override: str | None = None,
+        columns: list[ColumnInfo] | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1041,6 +1043,10 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         view_text = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+        if columns is None:
+            schema = "(id INT, value STRING)"
+        else:
+            schema = "(" + ", ".join(f"`{column.name}` {column.type_name.value}" for column in columns) + ")"
         if view:
             table_type = TableType.VIEW
             view_text = ctas
@@ -1066,7 +1072,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.DELTA
             storage_location = external_delta
-            ddl = f"{ddl} (id string) LOCATION '{storage_location}'"
+            ddl = f"{ddl} {schema} LOCATION '{storage_location}'"
         elif external:
             # external table
             table_type = TableType.EXTERNAL
@@ -1079,7 +1085,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             table_type = TableType.MANAGED
             data_source_format = DataSourceFormat.DELTA
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
-            ddl = f"{ddl} (id INT, value STRING)"
+            ddl = f"{ddl} {schema}"
         if tbl_properties:
             tbl_properties.update({"RemoveAfter": get_test_purge_time()})
         else:
