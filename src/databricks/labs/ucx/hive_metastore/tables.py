@@ -305,12 +305,12 @@ class Table:
     def sql_migrate_table_in_mount(self, target_table_key: str, table_schema: Iterator[typing.Any]):
         fields = []
         partitioned_fields = []
-        next_fileds_are_partitioned = False
+        next_fields_are_partitioned = False
         for key, value, _ in table_schema:
             if key == "# Partition Information":
                 continue
             if key == "# col_name":
-                next_fileds_are_partitioned = True
+                next_fields_are_partitioned = True
                 continue
             if next_fields_are_partitioned:
                 partitioned_fields.append(escape_sql_identifier(key))
