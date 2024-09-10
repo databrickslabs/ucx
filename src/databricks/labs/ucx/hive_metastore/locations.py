@@ -359,6 +359,14 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
+    def snapshot(self, *, force_refresh: bool = True) -> list[Table]:
+        # TODO: Figure out what this should do (and refactor); non-trivial due to it overwriting the static table data.
+        if not force_refresh:
+            logger.warning("The tables-in-mounts crawler always refreshes, and overwrites the static table inventory.")
+        updated_records = self._crawl()
+        self._overwrite_records(updated_records)
+        return updated_records
+
     def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         cached_results = []
