@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import DBFSPath
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -539,7 +539,16 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
-        src_timestamp = int(path.stat().st_mtime)
+        if isinstance(path, WorkspacePath):
+            # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
+            # pylint: disable=protected-access
+            src_timestamp = path._object_info.modified_at or -1
+        elif isinstance(path, DBFSPath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+            # pylint: disable=protected-access
+            src_timestamp = path._file_info.modification_time or -1
+        else:
+            src_timestamp = int(path.stat().st_mtime)
         src_id = str(path)
         src_lineage = json.dumps(self.lineage)
         for cell in notebook.cells:
@@ -562,9 +571,18 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
             return
+        if isinstance(path, WorkspacePath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
+            # pylint: disable=protected-access
+            src_timestamp = path._object_info.modified_at or -1
+        elif isinstance(path, DBFSPath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+            # pylint: disable=protected-access
+            src_timestamp = path._file_info.modification_time or -1
+        else:
+            src_timestamp = int(path.stat().st_mtime)
         src_id = str(path)
         src_lineage = json.dumps(self.lineage)
-        src_timestamp = int(path.stat().st_mtime)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
