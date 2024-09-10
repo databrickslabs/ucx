@@ -203,6 +203,12 @@ class DependencyGraph:
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
+        try:
+            return self._visit(visit_node, visited)
+        except RecursionError as e:
+            return False
+
+    def _visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
         """provide visited set if you want to ensure nodes are only visited once"""
         if visited is not None:
             path = self.dependency.path
