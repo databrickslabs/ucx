@@ -208,13 +208,9 @@ class DependencyGraph:
 
             def __init__(self):
                 self._visited_pairs: set[tuple[Path, Path]] = set()
-                self._depth = 0
 
             def visit(self, graph: DependencyGraph) -> bool:
                 path = graph.dependency.path
-                self._depth += 1
-                if self._depth > 20:
-                    pass
                 if visited is not None:
                     if path in visited:
                         return False
