@@ -477,6 +477,10 @@ def test_account_installer_returns_workspace_contexts(env_or_skip, installation_
     )
     account_installer = installation_ctx.account_installer.replace(prompts=prompts)
 
-    workspace_contexts = account_installer.get_workspace_contexts()
+    installation_ctx.workspace_installation.run()
+    workspace_contexts = account_installer.get_workspace_contexts(
+        installation_ctx.workspace_client,
+        run_as_collection=True,
+    )
 
     assert len(workspace_contexts) > 0
