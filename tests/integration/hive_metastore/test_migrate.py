@@ -20,7 +20,11 @@ _SPARK_CONF = get_azure_spark_conf()
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    src_managed_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        columns=[ColumnInfo(name="0", type_name=ColumnTypeName.STRING)],  # Test with column that needs escaping
+    )
 
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
