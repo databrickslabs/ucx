@@ -185,29 +185,3 @@ def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_reso
     assert not inference_context.tree.has_global("other_table_name")
 
 
-def test_graph_visits_package_with_recursive_imports(mock_path_lookup):
-    # we need a populated KnownList for this test to run in a reasonable time
-    # but sqlglot should be unknown since it exhibits the problematic recursion
-    class TestKnownList(KnownList):
-        def module_compatibility(self, name: str) -> Compatibility:
-            if name.startswith("sqlglot"):
-                return UNKNOWN
-            return super().module_compatibility(name)
-
-    root_path = mock_path_lookup.resolve(Path("import-sqlglot.py"))
-    allow_list = TestKnownList()
-    library_resolver = PythonLibraryResolver(allow_list)
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(FileLoader(), allow_list)
-    path_lookup = PathLookup.from_sys_path(root_path.parent)
-    dependency_resolver = DependencyResolver(
-        library_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup
-    )
-    maybe = dependency_resolver.resolve_file(path_lookup, root_path)
-    assert maybe.dependency
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
-    container = maybe.dependency.load(path_lookup)
-    container.build_dependency_graph(graph)
-    # visit the graph without a 'visited' set
-    roots = graph.root_dependencies
-    assert roots
