@@ -249,7 +249,7 @@ class CommonUtils:
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
-    def workspace_client(self):
+    def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
 
