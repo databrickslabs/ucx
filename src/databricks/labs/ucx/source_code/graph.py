@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable, Iterator
-from typing import TypeVar, Generic, Any
+from typing import TypeVar, Generic, cast
 
 from astroid import (  # type: ignore
     NodeNG,
@@ -317,8 +317,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage(self):
-        return PathLineage(self.path)
+    def lineage(self) -> LineageAtom:
+        return PathLineageAtom(self.path)
 
 
 class SourceContainer(abc.ABC):
@@ -588,34 +588,35 @@ class InheritedContext:
         return InheritedContext(tree, self.found)
 
 
-class Lineage(abc.ABC):
+@dataclass
+class LineageAtom(abc.ABC):
 
     @abc.abstractmethod
-    def to_json(self) -> Any: ...
+    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]: ...
 
 
-class PathLineage(Lineage):
+@dataclass
+class PathLineageAtom(LineageAtom):
 
-    def __init__(self, path: Path):
-        self._path = path
+    path: Path
 
-    def to_json(self) -> Any:
-        return str(self._path)
+    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
+        return str(self.path)
 
 
-class CompositeLineage(Lineage):
+@dataclass
+class CompositeLineageAtom(LineageAtom):
 
-    def __init__(self, *lineages: Lineage):
-        self._lineages = lineages
+    lineages: list[LineageAtom]
 
-    def to_json(self) -> Any:
-        atoms: list[Any] = []
-        for lineage in self._lineages:
+    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
+        atoms: list[str | int | dict[str, str | int]] = []
+        for lineage in self.lineages:
             json = lineage.to_json()
             if isinstance(json, list):
-                atoms.extend(json)
+                atoms.extend(cast(list[str | int | dict[str, str | int]], json))
             else:
-                atoms.append(json)
+                atoms.append(cast(str | int | dict[str, str | int], json))
         return atoms
 
 
@@ -664,6 +665,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage(self):
+    def lineage(self) -> LineageAtom:
         lineages = [dependency.lineage for dependency in self._lineage]
-        return CompositeLineage(lineages)
+        return CompositeLineageAtom(lineages)

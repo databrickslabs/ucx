@@ -9,7 +9,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Any
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -39,7 +38,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
     DependencyGraphWalker,
-    Lineage,
+    LineageAtom,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -69,15 +68,15 @@ class JobProblem:
         return message
 
 
-class _WorkflowTaskLineage(Lineage):
+@dataclass
+class _WorkflowTaskLineageAtom(LineageAtom):
 
-    def __init__(self, job_id: int, job_name: str, task_key: str):
-        self._job_id = job_id
-        self._job_name = job_name
-        self._task_key = task_key
+    job_id: int
+    job_name: str
+    task_key: str
 
-    def to_json(self) -> Any:
-        return [{"job_id": self._job_id, "job_name": self._job_name}, f"task: {self._task_key}"]
+    def to_json(self) -> str | int | dict[str, str | int] | list[str | int | dict[str, str | int]]:
+        return [{"job_id": self.job_id, "job_name": self.job_name}, f"task: {self.task_key}"]
 
 
 class WorkflowTask(Dependency):
@@ -94,8 +93,9 @@ class WorkflowTask(Dependency):
         return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
 
     @property
-    def lineage(self):
-        return _WorkflowTaskLineage(self._job.job_id, self._job.settings.name, self._task.task_key)
+    def lineage(self) -> LineageAtom:
+        job_name = ("" if self._job.settings is None else self._job.settings.name) or ""
+        return _WorkflowTaskLineageAtom(self._job.job_id or -1, job_name, self._task.task_key)
 
 
 class WorkflowTaskContainer(SourceContainer):
