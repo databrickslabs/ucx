@@ -312,10 +312,10 @@ class Table:
             if key == "# col_name":
                 next_fileds_are_partitioned = True
                 continue
-            if next_fileds_are_partitioned:
-                partitioned_fields.append(f"{key}")
+            if next_fields_are_partitioned:
+                partitioned_fields.append(escape_sql_identifier(key))
             else:
-                fields.append(f"{key} {value}")
+                fields.append(f"{escape_sql_identifier(key)} {value}")
 
         partitioned_str = ""
         if partitioned_fields:
