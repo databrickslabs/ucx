@@ -456,12 +456,10 @@ class WorkflowLinter:
         self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
     ) -> Iterable[DirectFsAccess]:
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
-        dfsas: list[DirectFsAccess] = []
         assert job.settings is not None  # as already done in _lint_job
         job_name = job.settings.name
         for dfsa in collector:
             yield dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
-        self._directfs_crawlers.for_paths().append(dfsas)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
