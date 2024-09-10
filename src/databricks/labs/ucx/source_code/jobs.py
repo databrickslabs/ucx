@@ -533,7 +533,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
         if isinstance(path, WorkspacePath):
-            # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
             src_timestamp = path._object_info.modified_at or -1
         elif isinstance(path, DBFSPath):
