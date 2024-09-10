@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import abc
+import itertools
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable, Iterator
-from typing import TypeVar, Generic, cast
+from typing import TypeVar, Generic
 
 from astroid import (  # type: ignore
     NodeNG,
@@ -317,8 +319,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage(self) -> Lineage:
-        return LineageAtom("path", str(self.path))
+    def lineage(self) -> list[Lineage]:
+        return [Lineage("path", str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -589,35 +591,20 @@ class InheritedContext:
 
 
 @dataclass
-class Lineage(abc.ABC):
-    @abc.abstractmethod
-    def as_object(self) -> dict[str, str] | list[dict[str, str]]: ...
+class Lineage:
 
+    @staticmethod
+    def to_json_string(lineages: list[Lineage]):
+        json_lists = list(l.as_objects() for l in lineages)
+        json_obj = list(itertools.chain(*json_lists))
+        return json.dumps(json_obj)
 
-@dataclass
-class LineageAtom(Lineage):
     object_type: str
     object_id: str
     other: dict[str, str] | None = None
 
-    def as_object(self) -> dict[str, str]:
-        return {"object_type": self.object_type, "object_id": self.object_id, **(self.other or {})}
-
-
-@dataclass
-class LineageList(Lineage):
-
-    lineages: list[Lineage]
-
-    def as_object(self) -> list[dict[str, str]]:
-        atoms: list[dict[str, str]] = []
-        for lineage in self.lineages:
-            obj = lineage.as_object()
-            if isinstance(obj, list):
-                atoms.extend(cast(list[dict[str, str]], obj))
-            else:
-                atoms.append(cast(dict[str, str], obj))
-        return atoms
+    def as_objects(self) -> list[dict[str, str]]:
+        return [{"object_type": self.object_type, "object_id": self.object_id, **(self.other or {})}]
 
 
 T = TypeVar("T")
@@ -665,6 +652,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage(self) -> Lineage:
+    def lineage(self) -> list[Lineage]:
         lineages = [dependency.lineage for dependency in self._lineage]
-        return LineageList(lineages)
+        return list(itertools.chain(*lineages))

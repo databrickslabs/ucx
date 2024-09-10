@@ -38,9 +38,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
     DependencyGraphWalker,
-    LineageAtom,
     Lineage,
-    LineageList,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -84,11 +82,11 @@ class WorkflowTask(Dependency):
         return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
 
     @property
-    def lineage(self) -> Lineage:
-        job_name = ("" if self._job.settings is None else self._job.settings.name) or ""
-        job_lineage = LineageAtom("job", str(self._job.job_id), {"name": job_name})
-        task_lineage = LineageAtom("task", self._task.task_key)
-        return LineageList([job_lineage, task_lineage])
+    def lineage(self) -> list[Lineage]:
+        job_name = ("" if self._job.settings is None else self._job.settings.name) or "unknown job"
+        job_lineage = Lineage("job", str(self._job.job_id), {"name": job_name})
+        task_lineage = Lineage("task", self._task.task_key)
+        return [job_lineage, task_lineage]
 
 
 class WorkflowTaskContainer(SourceContainer):

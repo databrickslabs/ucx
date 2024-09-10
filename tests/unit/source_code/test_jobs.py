@@ -1,4 +1,5 @@
 import io
+import itertools
 import json
 import logging
 import textwrap
@@ -22,9 +23,7 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFile
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
-    DependencyResolver,
-    LineageAtom,
-    LineageList,
+    DependencyResolver, Lineage,
 )
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
@@ -524,18 +523,14 @@ def test_xxx(graph):
 def test_full_lineage_is_converted_to_json():
     ws = create_autospec(WorkspaceClient)
     ws.assert_not_called()
-    path1 = LineageAtom("path", "abc")
-    path2 = LineageAtom("path", "xyz")
-    composite = LineageList([path1, path2])
     task = Task(task_key="task-key")
     settings = JobSettings(name="job-name")
     job = create_autospec(jobs.Job)
     job.job_id = "job-id"
     job.settings = settings
     wtask = WorkflowTask(ws, task, job)
-    lineage = LineageList([wtask.lineage, composite])
-    json_obj = lineage.as_object()
-    json_str = json.dumps(json_obj)
+    full_lineage = list(itertools.chain(wtask.lineage, [Lineage("path", "abc"), Lineage("path", "xyz")]))
+    json_str = Lineage.to_json_string(full_lineage)
     job.assert_not_called()
     assert json_str == (
         '[{"object_type": "job", "object_id": "job-id", "name": "job-name"}, '
