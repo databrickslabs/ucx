@@ -1555,7 +1555,7 @@ def test_user_not_admin(ws, mock_installation):
         Workflows.all().tasks(),
     )
 
-    with pytest.raises(PermissionError) as failure:
+    with pytest.raises(PermissionDenied) as failure:
         workspace_installation.create_jobs()
     assert "Current user is not a workspace admin" in str(failure.value)
 
