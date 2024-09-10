@@ -92,7 +92,7 @@ def test_mounts_inventory_should_contain_mounts_without_encryption_type():
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
         Row(name="mp_3", source="path_3"),
-    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
 def test_mounts_inventory_should_contain_deduped_mounts_without_encryption_type():
@@ -111,7 +111,7 @@ def test_mounts_inventory_should_contain_deduped_mounts_without_encryption_type(
     assert [
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
-    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
 def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_names():
@@ -136,7 +136,7 @@ def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
     ]
-    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
 def test_external_locations():

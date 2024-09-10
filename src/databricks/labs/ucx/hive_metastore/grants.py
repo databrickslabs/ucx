@@ -205,9 +205,9 @@ class GrantsCrawler(CrawlerBase[Grant]):
         self._udf = udf
         self._include_databases = include_databases
 
-    def snapshot(self) -> Iterable[Grant]:
+    def snapshot(self, *, force_refresh: bool = False) -> Iterable[Grant]:
         try:
-            return super().snapshot()
+            return super().snapshot(force_refresh=force_refresh)
         except Exception as e:  # pylint: disable=broad-exception-caught
             log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
             log_fn(f"Couldn't fetch grants snapshot: {e}")

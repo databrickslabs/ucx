@@ -2,7 +2,7 @@ import dataclasses
 import logging
 import os
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
@@ -359,11 +359,6 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
-    def snapshot(self) -> list[Table]:
-        updated_records = self._crawl()
-        self._overwrite_records(updated_records)
-        return updated_records
-
     def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         cached_results = []
@@ -393,11 +388,7 @@ class TablesInMounts(CrawlerBase[Table]):
             seen[rec.location] = rec.key
         return seen
 
-    def _overwrite_records(self, items: Sequence[Table]):
-        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
-
-    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]):
+    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]) -> list[Table]:
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
