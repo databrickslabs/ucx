@@ -378,7 +378,7 @@ which can be used for further analysis and decision-making through the [assessme
 
 After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
 
-The UCX assessment workflow is intended to only be run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then UCX should first be [uninstalled](#uninstall-ucx) and reinstalled.
+The UCX assessment workflow is intended to only run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx) and [installing](#install-ucx) it again.
 
 [[back to top](#databricks-labs-ucx)]
 
