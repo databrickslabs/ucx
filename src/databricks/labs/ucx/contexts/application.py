@@ -364,7 +364,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def deployed_workflows(self):
-        return DeployedWorkflows(self.workspace_client, self.install_state, self.verify_timeout)
+        return DeployedWorkflows(self.workspace_client, self.install_state)
 
     @cached_property
     def workspace_info(self):

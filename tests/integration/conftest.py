@@ -5,7 +5,6 @@ import os
 import logging
 from dataclasses import replace
 from functools import partial, cached_property
-from datetime import timedelta
 import shutil
 import subprocess
 import databricks.sdk.core
@@ -722,7 +721,6 @@ class MockInstallationContext(MockRuntimeContext):
             self.workspace_client,
             self.product_info.wheels(self.workspace_client),
             self.product_info,
-            timedelta(minutes=3),
             self.tasks,
         )
 
