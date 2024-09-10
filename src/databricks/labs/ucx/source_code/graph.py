@@ -319,8 +319,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage(self) -> list[Lineage]:
-        return [Lineage("path", str(self.path))]
+    def lineage(self) -> list[LineageAtom]:
+        return [LineageAtom("path", str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -591,11 +591,11 @@ class InheritedContext:
 
 
 @dataclass
-class Lineage:
+class LineageAtom:
 
     @staticmethod
-    def to_json_string(lineages: list[Lineage]):
-        json_lists = list(l.as_objects() for l in lineages)
+    def atoms_to_json_string(atoms: list[LineageAtom]):
+        json_lists = list(lineage.as_objects() for lineage in atoms)
         json_obj = list(itertools.chain(*json_lists))
         return json.dumps(json_obj)
 
@@ -652,6 +652,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage(self) -> list[Lineage]:
+    def lineage(self) -> list[LineageAtom]:
         lineages = [dependency.lineage for dependency in self._lineage]
         return list(itertools.chain(*lineages))

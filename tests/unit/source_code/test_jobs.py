@@ -1,6 +1,5 @@
 import io
 import itertools
-import json
 import logging
 import textwrap
 from pathlib import Path
@@ -23,7 +22,8 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFile
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
-    DependencyResolver, Lineage,
+    DependencyResolver,
+    LineageAtom,
 )
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
@@ -529,8 +529,8 @@ def test_full_lineage_is_converted_to_json():
     job.job_id = "job-id"
     job.settings = settings
     wtask = WorkflowTask(ws, task, job)
-    full_lineage = list(itertools.chain(wtask.lineage, [Lineage("path", "abc"), Lineage("path", "xyz")]))
-    json_str = Lineage.to_json_string(full_lineage)
+    full_lineage = list(itertools.chain(wtask.lineage, [LineageAtom("path", "abc"), LineageAtom("path", "xyz")]))
+    json_str = LineageAtom.atoms_to_json_string(full_lineage)
     job.assert_not_called()
     assert json_str == (
         '[{"object_type": "job", "object_id": "job-id", "name": "job-name"}, '
