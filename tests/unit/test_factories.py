@@ -62,7 +62,7 @@ def test_replace_installation():
         installation=mock_installation,
         sql_backend=MockBackend(
             rows={
-                r'some.azure_service_principals': spn_info_rows[
+                r'`some`.`azure_service_principals`': spn_info_rows[
                     ('first-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
                     ('second-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
                 ]
