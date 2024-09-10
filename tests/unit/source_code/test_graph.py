@@ -208,5 +208,6 @@ def test_graph_visits_package_with_recursive_imports(mock_path_lookup):
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
     container = maybe.dependency.load(path_lookup)
     container.build_dependency_graph(graph)
+    # visit the graph without a 'visited' set
     roots = graph.root_dependencies
     assert roots
