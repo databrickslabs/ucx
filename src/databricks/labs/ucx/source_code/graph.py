@@ -203,30 +203,7 @@ class DependencyGraph:
         when visit_node returns True it interrupts the visit
         provide visited set if you want to ensure nodes are only visited once
         """
-
-        class Visitor:
-
-            def __init__(self):
-                self._visited_pairs: set[tuple[Path, Path]] = set()
-
-            def visit(self, graph: DependencyGraph) -> bool:
-                path = graph.dependency.path
-                if visited is not None:
-                    if path in visited:
-                        return False
-                    visited.add(path)
-                if visit_node(graph):
-                    return True
-                for dependency_graph in graph.dependencies.values():
-                    pair = (path, dependency_graph.dependency.path)
-                    if pair in self._visited_pairs:
-                        continue
-                    self._visited_pairs.add(pair)
-                    if self.visit(dependency_graph):
-                        return True
-                return False
-
-        visitor = Visitor()
+        visitor = DependencyGraphVisitor(visit_node, visited)
         return visitor.visit(self)
 
     def new_dependency_graph_context(self):
@@ -292,6 +269,31 @@ class DependencyGraph:
 
     def __repr__(self):
         return f"<DependencyGraph {self.dependency.path}>"
+
+
+class DependencyGraphVisitor:
+
+    def __init__(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None):
+        self._visit_node = visit_node
+        self._visited = visited
+        self._visited_pairs: set[tuple[Path, Path]] = set()
+
+    def visit(self, graph: DependencyGraph) -> bool:
+        path = graph.dependency.path
+        if self._visited is not None:
+            if path in self._visited:
+                return False
+            self._visited.add(path)
+        if self._visit_node(graph):
+            return True
+        for dependency_graph in graph.dependencies.values():
+            pair = (path, dependency_graph.dependency.path)
+            if pair in self._visited_pairs:
+                continue
+            self._visited_pairs.add(pair)
+            if self.visit(dependency_graph):
+                return True
+        return False
 
 
 @dataclass
