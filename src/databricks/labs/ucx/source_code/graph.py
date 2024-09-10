@@ -174,13 +174,6 @@ class DependencyGraph:
     def local_dependencies(self) -> set[Dependency]:
         return {child.dependency for child in self._dependencies.values()}
 
-    @property
-    def all_paths(self) -> set[Path]:
-        # TODO: remove this public method, as it'll throw false positives
-        # for package imports, like certifi. a WorkflowTask is also a dependency,
-        # but it does not exist on a filesystem
-        return {d.path for d in self.all_dependencies}
-
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
         return self._relative_names(self.all_dependencies)
