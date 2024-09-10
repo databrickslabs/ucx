@@ -42,6 +42,10 @@ class DependencyGraph:
     def dependency(self):
         return self._dependency
 
+    @property
+    def dependencies(self):
+        return self._dependencies
+
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
 
@@ -201,20 +205,40 @@ class DependencyGraph:
         """This method is intended to simplify testing"""
         return self._relative_names(self.root_dependencies)
 
-    # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
-        """provide visited set if you want to ensure nodes are only visited once"""
-        if visited is not None:
-            path = self.dependency.path
-            if path in visited:
+        """ "
+        when visit_node returns True it interrupts the visit
+        provide visited set if you want to ensure nodes are only visited once
+        """
+
+        class Visitor:
+
+            def __init__(self):
+                self._visited_pairs: set[tuple[Path, Path]] = set()
+                self._depth = 0
+
+            def visit(self, graph: DependencyGraph) -> bool:
+                path = graph.dependency.path
+                self._depth += 1
+                if self._depth > 20:
+                    pass
+                if visited is not None:
+                    if path in visited:
+                        return False
+                    visited.add(path)
+                if visit_node(graph):
+                    return True
+                for dependency_graph in graph.dependencies.values():
+                    pair = (path, dependency_graph.dependency.path)
+                    if pair in self._visited_pairs:
+                        continue
+                    self._visited_pairs.add(pair)
+                    if self.visit(dependency_graph):
+                        return True
                 return False
-            visited.add(path)
-        if visit_node(self):
-            return True
-        for dependency in self._dependencies.values():
-            if dependency.visit(visit_node, visited):
-                return True
-        return False
+
+        visitor = Visitor()
+        return visitor.visit(self)
 
     def new_dependency_graph_context(self):
         return DependencyGraphContext(
