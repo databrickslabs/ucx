@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import itertools
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -291,11 +293,10 @@ class DependencyGraphContext:
 
 class Dependency:
 
-    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True, lineage_str: str | None = None):
+    def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
         self._path = path
         self._inherits_context = inherits_context
-        self._lineage_str = lineage_str or '"' + self._path.as_posix() + '"'
 
     @property
     def path(self) -> Path:
@@ -318,8 +319,8 @@ class Dependency:
         return f"Dependency<{self.path}>"
 
     @property
-    def lineage_str(self):
-        return self._lineage_str
+    def lineage(self) -> list[LineageAtom]:
+        return [LineageAtom("path", str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -589,6 +590,23 @@ class InheritedContext:
         return InheritedContext(tree, self.found)
 
 
+@dataclass
+class LineageAtom:
+
+    @staticmethod
+    def atoms_to_json_string(atoms: list[LineageAtom]):
+        json_lists = list(lineage.as_objects() for lineage in atoms)
+        json_obj = list(itertools.chain(*json_lists))
+        return json.dumps(json_obj)
+
+    object_type: str
+    object_id: str
+    other: dict[str, str] | None = None
+
+    def as_objects(self) -> list[dict[str, str]]:
+        return [{"object_type": self.object_type, "object_id": self.object_id, **(self.other or {})}]
+
+
 T = TypeVar("T")
 
 
@@ -634,6 +652,6 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     ) -> Iterable[T]: ...
 
     @property
-    def lineage_str(self):
-        parts = [dependency.lineage_str for dependency in self._lineage]
-        return "->".join(parts)
+    def lineage(self) -> list[LineageAtom]:
+        lineages = [dependency.lineage for dependency in self._lineage]
+        return list(itertools.chain(*lineages))

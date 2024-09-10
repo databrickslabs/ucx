@@ -37,6 +37,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
     DependencyGraphWalker,
+    LineageAtom,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -68,10 +69,8 @@ class JobProblem:
 
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
-        # concat job and task for lineage, see DependencyGraphWalker.lineage_str
-        lineage_str = f'"job:{job.job_id}"->"task:{task.task_key}"'
         loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
-        super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False, lineage_str=lineage_str)
+        super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False)
         self._task = task
         self._job = job
 
@@ -80,6 +79,13 @@ class WorkflowTask(Dependency):
 
     def __repr__(self):
         return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        job_name = ("" if self._job.settings is None else self._job.settings.name) or "unknown job"
+        job_lineage = LineageAtom("job", str(self._job.job_id), {"name": job_name})
+        task_lineage = LineageAtom("task", self._task.task_key)
+        return [job_lineage, task_lineage]
 
 
 class WorkflowTaskContainer(SourceContainer):
@@ -521,19 +527,19 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
+        if isinstance(path, WorkspacePath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
+            # pylint: disable=protected-access
+            src_timestamp = path._object_info.modified_at or -1
+        elif isinstance(path, DBFSPath):
+            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+            # pylint: disable=protected-access
+            src_timestamp = path._file_info.modification_time or -1
+        else:
+            src_timestamp = int(path.stat().st_mtime)
+        src_id = str(path)
+        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for cell in notebook.cells:
-            if isinstance(path, WorkspacePath):
-                # TODO add modified_at property in lsql, see https://github.com/databrickslabs/lsql/issues/268
-                # pylint: disable=protected-access
-                src_timestamp = path._object_info.modified_at or -1
-            elif isinstance(path, DBFSPath):
-                # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
-                # pylint: disable=protected-access
-                src_timestamp = path._file_info.modification_time or -1
-            else:
-                src_timestamp = int(path.stat().st_mtime)
-            src_id = str(path)
-            src_lineage = self.lineage_str
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
                 yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
@@ -553,8 +559,6 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
             return
-        src_id = str(path)
-        src_lineage = self.lineage_str
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
@@ -565,6 +569,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             src_timestamp = path._file_info.modification_time or -1
         else:
             src_timestamp = int(path.stat().st_mtime)
+        src_id = str(path)
+        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
