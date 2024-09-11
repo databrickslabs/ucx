@@ -204,26 +204,26 @@ class LocalFileMigrator:
         # Open the file and read the code
         with path.open("r") as f:
             try:
-                source_code = f.read()
+                code = f.read()
             except UnicodeDecodeError as e:
                 logger.error(f"Could not decode file {path}: {e}")
                 return False
             applied = False
             # Lint the code and apply fixes
-            for advice in linter.lint(source_code):
+            for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
                 fixer = context.fixer(language, advice.code)
                 if not fixer:
                     continue
                 logger.info(f"Applying fix for {advice}")
-                source_code = fixer.apply(advice.code, source_code)
+                code = fixer.apply(code)
                 applied = True
             if not applied:
                 return False
             # Write the fixed code back to the file
             with path.open("w") as f:
                 logger.info(f"Overwriting {path}")
-                f.write(source_code)
+                f.write(code)
                 return True
 
 

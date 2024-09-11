@@ -252,7 +252,7 @@ class LspServer:
         if not fixer:
             return QuickFixResponse(code_actions=[])
         fragment = code_range.fragment(code)
-        apply = fixer.apply(diagnostic_code, fragment)
+        apply = fixer.apply(fragment)
         return QuickFixResponse(
             code_actions=[
                 CodeAction(

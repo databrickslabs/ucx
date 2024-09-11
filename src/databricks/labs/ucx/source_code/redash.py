@@ -62,7 +62,7 @@ class Redash:
         self._installation.save(query, filename=f'backup/queries/{query.id}.json')
         from_table = FromTableSqlLinter(self._index, self._get_session_state(query))
         new_query = UpdateQueryRequestQuery(
-            query_text=from_table.apply("", query.query),
+            query_text=from_table.apply(query.query),
             tags=self._get_migrated_tags(query.tags),
         )
         try:

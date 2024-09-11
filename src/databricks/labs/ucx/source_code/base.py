@@ -177,21 +177,13 @@ class PythonLinter(Linter):
 
 
 class Fixer(ABC):
-    @abstractmethod
-    def can_fix(self, advice_code: str) -> bool: ...
-
-    @abstractmethod
-    def apply(self, advice_code: str, source_code: str) -> str: ...
-
-
-class NamedFixer(Fixer, ABC):
 
     @property
     @abstractmethod
     def name(self) -> str: ...
 
-    def can_fix(self, advice_code: str) -> bool:
-        return self.name == advice_code
+    @abstractmethod
+    def apply(self, code: str) -> str: ...
 
 
 # The default schema to use when the schema is not specified in a table reference
