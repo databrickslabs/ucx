@@ -120,6 +120,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`validate-table-locations` command](#validate-table-locations-command)
   * [`cluster-remap` command](#cluster-remap-command)
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
+  * [`upload` command](#upload-command)
+  * [`download` command](#download-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
@@ -1692,6 +1694,27 @@ cluster configurations to original one.This will also ask the user to provide th
 By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
+
+## `upload` command
+
+```text
+$ databricks labs ucx upload --file <file_path> --run-as-collection True
+21:31:29 WARNING [d.labs.ucx] The schema of CSV files is NOT validated, ensure it is correct
+21:31:29 INFO [d.labs.ucx] Finished uploading: <file_path>
+```
+
+Upload a file to a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when uploading the same file to multiple workspaces.
+
+## `download` command
+
+```text
+$ databricks labs ucx download --file <file_path> --run-as-collection True
+21:31:29 INFO [d.labs.ucx] Finished downloading: <file_path>
+```
+
+Download a csv file from a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when downloading the same file from multiple workspaces.
 
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
