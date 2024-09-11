@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 
-from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter, SparkTableNamePyLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectPyLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLinter
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
@@ -36,16 +36,23 @@ class LinterContext:
             from_table = FromTableSqlLinter(index, session_state=session_state)
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
-            python_linters.append(SparkSqlPyLinter(from_table, index, session_state))
-            python_fixers.append(SparkSqlPyLinter(from_table, index, session_state))
+            spark_sql = SparkSqlPyLinter(from_table, from_table)
+            python_linters.append(spark_sql)
+            python_fixers.append(spark_sql)
+            spark_table = SparkTableNamePyLinter(from_table, index, session_state)
+            python_linters.append(spark_table)
+            python_fixers.append(spark_table)
+
+        direct_fs = DirectFsAccessSqlLinter()
+        sql_linters.append(direct_fs)
 
         python_linters += [
             DirectFsAccessPyLinter(session_state),
             DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
             SparkConnectPyLinter(session_state),
             DbutilsPyLinter(session_state),
+            SparkSqlPyLinter(direct_fs, None),
         ]
-        sql_linters.append(DirectFsAccessSqlLinter())
 
         self._linters: dict[Language, list[SqlLinter] | list[PythonLinter]] = {
             Language.PYTHON: python_linters,
@@ -72,7 +79,7 @@ class LinterContext:
         if language not in self._fixers:
             return None
         for fixer in self._fixers[language]:
-            if fixer.name() == diagnostic_code:
+            if fixer.name == diagnostic_code:
                 return fixer
         return None
 
