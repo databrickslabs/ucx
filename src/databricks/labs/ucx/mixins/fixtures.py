@@ -1049,7 +1049,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         else:
             schema = "("
             for column in columns:
-                schema += escape_sql_identifier(column.name, maxsplit=0)
+                schema += escape_sql_identifier(column.name or "", maxsplit=0)
                 if column.type_name is None:
                     type_name = "STRING"
                 else:
