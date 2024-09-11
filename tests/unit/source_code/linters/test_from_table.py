@@ -1,5 +1,5 @@
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 
 def test_not_migrated_tables_trigger_nothing(empty_index):

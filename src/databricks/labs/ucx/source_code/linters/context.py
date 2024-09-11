@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectPyLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLinter
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 
 class LinterContext:
