@@ -18,7 +18,7 @@ class AssessmentExport:
         self._sql_backend = sql_backend
         self._config = config
 
-    def export_results(self, prompts: Prompts) -> Path:
+    def export_results(self, prompts: Prompts):
         """Main method to export results to CSV files inside a ZIP archive."""
         valid_queries = {"azure", "estimates", "interactive", "main"}
 
@@ -47,8 +47,6 @@ class AssessmentExport:
         )
 
         # Export results
-        logger.info(f"Exporting assessment results to {export_path}")
+        logger.info("Exporting assessment results....")
         results_path = assessment_results.export_to_zipped_csv(self._sql_backend, export_path)
         logger.info(f"Results exported to {results_path}")
-
-        return results_path
