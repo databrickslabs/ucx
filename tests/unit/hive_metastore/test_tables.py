@@ -153,7 +153,7 @@ def test_uc_sql(table, target, query):
                 ("country", "STRING", ""),
                 ("# Partition Information", "", ""),
                 ("# col_name", "", ""),
-                ("country", "STRING", ""),
+                ("country", "", ""),
             ],
         ),
     ],
