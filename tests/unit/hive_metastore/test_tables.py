@@ -146,7 +146,7 @@ def test_uc_sql(table, target, query):
     ],
 )
 def test_uc_sql_when_table_is_in_mount(schema, table_schema):
-    expected = "CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` " f"{schema}  LOCATION 's3a://foo/bar';"
+    expected = f"CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` {schema}  LOCATION 's3a://foo/bar';"
     table = Table(
         catalog="catalog",
         database="db",
