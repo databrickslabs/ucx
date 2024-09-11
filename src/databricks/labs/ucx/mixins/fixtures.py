@@ -1016,6 +1016,19 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
+    def generate_sql_schema(columns: list[ColumnInfo]) -> str:
+        """Generate a SQL schema from columns."""
+        schema = "("
+        for index, column in enumerate(columns):
+            schema += escape_sql_identifier(column.name or str(index), maxsplit=0)
+            if column.type_name is None:
+                type_name = "STRING"
+            else:
+                type_name = column.type_name.value
+            schema += f" {type_name}, "
+        schema = schema[:-2] + ")"  # Remove the last ', '
+        return schema
+
     def create(  # pylint: disable=too-many-locals,too-many-arguments,too-many-statements
         *,
         catalog_name="hive_metastore",
@@ -1032,13 +1045,6 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         storage_override: str | None = None,
         columns: list[ColumnInfo] | None = None,
     ) -> TableInfo:
-        """Create a table for testing.
-
-        Raises:
-            ValueError : If any of the columns is missing a name.
-        """
-        if columns is not None and any(column.name is None for column in columns):
-            raise ValueError("A column is missing a name")
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
             catalog_name = schema.catalog_name
@@ -1054,17 +1060,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         if columns is None:
             schema = "(id INT, value STRING)"
         else:
-            schema = "("
-            for column in columns:
-                # The "" in the next line is only reached when column name is an empty string because of the column name
-                # check above; it is required for the linter.
-                schema += escape_sql_identifier(column.name or "", maxsplit=0)
-                if column.type_name is None:
-                    type_name = "STRING"
-                else:
-                    type_name = column.type_name.value
-                schema += f" {type_name}, "
-            schema = schema[:-2] + ")"  # Remove the last ', '
+            schema = generate_sql_schema(columns)
         if view:
             table_type = TableType.VIEW
             view_text = ctas
