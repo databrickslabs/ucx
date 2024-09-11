@@ -46,7 +46,8 @@ def test_folder_loads_content(mock_path_lookup, simple_dependency_resolver):
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     container = dependency.load(mock_path_lookup)
     container.build_dependency_graph(graph)
-    assert len(graph.all_paths) == 4
+    all_paths = [d.path for d in graph.all_dependencies]
+    assert len(all_paths) == 4
 
 
 def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependency_resolver):
