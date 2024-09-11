@@ -127,10 +127,28 @@ def test_uc_sql(table, target, query):
         assert table.sql_migrate_external(target) == query
 
 
-def test_uc_sql_when_table_is_in_mount():
+@pytest.mark.parametrize(
+    "schema,table_schema",
+    [
+        (
+            "(`id` INT, `value` STRING)",
+            [
+                ("id", "INT", ""),
+                ("value", "STRING", ""),
+            ]
+        ),
+        (
+            "(`column.with.periods` STRING)",
+            [
+                ("column.with.periods", "STRING", ""),
+            ]
+        ),
+    ]
+)
+def test_uc_sql_when_table_is_in_mount(schema, table_schema):
     expected = (
         "CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` "
-        "(`id` INT, `value` STRING)  LOCATION 's3a://foo/bar';"
+        f"{schema}  LOCATION 's3a://foo/bar';"
     )
     table = Table(
         catalog="catalog",
@@ -141,11 +159,6 @@ def test_uc_sql_when_table_is_in_mount():
         location="s3a://foo/bar",
     )
     target = "new_catalog.db.external_table"
-    table_schema = [
-        # ("col_name", "data_type", "comment"),
-        ("id", "INT", ""),
-        ("value", "STRING", ""),
-    ]
 
     assert table.sql_migrate_table_in_mount(target, table_schema) == expected
 

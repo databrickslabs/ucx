@@ -313,9 +313,9 @@ class Table:
                 next_fields_are_partitioned = True
                 continue
             if next_fields_are_partitioned:
-                partitioned_fields.append(escape_sql_identifier(key))
+                partitioned_fields.append(escape_sql_identifier(key, maxsplit=0))
             else:
-                fields.append(f"{escape_sql_identifier(key)} {value}")
+                fields.append(f"{escape_sql_identifier(key, maxsplit=0)} {value}")
 
         partitioned_str = ""
         if partitioned_fields:
