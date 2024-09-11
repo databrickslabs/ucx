@@ -7,7 +7,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist
+from databricks.sdk.errors import ResourceDoesNotExist, PermissionDenied
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
@@ -340,7 +340,7 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
         locations,
     )
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(PermissionDenied):
         aws_resource_permissions.create_uber_principal(prompts)
 
     assert len([cmd for cmd in command_calls if "delete-instance-profile" in cmd]) == 1
