@@ -1,10 +1,10 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Collection
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import partial
+from functools import partial, cached_property
 
 import sqlglot
 from sqlglot import expressions
@@ -357,15 +357,6 @@ class TablesCrawler(CrawlerBase):
             return [row[0] for row in self._fetch("SHOW DATABASES")]
         return self._include_database
 
-    def snapshot(self) -> list[Table]:
-        """
-        Takes a snapshot of tables in the specified catalog and database.
-
-        Returns:
-            list[Table]: A list of Table objects representing the snapshot of tables.
-        """
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
-
     def load_one(self, schema_name: str, table_name: str) -> Table | None:
         query = f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE database='{schema_name}' AND name='{table_name}' LIMIT 1"
         for row in self._fetch(query):
@@ -386,7 +377,7 @@ class TablesCrawler(CrawlerBase):
         # Convert key-value pairs to dictionary
         return dict(key_value_pairs)
 
-    def _try_load(self) -> Iterable[Table]:
+    def _try_fetch(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Table(*row)
@@ -481,3 +472,131 @@ class TablesCrawler(CrawlerBase):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None
+
+
+class FasterTableScanCrawler(CrawlerBase):
+    def _try_fetch(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Table(*row)
+
+    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+        self._backend = backend
+        self._include_database = include_databases
+
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        self._spark = SparkSession.builder.getOrCreate()
+
+    def snapshot(self) -> list[Table]:
+        """
+        Takes a snapshot of tables in the specified catalog and database.
+
+        Returns:
+            list[Table]: A list of Table objects representing the snapshot of tables.
+        """
+        return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def _try_load(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Table(*row)
+
+    @cached_property
+    def _external_catalog(self):
+        return self._spark._jsparkSession.sharedState().externalCatalog()  # pylint: disable=protected-access
+
+    def _iterator(self, result: typing.Any) -> Iterator:
+        iterator = result.iterator()
+        while iterator.hasNext():
+            yield iterator.next()
+
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return list(self._iterator(self._external_catalog.listDatabases()))
+        return self._include_database
+
+    def _list_tables(self, database: str) -> list[str]:
+        try:
+            return list(self._iterator(self._external_catalog.listTables(database)))
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Failed to list tables in {database}: {err}")
+            return []
+
+    @staticmethod
+    def _format_properties_list(properties_list: list) -> str:
+        if len(properties_list) == 0:
+            return ""
+        formatted_items: list[str] = []
+        for each_property in properties_list:
+            key = each_property.productElement(0)
+            value = each_property.productElement(1)
+
+            redacted_key = "*******"
+
+            if key == "personalAccessToken" or key.lower() == "password":
+                value = redacted_key
+            elif value is None:
+                value = "None"
+
+            formatted_items.append(f"{key}={value}")
+        return f"[{', '.join(formatted_items)}]"
+
+    def _describe(self, catalog, database, table) -> Table | None:
+        """Fetches metadata like table type, data format, external table location,
+        and the text of a view if specified for a specific table within the given
+        catalog and database.
+        """
+        full_name = f"{catalog}.{database}.{table}"
+        try:
+            raw_table = self._external_catalog.getTable(database, table)
+            table_format = raw_table.provider().getOrElse(None) or "UNKNOWN"
+            location_uri = raw_table.storage().locationUri().getOrElse(None)
+            if location_uri:
+                location_uri = location_uri.toString()
+            is_partitioned = len(list(self._iterator(raw_table.partitionColumnNames()))) > 0
+
+            return Table(
+                catalog='hive_metastore',
+                database=database,
+                name=table,
+                object_type=raw_table.tableType().name(),
+                table_format=table_format,
+                location=location_uri,
+                view_text=raw_table.viewText(),
+                storage_properties=self._format_properties_list(list(self._iterator(raw_table.properties()))),
+                is_partitioned=is_partitioned,
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Couldn't fetch information for table {full_name} : {e}")
+            return None
+
+    def _crawl(self) -> Iterable[Table]:
+        """Crawls and lists tables within the specified catalog and database."""
+        tasks = []
+        catalog_tables: Collection[Table] = []
+        catalog = "hive_metastore"
+        databases = self._all_databases()
+        for database in databases:
+            logger.info(f"Scanning {database}")
+            table_names = self._get_table_names(database)
+            tasks.extend(self._create_describe_tasks(catalog, database, table_names))
+        catalog_tables, errors = Threads.gather("describing tables in ", tasks)
+        if len(errors) > 0:
+            logger.warning(f"Detected {len(errors)} errors while scanning tables in ")
+        return catalog_tables
+
+    def _get_table_names(self, database: str) -> list[str]:
+        table_names = []
+        table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
+        for table_batch in table_names_batches:
+            table_names.extend(table_batch)
+        return table_names
+
+    def _create_describe_tasks(self, catalog: str, database: str, table_names: list[str]) -> list[partial]:
+        tasks = []
+        for table in table_names:
+            tasks.append(partial(self._describe, catalog, database, table))
+        return tasks

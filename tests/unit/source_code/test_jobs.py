@@ -1,15 +1,17 @@
 import io
+import itertools
 import logging
 import textwrap
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.jobs import Job, SparkPythonTask
+from databricks.sdk.service.jobs import Job, SparkPythonTask, JobSettings, Task
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
@@ -18,8 +20,13 @@ from databricks.sdk.service.sql import Query, ListQueryObjectsResponseQuery
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+    LineageAtom,
+)
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 
 
@@ -230,13 +237,12 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
     assert registered_notebooks == [expected_path_instance]
 
 
-def test_workflow_linter_lint_job_logs_problems(
-    dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler, caplog
-):
+def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler)
+    dfsas = create_autospec(DirectFsAccessCrawlers)
+    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, dfsas)
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test-task", libraries=libraries)
@@ -244,10 +250,10 @@ def test_workflow_linter_lint_job_logs_problems(
     job = jobs.Job(job_id=1234, settings=settings)
 
     ws.jobs.get.return_value = job
-
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         linter.lint_job(1234)
 
+    dfsas.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 
@@ -515,6 +521,26 @@ def test_xxx(graph):
     ws.assert_not_called()
 
 
+def test_full_lineage_is_converted_to_json():
+    ws = create_autospec(WorkspaceClient)
+    ws.assert_not_called()
+    task = Task(task_key="task-key")
+    settings = JobSettings(name="job-name")
+    job = create_autospec(jobs.Job)
+    job.job_id = "job-id"
+    job.settings = settings
+    wtask = WorkflowTask(ws, task, job)
+    full_lineage = list(itertools.chain(wtask.lineage, [LineageAtom("path", "abc"), LineageAtom("path", "xyz")]))
+    json_str = LineageAtom.atoms_to_json_string(full_lineage)
+    job.assert_not_called()
+    assert json_str == (
+        '[{"object_type": "job", "object_id": "job-id", "name": "job-name"}, '
+        '{"object_type": "task", "object_id": "task-key"}, '
+        '{"object_type": "path", "object_id": "abc"}, '
+        '{"object_type": "path", "object_id": "xyz"}]'
+    )
+
+
 @pytest.mark.parametrize(
     "name, query, dfsa_paths, is_read, is_write",
     [
@@ -537,15 +563,15 @@ def test_workflow_linter_collects_dfsas_from_queries(
     mock_path_lookup,
     simple_dependency_resolver,
     empty_index,
-    mock_dfsa_crawler,
 ):
     ws = create_autospec(WorkspaceClient)
+    crawlers = create_autospec(DirectFsAccessCrawlers)
     query = Query.from_dict({"parent_path": "workspace", "display_name": name, "query_text": query})
     response = ListQueryObjectsResponseQuery.from_dict(query.as_dict())
     ws.queries.list.return_value = iter([response])
-    linter = WorkflowLinter(ws, simple_dependency_resolver, mock_path_lookup, empty_index, mock_dfsa_crawler)
+    linter = WorkflowLinter(ws, simple_dependency_resolver, mock_path_lookup, empty_index, crawlers)
     dfsas = linter.collect_dfsas_from_queries()
+    crawlers.assert_not_called()
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
-    assert not any(dfsa for dfsa in dfsas if dfsa.source_type != "QUERY")
     assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)

@@ -16,7 +16,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -340,26 +339,73 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
 
 @dataclass
 class DirectFsAccess:
-    """A DFSA is a record describing a Direct File System Access"""
+    """A record describing a Direct File System Access"""
 
     UNKNOWN = "unknown"
 
-    source_type: str
-    source_id: str
     path: str
     is_read: bool
     is_write: bool
+    source_id: str = UNKNOWN
+    source_timestamp: int = -1
+    source_lineage: str = UNKNOWN
+    job_id: int = -1
+    job_name: str = UNKNOWN
+    task_key: str = UNKNOWN
+    assessment_start_timestamp: int = -1
+    assessment_end_timestamp: int = -1
 
-    @property
-    def key(self) -> str:
-        return f"{self.source_type}.{self.source_id}.{self.path}".lower()  # TODO for now
+    def replace_source(
+        self,
+        source_id: str | None = None,
+        source_lineage: str | None = None,
+        source_timestamp: int | None = None,
+    ):
+        return DirectFsAccess(
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_id=source_id or self.source_id,
+            source_timestamp=source_timestamp or self.source_timestamp,
+            source_lineage=source_lineage or self.source_lineage,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
+        )
 
-    @property
-    def safe_sql_key(self) -> str:
-        return escape_sql_identifier(self.key)
+    def replace_job_infos(
+        self,
+        job_id: int | None = None,
+        job_name: str | None = None,
+        task_key: str | None = None,
+    ):
+        return DirectFsAccess(
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_id=self.source_id,
+            source_timestamp=self.source_timestamp,
+            source_lineage=self.source_lineage,
+            job_id=job_id or self.job_id,
+            job_name=job_name or self.job_name,
+            task_key=task_key or self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
+        )
 
-    def __hash__(self) -> int:
-        return hash(self.key)
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, DirectFsAccess) and self.key == other.key
+    def replace_assessment_infos(self, assessment_start: int | None = None, assessment_end: int | None = None):
+        return DirectFsAccess(
+            path=self.path,
+            is_read=self.is_read,
+            is_write=self.is_write,
+            source_id=self.source_id,
+            source_timestamp=self.source_timestamp,
+            source_lineage=self.source_lineage,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
+            assessment_end_timestamp=assessment_end or self.assessment_start_timestamp,
+        )

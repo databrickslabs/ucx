@@ -107,8 +107,6 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
             # since we're normally filtering out spark calls, we're dealing with dfsas we know little about
             # notable we don't know is_read or is_write
             dfsa = DirectFsAccess(
-                source_type=DirectFsAccess.UNKNOWN,
-                source_id=DirectFsAccess.UNKNOWN,
                 path=value,
                 is_read=True,
                 is_write=False,
@@ -204,8 +202,6 @@ class DirectFsAccessSqlLinter(SqlLinter):
             is_read = cls._is_read(expression)
             is_write = cls._is_write(expression)
             yield DirectFsAccess(
-                source_type=DirectFsAccess.UNKNOWN,
-                source_id=DirectFsAccess.UNKNOWN,
                 path=path,
                 is_read=is_read,
                 is_write=is_write,

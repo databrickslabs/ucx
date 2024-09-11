@@ -15,7 +15,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
@@ -426,13 +426,13 @@ class GlobalContext(abc.ABC):
             self.dependency_resolver,
             self.path_lookup,
             MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
-            self.directfs_access_crawler,
+            self.directfs_access_crawlers,
             self.config.include_job_ids,
         )
 
     @cached_property
-    def directfs_access_crawler(self):
-        return DirectFsAccessCrawler(self.sql_backend, self.inventory_database)
+    def directfs_access_crawlers(self):
+        return DirectFsAccessCrawlers(self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self):

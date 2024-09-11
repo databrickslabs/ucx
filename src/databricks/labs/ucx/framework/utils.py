@@ -17,7 +17,7 @@ def escape_sql_identifier(path: str) -> str:
     if not path:
         return path
     parts = path.split(".", maxsplit=2)
-    escaped = [f"`{part.strip('`')}`" for part in parts]
+    escaped = [f"`{part.strip('`').replace('`', '``')}`" for part in parts]
     return ".".join(escaped)
 
 

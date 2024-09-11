@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import itertools
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -289,7 +291,7 @@ class DependencyGraphContext:
     session_state: CurrentSessionState
 
 
-class Dependency(abc.ABC):
+class Dependency:
 
     def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
@@ -315,6 +317,10 @@ class Dependency(abc.ABC):
 
     def __repr__(self):
         return f"Dependency<{self.path}>"
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        return [LineageAtom("path", str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -584,6 +590,23 @@ class InheritedContext:
         return InheritedContext(tree, self.found)
 
 
+@dataclass
+class LineageAtom:
+
+    @staticmethod
+    def atoms_to_json_string(atoms: list[LineageAtom]):
+        json_lists = list(lineage.as_objects() for lineage in atoms)
+        json_obj = list(itertools.chain(*json_lists))
+        return json.dumps(json_obj)
+
+    object_type: str
+    object_id: str
+    other: dict[str, str] | None = None
+
+    def as_objects(self) -> list[dict[str, str]]:
+        return [{"object_type": self.object_type, "object_id": self.object_id, **(self.other or {})}]
+
+
 T = TypeVar("T")
 
 
@@ -593,6 +616,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._graph = graph
         self._walked_paths = walked_paths
         self._path_lookup = path_lookup
+        self._lineage: list[Dependency] = []
 
     def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:
@@ -604,6 +628,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
         if dependency.path in self._walked_paths:
             return
+        self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
         if dependency.path.is_file() or is_a_notebook(dependency.path):
@@ -616,6 +641,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
                 child_graph = maybe_graph.graph
                 for child_dependency in child_graph.local_dependencies:
                     yield from self._iter_one(child_dependency, child_graph, root_path)
+        self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency):
         logger.debug(f'Analyzing dependency: {dependency}')
@@ -624,3 +650,8 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
     ) -> Iterable[T]: ...
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        lineages = [dependency.lineage for dependency in self._lineage]
+        return list(itertools.chain(*lineages))
