@@ -659,12 +659,16 @@ def test_migrate_table_in_mount(
         connect=ws.config,
     )
     runtime_ctx = runtime_ctx.replace(config=config)
-    tbl_path = make_random(4).lower()
-    src_external_table = runtime_ctx.make_table(
-        schema_name=make_schema(catalog_name="hive_metastore", name=f'mounted_{env_or_skip("TEST_MOUNT_NAME")}').name,
-        external_delta=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{tbl_path}',
+    table_path = make_random(4).lower()
+    src_schema = make_schema(
+        catalog_name="hive_metastore",
+        name=f"mounted_{env_or_skip('TEST_MOUNT_NAME')}_{table_path}",
     )
-    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
+    src_external_table = runtime_ctx.make_table(
+        schema_name=src_schema.name,
+        external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
+    )
+    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
     # TODO: Remove this hack below
     # This is done because we have to create the external table in a mount point, but TablesInMounts() has to use the adls/ path
     # Otherwise, if we keep the dbfs:/ path, the entire logic of TablesInMounts won't work
@@ -678,7 +682,7 @@ def test_migrate_table_in_mount(
             Rule(
                 "workspace",
                 dst_catalog.name,
-                f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
+                src_schema.name,
                 dst_schema.name,
                 table_in_mount_location,
                 src_external_table.name,

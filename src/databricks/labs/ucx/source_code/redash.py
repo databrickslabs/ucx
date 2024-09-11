@@ -10,7 +10,7 @@ from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 logger = logging.getLogger(__name__)
 

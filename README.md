@@ -122,6 +122,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`validate-table-locations` command](#validate-table-locations-command)
   * [`cluster-remap` command](#cluster-remap-command)
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
+  * [`upload` command](#upload-command)
+  * [`download` command](#download-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
@@ -364,8 +366,6 @@ It identifies incompatible entities and provides information necessary for plann
 the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators.
 The output of each task is stored in Delta tables in the `$inventory_database` schema, that you specify during [installation](#install-ucx),
 which can be used for further analysis and decision-making through the [assessment report](docs/assessment.md).
-The assessment workflow can be executed multiple times to ensure that all incompatible entities are identified and accounted
-for before starting the migration process.
 
 1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a Delta table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
 2. `crawl_grants`: This task scans the Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS` statement for every object to retrieve the permissions assigned to it. The permissions include information such as the principal, action type, and the table it applies to. This task persists the permissions in the Delta table `$inventory_database.grants`.
@@ -381,6 +381,8 @@ for before starting the migration process.
 ![report](docs/assessment-report.png)
 
 After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
+
+The UCX assessment workflow is intended to only run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx) and [installing](#install-ucx) it again.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1694,6 +1696,27 @@ cluster configurations to original one.This will also ask the user to provide th
 By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
+
+## `upload` command
+
+```text
+$ databricks labs ucx upload --file <file_path> --run-as-collection True
+21:31:29 WARNING [d.labs.ucx] The schema of CSV files is NOT validated, ensure it is correct
+21:31:29 INFO [d.labs.ucx] Finished uploading: <file_path>
+```
+
+Upload a file to a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when uploading the same file to multiple workspaces.
+
+## `download` command
+
+```text
+$ databricks labs ucx download --file <file_path> --run-as-collection True
+21:31:29 INFO [d.labs.ucx] Finished downloading: <file_path>
+```
+
+Download a csv file from a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when downloading the same file from multiple workspaces.
 
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.

@@ -1,3 +1,4 @@
+from io import BytesIO
 import json
 import webbrowser
 from pathlib import Path
@@ -8,6 +9,7 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -16,6 +18,8 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCh
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+
+from databricks.labs.ucx.assessment.export import AssessmentExport
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -26,9 +30,10 @@ CANT_FIND_UCX_MSG = (
 )
 
 
-def get_contexts(
+def _get_workspace_contexts(
     w: WorkspaceClient, a: AccountClient | None = None, run_as_collection: bool = False, **named_parameters
 ) -> list[WorkspaceContext]:
+    """Get workspace contexts to the workspaces for which the user has access"""
     if not a:
         a = AccountClient(product='ucx', product_version=__version__)
     account_installer = AccountInstaller(a)
@@ -167,9 +172,9 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
+def ensure_assessment_run(w: WorkspaceClient, *, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
-    workspace_contexts = get_contexts(w, a, run_as_collection)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
     skip_job_status = bool(run_as_collection)
     for ctx in workspace_contexts:
@@ -307,7 +312,7 @@ def principal_prefix_access(
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass subscription_id for azure and aws_profile for aws."""
-    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
     if ctx:
         workspace_contexts = [ctx]
     if w.config.is_azure:
@@ -390,7 +395,7 @@ def migrate_credentials(
     Please review the file and delete the Roles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    workspace_contexts = get_contexts(w, a, run_as_collection, **named_parameters)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
     if ctx:
         workspace_contexts = [ctx]
     if w.config.is_azure:
@@ -573,6 +578,65 @@ def export_assessment(w: WorkspaceClient, prompts: Prompts, path: Path | None = 
 
 
 @ucx.command
+def upload(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,  # Only used while testing
+):
+    """Upload a file to the (collection of) workspace(s)"""
+    file = Path(file)
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
+    logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
+    for ctx in contexts:
+        ctx.installation.upload(file.name, file.read_bytes())
+    if len(contexts) > 0:
+        logger.info(f"Finished uploading {file}")
+
+
+@ucx.command
+def download(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,  # Only used while testing
+):
+    """Download and merge a CSV file from the ucx installation in a (collection of) workspace(s)"""
+    file = Path(file)
+    if file.suffix != ".csv":
+        raise ValueError("Command only supported for CSV files")
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
+    csv_header = None
+    with file.open("wb") as output:
+        for ctx in contexts:
+            remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
+            try:
+                # Installation does not have a download method
+                data = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
+            except NotFound:
+                logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
+                continue
+            input_ = BytesIO()  # BytesIO supports .readline() to read the header, where StreamingResponse does not
+            input_.write(data.rstrip(b"\n"))
+            input_.seek(0)  # Go back to the beginning of the file
+            csv_header_next = input_.readline()
+            if csv_header is None:
+                csv_header = csv_header_next
+                output.write(csv_header)
+            elif csv_header == csv_header_next:
+                output.write(b"\n")
+            else:
+                raise ValueError("CSV files have different headers")
+            output.write(input_.read())
+    if csv_header is None:
+        logger.warning("No file(s) to download found")
+    if file.is_file() and file.stat().st_size == 0:
+        file.unlink()
+    else:
+        logger.info(f"Finished downloading {file}")
+
+
+@ucx.command
 def lint_local_code(
     w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
 ):
@@ -581,6 +645,15 @@ def lint_local_code(
         ctx = LocalCheckoutContext(w)
     linter: LocalCodeLinter = ctx.local_code_linter
     linter.lint(prompts, None if path is None else Path(path))
+
+
+@ucx.command
+def export_assessment(w: WorkspaceClient, prompts: Prompts):
+    """Export the UCX assessment queries to a zip file."""
+    ctx: WorkspaceContext = WorkspaceContext(w)
+    export: AssessmentExport = AssessmentExport(ctx.sql_backend, ctx.config)
+
+    export.export_results(prompts)
 
 
 if __name__ == "__main__":

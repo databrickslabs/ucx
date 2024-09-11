@@ -54,7 +54,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path, CurrentSessionState())
     assert not maybe.problems
     assert maybe.graph is not None
-    assert len(maybe.graph.all_paths) == expected
+    all_paths = [d.path for d in maybe.graph.all_dependencies]
+    assert len(all_paths) == expected
 
 
 @pytest.mark.parametrize(
@@ -119,7 +120,8 @@ sys.path.append('{child_dir_path.as_posix()}')
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
         assert maybe.graph is not None
-        assert len(maybe.graph.all_paths) == 2
+        all_paths = [d.path for d in maybe.graph.all_dependencies]
+        assert len(all_paths) == 2
 
 
 def test_locates_files_with_absolute_path():

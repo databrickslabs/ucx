@@ -959,6 +959,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     assert sql_backend.queries == [
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
+        "COMMENT ON TABLE `hive_metastore`.`db1_src`.`managed_dbfs` IS 'This table is deprecated. Please use `ucx_default.db1_dst.managed_dbfs` instead of `hive_metastore.db1_src.managed_dbfs`.';",
         "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
     ]
 

@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import time
 from pathlib import Path
 from unittest.mock import create_autospec, patch, Mock
@@ -11,12 +12,13 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
-from databricks.sdk.service import iam, jobs, sql
+from databricks.sdk.service import jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ExportFormat, ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -31,6 +33,7 @@ from databricks.labs.ucx.cli import (
     create_missing_principals,
     create_table_mapping,
     create_uber_principal,
+    download,
     ensure_assessment_run,
     installations,
     join_collection,
@@ -51,10 +54,12 @@ from databricks.labs.ucx.cli import (
     show_all_metastores,
     skip,
     sync_workspace_info,
+    upload,
     validate_external_locations,
     validate_groups_membership,
     workflows,
     delete_missing_principals,
+    export_assessment,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -64,8 +69,13 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
-@pytest.fixture
-def ws():
+def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
+    # This function is meant to cover the setup for the tests below, it is not intended to be more flexibile than that.
+    # If you want to create mocks with other workspace ids, please update the list below with **all** workspace ids
+    # used by the tests
+    installed_workspace_ids = [123, 456]
+    assert workspace_id in installed_workspace_ids
+
     state = {
         "/Users/foo/.ucx/config.yml": yaml.dump(
             {
@@ -76,6 +86,7 @@ def ws():
                     'host': 'foo',
                     'token': 'bar',
                 },
+                'installed_workspace_ids': installed_workspace_ids,
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -100,7 +111,7 @@ def ws():
 """,
     }
 
-    def download(path: str) -> io.StringIO | io.BytesIO:
+    def mock_download(path: str, **_) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
         if ".csv" in path or ".log" in path:
@@ -108,16 +119,45 @@ def ws():
         return io.StringIO(state[path])
 
     workspace_client = create_autospec(WorkspaceClient)
-    workspace_client.get_workspace_id.return_value = 123
+    workspace_client.get_workspace_id.return_value = workspace_id
     workspace_client.config.host = 'https://localhost'
-    workspace_client.current_user.me().user_name = "foo"
-    workspace_client.workspace.download = download
+    workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    workspace_client.workspace.download.side_effect = mock_download
     workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
         statement_id='123',
     )
     return workspace_client
+
+
+@pytest.fixture
+def ws() -> WorkspaceClient:
+    return create_workspace_client_mock(123)
+
+
+@pytest.fixture
+def ws2() -> WorkspaceClient:
+    return create_workspace_client_mock(456)
+
+
+@pytest.fixture
+def workspace_clients(ws, ws2) -> list[WorkspaceClient]:
+    return [ws, ws2]
+
+
+@pytest.fixture
+def acc_client(acc_client: Mock, workspace_clients: list[WorkspaceClient]) -> Mock:
+    acc_client.workspaces.get.side_effect = lambda workspace_id: Workspace(workspace_id=workspace_id)
+
+    def get_workspace_client(workspace: Workspace) -> WorkspaceClient:
+        workspace_client = [ws for ws in workspace_clients if ws.get_workspace_id() == workspace.workspace_id]
+        if len(workspace_client) == 0:
+            raise NotFound(f"Workspace not found: {workspace.workspace_id}")
+        return workspace_client[0]
+
+    acc_client.get_workspace_client.side_effect = get_workspace_client
+    return acc_client
 
 
 def test_workflow(ws, caplog):
@@ -133,7 +173,7 @@ def test_open_remote_config(ws):
 
 
 def test_installations(ws, capsys):
-    ws.users.list.return_value = [iam.User(user_name='foo')]
+    ws.users.list.return_value = [User(user_name='foo')]
     installations(ws)
     assert '{"database": "ucx", "path": "/Users/foo/.ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
@@ -178,6 +218,25 @@ def test_sync_workspace_info():
     a = create_autospec(AccountClient)
     sync_workspace_info(a)
     a.workspaces.list.assert_called()
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_upload(tmp_path, workspace_clients, acc_client, run_as_collection):
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    test_file = tmp_path / "test.txt"
+    content = b"test"
+    test_file.write_bytes(content)
+
+    upload(test_file, workspace_clients[0], run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.workspace.upload.assert_called_with(
+            f"/Users/foo/.ucx/{test_file.name}",
+            content,
+            format=ImportFormat.AUTO,
+            overwrite=True,
+        )
 
 
 def test_create_account_groups():
@@ -227,9 +286,11 @@ def test_ensure_assessment_run(ws, acc_client):
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_ensure_assessment_run_collection(ws, acc_client):
-    ensure_assessment_run(ws, True, acc_client)
-    acc_client.workspaces.get.assert_called_once()
+def test_ensure_assessment_run_collection(workspace_clients, acc_client):
+    ensure_assessment_run(workspace_clients[0], run_as_collection=True, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.run_now.assert_called_with(123)
 
 
 def test_repair_run(ws):
@@ -571,7 +632,6 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog):
 
 def test_cluster_remap(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
     ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
     ws.clusters.list.return_value = [
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
@@ -583,23 +643,22 @@ def test_cluster_remap(ws, caplog):
 
 def test_cluster_remap_error(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = []
     cluster_remap(ws, prompts)
     assert "No cluster information present in the workspace" in caplog.messages
 
 
-def test_revert_cluster_remap(ws, caplog, mocker):
+def test_revert_cluster_remap(caplog):
+    # TODO: What is this test supposed to test? Why do we expect a TypeError below?
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.list.return_value = [ObjectInfo(path='/ucx/backup/clusters/123.json')]
+    workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.workspace.list.return_value = [ObjectInfo(path='/ucx/backup/clusters/123.json')]
     with pytest.raises(TypeError):
-        revert_cluster_remap(ws, prompts)
+        revert_cluster_remap(workspace_client, prompts)
 
 
 def test_revert_cluster_remap_empty(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    ws = create_autospec(WorkspaceClient)
     revert_cluster_remap(ws, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
     ws.workspace.list.assert_called_once()
@@ -752,6 +811,75 @@ def test_join_collection():
     w.workspace.download.assert_not_called()
 
 
+def test_download_raises_value_error_if_not_downloading_a_csv(ws):
+    with pytest.raises(ValueError) as e:
+        download(Path("test.txt"), ws)
+    assert "Command only supported for CSV files" in str(e)
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_download_calls_workspace_download(tmp_path, workspace_clients, acc_client, run_as_collection):
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+
+    download(
+        tmp_path / "test.csv",
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.workspace.download.assert_called_with(
+            "/Users/foo/.ucx/test.csv",
+            format=ExportFormat.AUTO,
+        )
+
+
+def test_download_warns_if_file_not_found(caplog, ws, acc_client):
+    ws.workspace.download.side_effect = NotFound("test.csv")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.cli"):
+        download(
+            Path("test.csv"),
+            ws,
+            run_as_collection=False,
+            a=acc_client,
+        )
+    assert "File not found for https://localhost: /Users/foo/.ucx/test.csv" in caplog.messages
+    assert "No file(s) to download found" in caplog.messages
+
+
+def test_download_deletes_empty_file(tmp_path, ws, acc_client):
+    ws.workspace.download.side_effect = NotFound("test.csv")
+    mapping_path = tmp_path / "mapping.csv"
+    download(
+        mapping_path,
+        ws,
+        run_as_collection=False,
+        a=acc_client,
+    )
+    assert not mapping_path.is_file()
+
+
+def test_download_has_expected_content(tmp_path, workspace_clients, acc_client):
+    expected = (
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table"
+        "\ntest,test,test,test,test,test"
+        "\ntest,test,test,test,test,test"
+    )
+    mapping_path = tmp_path / "mapping.csv"
+
+    download(
+        mapping_path,
+        workspace_clients[0],
+        run_as_collection=True,
+        a=acc_client,
+    )
+
+    content = mapping_path.read_text()
+    assert content == expected
+
+
 def test_delete_principals(ws):
     ws.config.is_azure = False
     ws.config.is_aws = True
@@ -760,3 +888,12 @@ def test_delete_principals(ws):
     prompts = MockPrompts({"Select the list of roles *": "0"})
     delete_missing_principals(ws, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
+
+def test_export_assessment(ws, tmp_path):
+    mock_prompts = MockPrompts({
+            "Choose a path to save the UCX Assessment results": tmp_path.as_posix(),
+            "Choose which assessment results to export": "main",
+        })
+
+    export_assessment(ws, mock_prompts)
+    assert len(list(tmp_path.glob("export_to_zipped_csv.zip"))) == 1

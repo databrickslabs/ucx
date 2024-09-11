@@ -275,5 +275,27 @@ commands:
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
 
+  - name: upload
+    description: upload file to all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to upload
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
+
+  - name: download
+    description: download file from all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to download
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
+
   - name: export-assessment
-    description: export widget data from the assessment to see tabular data output
+    description: Export UCX results to a specified location
+    flags:
+      - name: path
+        description: choose a path to save the results. If not specified, ucx will be saved in the current directory.
+      - name: what
+        description: choose which results to export. If not specified, Assessment (Main) results will be exported.
+          Options to export azure, estimates, interactive, main.

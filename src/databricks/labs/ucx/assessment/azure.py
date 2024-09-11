@@ -12,6 +12,7 @@ from databricks.labs.ucx.assessment.crawlers import azure_sp_conf_present_check,
 from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.assessment.secrets import SecretsMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 _STORAGE_ACCOUNT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 
@@ -45,7 +46,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
         self._ws = ws
 
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield AzureServicePrincipalInfo(*row)
 
     def _crawl(self) -> Iterable[AzureServicePrincipalInfo]:

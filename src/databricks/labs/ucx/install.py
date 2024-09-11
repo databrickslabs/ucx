@@ -175,7 +175,6 @@ class WorkspaceInstaller(WorkspaceContext):
     def run(
         self,
         default_config: WorkspaceConfig | None = None,
-        verify_timeout=timedelta(minutes=2),
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
@@ -191,7 +190,6 @@ class WorkspaceInstaller(WorkspaceContext):
                 self.workspace_client,
                 self.wheels,
                 self.product_info,
-                verify_timeout,
                 self._tasks,
             )
             workspace_installation = WorkspaceInstallation(
@@ -468,11 +466,8 @@ class WorkspaceInstallation(InstallationMixin):
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
-        timeout = timedelta(minutes=2)
         tasks = Workflows.all().tasks()
-        workflows_installer = WorkflowsDeployment(
-            config, installation, install_state, ws, wheels, product_info, timeout, tasks
-        )
+        workflows_installer = WorkflowsDeployment(config, installation, install_state, ws, wheels, product_info, tasks)
 
         return cls(
             config,
