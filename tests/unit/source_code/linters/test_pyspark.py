@@ -9,8 +9,9 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
-from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter, SparkSqlPyLinter
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter
 
 
 def test_spark_no_sql(empty_index):
