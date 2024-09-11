@@ -1,17 +1,23 @@
+from typing import cast
+
 import pytest
 
 from astroid import Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
+from databricks.sdk.service.workspace import Language
+
+from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
-from databricks.labs.ucx.source_code.linters.pyspark import TableNameMatcher, SparkSqlPyLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter
 
 
 def test_spark_no_sql(empty_index):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
 
     assert not list(sqf.lint("print(1)"))
 
@@ -23,14 +29,14 @@ df4.write.saveAsTable(f"{schema}.member_measure")
 """
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     assert not list(sqf.lint(source))
 
 
 def test_spark_sql_no_match(empty_index):
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    context = LinterContext(empty_index, CurrentSessionState())
+    sql_linter = context.linter(Language.SQL)
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
 
     old_code = """
 for i in range(10):
@@ -38,60 +44,49 @@ for i in range(10):
     print(len(result))
 """
 
-    assert not list(sqf.lint(old_code))
+    assert not list(spark_linter.lint(old_code))
 
 
 def test_spark_sql_match(migration_index):
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, migration_index, session_state)
-
-    old_code = """
-spark.read.csv("s3://bucket/path")
-for i in range(10):
-    result = spark.sql("SELECT * FROM old.things").collect()
-    print(len(result))
+    context = LinterContext(migration_index, CurrentSessionState())
+    sql_linter = context.linter(Language.SQL)
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
+    python_code = """
+spark.sql("SELECT * FROM old.things")
+spark.sql("SELECT * FROM csv.`s3://bucket/path`")
 """
-    assert list(sqf.lint(old_code)) == [
-        Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: s3://bucket/path',
-            start_line=1,
-            start_col=0,
-            end_line=1,
-            end_col=34,
-        ),
+    advices = list(spark_linter.lint(python_code))
+    assert [
         Deprecation(
             code='table-migrated-to-uc',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=3,
-            start_col=13,
-            end_line=3,
-            end_col=50,
+            start_line=1,
+            start_col=0,
+            end_line=1,
+            end_col=37,
         ),
-    ]
+        Deprecation(
+            code='direct-filesystem-access-in-sql-query',
+            message='The use of direct filesystem references is deprecated: s3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=49,
+        ),
+    ] == advices
 
 
 def test_spark_sql_match_named(migration_index):
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, migration_index, session_state)
-
+    context = LinterContext(migration_index, CurrentSessionState())
+    sql_linter = context.linter(Language.SQL)
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
     old_code = """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code)) == [
-        Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=1,
-            start_col=0,
-            end_line=1,
-            end_col=34,
-        ),
+    assert list(spark_linter.lint(old_code)) == [
         Deprecation(
             code='table-migrated-to-uc',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -106,7 +101,7 @@ for i in range(10):
 def test_spark_table_return_value_apply(migration_index):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, migration_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, migration_index, session_state)
     old_code = """spark.read.csv('s3://bucket/path')
 for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
@@ -115,17 +110,17 @@ for table in spark.catalog.listTables():
     assert fixed_code.rstrip() == old_code.rstrip()
 
 
-def test_spark_sql_fix(migration_index):
+def test_spark_sql_tablename_fix(migration_index):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(migration_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, migration_index, session_state)
+    spark_linter = SparkSqlPyLinter(ftf, ftf)
 
     old_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    fixed_code = sqf.apply(old_code)
+    fixed_code = spark_linter.apply(old_code)
     assert (
         fixed_code.rstrip()
         == """spark.read.csv('s3://bucket/path')
@@ -542,7 +537,7 @@ for i in range(10):
 def test_spark_cloud_direct_access(empty_index, code, expected):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     advisories = list(sqf.lint(code))
     assert advisories == expected
 
@@ -562,7 +557,7 @@ FS_FUNCTIONS = [
 def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/Workspace/bucket/path")"""
     advisories = list(sqf.lint(code))
@@ -573,7 +568,7 @@ def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_functi
 def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkSqlPyLinter(ftf, empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/Volumes/bucket/path")"""
     advisories = list(sqf.lint(code))
@@ -621,7 +616,7 @@ def test_get_full_function_name_for_non_method():
 
 def test_apply_table_name_matcher_with_missing_constant(migration_index):
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
-    matcher = TableNameMatcher('things', 1, 1, 0)
+    matcher = SparkCallMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('some.things')")
     node = tree.first_statement()
     assert isinstance(node, Expr)
@@ -634,7 +629,7 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index):
 
 def test_apply_table_name_matcher_with_existing_constant(migration_index):
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
-    matcher = TableNameMatcher('things', 1, 1, 0)
+    matcher = SparkCallMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('old.things')")
     node = tree.first_statement()
     assert isinstance(node, Expr)
