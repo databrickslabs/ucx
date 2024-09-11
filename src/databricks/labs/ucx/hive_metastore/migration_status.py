@@ -135,7 +135,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
             yield table_migration_status
 
     def _try_fetch(self) -> Iterable[MigrationStatus]:
-        for row in self._fetch(f"SELECT * FROM {self._catalog}.{self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield MigrationStatus(*row)
 
     def _iter_schemas(self):
