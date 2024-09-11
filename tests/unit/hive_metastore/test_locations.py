@@ -329,7 +329,7 @@ def test_mount_listing_multiple_folders():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
         Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
@@ -368,7 +368,7 @@ def test_mount_listing_sub_folders():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -409,7 +409,7 @@ def test_partitioned_parquet_layout():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -466,7 +466,7 @@ def test_partitioned_delta():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 2
     assert results[0].table_format == "DELTA"
     assert results[0].is_partitioned
@@ -499,7 +499,8 @@ def test_filtering_irrelevant_paths():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"]).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"])
+    results = crawler.snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
     ]
@@ -532,7 +533,8 @@ def test_filter_irrelevant_mounts():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"]).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"])
+    results = crawler.snapshot(force_refresh=True)
 
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
@@ -569,7 +571,7 @@ def test_historical_data_should_be_overwritten():
         }
     )
     mounts = Mounts(backend, client, "test")
-    TablesInMounts(backend, client, "test", mounts).snapshot()
+    TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert backend.rows_written_for("hive_metastore.test.tables", "overwrite") == [
         Row(
             catalog='hive_metastore',
@@ -624,9 +626,8 @@ def test_mount_include_paths():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(
-        backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"]
-    ).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"])
+    results = crawler.snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
     ]
@@ -663,7 +664,7 @@ def test_mount_listing_csv_json():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -713,7 +714,7 @@ def test_mount_listing_seen_tables():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 3
     assert results[0].location == "adls://bucket/table1"
     assert results[1].location == "dbfs:/mnt/test_mount/table2"

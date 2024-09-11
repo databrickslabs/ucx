@@ -335,6 +335,14 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
+    """Experimental scanner for tables that can be found on mounts.
+
+    This crawler was developed with a specific use-case in mind and isn't currently in use. It does not conform to the
+    design of other crawlers. In particular:
+     - It depends on the `tables` inventory, but without verifying the tables crawler has run.
+     - Rather than have its own table it will blindly overwrite the existing content of the tables inventory.
+    """
+
     TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
@@ -359,21 +367,20 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
-    def snapshot(self, *, force_refresh: bool = True) -> list[Table]:
-        # TODO: Figure out what this should do (and refactor); non-trivial due to it overwriting the static table data.
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
         if not force_refresh:
-            logger.warning("The tables-in-mounts crawler always refreshes, and overwrites the static table inventory.")
-        updated_records = self._crawl()
-        self._overwrite_records(updated_records)
-        return updated_records
+            msg = "This crawler only supports forced refresh; refer to source implementation for details."
+            raise NotImplementedError(msg)
+        return list(super().snapshot(force_refresh=force_refresh))
 
     def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
-        cached_results = []
         try:
             cached_results = list(self._try_fetch())
         except NotFound:
-            pass
+            # This happens when the table crawler hasn't run yet, and is arguably incorrect:
+            # rather than pretending there are no tables it should instead trigger a crawl.
+            cached_results = []
         table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
         loaded_records = list(self._crawl_tables(table_paths))
