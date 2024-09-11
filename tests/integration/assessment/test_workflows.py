@@ -31,3 +31,4 @@ def test_running_real_assessment_job(
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
 
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
+
