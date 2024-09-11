@@ -54,6 +54,7 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoad
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -429,6 +430,10 @@ class GlobalContext(abc.ABC):
             self.directfs_access_crawlers,
             self.config.include_job_ids,
         )
+
+    @cached_property
+    def query_linter(self):
+        return QueryLinter(self.workspace_client, self.directfs_access_crawlers)
 
     @cached_property
     def directfs_access_crawlers(self):
