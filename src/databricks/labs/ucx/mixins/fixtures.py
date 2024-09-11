@@ -56,6 +56,7 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
@@ -1046,7 +1047,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         if columns is None:
             schema = "(id INT, value STRING)"
         else:
-            schema = "(" + ", ".join(f"`{column.name}` {column.type_name.value}" for column in columns) + ")"
+            schema = ", ".join(escape_sql_identifier(column.name) + " " + column.type_name.value for column in columns)
+            schema = f"({schema})"
         if view:
             table_type = TableType.VIEW
             view_text = ctas
