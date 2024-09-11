@@ -32,7 +32,7 @@ def test_export(tmp_path):
     )
 
     # Execute export process
-    export = AssessmentExport(mock_backend, config)
+    export = AssessmentExporter(mock_backend, config)
     exported = export.export_results(mock_prompts)
 
     # Assertions

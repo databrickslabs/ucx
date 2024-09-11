@@ -10,7 +10,7 @@ from databricks.labs.lsql.dashboards import DashboardMetadata
 logger = logging.getLogger(__name__)
 
 
-class AssessmentExport:
+class AssessmentExporter:
     # File and Path Constants
     _EXPORT_FILE_NAME = "ucx_assessment_results.zip"
 
