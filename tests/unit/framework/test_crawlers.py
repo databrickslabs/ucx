@@ -127,6 +127,8 @@ def test_snapshot_force_refresh_replaces_prior_data() -> None:
 
     cb.snapshot(force_refresh=True)
 
+    mock_fetcher.assert_not_called()
+    mock_loader.assert_called_once()
     assert [Row(first="second", second=None)] == mock_backend.rows_written_for("a.b.c", mode="overwrite")
 
 
