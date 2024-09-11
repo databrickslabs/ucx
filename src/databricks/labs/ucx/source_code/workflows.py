@@ -11,4 +11,3 @@ class ExperimentalWorkflowLinter(Workflow):
         """[EXPERIMENTAL] Analyses all jobs for source code compatibility problems. This is an experimental feature,
         that is not yet fully supported."""
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
-
