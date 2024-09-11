@@ -662,11 +662,11 @@ def test_migrate_table_in_mount(
     table_path = make_random(4).lower()
     src_schema = make_schema(
         catalog_name="hive_metastore",
-        name=f"mounted_{env_or_skip("TEST_MOUNT_NAME")}_{table_path}",
+        name=f"mounted_{env_or_skip('TEST_MOUNT_NAME')}_{table_path}",
     )
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
-        external_delta=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{table_path}',
+        external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
     )
     table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
     # TODO: Remove this hack below
