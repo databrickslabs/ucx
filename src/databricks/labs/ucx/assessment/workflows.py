@@ -11,7 +11,6 @@ class Assessment(Workflow):
     def __init__(self):
         super().__init__('assessment')
 
-    # @job_task(notebook="hive_metastore/tables.scala")
     @job_task
     def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
@@ -19,8 +18,6 @@ class Assessment(Workflow):
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
         stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
         cannot easily be migrated to Unity Catalog."""
-        # if ctx.config.use_experimental_tables_scan:
-        #     self.crawl_tables.job_task["notebook"] = None
         ctx.faster_table_scan_crawler.snapshot()
 
     @job_task
