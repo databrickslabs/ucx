@@ -14,11 +14,6 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup, Migration
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 
-@pytest.fixture
-def mock_backend():
-    return MockBackend()
-
-
 def test_inventory_permission_manager_init(mock_backend):
     permission_manager = PermissionManager(mock_backend, "test_database", [])
 
