@@ -1,5 +1,4 @@
 import logging
-from datetime import timedelta
 from unittest import mock
 
 import pytest
@@ -32,7 +31,6 @@ def workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=10),
         [],
     )
     return WorkspaceInstallation(

@@ -44,6 +44,10 @@ class DependencyGraph:
     def dependency(self):
         return self._dependency
 
+    @property
+    def dependencies(self):
+        return self._dependencies
+
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
 
@@ -172,13 +176,6 @@ class DependencyGraph:
     def local_dependencies(self) -> set[Dependency]:
         return {child.dependency for child in self._dependencies.values()}
 
-    @property
-    def all_paths(self) -> set[Path]:
-        # TODO: remove this public method, as it'll throw false positives
-        # for package imports, like certifi. a WorkflowTask is also a dependency,
-        # but it does not exist on a filesystem
-        return {d.path for d in self.all_dependencies}
-
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
         return self._relative_names(self.all_dependencies)
@@ -203,20 +200,13 @@ class DependencyGraph:
         """This method is intended to simplify testing"""
         return self._relative_names(self.root_dependencies)
 
-    # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
-        """provide visited set if you want to ensure nodes are only visited once"""
-        if visited is not None:
-            path = self.dependency.path
-            if path in visited:
-                return False
-            visited.add(path)
-        if visit_node(self):
-            return True
-        for dependency in self._dependencies.values():
-            if dependency.visit(visit_node, visited):
-                return True
-        return False
+        """ "
+        when visit_node returns True it interrupts the visit
+        provide visited set if you want to ensure nodes are only visited once
+        """
+        visitor = DependencyGraphVisitor(visit_node, visited)
+        return visitor.visit(self)
 
     def new_dependency_graph_context(self):
         return DependencyGraphContext(
@@ -281,6 +271,31 @@ class DependencyGraph:
 
     def __repr__(self):
         return f"<DependencyGraph {self.dependency.path}>"
+
+
+class DependencyGraphVisitor:
+
+    def __init__(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None):
+        self._visit_node = visit_node
+        self._visited = visited
+        self._visited_pairs: set[tuple[Path, Path]] = set()
+
+    def visit(self, graph: DependencyGraph) -> bool:
+        path = graph.dependency.path
+        if self._visited is not None:
+            if path in self._visited:
+                return False
+            self._visited.add(path)
+        if self._visit_node(graph):
+            return True
+        for dependency_graph in graph.dependencies.values():
+            pair = (path, dependency_graph.dependency.path)
+            if pair in self._visited_pairs:
+                continue
+            self._visited_pairs.add(pair)
+            if self.visit(dependency_graph):
+                return True
+        return False
 
 
 @dataclass

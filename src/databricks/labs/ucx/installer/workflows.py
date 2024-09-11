@@ -114,10 +114,9 @@ main(f'--config=/Workspace{config_file}',
 
 
 class DeployedWorkflows:
-    def __init__(self, ws: WorkspaceClient, install_state: InstallState, verify_timeout: timedelta):
+    def __init__(self, ws: WorkspaceClient, install_state: InstallState):
         self._ws = ws
         self._install_state = install_state
-        self._verify_timeout = verify_timeout
 
     def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
@@ -175,19 +174,25 @@ class DeployedWorkflows:
                 f"Completed {step} job run {run_id} duration: {duration or 'N/A'} ({start_time or 'N/A'} thru {end_time or 'N/A'})"
             )
 
-    def repair_run(self, workflow):
+    def repair_run(self, workflow, verify_timeout: timedelta = timedelta(minutes=2)):
         try:
-            job_id, run_id = self._repair_workflow(workflow)
+            job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
+            self._handle_repair_run(run_details, job_id, run_id, workflow)
+        except InvalidParameterValue as e:
+            logger.warning(f"Skipping {workflow}: {e}")
+        except TimeoutError:
+            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+
+    def _handle_repair_run(self, run_details, job_id, run_id, workflow):
+        if run_details.repair_history:
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
             logger.debug(f"Repairing {workflow} job: {job_url}")
             self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
             webbrowser.open(job_url)
-        except InvalidParameterValue as e:
-            logger.warning(f"Skipping {workflow}: {e}")
-        except TimeoutError:
-            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+        else:
+            logger.warning(f"No repair history found for run_id={run_id}")
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
@@ -323,9 +328,9 @@ class DeployedWorkflows:
             return " ".join(time_parts)
         return "less than 1 second ago"
 
-    def _repair_workflow(self, workflow):
+    def _repair_workflow(self, workflow, verify_timeout):
         job_id, latest_job_run = self._latest_job_run(workflow)
-        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=verify_timeout)
         retried_check = retry_on_attribute_error(self._get_result_state)
         state_value = retried_check(job_id)
         logger.info(f"The status for the latest run is {state_value}")
@@ -443,7 +448,6 @@ class WorkflowsDeployment(InstallationMixin):
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
-        verify_timeout: timedelta,
         tasks: list[Task],
     ):
         self._config = config
@@ -452,7 +456,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
@@ -783,8 +786,9 @@ class WorkflowsDeployment(InstallationMixin):
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._install_state.jobs.items()
         )
+        remote_wheels_str = " ".join(remote_wheels)
         content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            remote_wheel=remote_wheels_str, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
