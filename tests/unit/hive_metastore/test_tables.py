@@ -127,6 +127,29 @@ def test_uc_sql(table, target, query):
         assert table.sql_migrate_external(target) == query
 
 
+def test_uc_sql_when_table_is_in_mount():
+    expected = (
+        "CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` "
+        "(`id` INT, `value` STRING)  LOCATION 's3a://foo/bar';"
+    )
+    table = Table(
+        catalog="catalog",
+        database="db",
+        name="external_table",
+        object_type="EXTERNAL",
+        table_format="DELTA",
+        location="s3a://foo/bar",
+    )
+    target = "new_catalog.db.external_table"
+    table_schema = [
+        # ("col_name", "data_type", "comment"),
+        ("id", "INT", ""),
+        ("value", "STRING", ""),
+    ]
+
+    assert table.sql_migrate_table_in_mount(target, table_schema) == expected
+
+
 def test_tables_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`": "error"}
     rows = {
