@@ -105,7 +105,7 @@ def test_snapshot_doesnt_crawl_if_previous_crawl_yielded_data() -> None:
 
 
 def test_snapshot_crawls_if_refresh_forced() -> None:
-    """Check that existing data is used (with no crawl) if the fetcher can load the snapshot data."""
+    """Check that a crawl happens (without even checking existing data) if a refresh is forced."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(return_value=[Baz(first="first")])
     mock_loader = Mock(return_value=[Baz(first="second")])
@@ -119,6 +119,7 @@ def test_snapshot_crawls_if_refresh_forced() -> None:
 
 
 def test_snapshot_force_refresh_replaces_prior_data() -> None:
+    """Check that when refreshing the new data replaces (via overwrite) any existing data."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(side_effect=RuntimeError("never called"))
     mock_loader = Mock(return_value=[Baz(first="second")])
