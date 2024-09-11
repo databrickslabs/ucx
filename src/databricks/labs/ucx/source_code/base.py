@@ -5,8 +5,9 @@ import locale
 import logging
 from abc import abstractmethod
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Any
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
@@ -338,7 +339,8 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
 
 
 @dataclass
-class DirectFsAccess:
+class AbstractDirectFsAccess:
+    # don't inherit from ABC because it prevents the ORM from working
     """A record describing a Direct File System Access"""
 
     UNKNOWN = "unknown"
@@ -349,11 +351,11 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_timestamp: int = -1
     source_lineage: str = UNKNOWN
-    job_id: int = -1
-    job_name: str = UNKNOWN
-    task_key: str = UNKNOWN
     assessment_start_timestamp: int = -1
     assessment_end_timestamp: int = -1
+
+    @abstractmethod
+    def from_dict(self, data: dict[str, Any]): ...
 
     def replace_source(
         self,
@@ -361,19 +363,38 @@ class DirectFsAccess:
         source_lineage: str | None = None,
         source_timestamp: int | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=source_id or self.source_id,
-            source_timestamp=source_timestamp or self.source_timestamp,
-            source_lineage=source_lineage or self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
-        )
+        data = {
+            "source_id": source_id or self.source_id,
+            "source_timestamp": source_timestamp or self.source_timestamp,
+            "source_lineage": source_lineage or self.source_lineage,
+            **asdict(self),
+        }
+        return self.from_dict(**data)
+
+    def replace_assessment_infos(self, assessment_start: int | None = None, assessment_end: int | None = None):
+        data = {
+            "assessment_start_timestamp": assessment_start or self.assessment_start_timestamp,
+            "assessment_end_timestamp": assessment_end or self.assessment_end_timestamp,
+            **asdict(self),
+        }
+        return self.from_dict(**data)
+
+
+@dataclass
+class DirectFsAccessInQuery(AbstractDirectFsAccess):
+
+    def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInQuery:
+        return DirectFsAccessInQuery(**data)
+
+
+@dataclass
+class DirectFsAccessInPath(AbstractDirectFsAccess):
+    job_id: int = -1
+    job_name: str = AbstractDirectFsAccess.UNKNOWN
+    task_key: str = AbstractDirectFsAccess.UNKNOWN
+
+    def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInPath:
+        return DirectFsAccessInPath(**data)
 
     def replace_job_infos(
         self,
@@ -381,31 +402,10 @@ class DirectFsAccess:
         job_name: str | None = None,
         task_key: str | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=job_id or self.job_id,
-            job_name=job_name or self.job_name,
-            task_key=task_key or self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
-        )
-
-    def replace_assessment_infos(self, assessment_start: int | None = None, assessment_end: int | None = None):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
-            assessment_end_timestamp=assessment_end or self.assessment_start_timestamp,
-        )
+        data = {
+            "job_id": job_id or self.job_id,
+            "job_name": job_name or self.job_name,
+            "task_key": task_key or self.task_key,
+            **asdict(self),
+        }
+        return self.from_dict(**data)

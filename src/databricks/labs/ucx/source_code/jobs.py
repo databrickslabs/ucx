@@ -26,7 +26,7 @@ from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     file_language,
     guess_encoding,
-    DirectFsAccess,
+    DirectFsAccessInPath,
 )
 from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.graph import (
@@ -360,7 +360,7 @@ class WorkflowLinter:
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
-        job_dfsas: list[DirectFsAccess] = []
+        job_dfsas: list[DirectFsAccessInPath] = []
         for problems, dfsas in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
@@ -375,7 +375,7 @@ class WorkflowLinter:
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
@@ -390,9 +390,9 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         problems: list[JobProblem] = []
-        dfsas: list[DirectFsAccess] = []
+        dfsas: list[DirectFsAccessInPath] = []
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -460,7 +460,7 @@ class WorkflowLinter:
 
     def _collect_task_dfsas(
         self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[DirectFsAccessInPath]:
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
         assert job.settings is not None  # as already done in _lint_job
         job_name = job.settings.name
@@ -497,7 +497,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
+class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
 
     def __init__(
         self,
@@ -511,7 +511,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[DirectFsAccessInPath]:
         language = file_language(dependency.path)
         if not language:
             logger.warning(f"Unknown language for {dependency.path}")
@@ -525,7 +525,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def _collect_from_notebook(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[DirectFsAccessInPath]:
         notebook = Notebook.parse(path, source, language.language)
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
@@ -550,8 +550,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def _collect_from_source(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
-        iterable: Iterable[DirectFsAccess] | None = None
+    ) -> Iterable[DirectFsAccessInPath]:
+        iterable: Iterable[DirectFsAccessInPath] | None = None
         if language is CellLanguage.SQL:
             iterable = self._collect_from_sql(source)
         if language is CellLanguage.PYTHON:
@@ -574,11 +574,11 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessInPath]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
         for dfsa_node in linter.collect_dfsas(source, inherited_tree):
             yield dfsa_node.dfsa
 
-    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
+    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccessInPath]:
         linter = DirectFsAccessSqlLinter()
         yield from linter.collect_dfsas(source)

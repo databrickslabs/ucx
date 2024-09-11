@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
     SqlLinter,
-    DirectFsAccess,
+    DirectFsAccessInPath,
 )
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -59,7 +59,7 @@ DIRECT_FS_ACCESS_PATTERNS = [
 
 @dataclass
 class DirectFsAccessNode:
-    dfsa: DirectFsAccess
+    dfsa: DirectFsAccessInPath
     node: NodeNG
 
 
@@ -106,7 +106,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
                 continue
             # since we're normally filtering out spark calls, we're dealing with dfsas we know little about
             # notable we don't know is_read or is_write
-            dfsa = DirectFsAccess(
+            dfsa = DirectFsAccessInPath(
                 path=value,
                 is_read=True,
                 is_write=False,
@@ -178,30 +178,30 @@ class DirectFsAccessSqlLinter(SqlLinter):
             logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
 
     @classmethod
-    def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+    def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DirectFsAccessInPath]:
         yield from cls._collect_dfsas_from_literals(expression)
         yield from cls._collect_dfsas_from_identifiers(expression)
 
     @classmethod
-    def _collect_dfsas_from_literals(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+    def _collect_dfsas_from_literals(cls, expression: SqlExpression) -> Iterable[DirectFsAccessInPath]:
         for literal in expression.find_all(Literal):
             if not isinstance(literal.this, str):
                 logger.warning(f"Can't interpret {type(literal.this).__name__}")
             yield from cls._collect_dfsa_from_node(literal, literal.this)
 
     @classmethod
-    def _collect_dfsas_from_identifiers(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+    def _collect_dfsas_from_identifiers(cls, expression: SqlExpression) -> Iterable[DirectFsAccessInPath]:
         for identifier in expression.find_all(Identifier):
             if not isinstance(identifier.this, str):
                 logger.warning(f"Can't interpret {type(identifier.this).__name__}")
             yield from cls._collect_dfsa_from_node(identifier, identifier.this)
 
     @classmethod
-    def _collect_dfsa_from_node(cls, expression: SqlExpression, path: str) -> Iterable[DirectFsAccess]:
+    def _collect_dfsa_from_node(cls, expression: SqlExpression, path: str) -> Iterable[DirectFsAccessInPath]:
         if any(pattern.matches(path) for pattern in DIRECT_FS_ACCESS_PATTERNS):
             is_read = cls._is_read(expression)
             is_write = cls._is_write(expression)
-            yield DirectFsAccess(
+            yield DirectFsAccessInPath(
                 path=path,
                 is_read=is_read,
                 is_write=is_write,
