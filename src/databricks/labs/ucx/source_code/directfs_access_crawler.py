@@ -6,12 +6,12 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
-from databricks.labs.ucx.source_code.base import DirectFsAccessInPath, DirectFsAccessInQuery, AbstractDirectFsAccess
+from databricks.labs.ucx.source_code.base import DirectFsAccessInPath, DirectFsAccessInQuery, DirectFsAccess
 
 logger = logging.getLogger(__name__)
 
 
-T = TypeVar("T", bound=AbstractDirectFsAccess)
+T = TypeVar("T", bound=DirectFsAccess)
 
 
 class _DirectFsAccessCrawler(CrawlerBase):

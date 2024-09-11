@@ -5,7 +5,7 @@ import tempfile
 import time
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from importlib import metadata
 from pathlib import Path
 from urllib import parse
@@ -27,6 +27,7 @@ from databricks.labs.ucx.source_code.base import (
     file_language,
     guess_encoding,
     DirectFsAccessInPath,
+    DirectFsAccess,
 )
 from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.graph import (
@@ -465,7 +466,9 @@ class WorkflowLinter:
         assert job.settings is not None  # as already done in _lint_job
         job_name = job.settings.name
         for dfsa in collector:
-            yield dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
+            yield DirectFsAccessInPath(**asdict(dfsa)).replace_job_infos(
+                job_id=job.job_id, job_name=job_name, task_key=task.task_key
+            )
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
@@ -497,7 +500,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
+class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def __init__(
         self,
@@ -511,7 +514,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
 
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccessInPath]:
+    ) -> Iterable[DirectFsAccess]:
         language = file_language(dependency.path)
         if not language:
             logger.warning(f"Unknown language for {dependency.path}")
@@ -525,7 +528,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
 
     def _collect_from_notebook(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccessInPath]:
+    ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
@@ -550,8 +553,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
 
     def _collect_from_source(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccessInPath]:
-        iterable: Iterable[DirectFsAccessInPath] | None = None
+    ) -> Iterable[DirectFsAccess]:
+        iterable: Iterable[DirectFsAccess] | None = None
         if language is CellLanguage.SQL:
             iterable = self._collect_from_sql(source)
         if language is CellLanguage.PYTHON:
@@ -574,11 +577,11 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccessInPath]):
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
 
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessInPath]:
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
         for dfsa_node in linter.collect_dfsas(source, inherited_tree):
             yield dfsa_node.dfsa
 
-    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccessInPath]:
+    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessSqlLinter()
         yield from linter.collect_dfsas(source)

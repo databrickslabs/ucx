@@ -339,7 +339,7 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
 
 
 @dataclass
-class AbstractDirectFsAccess:
+class DirectFsAccess:
     # don't inherit from ABC because it prevents the ORM from working
     """A record describing a Direct File System Access"""
 
@@ -354,8 +354,8 @@ class AbstractDirectFsAccess:
     assessment_start_timestamp: int = -1
     assessment_end_timestamp: int = -1
 
-    @abstractmethod
-    def from_dict(self, data: dict[str, Any]): ...
+    def from_dict(self, data: dict[str, Any]):
+        return DirectFsAccess(**data)
 
     def replace_source(
         self,
@@ -369,7 +369,7 @@ class AbstractDirectFsAccess:
             "source_lineage": source_lineage or self.source_lineage,
             **asdict(self),
         }
-        return self.from_dict(**data)
+        return self.from_dict(data)
 
     def replace_assessment_infos(self, assessment_start: int | None = None, assessment_end: int | None = None):
         data = {
@@ -377,21 +377,21 @@ class AbstractDirectFsAccess:
             "assessment_end_timestamp": assessment_end or self.assessment_end_timestamp,
             **asdict(self),
         }
-        return self.from_dict(**data)
+        return self.from_dict(data)
 
 
 @dataclass
-class DirectFsAccessInQuery(AbstractDirectFsAccess):
+class DirectFsAccessInQuery(DirectFsAccess):
 
     def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInQuery:
         return DirectFsAccessInQuery(**data)
 
 
 @dataclass
-class DirectFsAccessInPath(AbstractDirectFsAccess):
+class DirectFsAccessInPath(DirectFsAccess):
     job_id: int = -1
-    job_name: str = AbstractDirectFsAccess.UNKNOWN
-    task_key: str = AbstractDirectFsAccess.UNKNOWN
+    job_name: str = DirectFsAccess.UNKNOWN
+    task_key: str = DirectFsAccess.UNKNOWN
 
     def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInPath:
         return DirectFsAccessInPath(**data)
