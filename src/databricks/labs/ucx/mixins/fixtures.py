@@ -1047,8 +1047,15 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         if columns is None:
             schema = "(id INT, value STRING)"
         else:
-            schema = ", ".join(escape_sql_identifier(column.name) + " " + column.type_name.value for column in columns)
-            schema = f"({schema})"
+            schema = "("
+            for column in columns:
+                schema += escape_sql_identifier(column.name, maxsplit=0)
+                if column.type_name is None:
+                    type_name = "STRING"
+                else:
+                    type_name = column.type_name.value
+                schema += f" {type_name}, "
+            schema = schema[:-2] + ")"  # Remove the last ', '
         if view:
             table_type = TableType.VIEW
             view_text = ctas
