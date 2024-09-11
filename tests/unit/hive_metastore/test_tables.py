@@ -156,7 +156,7 @@ def test_uc_sql(table, target, query):
                 ("country", "STRING", ""),
             ],
         ),
-    ]
+    ],
 )
 def test_uc_sql_when_table_is_in_mount(schema, partitions, table_schema):
     expected = (
