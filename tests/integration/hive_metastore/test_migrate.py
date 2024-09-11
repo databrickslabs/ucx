@@ -676,7 +676,8 @@ def test_migrate_table_in_mount(
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
         external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
-        columns=[ColumnInfo(name="10.0", type_name=ColumnTypeName.STRING)],  # Test with column that needs escaping
+        # Test with column that needs escaping
+        columns=[ColumnInfo(name="1-0`.0-ugly-column", type_name=ColumnTypeName.STRING)],
     )
     table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
     # TODO: Remove this hack below
