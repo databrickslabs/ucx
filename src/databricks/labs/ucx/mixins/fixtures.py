@@ -1032,6 +1032,13 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         storage_override: str | None = None,
         columns: list[ColumnInfo] | None = None,
     ) -> TableInfo:
+        """Create a table for testing.
+
+        Raises:
+            ValueError : If any of the columns is missing a name.
+        """
+        if columns is not None and any(column.name is None for column in columns):
+            raise ValueError("A column is missing a name")
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
             catalog_name = schema.catalog_name
@@ -1049,6 +1056,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         else:
             schema = "("
             for column in columns:
+                # The "" in the next line is only reached when column name is an empty string because of the column name
+                # check above; it is required for the linter.
                 schema += escape_sql_identifier(column.name or "", maxsplit=0)
                 if column.type_name is None:
                     type_name = "STRING"
