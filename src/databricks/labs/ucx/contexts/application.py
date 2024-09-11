@@ -252,7 +252,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def exporter(self):
+    def assessment_exporter(self):
         return AssessmentExporter(self.sql_backend, self.config)
 
     @cached_property
