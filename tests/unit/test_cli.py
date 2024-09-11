@@ -59,6 +59,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
     delete_missing_principals,
+    export_assessment,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -887,3 +888,12 @@ def test_delete_principals(ws):
     prompts = MockPrompts({"Select the list of roles *": "0"})
     delete_missing_principals(ws, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
+
+def test_export_assessment(ws, tmp_path):
+    mock_prompts = MockPrompts({
+            "Choose a path to save the UCX Assessment results": tmp_path.as_posix(),
+            "Choose which assessment results to export": "main",
+        })
+
+    export_assessment(ws, mock_prompts)
+    assert len(list(tmp_path.glob("export_to_zipped_csv.zip"))) == 1
