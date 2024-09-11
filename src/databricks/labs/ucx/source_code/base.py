@@ -3,7 +3,7 @@ from __future__ import annotations
 import codecs
 import locale
 import logging
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -177,7 +177,9 @@ class PythonLinter(Linter):
     def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
-class Fixer:
+class Fixer(ABC):
+
+    @property
     @abstractmethod
     def name(self) -> str: ...
 

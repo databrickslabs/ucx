@@ -4,27 +4,27 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import TypeVar
 
-from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
     Deprecation,
-    Fixer,
     CurrentSessionState,
     PythonLinter,
+    SqlLinter,
+    Fixer,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
-from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
-
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Matcher(ABC):
+class _TableNameMatcher(ABC):
     method_name: str
     min_args: int
     max_args: int
@@ -83,44 +83,7 @@ class Matcher(ABC):
 
 
 @dataclass
-class QueryMatcher(Matcher):
-
-    def lint(
-        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
-    ) -> Iterator[Advice]:
-        table_arg = self._get_table_arg(node)
-        if table_arg:
-            try:
-                for inferred in InferredValue.infer_from_node(table_arg, self.session_state):
-                    yield from self._lint_table_arg(from_table, node, inferred)
-            except InferenceError:
-                yield Advisory.from_node(
-                    code='cannot-autofix-table-reference',
-                    message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
-                    node=node,
-                )
-
-    @classmethod
-    def _lint_table_arg(cls, from_table: FromTableSqlLinter, call_node: NodeNG, inferred: InferredValue):
-        if inferred.is_inferred():
-            for advice in from_table.lint(inferred.as_string()):
-                yield advice.replace_from_node(call_node)
-        else:
-            yield Advisory.from_node(
-                code='cannot-autofix-table-reference',
-                message=f"Can't migrate table_name argument in '{call_node.as_string()}' because its value cannot be computed",
-                node=call_node,
-            )
-
-    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
-        table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, Const)
-        new_query = from_table.apply(table_arg.value)
-        table_arg.value = new_query
-
-
-@dataclass
-class TableNameMatcher(Matcher):
+class SparkCallMatcher(_TableNameMatcher):
 
     def lint(
         self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
@@ -164,7 +127,7 @@ class TableNameMatcher(Matcher):
 
 
 @dataclass
-class ReturnValueMatcher(Matcher):
+class ReturnValueMatcher(_TableNameMatcher):
 
     def matches(self, node: NodeNG):
         return (
@@ -190,7 +153,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class DirectFilesystemAccessMatcher(Matcher):
+class DirectFilesystemAccessMatcher(_TableNameMatcher):
 
     def matches(self, node: NodeNG):
         return (
@@ -221,11 +184,11 @@ class DirectFilesystemAccessMatcher(Matcher):
         return
 
 
-class SparkMatchers:
+class SparkTableNameMatchers:
 
     def __init__(self, dfsa_matchers_only: bool):
 
-        spark_dfsa_matchers: list[Matcher] = [
+        spark_dfsa_matchers: list[_TableNameMatcher] = [
             DirectFilesystemAccessMatcher(
                 "ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}, is_read=True, is_write=False
             ),
@@ -274,29 +237,27 @@ class SparkMatchers:
             return
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
-        spark_session_matchers: list[Matcher] = [
-            QueryMatcher("sql", 1, 1000, 0, "sqlQuery"),
-            TableNameMatcher("table", 1, 1, 0),
-        ]
+        # spark.sql is handled by a dedicated linter
+        spark_session_matchers = [SparkCallMatcher("table", 1, 1, 0)]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
-        spark_catalog_matchers: list[Matcher] = [
-            TableNameMatcher("cacheTable", 1, 2, 0, "tableName"),
-            TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
-            TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
-            TableNameMatcher("getTable", 1, 1, 0),
-            TableNameMatcher("isCached", 1, 1, 0),
-            TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
-            TableNameMatcher("tableExists", 1, 2, 0, "tableName"),
-            TableNameMatcher("recoverPartitions", 1, 1, 0),
-            TableNameMatcher("refreshTable", 1, 1, 0),
-            TableNameMatcher("uncacheTable", 1, 1, 0),
+        spark_catalog_matchers = [
+            SparkCallMatcher("cacheTable", 1, 2, 0, "tableName"),
+            SparkCallMatcher("createTable", 1, 1000, 0, "tableName"),
+            SparkCallMatcher("createExternalTable", 1, 1000, 0, "tableName"),
+            SparkCallMatcher("getTable", 1, 1, 0),
+            SparkCallMatcher("isCached", 1, 1, 0),
+            SparkCallMatcher("listColumns", 1, 2, 0, "tableName"),
+            SparkCallMatcher("tableExists", 1, 2, 0, "tableName"),
+            SparkCallMatcher("recoverPartitions", 1, 1, 0),
+            SparkCallMatcher("refreshTable", 1, 1, 0),
+            SparkCallMatcher("uncacheTable", 1, 1, 0),
             ReturnValueMatcher("listTables", 0, 2, 0),
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
-        spark_dataframe_matchers: list[Matcher] = [
-            TableNameMatcher("writeTo", 1, 1, 0),
+        spark_dataframe_matchers = [
+            SparkCallMatcher("writeTo", 1, 1, 0),
         ]
 
         # nothing to migrate in Column, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Column.html
@@ -309,15 +270,15 @@ class SparkMatchers:
         # nothing to migrate in Window, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Window.html
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
-        spark_dataframereader_matchers: list[Matcher] = [
-            TableNameMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
+        spark_dataframereader_matchers = [
+            SparkCallMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
-        spark_dataframewriter_matchers: list[Matcher] = [
-            TableNameMatcher("insertInto", 1, 2, 0, "tableName"),
+        spark_dataframewriter_matchers = [
+            SparkCallMatcher("insertInto", 1, 2, 0, "tableName"),
             # TODO jdbc: could the url be a databricks url, raise warning ?
-            TableNameMatcher("saveAsTable", 1, 4, 0, "name"),
+            SparkCallMatcher("saveAsTable", 1, 4, 0, "name"),
         ]
 
         # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
@@ -334,7 +295,7 @@ class SparkMatchers:
             + spark_dataframewriter_matchers
         )
 
-    def _make_matchers(self, matchers: list[Matcher]):
+    def _make_matchers(self, matchers: list[_TableNameMatcher]):
         self._matchers = {}
         for matcher in matchers:
             self._matchers[matcher.method_name] = matcher
@@ -344,17 +305,18 @@ class SparkMatchers:
         return self._matchers
 
 
-class SparkSqlPyLinter(PythonLinter, Fixer):
+class SparkTableNamePyLinter(PythonLinter, Fixer):
 
     def __init__(self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
-        self._spark_matchers = SparkMatchers(False).matchers
+        self._spark_matchers = SparkTableNameMatchers(False).matchers
 
+    @property
     def name(self) -> str:
         # this is the same fixer, just in a different language context
-        return self._from_table.name()
+        return self._from_table.name
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -384,3 +346,49 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
         if matcher is None:
             return None
         return matcher if matcher.matches(node) else None
+
+
+class SparkSqlPyLinter(PythonLinter, Fixer):
+
+    def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
+        self._sql_linter = sql_linter
+        self._sql_fixer = sql_fixer
+
+    @property
+    def name(self) -> str:
+        return "<none>" if self._sql_fixer is None else self._sql_fixer.name
+
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        for call_node, query in self._visit_call_nodes(tree):
+            for value in InferredValue.infer_from_node(query):
+                if not value.is_inferred():
+                    yield Advisory.from_node(
+                        code="cannot-autofix-table-reference",
+                        message=f"Can't migrate table_name argument in '{query.as_string()}' because its value cannot be computed",
+                        node=call_node,
+                    )
+                    continue
+                for advice in self._sql_linter.lint(value.as_string()):
+                    yield advice.replace_from_node(call_node)
+
+    def _visit_call_nodes(self, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
+        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
+        visitor.visit(tree.node)
+        for call_node in visitor.matched_nodes:
+            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
+            if query is None:
+                continue
+            yield call_node, query
+
+    def apply(self, code: str) -> str:
+        if not self._sql_fixer:
+            return code
+        tree = Tree.normalize_and_parse(code)
+        for _call_node, query in self._visit_call_nodes(tree):
+            if not isinstance(query, Const) or not isinstance(query.value, str):
+                continue
+            # TODO avoid applying same fix multiple times
+            # this requires changing 'apply' API in order to check advice fragment location
+            new_query = self._sql_fixer.apply(query.value)
+            query.value = new_query
+        return tree.node.as_string()
