@@ -128,10 +128,11 @@ def test_uc_sql(table, target, query):
 
 
 @pytest.mark.parametrize(
-    "schema,table_schema",
+    "schema,partitions,table_schema",
     [
         (
             "(`id` INT, `value` STRING)",
+            "",
             [
                 ("id", "INT", ""),
                 ("value", "STRING", ""),
@@ -139,14 +140,29 @@ def test_uc_sql(table, target, query):
         ),
         (
             "(`column.with.periods` STRING)",
+            "",
             [
                 ("column.with.periods", "STRING", ""),
             ],
         ),
-    ],
+        (
+            "(`id` STRING, `country` STRING)",
+            "PARTITIONED BY (`country`)",
+            [
+                ("id", "STRING", ""),
+                ("country", "STRING", ""),
+                ("# Partition Information", "", ""),
+                ("# col_name", "", ""),
+                ("country", "STRING", ""),
+            ],
+        ),
+    ]
 )
-def test_uc_sql_when_table_is_in_mount(schema, table_schema):
-    expected = f"CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` {schema}  LOCATION 's3a://foo/bar';"
+def test_uc_sql_when_table_is_in_mount(schema, partitions, table_schema):
+    expected = (
+        f"CREATE TABLE IF NOT EXISTS `new_catalog`.`db`.`external_table` "
+        f"{schema} {partitions} LOCATION 's3a://foo/bar';"
+    )
     table = Table(
         catalog="catalog",
         database="db",
