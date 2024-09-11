@@ -238,10 +238,10 @@ class SparkTableNameMatchers:
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
         # spark.sql is handled by a dedicated linter
-        spark_session_matchers = [SparkCallMatcher("table", 1, 1, 0)]
+        spark_session_matchers: list[_TableNameMatcher] = [SparkCallMatcher("table", 1, 1, 0)]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
-        spark_catalog_matchers = [
+        spark_catalog_matchers: list[_TableNameMatcher] = [
             SparkCallMatcher("cacheTable", 1, 2, 0, "tableName"),
             SparkCallMatcher("createTable", 1, 1000, 0, "tableName"),
             SparkCallMatcher("createExternalTable", 1, 1000, 0, "tableName"),
@@ -256,7 +256,7 @@ class SparkTableNameMatchers:
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
-        spark_dataframe_matchers = [
+        spark_dataframe_matchers: list[_TableNameMatcher] = [
             SparkCallMatcher("writeTo", 1, 1, 0),
         ]
 
@@ -270,12 +270,12 @@ class SparkTableNameMatchers:
         # nothing to migrate in Window, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Window.html
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
-        spark_dataframereader_matchers = [
+        spark_dataframereader_matchers: list[_TableNameMatcher] = [
             SparkCallMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
-        spark_dataframewriter_matchers = [
+        spark_dataframewriter_matchers: list[_TableNameMatcher] = [
             SparkCallMatcher("insertInto", 1, 2, 0, "tableName"),
             # TODO jdbc: could the url be a databricks url, raise warning ?
             SparkCallMatcher("saveAsTable", 1, 4, 0, "name"),
