@@ -1068,7 +1068,7 @@ def test_table_in_mount_mapping_with_table_owner():
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
-        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
+        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (`col1` string, `col2` decimal)  LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
     migrate_grants.apply.assert_called()
@@ -1111,7 +1111,7 @@ def test_table_in_mount_mapping_with_partition_information():
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
-        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
+        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (`col1` string, `col2` decimal) PARTITIONED BY (`col1`) LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
     migrate_grants.apply.assert_called()
