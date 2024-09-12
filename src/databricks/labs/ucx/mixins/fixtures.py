@@ -1090,7 +1090,6 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             data_source_format = DataSourceFormat.JSON
             # DBFS locations are not purged; no suffix necessary.
             storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
-            # Modified, otherwise it will identify the table as a DB Dataset
             if columns is None:
                 select = "*"
             else:
@@ -1106,6 +1105,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
                     ColumnInfo(name="value"),
                 ]
                 select = generate_sql_column_casting(dataset_columns, columns)
+            # Modified, otherwise it will identify the table as a DB Dataset
             ddl = (
                 f"{ddl} USING json location '{storage_location}' as SELECT {select} FROM "
                 f"JSON.`dbfs:/databricks-datasets/iot-stream/data-device`"
