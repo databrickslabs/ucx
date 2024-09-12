@@ -304,7 +304,8 @@ class Mounts(CrawlerBase[Mount]):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
-    def _deduplicate_mounts(self, mounts: list) -> list:
+    @staticmethod
+    def _deduplicate_mounts(mounts: list) -> list:
         seen = set()
         deduplicated_mounts = []
         for obj in mounts:
@@ -395,7 +396,8 @@ class TablesInMounts(CrawlerBase[Table]):
         ):
             yield Table(*row)
 
-    def _get_tables_paths_from_assessment(self, loaded_records: Iterable[Table]) -> dict[str, str]:
+    @staticmethod
+    def _get_tables_paths_from_assessment(loaded_records: Iterable[Table]) -> dict[str, str]:
         seen = {}
         for rec in loaded_records:
             if not rec.location:
@@ -446,7 +448,8 @@ class TablesInMounts(CrawlerBase[Table]):
         logger.info(f"Found a total of {len(all_tables)} tables in mount points")
         return all_tables
 
-    def _get_table_location(self, mount: Mount, path: str):
+    @staticmethod
+    def _get_table_location(mount: Mount, path: str) -> str:
         """
         There can be different cases for mounts:
             - Mount(name='/mnt/things/a', source='abfss://things@labsazurethings.dfs.core.windows.net/a')
@@ -519,18 +522,22 @@ class TablesInMounts(CrawlerBase[Table]):
             return TableInMount(format="PARQUET", is_partitioned=False)
         return None
 
-    def _is_partitioned(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_partitioned(file_name: str) -> bool:
         return '=' in file_name
 
-    def _is_parquet(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_parquet(file_name: str) -> bool:
         parquet_patterns = {'.parquet'}
         return any(pattern in file_name for pattern in parquet_patterns)
 
-    def _is_csv(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_csv(file_name: str) -> bool:
         csv_patterns = {'.csv'}
         return any(pattern in file_name for pattern in csv_patterns)
 
-    def _is_json(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_json(file_name: str) -> bool:
         json_patterns = {'.json'}
         return any(pattern in file_name for pattern in json_patterns)
 
