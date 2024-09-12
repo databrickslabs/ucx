@@ -2,7 +2,7 @@ import dataclasses
 import logging
 import os
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
@@ -335,6 +335,14 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
+    """Experimental scanner for tables that can be found on mounts.
+
+    This crawler was developed with a specific use-case in mind and isn't currently in use. It does not conform to the
+    design of other crawlers. In particular:
+     - It depends on the `tables` inventory, but without verifying the tables crawler has run.
+     - Rather than have its own table it will blindly overwrite the existing content of the tables inventory.
+    """
+
     TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
@@ -359,18 +367,20 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
-    def snapshot(self) -> list[Table]:
-        updated_records = self._crawl()
-        self._overwrite_records(updated_records)
-        return updated_records
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
+        if not force_refresh:
+            msg = "This crawler only supports forced refresh; refer to source implementation for details."
+            raise NotImplementedError(msg)
+        return list(super().snapshot(force_refresh=force_refresh))
 
     def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
-        cached_results = []
         try:
             cached_results = list(self._try_fetch())
         except NotFound:
-            pass
+            # This happens when the table crawler hasn't run yet, and is arguably incorrect:
+            # rather than pretending there are no tables it should instead trigger a crawl.
+            cached_results = []
         table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
         loaded_records = list(self._crawl_tables(table_paths))
@@ -393,11 +403,7 @@ class TablesInMounts(CrawlerBase[Table]):
             seen[rec.location] = rec.key
         return seen
 
-    def _overwrite_records(self, items: Sequence[Table]):
-        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
-
-    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]):
+    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]) -> list[Table]:
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
