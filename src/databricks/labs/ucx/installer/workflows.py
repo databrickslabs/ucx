@@ -904,7 +904,7 @@ class WorkflowsDeployment(InstallationMixin):
             workspace_host=self._ws.config.host,
             workspace_id=self._ws.get_workspace_id(),
         ).encode("utf8")
-        self._installation.upload('EXPORT_TO_EXCEL_NOTEBOOK.py', content)
+        self._installation.upload('EXPORT_ASSESSMENT_TO_EXCEL.py', content)
 
 
 class MaxedStreamHandler(logging.StreamHandler):
