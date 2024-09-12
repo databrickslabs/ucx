@@ -384,6 +384,7 @@ def test_alias(ws):
 
 def test_save_storage_and_principal_azure_no_azure_cli(ws):
     ws.config.is_azure = True
+    ws.config.is_aws = False
     ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx, False)
@@ -413,7 +414,9 @@ def test_save_storage_and_principal_aws(ws, acc_client):
 
 
 def test_save_storage_and_principal_gcp(ws):
-    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx=ctx)
 
