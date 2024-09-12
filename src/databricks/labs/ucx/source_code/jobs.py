@@ -5,7 +5,7 @@ import tempfile
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 from urllib import parse
@@ -495,6 +495,21 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
+def _get_path_modified_datetime(path: Path) -> datetime:
+    unix_time = 0.0
+    if isinstance(path, WorkspacePath):
+        # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
+        # pylint: disable=protected-access
+        unix_time += float(path._object_info.modified_at) / 1000.0 or 0.0
+    elif isinstance(path, DBFSPath):
+        # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
+        # pylint: disable=protected-access
+        unix_time += float(path._file_info.modification_time) / 1000.0 or 0.0
+    else:
+        unix_time = path.stat().st_mtime
+    return datetime.fromtimestamp(unix_time, timezone.utc)
+
+
 class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def __init__(
@@ -525,16 +540,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
-        if isinstance(path, WorkspacePath):
-            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
-            # pylint: disable=protected-access
-            src_timestamp = datetime.fromtimestamp(path._object_info.modified_at or -1)
-        elif isinstance(path, DBFSPath):
-            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
-            # pylint: disable=protected-access
-            src_timestamp = datetime.fromtimestamp(path._file_info.modification_time or -1)
-        else:
-            src_timestamp = datetime.fromtimestamp(path.stat().st_mtime)
+        src_timestamp = _get_path_modified_datetime(path)
         src_id = str(path)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
@@ -556,16 +562,7 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if iterable is None:
             logger.warning(f"Language {language.name} not supported yet!")
             return
-        if isinstance(path, WorkspacePath):
-            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
-            # pylint: disable=protected-access
-            src_timestamp = datetime.fromtimestamp(path._object_info.modified_at or -1)
-        elif isinstance(path, DBFSPath):
-            # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
-            # pylint: disable=protected-access
-            src_timestamp = datetime.fromtimestamp(path._file_info.modification_time or -1)
-        else:
-            src_timestamp = datetime.fromtimestamp(path.stat().st_mtime)
+        src_timestamp = _get_path_modified_datetime(path)
         src_id = str(path)
         for dfsa in iterable:
             yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
