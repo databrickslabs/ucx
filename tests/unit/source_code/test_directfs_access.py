@@ -3,7 +3,7 @@ from datetime import datetime
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.source_code.directfs_access import (
-    DirectFsAccessCrawlers,
+    DirectFsAccessCrawler,
     LineageAtom,
     DirectFsAccessInPath,
 )
@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.directfs_access import (
 
 def test_crawler_appends_dfsas():
     backend = MockBackend()
-    crawler = DirectFsAccessCrawlers(backend, "schema").for_paths()
+    crawler = DirectFsAccessCrawler.for_paths(backend, "schema")
     dfsas = list(
         DirectFsAccessInPath(
             path=path,

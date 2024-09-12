@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, ListQueryObjectsResponseQuery
 
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
@@ -30,7 +30,7 @@ def test_workflow_linter_collects_dfsas_from_queries(
     is_write,
 ):
     ws = create_autospec(WorkspaceClient)
-    crawlers = create_autospec(DirectFsAccessCrawlers)
+    crawlers = create_autospec(DirectFsAccessCrawler)
     query = Query.from_dict({"parent_path": "workspace", "display_name": name, "query_text": query})
     response = ListQueryObjectsResponseQuery.from_dict(query.as_dict())
     ws.queries.list.return_value = iter([response])

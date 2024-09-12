@@ -30,7 +30,7 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccess,
     LineageAtom,
-    DirectFsAccessCrawlers,
+    DirectFsAccessCrawler,
     DirectFsAccessInPath,
 )
 from databricks.labs.ucx.source_code.graph import (
@@ -341,14 +341,14 @@ class WorkflowLinter:
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
-        directfs_crawlers: DirectFsAccessCrawlers,
+        directfs_crawler: DirectFsAccessCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
-        self._directfs_crawlers = directfs_crawlers
+        self._directfs_crawler = directfs_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -374,7 +374,7 @@ class WorkflowLinter:
             JobProblem,
             mode='overwrite',
         )
-        self._directfs_crawlers.for_paths().append(job_dfsas)
+        self._directfs_crawler.append(job_dfsas)
         if len(errors) > 0:
             raise ManyError(errors)
 

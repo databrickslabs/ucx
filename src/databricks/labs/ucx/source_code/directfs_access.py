@@ -99,7 +99,15 @@ class DirectFsAccessInPath(DirectFsAccess):
 T = TypeVar("T", bound=DirectFsAccess)
 
 
-class _DirectFsAccessCrawler(CrawlerBase):
+class DirectFsAccessCrawler(CrawlerBase):
+
+    @classmethod
+    def for_paths(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler(backend, schema, "direct_file_system_access_in_paths", DirectFsAccessInPath)
+
+    @classmethod
+    def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler(backend, schema, "direct_file_system_access_in_queries", DirectFsAccessInQuery)
 
     def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type):
         """
@@ -123,20 +131,3 @@ class _DirectFsAccessCrawler(CrawlerBase):
 
     def _crawl(self) -> Iterable[Result]:
         return []
-
-
-class DirectFsAccessCrawlers:
-
-    def __init__(self, sql_backend: SqlBackend, schema: str):
-        self._sql_backend = sql_backend
-        self._schema = schema
-
-    def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(
-            self._sql_backend, self._schema, "direct_file_system_access_in_paths", DirectFsAccessInPath
-        )
-
-    def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(
-            self._sql_backend, self._schema, "direct_file_system_access_in_queries", DirectFsAccessInQuery
-        )

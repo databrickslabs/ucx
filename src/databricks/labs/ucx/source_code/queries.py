@@ -7,7 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import ListQueryObjectsResponseQuery
 
 
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawlers, DirectFsAccessInQuery
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessInQuery
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessSqlLinter
 
 logger = logging.getLogger(__name__)
@@ -18,10 +18,10 @@ class QueryLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
-        directfs_crawlers: DirectFsAccessCrawlers,
+        directfs_crawler: DirectFsAccessCrawler,
     ):
         self._ws = ws
-        self._directfs_crawlers = directfs_crawlers
+        self._directfs_crawler = directfs_crawler
 
     def collect_dfsas_from_queries(self) -> Iterable[DirectFsAccessInQuery]:
         assessment_start = datetime.now()
@@ -32,7 +32,7 @@ class QueryLinter:
             dfsas.append(
                 dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
             )
-        self._directfs_crawlers.for_queries().append(dfsas)
+        self._directfs_crawler.append(dfsas)
         return dfsas
 
     def _collect_dfsas_from_queries(self) -> Iterable[DirectFsAccessInQuery]:
