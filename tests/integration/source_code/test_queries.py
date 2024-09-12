@@ -22,7 +22,7 @@ from databricks.labs.ucx.source_code.queries import QueryLinter
         ),
     ],
 )
-def test_workflow_linter_collects_dfsas_from_queries(
+def test_query_linter_collects_dfsas_from_queries(
     name,
     query,
     dfsa_paths,
