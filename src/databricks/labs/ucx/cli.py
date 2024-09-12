@@ -153,11 +153,21 @@ def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def create_table_mapping(w: WorkspaceClient):
+def create_table_mapping(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
     """create initial table mapping for review"""
-    ctx = WorkspaceContext(w)
-    path = ctx.table_mapping.save(ctx.tables_crawler, ctx.workspace_info)
-    webbrowser.open(f"{w.config.host}/#workspace{path}")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    if ctx:
+        workspace_contexts = [ctx]
+    for workspace_ctx in workspace_contexts:
+        logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+        path = workspace_ctx.table_mapping.save(workspace_ctx.tables_crawler, workspace_ctx.workspace_info)
+        if len(workspace_contexts) == 1:
+            webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
 @ucx.command
