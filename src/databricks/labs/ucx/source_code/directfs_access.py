@@ -134,7 +134,7 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
 
     def _try_fetch(self) -> Iterable[T]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
-        yield from self._backend.fetch(sql)
+        return self._backend.fetch(sql)
 
     def _crawl(self) -> Iterable[T]:
         raise NotImplementedError()

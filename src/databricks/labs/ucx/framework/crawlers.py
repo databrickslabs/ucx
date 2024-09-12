@@ -136,7 +136,8 @@ class CrawlerBase(ABC, Generic[Result]):
                 cached_results = list(fetcher())
                 if cached_results:
                     return cached_results
-            except NotFound:
+            except NotFound as e:
+                logger.debug(e.strerror)
                 pass
         logger.debug(f"[{self.full_name}] crawling new set of snapshot data for {self._table}")
         loaded_records = list(loader())

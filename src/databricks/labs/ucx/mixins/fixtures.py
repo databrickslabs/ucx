@@ -50,7 +50,7 @@ from databricks.sdk.service.sql import (
     ObjectTypePlural,
     WidgetOptions,
     WidgetPosition,
-    LegacyQuery,
+    LegacyQuery, CreateQueryRequestQuery,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -835,6 +835,30 @@ def make_job(ws, make_random, make_notebook):
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
 
+
+@pytest.fixture
+def make_ws_query(ws, make_random):
+    def create(query_text: str, **kwargs):
+        if "display_name" not in kwargs:
+            kwargs["display_name"] = f"query-{make_random(4)}"
+        # add RemoveAfter tag for test job cleanup
+        date_to_remove = get_test_purge_time()
+        remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
+        kwargs["query_text"] = query_text
+        request = CreateQueryRequestQuery(
+            display_name=kwargs["display_name"],
+            query_text=query_text,
+            tags=[str(tag) for tag in kwargs["tags"]]
+        )
+        query = ws.queries.create(query=request)
+        logger.info(f"Query: {ws.config.host}#job/{query.id}")
+        return query
+
+    yield from factory("query", create, lambda item: ws.queries.delete(item.id))
 
 @pytest.fixture
 def make_model(ws, make_random):
