@@ -38,16 +38,14 @@ class AssessmentExporter:
             validate=lambda q: q in valid_queries,
         )
 
-
-        # Initialize and export results
         queries_path = queries_path_root / query_choice
-        dashboard_metadata = DashboardMetadata(display_name="UCX Assessment Results")
-        assessment_results = dashboard_metadata.from_path(queries_path)
-        assessment_results = assessment_results.replace_database(
-            catalog="hive_metastore", database=self._config.inventory_database
+        display_name = "UCX Assessment Results"
+        dashboard_metadata = DashboardMetadata(display_name)
+        assessment_results = (
+            DashboardMetadata.from_path(queries_path)
+                .replace_database(catalog="hive_metastore", database=self._config.inventory_database)
         )
 
-        # Export results
         logger.info("Exporting assessment results....")
         results_path = assessment_results.export_to_zipped_csv(self._sql_backend, export_path)
         logger.info(f"Results exported to {results_path}")

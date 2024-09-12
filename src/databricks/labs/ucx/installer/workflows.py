@@ -136,7 +136,6 @@ EXPORT_TO_EXCEL_NOTEBOOK = """
 # COMMAND ----------
 
 # DBTITLE 1,Libraries Import and Setting UCX
-# Standard library imports
 import os
 import shutil
 import logging, threading
@@ -167,11 +166,11 @@ lock = Lock()
 
 # File and Path Constants
 FILE_NAME = "assessment_results.xlsx"
-TMP_PATH = f'/Workspace' + ctx.installation.install_folder() + '/excel-export'
+TMP_PATH = f'/tmp' + ctx.installation.install_folder() + '/excel-export'
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
 def _cleanup() -> None:
-    '''Move the temporary results file to the download path and clean up the temp directory.'''
+    \"\"\"Move the temporary results file to the download path and clean up the temp directory.\"\"\"
     shutil.move(
         os.path.join(TMP_PATH, FILE_NAME),
         os.path.join(DOWNLOAD_PATH, FILE_NAME),
