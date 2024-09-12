@@ -1,7 +1,7 @@
 import logging
 from sqlglot import parse as parse_sql
 from sqlglot.expressions import Table, Expression, Use, Create
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class FromTableSqlLinter(SqlLinter, Fixer):
     SQL queries.
     """
 
-    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
+    def __init__(self, index: TableMigrationIndex, session_state: CurrentSessionState):
         """
         Initializes the FromTableLinter class.
 
@@ -30,7 +30,7 @@ class FromTableSqlLinter(SqlLinter, Fixer):
                 schema.table                 -> Table(catalog='', db='schema', this='table')
                 table                               -> Table(catalog='', db='', this='table')
         """
-        self._index: MigrationIndex = index
+        self._index: TableMigrationIndex = index
         self._session_state: CurrentSessionState = session_state
 
     @property

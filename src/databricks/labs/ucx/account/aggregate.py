@@ -12,7 +12,7 @@ from databricks.labs.blueprint.installation import NotInstalled
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.locations import LocationTrie
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -70,9 +70,9 @@ class AccountAggregate:
             try:
                 # use already existing code to replace tables in the query, assuming that UCX database is in HMS
                 inventory_database = ctx.config.inventory_database
-                stub_index = MigrationIndex(
+                stub_index = TableMigrationIndex(
                     [
-                        MigrationStatus(
+                        TableMigrationStatus(
                             src_schema=inventory_database,
                             src_table=table_name,
                             dst_catalog='hive_metastore',

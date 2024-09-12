@@ -64,7 +64,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -75,6 +75,7 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
@@ -115,11 +116,14 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
             functools.partial(table, "policies", PolicyInfo),
-            functools.partial(table, "migration_status", MigrationStatus),
+            functools.partial(table, "migration_status", TableMigrationStatus),
             functools.partial(table, "workflow_problems", JobProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
+            functools.partial(
+                table, "direct_file_system_access_in_paths", DirectFsAccess
+            ),  # direct_file_system_access_in_queries will be added in upcoming PR
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -128,6 +132,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
+    # direct_file_system_access view will be added in upcoming PR
 
 
 def extract_major_minor(version_string):

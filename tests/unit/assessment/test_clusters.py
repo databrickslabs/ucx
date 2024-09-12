@@ -93,7 +93,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     ws = mock_workspace_client(cluster_ids=['simplest-autoscale'])
     mockbackend = MockBackend()
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
-    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
+    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "overwrite")
     assert result == [
         Row(
             cluster_id="simplest-autoscale",

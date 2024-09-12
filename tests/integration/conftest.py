@@ -160,7 +160,7 @@ class StaticTablesCrawler(TablesCrawler):
             for _ in tables
         ]
 
-    def snapshot(self) -> list[Table]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
         return self._tables
 
 
@@ -169,7 +169,7 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
         super().__init__(*args)
         self._spn_infos = spn_infos
 
-    def snapshot(self) -> list[AzureServicePrincipalInfo]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[AzureServicePrincipalInfo]:
         return self._spn_infos
 
 
@@ -184,7 +184,7 @@ class StaticMountCrawler(Mounts):
         super().__init__(sb, workspace_client, inventory_database)
         self._mounts = mounts
 
-    def snapshot(self) -> list[Mount]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[Mount]:
         return self._mounts
 
 
