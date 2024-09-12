@@ -539,8 +539,6 @@ def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **n
         ctx = WorkspaceContext(w)
     ctx.acl_migrator.migrate_acls(
         target_catalog=named_parameters.get("target_catalog"),
-        legacy_table_acl=True,
-        principal=True,
         hms_fed=named_parameters.get("hms_fed", False),
     )
 
