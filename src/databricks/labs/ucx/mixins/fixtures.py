@@ -1029,6 +1029,24 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         schema = schema[:-2] + ")"  # Remove the last ', '
         return schema
 
+    def generate_sql_column_casting(existing_columns: list[ColumnInfo], new_columns: list[ColumnInfo]) -> str:
+        """Generate the SQL to cast columns"""
+        if any(column.name is None for column in existing_columns):
+            raise ValueError(f"Columns should have a name: {existing_columns}")
+        if len(new_columns) > len(existing_columns):
+            raise ValueError(f"Too many columns: {new_columns}")
+        select_expressions = []
+        for index, (existing_column, new_column) in enumerate(zip(existing_columns, new_columns)):
+            column_name_new = escape_sql_identifier(new_column.name or str(index), maxsplit=0)
+            if new_column.type_name is None:
+                type_name = "STRING"
+            else:
+                type_name = new_column.type_name.value
+            select_expression = f"CAST({existing_column.name} AS {type_name}) AS {column_name_new}"
+            select_expressions.append(select_expression)
+        select = ", ".join(select_expressions)
+        return select
+
     def create(  # pylint: disable=too-many-locals,too-many-arguments,too-many-statements
         *,
         catalog_name="hive_metastore",
@@ -1078,27 +1096,16 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             else:
                 # These are the columns in the dataset from the JSON below
                 dataset_columns = [
-                    "calories_burnt",
-                    "device_id",
-                    "id",
-                    "miles_walked",
-                    "num_steps",
-                    "timestamp",
-                    "user_id",
-                    "value",
+                    ColumnInfo(name="calories_burnt"),
+                    ColumnInfo(name="device_id"),
+                    ColumnInfo(name="id"),
+                    ColumnInfo(name="miles_walked"),
+                    ColumnInfo(name="num_steps"),
+                    ColumnInfo(name="timestamp"),
+                    ColumnInfo(name="user_id"),
+                    ColumnInfo(name="value"),
                 ]
-                if len(columns) > len(dataset_columns):
-                    raise ValueError(f"Too many columns: {columns}")
-                select_expressions = []
-                for index, (column_name, column) in enumerate(zip(dataset_columns, columns)):
-                    column_name_new = escape_sql_identifier(column.name or str(index), maxsplit=0)
-                    if column.type_name is None:
-                        type_name = "STRING"
-                    else:
-                        type_name = column.type_name.value
-                    select_expression = f"CAST({column_name} AS {type_name}) AS {column_name_new}"
-                    select_expressions.append(select_expression)
-                select = ", ".join(select_expressions)
+                select = generate_sql_column_casting(dataset_columns, columns)
             ddl = (
                 f"{ddl} USING json location '{storage_location}' as SELECT {select} FROM "
                 f"JSON.`dbfs:/databricks-datasets/iot-stream/data-device`"
