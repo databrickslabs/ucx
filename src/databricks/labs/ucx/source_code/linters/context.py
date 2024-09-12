@@ -22,7 +22,11 @@ from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinte
 
 
 class LinterContext:
-    def __init__(self, index: TableMigrationIndex | None = None, session_state: CurrentSessionState | None = None):
+    def __init__(
+        self,
+        index: TableMigrationIndex | None = None,
+        session_state: CurrentSessionState | None = None,
+    ):
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
 
