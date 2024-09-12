@@ -229,7 +229,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def f(self):
+    def grants_crawler(self):
         return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
 
     @cached_property

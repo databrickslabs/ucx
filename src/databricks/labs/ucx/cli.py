@@ -568,15 +568,6 @@ def join_collection(a: AccountClient, workspace_ids: str):
     w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
     account_installer.join_collection(w_ids)
 
-
-@ucx.command()
-def export_assessment(w: WorkspaceClient, prompts: Prompts, path: Path | None = None):
-    """exports the assessment dashboard"""
-    ctx = WorkspaceContext(w)
-    exporter = ctx.exporter
-    exporter.export_results(prompts, path)
-
-
 @ucx.command
 def upload(
     file: Path | str,
