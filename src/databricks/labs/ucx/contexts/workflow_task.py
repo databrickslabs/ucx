@@ -83,7 +83,7 @@ class RuntimeContext(GlobalContext):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def faster_table_scan_crawler(self):
+    def py4j_table_crawler(self):
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
 
     @cached_property
