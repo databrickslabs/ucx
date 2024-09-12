@@ -7,9 +7,11 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any, TypeVar
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -99,17 +101,21 @@ class DirectFsAccessInPath(DirectFsAccess):
 T = TypeVar("T", bound=DirectFsAccess)
 
 
-class DirectFsAccessCrawler(CrawlerBase):
+class DirectFsAccessCrawler(CrawlerBase[T]):
 
     @classmethod
     def for_paths(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler(backend, schema, "direct_file_system_access_in_paths", DirectFsAccessInPath)
+        return DirectFsAccessCrawler[DirectFsAccessInPath](
+            backend, schema, "direct_file_system_access_in_paths", DirectFsAccessInPath
+        )
 
     @classmethod
     def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler(backend, schema, "direct_file_system_access_in_queries", DirectFsAccessInQuery)
+        return DirectFsAccessCrawler[DirectFsAccessInQuery](
+            backend, schema, "direct_file_system_access_in_queries", DirectFsAccessInQuery
+        )
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type):
+    def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type[T]):
         """
         Initializes a DFSACrawler instance.
 
@@ -121,13 +127,14 @@ class DirectFsAccessCrawler(CrawlerBase):
 
     def append(self, dfsas: Sequence[T]):
         try:
-            self._append_records(dfsas)
+            # TODO until we historize data, we append all DFSAs
+            self._update_snapshot(dfsas, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
     def _try_fetch(self) -> Iterable[T]:
-        sql = f"SELECT * FROM {self.full_name}"
+        sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
         yield from self._backend.fetch(sql)
 
-    def _crawl(self) -> Iterable[Result]:
-        return []
+    def _crawl(self) -> Iterable[T]:
+        raise NotImplementedError()
