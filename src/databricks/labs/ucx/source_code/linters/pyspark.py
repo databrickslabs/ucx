@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
 
 logger = logging.getLogger(__name__)
