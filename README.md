@@ -90,6 +90,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
   * [`report-account-compatibility` command](#report-account-compatibility-command)
+  * [`export-assessment` command](#export-assessment-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -1110,6 +1111,29 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 ```
 
 [[back to top](#databricks-labs-ucx)]
+
+## `export-assessment` command
+
+```commandline
+databricks labs ucx export-assessment
+```
+The `export-assessment` command exports UCX results to a specified location and prompts for details on the path and report type. If not specified, it defaults to exporting the main results to the current directory as `export_to_zipped_csv.zip`.
+
+### Prompts
+
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+- **Choose which assessment results to export:**
+    - **Description:** Select the type of results to export. Options include:
+        - `azure`
+        - `estimates`
+        - `interactive`
+        - `main`
+    - **Default:** `main`
+
+[[back to top](#databricks-labs-ucx)]
+
 
 # Metastore related commands
 
