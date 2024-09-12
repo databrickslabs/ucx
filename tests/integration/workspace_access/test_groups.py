@@ -64,6 +64,7 @@ def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
     ws_group, _ = make_ucx_group()
+    ws_group, acc_group = make_ucx_group(wait_for_provisioning=True)
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     group_manager.reflect_account_groups_on_workspace()
