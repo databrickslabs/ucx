@@ -460,7 +460,11 @@ class TablesInMounts(CrawlerBase[Table]):
             return path.replace(f"dbfs:{mount.name}/", mount.source)
         return path.replace(f"dbfs:{mount.name}", mount.source)
 
-    def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(
+        self,
+        root_dir: str,
+        delta_log_folders: dict[str, TableInMount] | None = None,
+    ) -> dict[str, TableInMount]:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
