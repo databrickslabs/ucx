@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -27,7 +27,12 @@ from databricks.labs.ucx.source_code.base import (
     file_language,
     guess_encoding,
 )
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom, DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import (
+    DirectFsAccess,
+    LineageAtom,
+    DirectFsAccessCrawlers,
+    DirectFsAccessInPath,
+)
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -358,7 +363,7 @@ class WorkflowLinter:
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
-        job_dfsas: list[DirectFsAccess] = []
+        job_dfsas: list[DirectFsAccessInPath] = []
         for problems, dfsas in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
@@ -373,7 +378,7 @@ class WorkflowLinter:
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
@@ -388,9 +393,9 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         problems: list[JobProblem] = []
-        dfsas: list[DirectFsAccess] = []
+        dfsas: list[DirectFsAccessInPath] = []
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -458,12 +463,14 @@ class WorkflowLinter:
 
     def _collect_task_dfsas(
         self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[DirectFsAccessInPath]:
         collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
         assert job.settings is not None  # as already done in _lint_job
         job_name = job.settings.name
         for dfsa in collector:
-            yield dfsa.replace_job_infos(job_id=job.job_id, job_name=job_name, task_key=task.task_key)
+            yield DirectFsAccessInPath(**asdict(dfsa)).replace_job_infos(
+                job_id=job.job_id, job_name=job_name, task_key=task.task_key
+            )
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):

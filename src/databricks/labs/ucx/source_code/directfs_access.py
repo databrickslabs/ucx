@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from typing import Any, TypeVar
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result
 from databricks.labs.lsql.backends import SqlBackend
@@ -33,11 +34,11 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_timestamp: datetime = datetime.fromtimestamp(0)
     source_lineage: list[LineageAtom] = field(default_factory=list)
-    job_id: int = -1
-    job_name: str = UNKNOWN
-    task_key: str = UNKNOWN
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
+
+    def from_dict(self, data: dict[str, Any]):
+        return DirectFsAccess(**data)
 
     def replace_source(
         self,
@@ -45,19 +46,40 @@ class DirectFsAccess:
         source_lineage: list[LineageAtom] | None = None,
         source_timestamp: datetime | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=source_id or self.source_id,
-            source_timestamp=source_timestamp or self.source_timestamp,
-            source_lineage=source_lineage or self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
-        )
+        data = {
+            "source_id": source_id or self.source_id,
+            "source_timestamp": source_timestamp or self.source_timestamp,
+            "source_lineage": source_lineage or self.source_lineage,
+            **asdict(self),
+        }
+        return self.from_dict(data)
+
+    def replace_assessment_infos(
+        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
+    ):
+        data = {
+            "assessment_start_timestamp": assessment_start or self.assessment_start_timestamp,
+            "assessment_end_timestamp": assessment_end or self.assessment_end_timestamp,
+            **asdict(self),
+        }
+        return self.from_dict(data)
+
+
+@dataclass
+class DirectFsAccessInQuery(DirectFsAccess):
+
+    def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInQuery:
+        return DirectFsAccessInQuery(**data)
+
+
+@dataclass
+class DirectFsAccessInPath(DirectFsAccess):
+    job_id: int = -1
+    job_name: str = DirectFsAccess.UNKNOWN
+    task_key: str = DirectFsAccess.UNKNOWN
+
+    def from_dict(self, data: dict[str, Any]) -> DirectFsAccessInPath:
+        return DirectFsAccessInPath(**data)
 
     def replace_job_infos(
         self,
@@ -65,41 +87,21 @@ class DirectFsAccess:
         job_name: str | None = None,
         task_key: str | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=job_id or self.job_id,
-            job_name=job_name or self.job_name,
-            task_key=task_key or self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
-        )
+        data = {
+            "job_id": job_id or self.job_id,
+            "job_name": job_name or self.job_name,
+            "task_key": task_key or self.task_key,
+            **asdict(self),
+        }
+        return self.from_dict(**data)
 
-    def replace_assessment_infos(
-        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
-    ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
-            assessment_end_timestamp=assessment_end or self.assessment_start_timestamp,
-        )
+
+T = TypeVar("T", bound=DirectFsAccess)
 
 
 class _DirectFsAccessCrawler(CrawlerBase):
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+    def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type):
         """
         Initializes a DFSACrawler instance.
 
@@ -107,15 +109,15 @@ class _DirectFsAccessCrawler(CrawlerBase):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, table, DirectFsAccess)
+        super().__init__(backend, "hive_metastore", schema, table, klass)
 
-    def append(self, dfsas: Sequence[DirectFsAccess]):
+    def append(self, dfsas: Sequence[T]):
         try:
             self._append_records(dfsas)
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
-    def _try_fetch(self) -> Iterable[DirectFsAccess]:
+    def _try_fetch(self) -> Iterable[T]:
         sql = f"SELECT * FROM {self.full_name}"
         yield from self._backend.fetch(sql)
 
@@ -130,7 +132,11 @@ class DirectFsAccessCrawlers:
         self._schema = schema
 
     def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_paths")
+        return _DirectFsAccessCrawler(
+            self._sql_backend, self._schema, "direct_file_system_access_in_paths", DirectFsAccessInPath
+        )
 
     def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_queries")
+        return _DirectFsAccessCrawler(
+            self._sql_backend, self._schema, "direct_file_system_access_in_queries", DirectFsAccessInQuery
+        )
