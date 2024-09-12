@@ -9,7 +9,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, PermissionDenied
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
@@ -307,7 +307,7 @@ class AWSResourcePermissions:
             )
         ):
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
-            raise PermissionError(f"Failed to create migration role and instance profile {iam_role_name}")
+            raise PermissionDenied(f"Failed to create migration role and instance profile {iam_role_name}")
 
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
@@ -358,7 +358,7 @@ class AWSResourcePermissions:
             self._update_cluster_policy_with_instance_profile(cluster_policy, iam_instance_profile)
             self._update_sql_dac_with_instance_profile(iam_instance_profile, prompts)
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
-        except PermissionError:
+        except PermissionDenied:
             logger.error(f"Failed to assign instance profile to cluster policy {iam_role_name}")
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
 
