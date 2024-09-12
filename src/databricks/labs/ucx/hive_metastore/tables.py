@@ -583,6 +583,8 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog_tables, errors = Threads.gather("describing tables in ", tasks)
         if len(errors) > 0:
             logger.warning(f"Detected {len(errors)} errors while scanning tables in ")
+
+        logger.info(f"Finished scanning {len(catalog_tables)} tables")
         return catalog_tables
 
     def _get_table_names(self, database: str) -> list[str]:
