@@ -1,7 +1,7 @@
 import logging
 from sqlglot import parse as parse_sql
 from sqlglot.expressions import Table, Expression, Use, Create
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer
 
 logger = logging.getLogger(__name__)

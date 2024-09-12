@@ -74,6 +74,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     Migrated tables have a property set to mark them as such; this crawler scans all tables and examines the properties
     for the presence of the marker.
     """
+
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
         super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws

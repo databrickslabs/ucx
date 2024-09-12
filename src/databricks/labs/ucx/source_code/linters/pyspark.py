@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,

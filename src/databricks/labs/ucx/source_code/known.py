@@ -13,7 +13,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.entrypoint import get_logger
 
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext

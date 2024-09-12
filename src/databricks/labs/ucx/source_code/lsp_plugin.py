@@ -6,7 +6,7 @@ from pylsp.config.config import Config  # type: ignore
 from pylsp.workspace import Document  # type: ignore
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex, TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.lsp import Diagnostic

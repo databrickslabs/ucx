@@ -8,7 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 

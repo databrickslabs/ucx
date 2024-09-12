@@ -38,7 +38,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
     Mounts,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager

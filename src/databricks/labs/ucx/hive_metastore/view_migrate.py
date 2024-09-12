@@ -6,7 +6,7 @@ from functools import cached_property
 import sqlglot
 from sqlglot import ParseError, expressions
 
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex, TableView
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter

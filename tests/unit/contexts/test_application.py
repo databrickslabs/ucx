@@ -4,7 +4,7 @@ import pytest
 
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from tests.unit import mock_workspace_client

@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants, ACLMigrator, Grant
-from databricks.labs.ucx.hive_metastore.migration_status import (
+from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatusRefresher,
     TableMigrationIndex,
 )

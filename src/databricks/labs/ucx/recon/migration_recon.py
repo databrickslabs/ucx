@@ -10,7 +10,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.recon.base import (
     DataComparator,
     SchemaComparator,

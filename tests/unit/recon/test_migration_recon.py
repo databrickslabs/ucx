@@ -5,7 +5,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.recon.base import TableIdentifier
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
