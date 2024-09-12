@@ -129,8 +129,8 @@ EXPORT_TO_EXCEL_NOTEBOOK = """
 # COMMAND ----------
 
 # DBTITLE 1,Installing Packages
-# MAGIC %pip install {remote_wheel} -q -q -q
-# MAGIC %pip install xlsxwriter -q -q -q
+# MAGIC %pip install {remote_wheel} -qqq
+# MAGIC %pip install xlsxwriter -qqq
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -169,7 +169,7 @@ lock = Lock()
 
 # File and Path Constants
 FILE_NAME = "assessment_results.xlsx"
-TMP_PATH = TMP_PATH = f"/Workspace{ctx.installation.install_folder()}/excel-export"
+TMP_PATH = TMP_PATH = f"/tmp/{ctx.installation.install_folder()}/excel-export"
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
 def _cleanup() -> None:
