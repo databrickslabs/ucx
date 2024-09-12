@@ -138,7 +138,7 @@ class CrawlerBase(ABC, Generic[Result]):
                     return cached_results
             except NotFound:
                 pass
-        logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
+        logger.debug(f"[{self.full_name}] crawling new set of snapshot data for {self._table}")
         loaded_records = list(loader())
         self._update_snapshot(loaded_records, mode="overwrite")
         return loaded_records
