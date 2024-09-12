@@ -253,10 +253,6 @@ commands:
         description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
       - name: hms-fed
         description: (Optional) Migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
-      - name: legacy-table-acl
-        description: (Optional) Migrate ACLs for legacy tables. If not provided, ACLs for all tables will be migrated.
-      - name: principal
-        description: (Optional) Migrate principal based ACLS. If not provided, principal ACLs will be migrated.
 
   - name: migrate-dbsql-dashboards
     description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
