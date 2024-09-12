@@ -40,3 +40,9 @@ def test_query_linter_collects_dfsas_from_queries(
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
     assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
+
+
+def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, make_query):
+    make_query("query_1", "SELECT * from csv.`dbfs://some_folder/some_file.csv`")
+    linter = QueryLinter(ws, simple_ctx.directfs_access_crawler_for_queries)
+    problems = linter.
