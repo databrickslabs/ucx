@@ -50,3 +50,5 @@ class AssessmentExporter:
         logger.info("Exporting assessment results....")
         results_path = assessment_results.export_to_zipped_csv(self._sql_backend, export_path)
         logger.info(f"Results exported to {results_path}")
+
+        return results_path
