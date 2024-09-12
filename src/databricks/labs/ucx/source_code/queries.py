@@ -38,10 +38,10 @@ class QueryLinter:
     def _collect_dfsas_from_queries(self) -> Iterable[DirectFsAccessInQuery]:
         queries = self._ws.queries.list()
         for query in queries:
-            yield from self._collect_from_query(query)
+            yield from self._collect_dfsas_from_query(query)
 
     @classmethod
-    def _collect_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccessInQuery]:
+    def _collect_dfsas_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccessInQuery]:
         if query.query_text is None:
             return
         linter = DirectFsAccessSqlLinter()
