@@ -111,6 +111,7 @@ class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     def append(self, dfsas: Sequence[DirectFsAccess]):
         try:
+            # TODO until we historize data, we append all DFSAs
             self._update_snapshot(dfsas, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
@@ -120,7 +121,7 @@ class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         yield from self._backend.fetch(sql)
 
     def _crawl(self) -> Iterable[DirectFsAccess]:
-        return []
+        raise NotImplementedError()
 
 
 class DirectFsAccessCrawlers:
