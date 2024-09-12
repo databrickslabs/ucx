@@ -129,18 +129,21 @@ EXPORT_TO_EXCEL_NOTEBOOK = """
 # COMMAND ----------
 
 # DBTITLE 1,Installing Packages
-# MAGIC %pip install {remote_wheel} -qqq
-# MAGIC %pip install xlsxwriter -qqq
+# MAGIC %pip install {remote_wheel} -q -q -q
+# MAGIC %pip install xlsxwriter -q -q -q
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
 # DBTITLE 1,Libraries Import and Setting UCX
+# Standard library imports
 import os
+import logging
+import threading
 import shutil
-import logging, threading
-from functools import partial
 from threading import Lock
+from functools import partial
+
 
 # third party Libraries imports
 import pandas as pd
@@ -166,7 +169,7 @@ lock = Lock()
 
 # File and Path Constants
 FILE_NAME = "assessment_results.xlsx"
-TMP_PATH = f'/tmp' + ctx.installation.install_folder() + '/excel-export'
+TMP_PATH = TMP_PATH = f"/Workspace{ctx.installation.install_folder()}/excel-export"
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
 def _cleanup() -> None:
@@ -178,26 +181,26 @@ def _cleanup() -> None:
     shutil.rmtree(TMP_PATH)
 
 def _prepare_directories() -> None:
-    '''Ensure that the necessary directories exist.'''
+    \"\"\"Ensure that the necessary directories exist.\"\"\"
     os.makedirs(TMP_PATH, exist_ok=True)
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 def _to_excel(tile: QueryTile, writer: ...) -> None:
-    '''Execute a SQL query and write the result to an Excel sheet.'''
+    \"\"\"Execute a SQL query and write the result to an Excel sheet.\"\"\"
     sdf = spark.sql(tile.content)
     df = sdf.toPandas()
     with lock:
         df.to_excel(writer, sheet_name=tile.metadata.title, index=False)
 
 def _render_export() -> None:
-    '''Render an HTML link for downloading the results.'''
+    \"\"\"Render an HTML link for downloading the results.\"\"\"
     html_content = f'''
             <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform 0.3s ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style><div class="export-container"><h2>Export Results</h2><a href='{workspace_host}files/excel-export/assessment_results.xlsx?o={workspace_id}' target='_blank' download>Download UCX Results </a></div>
     '''
     displayHTML(html_content)
 
 def export_results() -> None:
-    '''Main method to export results to an Excel file.'''
+    \"\"\"Main method to export results to an Excel file.\"\"\"
     _prepare_directories()
     try:
         target = TMP_PATH + '/assessment_results.xlsx'
