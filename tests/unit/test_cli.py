@@ -265,9 +265,10 @@ def test_manual_workspace_info(ws):
     manual_workspace_info(ws, prompts)
 
 
-def test_create_table_mapping(ws):
+def test_create_table_mapping(ws, acc_client):
+    ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
-        create_table_mapping(ws)
+        create_table_mapping(ws, ctx, False, acc_client)
 
 
 def test_validate_external_locations(ws):
