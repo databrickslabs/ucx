@@ -412,8 +412,8 @@ class TablesInMounts(CrawlerBase[Table]):
             if self._include_mounts and mount.name not in self._include_mounts:
                 logger.info(f"Filtering mount {mount.name}")
                 continue
-            table_paths = {}
             if self._include_paths_in_mount:
+                table_paths = {}
                 for path in self._include_paths_in_mount:
                     table_paths.update(self._find_delta_log_folders(path))
             else:
