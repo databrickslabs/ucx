@@ -562,7 +562,7 @@ class FasterTableScanCrawler(CrawlerBase):
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database."""
         tasks = []
-        catalog_tables: Collection[Table] = []
+        catalog_tables: Collection[Table]
         catalog = "hive_metastore"
         databases = self._all_databases()
         for database in databases:
