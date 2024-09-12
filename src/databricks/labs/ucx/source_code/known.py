@@ -13,7 +13,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.entrypoint import get_logger
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -166,7 +166,7 @@ class KnownList:
 
     @classmethod
     def _analyze_file(cls, known_distributions, library_root, dist_info, module_path):
-        empty_index = MigrationIndex([])
+        empty_index = TableMigrationIndex([])
         relative_path = module_path.relative_to(library_root)
         module_ref = relative_path.as_posix().replace('/', '.')
         for suffix in ('.py', '.__init__'):

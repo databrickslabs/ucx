@@ -35,9 +35,9 @@ from databricks.labs.ucx.hive_metastore.grants import (
     ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher,
+    TableMigrationStatusRefresher,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
@@ -331,7 +331,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def migration_status_refresher(self):
-        return MigrationStatusRefresher(
+        return TableMigrationStatusRefresher(
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,
@@ -424,7 +424,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.dependency_resolver,
             self.path_lookup,
-            MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.config.include_job_ids,
         )
 

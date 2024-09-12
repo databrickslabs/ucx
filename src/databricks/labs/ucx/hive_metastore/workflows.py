@@ -123,9 +123,9 @@ class ScanTablesInMounts(Workflow):
     @job_task
     def scan_tables_in_mounts_experimental(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] This workflow scans for Delta tables inside all mount points
-        captured during the assessment. It will store the results under the `tables` table
-        located under the assessment."""
-        ctx.tables_in_mounts.snapshot()
+        captured during the assessment. It will store the results in the `tables` table,
+        replacing any existing content that might be present."""
+        ctx.tables_in_mounts.snapshot(force_refresh=True)
 
     @job_task(job_cluster="table_migration", depends_on=[scan_tables_in_mounts_experimental])
     def update_migration_status(self, ctx: RuntimeContext):

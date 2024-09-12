@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class MigrationStatus:
+class TableMigrationStatus:
     src_schema: str
     src_table: str
     dst_catalog: str | None = None
@@ -27,7 +27,7 @@ class MigrationStatus:
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
     @classmethod
-    def from_json(cls, raw: dict[str, str]) -> "MigrationStatus":
+    def from_json(cls, raw: dict[str, str]) -> "TableMigrationStatus":
         return cls(
             src_schema=raw['src_schema'],
             src_table=raw['src_table'],
@@ -49,15 +49,15 @@ class TableView:
         return f"{self.catalog}.{self.schema}.{self.name}".lower()
 
 
-class MigrationIndex:
-    def __init__(self, tables: list[MigrationStatus]):
+class TableMigrationIndex:
+    def __init__(self, tables: list[TableMigrationStatus]):
         self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
     def is_migrated(self, schema: str, table: str) -> bool:
         """Check if a table is migrated."""
         return self.get(schema, table) is not None
 
-    def get(self, schema: str, table: str) -> MigrationStatus | None:
+    def get(self, schema: str, table: str) -> TableMigrationStatus | None:
         """Get the migration status for a table. If the table is not migrated, return None."""
         dst = self._index.get((schema.lower(), table.lower()))
         if not dst or not dst.dst_table:
@@ -68,14 +68,20 @@ class MigrationIndex:
         return self._index.keys()
 
 
-class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
+class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
+    """Crawler to capture the migration status of tables (and views).
+
+    Migrated tables have a property set to mark them as such; this crawler scans all tables and views, examining the
+    properties for the presence of the marker.
+    """
+
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "migration_status", MigrationStatus)
+        super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
         self._table_crawler = table_crawler
 
-    def index(self) -> MigrationIndex:
-        return MigrationIndex(list(self.snapshot()))
+    def index(self) -> TableMigrationIndex:
+        return TableMigrationIndex(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
@@ -111,14 +117,14 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         logger.info(f"{schema}.{table} is set as not migrated")
         return False
 
-    def _crawl(self) -> Iterable[MigrationStatus]:
+    def _crawl(self) -> Iterable[TableMigrationStatus]:
         all_tables = self._table_crawler.snapshot()
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
             src_schema = table.database.lower()
             src_table = table.name.lower()
-            table_migration_status = MigrationStatus(
+            table_migration_status = TableMigrationStatus(
                 src_schema=src_schema,
                 src_table=src_table,
                 update_ts=str(timestamp),
@@ -134,9 +140,9 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
                     )
             yield table_migration_status
 
-    def _try_fetch(self) -> Iterable[MigrationStatus]:
+    def _try_fetch(self) -> Iterable[TableMigrationStatus]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
-            yield MigrationStatus(*row)
+            yield TableMigrationStatus(*row)
 
     def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
