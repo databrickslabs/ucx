@@ -18,7 +18,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
@@ -335,7 +335,7 @@ class WorkflowLinter:
         ws: WorkspaceClient,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
-        migration_index: MigrationIndex,
+        migration_index: TableMigrationIndex,
         directfs_crawlers: DirectFsAccessCrawlers,
         include_job_ids: list[int] | None = None,
     ):
@@ -475,7 +475,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         path_lookup: PathLookup,
         key: str,
         session_state: CurrentSessionState,
-        migration_index: MigrationIndex,
+        migration_index: TableMigrationIndex,
     ):
         super().__init__(graph, walked_paths, path_lookup)
         self._key = key

@@ -25,11 +25,10 @@ class Assessment(Workflow):
 
     @job_task(depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
     def crawl_grants(self, ctx: RuntimeContext):
-        """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
-        statement for every object to retrieve the permissions it has assigned to it. The permissions include information
-        such as the _principal_, _action type_, and the _table_ it applies to. This is persisted in the Delta table
-        `$inventory_database.grants`. Other, migration related jobs use this inventory table to convert the legacy Table
-        ACLs to Unity Catalog  permissions.
+        """Scans all securable objects for permissions that have been assigned: this include database-level permissions,
+        as well permissions directly configured on objects in the (already gathered) table and UDF inventories. The
+        captured information is stored in the `$inventory_database.grants` inventory table for further use during the
+        migration of legacy ACLs to Unity Catalog permissions.
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""

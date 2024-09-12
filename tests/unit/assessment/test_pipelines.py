@@ -49,7 +49,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()
     PipelinesCrawler(ws, mockbackend, "ucx").snapshot()
-    result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "append")
+    result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "overwrite")
 
     assert result == [
         Row(

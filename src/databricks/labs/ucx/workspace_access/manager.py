@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class PermissionManager(CrawlerBase[Permissions]):
+    """Crawler that captures permissions, intended for configuration-related (non-data) objects.
+
+    The set of objects types captured depends on the (sub)-crawlers supplied to the initializer, but is intended to
+    cover configuration-related (non-data) objects such as workspace configuration, dashboards, secrets, SCIM
+    entitlements, etc.
+    """
+
     ERRORS_TO_IGNORE = ["FEATURE_DISABLED"]
 
     def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):

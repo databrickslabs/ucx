@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
-from typing import ClassVar, Generic, Protocol, TypeVar
+from typing import ClassVar, Generic, Literal, Protocol, TypeVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
@@ -91,8 +91,8 @@ class CrawlerBase(ABC, Generic[Result]):
             return None
         return cls._valid(name)
 
-    def snapshot(self) -> Iterable[Result]:
-        return self._snapshot(self._try_fetch, self._crawl)
+    def snapshot(self, *, force_refresh: bool = False) -> Iterable[Result]:
+        return self._snapshot(self._try_fetch, self._crawl, force_refresh=force_refresh)
 
     @abstractmethod
     def _try_fetch(self) -> Iterable[Result]:
@@ -110,7 +110,7 @@ class CrawlerBase(ABC, Generic[Result]):
             Iterable[Result]: Records that capture the results of crawling the environment.
         """
 
-    def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
+    def _snapshot(self, fetcher: ResultFn, loader: ResultFn, *, force_refresh: bool) -> list[Result]:
         """
         Tries to load dataset of records with `fetcher` function, otherwise automatically creates
         a table with the schema defined in the class of the first row and executes `loader` function
@@ -119,26 +119,30 @@ class CrawlerBase(ABC, Generic[Result]):
         Args:
             fetcher: A function to fetch existing data.
             loader: A function to load new data.
+            force_refresh: Whether existing data should be ignored and forcibly replaced with data from the loader.
 
         Exceptions:
-        - If a runtime error occurs during fetching (other than "TABLE_OR_VIEW_NOT_FOUND"), the original error is
-          re-raised.
+        - Any errors raised by the fetcher are passed through, except for NotFound (usually due to
+          TABLE_OR_VIEW_NOT_FOUND) which is suppressed. All errors raised by the loader are passed through.
 
         Returns:
-        list[Result]: A list of data records, either fetched or loaded.
+            list[Result]: A list of data records, either fetched or loaded.
         """
-        logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
-        try:
-            cached_results = list(fetcher())
-            if len(cached_results) > 0:
-                return cached_results
-        except NotFound:
-            pass
-        logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
+        if force_refresh:
+            logger.debug(f"[{self.full_name}] ignoring any existing {self._table} inventory; refresh is forced.")
+        else:
+            logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
+            try:
+                cached_results = list(fetcher())
+                if cached_results:
+                    return cached_results
+            except NotFound:
+                pass
+        logger.debug(f"[{self.full_name}] crawling new set of snapshot data for {self._table}")
         loaded_records = list(loader())
-        self._append_records(loaded_records)
+        self._update_snapshot(loaded_records, mode="overwrite")
         return loaded_records
 
-    def _append_records(self, items: Sequence[Result]):
+    def _update_snapshot(self, items: Sequence[Result], mode: Literal["append", "overwrite"] = "append") -> None:
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, self._klass, mode="append")
+        self._backend.save_table(self.full_name, items, self._klass, mode=mode)

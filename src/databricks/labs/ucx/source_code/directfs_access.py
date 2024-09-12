@@ -6,7 +6,7 @@ from collections.abc import Sequence, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
@@ -97,7 +97,7 @@ class DirectFsAccess:
         )
 
 
-class _DirectFsAccessCrawler(CrawlerBase):
+class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     def __init__(self, backend: SqlBackend, schema: str, table: str):
         """
@@ -111,7 +111,7 @@ class _DirectFsAccessCrawler(CrawlerBase):
 
     def append(self, dfsas: Sequence[DirectFsAccess]):
         try:
-            self._append_records(dfsas)
+            self._update_snapshot(dfsas, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
@@ -119,7 +119,7 @@ class _DirectFsAccessCrawler(CrawlerBase):
         sql = f"SELECT * FROM {self.full_name}"
         yield from self._backend.fetch(sql)
 
-    def _crawl(self) -> Iterable[Result]:
+    def _crawl(self) -> Iterable[DirectFsAccess]:
         return []
 
 
