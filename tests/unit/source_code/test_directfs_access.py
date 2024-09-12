@@ -1,7 +1,8 @@
+from datetime import datetime
+
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.source_code.base import DirectFsAccess
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, DirectFsAccessCrawlers, LineageAtom
 
 
 def test_crawler_appends_dfsas():
@@ -13,13 +14,13 @@ def test_crawler_appends_dfsas():
             is_read=False,
             is_write=False,
             source_id="ID",
-            source_timestamp=7452,
-            source_lineage="LINEAGE",
+            source_timestamp=datetime.now(),
+            source_lineage=[LineageAtom(object_type="LINEAGE", object_id="ID")],
             job_id=222,
             job_name="JOB",
             task_key="TASK",
-            assessment_start_timestamp=123,
-            assessment_end_timestamp=234,
+            assessment_start_timestamp=datetime.now(),
+            assessment_end_timestamp=datetime.now(),
         )
         for path in ("a", "b", "c")
     )

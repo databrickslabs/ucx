@@ -20,7 +20,8 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
-from databricks.labs.ucx.source_code.base import CurrentSessionState, DirectFsAccess
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader

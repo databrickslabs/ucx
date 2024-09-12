@@ -2,10 +2,10 @@ import functools
 import logging
 import shutil
 import tempfile
-import time
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from importlib import metadata
 from pathlib import Path
 from urllib import parse
@@ -26,9 +26,8 @@ from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     file_language,
     guess_encoding,
-    DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom, DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -37,7 +36,6 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
     DependencyGraphWalker,
-    LineageAtom,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
@@ -417,9 +415,9 @@ class WorkflowLinter:
                     end_col=advice.advice.end_col,
                 )
                 problems.append(job_problem)
-            assessment_start = int(time.mktime(time.gmtime()))
+            assessment_start = datetime.now()
             task_dfsas = self._collect_task_dfsas(task, job, graph, session_state)
-            assessment_end = int(time.mktime(time.gmtime()))
+            assessment_end = datetime.now()
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
@@ -530,18 +528,17 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
-            src_timestamp = path._object_info.modified_at or -1
+            src_timestamp = datetime.fromtimestamp(path._object_info.modified_at or -1)
         elif isinstance(path, DBFSPath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
             # pylint: disable=protected-access
-            src_timestamp = path._file_info.modification_time or -1
+            src_timestamp = datetime.fromtimestamp(path._file_info.modification_time or -1)
         else:
-            src_timestamp = int(path.stat().st_mtime)
+            src_timestamp = datetime.fromtimestamp(path.stat().st_mtime)
         src_id = str(path)
-        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for cell in notebook.cells:
             for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
+                yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -562,17 +559,16 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         if isinstance(path, WorkspacePath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
             # pylint: disable=protected-access
-            src_timestamp = path._object_info.modified_at or -1
+            src_timestamp = datetime.fromtimestamp(path._object_info.modified_at or -1)
         elif isinstance(path, DBFSPath):
             # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
             # pylint: disable=protected-access
-            src_timestamp = path._file_info.modification_time or -1
+            src_timestamp = datetime.fromtimestamp(path._file_info.modification_time or -1)
         else:
-            src_timestamp = int(path.stat().st_mtime)
+            src_timestamp = datetime.fromtimestamp(path.stat().st_mtime)
         src_id = str(path)
-        src_lineage = LineageAtom.atoms_to_json_string(self.lineage)
         for dfsa in iterable:
-            yield dfsa.replace_source(source_id=src_id, source_lineage=src_lineage, source_timestamp=src_timestamp)
+            yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
         linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)

@@ -1,17 +1,16 @@
 import io
-import itertools
 import logging
 import textwrap
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.jobs import Job, SparkPythonTask, JobSettings, Task
+from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.directfs_access_crawler import DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawlers
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
@@ -23,9 +22,8 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
     DependencyResolver,
-    LineageAtom,
 )
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, WorkflowTask
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 
 
@@ -518,23 +516,3 @@ def test_xxx(graph):
     assert workflow_task_container.spark_conf == {"spark.databricks.cluster.profile": "singleNode"}
 
     ws.assert_not_called()
-
-
-def test_full_lineage_is_converted_to_json():
-    ws = create_autospec(WorkspaceClient)
-    ws.assert_not_called()
-    task = Task(task_key="task-key")
-    settings = JobSettings(name="job-name")
-    job = create_autospec(jobs.Job)
-    job.job_id = "job-id"
-    job.settings = settings
-    wtask = WorkflowTask(ws, task, job)
-    full_lineage = list(itertools.chain(wtask.lineage, [LineageAtom("path", "abc"), LineageAtom("path", "xyz")]))
-    json_str = LineageAtom.atoms_to_json_string(full_lineage)
-    job.assert_not_called()
-    assert json_str == (
-        '[{"object_type": "job", "object_id": "job-id", "name": "job-name"}, '
-        '{"object_type": "task", "object_id": "task-key"}, '
-        '{"object_type": "path", "object_id": "abc"}, '
-        '{"object_type": "path", "object_id": "xyz"}]'
-    )
