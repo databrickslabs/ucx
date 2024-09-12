@@ -245,10 +245,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
         list[Grant]: A list of Grant objects representing the grants found in hive_metastore.
         """
         catalog = "hive_metastore"
-        tasks = [partial(self.grants, catalog=catalog)]
-        # Scanning ANY FILE and ANONYMOUS FUNCTION grants
-        tasks.append(partial(self.grants, catalog=catalog, any_file=True))
-        tasks.append(partial(self.grants, catalog=catalog, anonymous_function=True))
+        tasks = [
+            partial(self.grants, catalog=catalog),
+            # Scanning ANY FILE and ANONYMOUS FUNCTION grants
+            partial(self.grants, catalog=catalog, any_file=True),
+            partial(self.grants, catalog=catalog, anonymous_function=True),
+        ]
         if not self._include_databases:
             # scan all databases, even empty ones
             for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
