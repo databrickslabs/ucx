@@ -1,5 +1,5 @@
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.assessment.export import AssessmentExport
+from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.core import Row
@@ -37,3 +37,4 @@ def test_export(tmp_path):
 
     # Assertions
     assert exported == export_path / "export_to_zipped_csv.zip"
+
