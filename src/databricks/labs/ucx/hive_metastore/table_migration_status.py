@@ -69,10 +69,10 @@ class TableMigrationIndex:
 
 
 class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
-    """Crawler to capture the migration status of tables.
+    """Crawler to capture the migration status of tables (and views).
 
-    Migrated tables have a property set to mark them as such; this crawler scans all tables and examines the properties
-    for the presence of the marker.
+    Migrated tables have a property set to mark them as such; this crawler scans all tables and views, examining the
+    properties for the presence of the marker.
     """
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
