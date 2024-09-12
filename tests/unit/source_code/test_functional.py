@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -110,7 +110,7 @@ class Functional:
         self.language = CellLanguage.PYTHON if path.suffix.endswith("py") else CellLanguage.SQL
 
     def verify(
-        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex
+        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: TableMigrationIndex
     ) -> None:
         expected_problems = list(self._expected_problems())
         actual_advices = list(self._lint(path_lookup, dependency_resolver, migration_index))
@@ -134,7 +134,7 @@ class Functional:
         # TODO: output annotated file with comments for quick fixing
 
     def _lint(
-        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: MigrationIndex
+        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: TableMigrationIndex
     ) -> Iterable[Advice]:
         session_state = self._test_session_state()
         print(str(session_state))

@@ -6,10 +6,10 @@ from functools import cached_property
 import sqlglot
 from sqlglot import ParseError, expressions
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class ViewToMigrate(TableToMigrate):
                     aliases.add(expression.alias_or_name)
         return aliases
 
-    def sql_migrate_view(self, index: MigrationIndex) -> str:
+    def sql_migrate_view(self, index: TableMigrationIndex) -> str:
         from_table = FromTableSqlLinter(index, CurrentSessionState(self.src.database))
         assert self.src.view_text is not None, 'Expected a view text'
         migrated_select = from_table.apply(self.src.view_text)
@@ -83,9 +83,14 @@ class ViewToMigrate(TableToMigrate):
 
 class ViewsMigrationSequencer:
 
-    def __init__(self, tables_to_migrate: Collection[TableToMigrate], *, migration_index: MigrationIndex | None = None):
+    def __init__(
+        self,
+        tables_to_migrate: Collection[TableToMigrate],
+        *,
+        migration_index: TableMigrationIndex | None = None,
+    ):
         self._tables = tables_to_migrate  # Also contains views to migrate
-        self._index = migration_index or MigrationIndex([])
+        self._index = migration_index or TableMigrationIndex([])
 
     @cached_property
     def _views(self) -> dict[ViewToMigrate, TableView]:

@@ -2,7 +2,7 @@ from typing import cast
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
@@ -18,11 +18,15 @@ from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter, SparkTableNamePyLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectPyLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLinter
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 
 class LinterContext:
-    def __init__(self, index: MigrationIndex | None = None, session_state: CurrentSessionState | None = None):
+    def __init__(
+        self,
+        index: TableMigrationIndex | None = None,
+        session_state: CurrentSessionState | None = None,
+    ):
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
 

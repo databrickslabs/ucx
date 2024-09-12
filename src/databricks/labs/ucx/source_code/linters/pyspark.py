@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
@@ -16,7 +16,7 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
 
 logger = logging.getLogger(__name__)
@@ -42,12 +42,12 @@ class _TableNameMatcher(ABC):
 
     @abstractmethod
     def lint(
-        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         """raises Advices by linting the code"""
 
     @abstractmethod
-    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         """applies recommendations"""
 
     def _get_table_arg(self, node: Call):
@@ -83,7 +83,7 @@ class _TableNameMatcher(ABC):
 class SparkCallMatcher(_TableNameMatcher):
 
     def lint(
-        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         table_name = table_arg.as_string().strip("'").strip('"')
@@ -105,7 +105,7 @@ class SparkCallMatcher(_TableNameMatcher):
                 node=node,
             )
 
-    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         dst = self._find_dest(index, table_arg.value, from_table.schema)
@@ -113,7 +113,7 @@ class SparkCallMatcher(_TableNameMatcher):
             table_arg.value = dst.destination()
 
     @staticmethod
-    def _find_dest(index: MigrationIndex, value: str, schema: str):
+    def _find_dest(index: TableMigrationIndex, value: str, schema: str):
         parts = value.split(".")
         # Ensure that unqualified table references use the current schema
         if len(parts) == 1:
@@ -130,7 +130,7 @@ class ReturnValueMatcher(_TableNameMatcher):
         )
 
     def lint(
-        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
@@ -139,7 +139,7 @@ class ReturnValueMatcher(_TableNameMatcher):
             node=node,
         )
 
-    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -156,7 +156,11 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
         )
 
     def lint(
-        self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: NodeNG,
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         for inferred in InferredValue.infer_from_node(table_arg):
@@ -171,7 +175,7 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
                     node=node,
                 )
 
-    def apply(self, from_table: FromTableSqlLinter, index: MigrationIndex, node: Call) -> None:
+    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -280,7 +284,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
 
     _spark_matchers = SparkTableNameMatchers()
 
-    def __init__(self, from_table: FromTableSqlLinter, index: MigrationIndex, session_state):
+    def __init__(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
