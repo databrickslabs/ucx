@@ -1093,7 +1093,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             if columns is None:
                 select = "*"
             else:
-                # These are the columns in the dataset from the JSON below
+                # These are the columns from the JSON dataset below
                 dataset_columns = [
                     ColumnInfo(name="calories_burnt"),
                     ColumnInfo(name="device_id"),
