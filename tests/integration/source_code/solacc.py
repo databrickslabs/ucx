@@ -9,7 +9,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.framework.utils import run_command
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
@@ -91,7 +91,7 @@ def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tu
 def lint_all(file_to_lint: str | None):
     ws = WorkspaceClient(host='...', token='...')
     ctx = LocalCheckoutContext(ws).replace(
-        linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
+        linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state)
     )
     parseable = 0
     not_computed = 0

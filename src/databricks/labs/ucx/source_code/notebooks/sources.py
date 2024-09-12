@@ -11,7 +11,7 @@ from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
@@ -131,7 +131,7 @@ class NotebookLinter:
     @classmethod
     def from_source(
         cls,
-        index: MigrationIndex,
+        index: TableMigrationIndex,
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         source: str,

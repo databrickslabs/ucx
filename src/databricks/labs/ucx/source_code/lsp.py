@@ -13,9 +13,9 @@ from databricks.labs.blueprint.logger import install_logger
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import (
-    MigrationStatus,
+    TableMigrationStatus,
 )
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
@@ -329,12 +329,12 @@ if __name__ == '__main__':
     install_logger()
     logging.root.setLevel('DEBUG')
     languages = LinterContext(
-        MigrationIndex(
+        TableMigrationIndex(
             [
-                MigrationStatus(
+                TableMigrationStatus(
                     src_schema='old', src_table='things', dst_catalog='brand', dst_schema='new', dst_table='stuff'
                 ),
-                MigrationStatus(
+                TableMigrationStatus(
                     src_schema='other',
                     src_table='matters',
                     dst_catalog='some',

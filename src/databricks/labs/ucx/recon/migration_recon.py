@@ -10,7 +10,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.recon.base import (
     DataComparator,
     SchemaComparator,
@@ -40,7 +40,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         self,
         sbe: SqlBackend,
         schema: str,
-        migration_status_refresher: MigrationStatusRefresher,
+        migration_status_refresher: TableMigrationStatusRefresher,
         table_mapping: TableMapping,
         schema_comparator: SchemaComparator,
         data_comparator: DataComparator,

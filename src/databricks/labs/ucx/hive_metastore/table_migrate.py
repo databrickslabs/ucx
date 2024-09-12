@@ -17,7 +17,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -40,7 +40,7 @@ class TablesMigrator:
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
-        migration_status_refresher: MigrationStatusRefresher,
+        migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
     ):
         self._tc = table_crawler

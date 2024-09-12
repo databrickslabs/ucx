@@ -7,7 +7,7 @@ from typing import TypeVar
 import pytest
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer, ViewToMigrate
 
@@ -25,10 +25,10 @@ def test_view_to_migrate_sql_migrate_view_sql():
     )
     rule = Rule("workspace", "cat1", "test_schema1", "schema1", "test_view1", "dest_view1")
     view_to_migrate = ViewToMigrate(view, rule)
-    migration_index = MigrationIndex(
+    migration_index = TableMigrationIndex(
         [
-            MigrationStatus("test_schema1", "test_table1", "cat1", "schema1", "dest_table1"),
-            MigrationStatus("test_schema1", "test_view1"),
+            TableMigrationStatus("test_schema1", "test_table1", "cat1", "schema1", "dest_table1"),
+            TableMigrationStatus("test_schema1", "test_view1"),
         ]
     )
 
@@ -69,10 +69,10 @@ def tables(request, samples) -> list[TableToMigrate]:
 
 @pytest.mark.parametrize("tables", [("db1.t1", "db2.t1")], indirect=True)
 def test_empty_sequence_without_views(tables):
-    migration_index = MigrationIndex(
+    migration_index = TableMigrationIndex(
         [
-            MigrationStatus("db1", "t1", "cat1", "db2", "t1"),
-            MigrationStatus("db2", "t2", "cat1", "db2", "t1"),
+            TableMigrationStatus("db1", "t1", "cat1", "db2", "t1"),
+            TableMigrationStatus("db2", "t2", "cat1", "db2", "t1"),
         ]
     )
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
@@ -91,7 +91,7 @@ def flatten(lists: list[list[T]]) -> list[T]:
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1")], indirect=True)
 def test_sequence_direct_view(tables) -> None:
     expected = ["hive_metastore.db1.v1"]
-    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    migration_index = TableMigrationIndex([TableMigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
@@ -102,8 +102,8 @@ def test_sequence_direct_view(tables) -> None:
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.t2", "db1.v2")], indirect=True)
 def test_sequence_direct_views(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v2"]
-    migration_index = MigrationIndex(
-        [MigrationStatus("db1", "t1", "cat1", "db1", "t1"), MigrationStatus("db1", "t2", "cat1", "db1", "t2")]
+    migration_index = TableMigrationIndex(
+        [TableMigrationStatus("db1", "t1", "cat1", "db1", "t1"), TableMigrationStatus("db1", "t2", "cat1", "db1", "t2")]
     )
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
@@ -117,7 +117,7 @@ def test_sequence_direct_views(tables) -> None:
 @pytest.mark.parametrize("tables", [("db1.t1", "db1.v1", "db1.v4")], indirect=True)
 def test_sequence_indirect_views(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
-    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    migration_index = TableMigrationIndex([TableMigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
@@ -135,7 +135,7 @@ def test_sequence_deep_indirect_views(tables) -> None:
         "hive_metastore.db1.v6",
         "hive_metastore.db1.v5",
     ]
-    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    migration_index = TableMigrationIndex([TableMigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()
@@ -147,7 +147,7 @@ def test_sequence_deep_indirect_views(tables) -> None:
 @pytest.mark.parametrize("tables", [("db1.v1", "db1.v15")], indirect=True)
 def test_sequence_view_with_view_and_table_dependency(tables) -> None:
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v15"]
-    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    migration_index = TableMigrationIndex([TableMigrationStatus("db1", "t1", "cat1", "db1", "t1")])
     sequencer = ViewsMigrationSequencer(tables, migration_index=migration_index)
 
     batches = sequencer.sequence_batches()

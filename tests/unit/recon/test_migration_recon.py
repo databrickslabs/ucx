@@ -5,7 +5,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.recon.base import TableIdentifier
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
@@ -75,7 +75,7 @@ def test_migrate_recon_should_produce_proper_queries(
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     metadata_retriever = DatabricksTableMetadataRetriever(backend)
     data_profiler = StandardDataProfiler(backend, metadata_retriever)
     migration_recon = MigrationRecon(
