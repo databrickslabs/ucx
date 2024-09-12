@@ -134,7 +134,7 @@ class CrawlerBase(ABC, Generic[Result]):
             logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
             try:
                 cached_results = list(fetcher())
-                if len(cached_results) > 0:
+                if cached_results:
                     return cached_results
             except NotFound:
                 pass
