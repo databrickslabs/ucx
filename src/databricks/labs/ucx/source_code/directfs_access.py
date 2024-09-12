@@ -49,10 +49,10 @@ class DirectFsAccess:
         source_timestamp: datetime | None = None,
     ):
         data = {
+            **asdict(self),
             "source_id": source_id or self.source_id,
             "source_timestamp": source_timestamp or self.source_timestamp,
             "source_lineage": source_lineage or self.source_lineage,
-            **asdict(self),
         }
         return self.from_dict(data)
 
@@ -60,9 +60,9 @@ class DirectFsAccess:
         self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
     ):
         data = {
+            **asdict(self),
             "assessment_start_timestamp": assessment_start or self.assessment_start_timestamp,
             "assessment_end_timestamp": assessment_end or self.assessment_end_timestamp,
-            **asdict(self),
         }
         return self.from_dict(data)
 
@@ -90,10 +90,10 @@ class DirectFsAccessInPath(DirectFsAccess):
         task_key: str | None = None,
     ):
         data = {
+            **asdict(self),
             "job_id": job_id or self.job_id,
             "job_name": job_name or self.job_name,
             "task_key": task_key or self.task_key,
-            **asdict(self),
         }
         return self.from_dict(**data)
 
@@ -137,4 +137,5 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
         return self._backend.fetch(sql)
 
     def _crawl(self) -> Iterable[T]:
-        raise NotImplementedError()
+        return []
+        # TODO raise NotImplementedError() once CrawlerBase supports empty snapshots
