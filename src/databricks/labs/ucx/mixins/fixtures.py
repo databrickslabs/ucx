@@ -1073,8 +1073,34 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             # DBFS locations are not purged; no suffix necessary.
             storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
             # Modified, otherwise it will identify the table as a DB Dataset
+            if columns is None:
+                select = "*"
+            else:
+                # These are the columns in the dataset from the JSON below
+                dataset_columns = [
+                    "calories_burnt",
+                    "device_id",
+                    "id",
+                    "miles_walked",
+                    "num_steps",
+                    "timestamp",
+                    "user_id",
+                    "value",
+                ]
+                if len(columns) > len(dataset_columns):
+                    raise ValueError(f"Too many columns: {columns}")
+                select_expressions = []
+                for index, (column_name, column) in enumerate(zip(dataset_columns, columns)):
+                    column_name_new = escape_sql_identifier(column.name or str(index), maxsplit=0)
+                    if column.type_name is None:
+                        type_name = "STRING"
+                    else:
+                        type_name = column.type_name.value
+                    select_expression = f"CAST({column_name} AS {type_name}) AS {column_name_new}"
+                    select_expressions.append(select_expression)
+                select = ", ".join(select_expressions)
             ddl = (
-                f"{ddl} USING json location '{storage_location}' as SELECT * FROM "
+                f"{ddl} USING json location '{storage_location}' as SELECT {select} FROM "
                 f"JSON.`dbfs:/databricks-datasets/iot-stream/data-device`"
             )
         elif external_csv is not None:

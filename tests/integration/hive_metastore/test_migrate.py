@@ -52,7 +52,11 @@ def test_migrate_dbfs_non_delta_tables(ws, sql_backend, runtime_ctx, make_catalo
         pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(
-        catalog_name=src_schema.catalog_name, non_delta=True, schema_name=src_schema.name
+        catalog_name=src_schema.catalog_name,
+        non_delta=True,
+        schema_name=src_schema.name,
+        # Test with column that needs escaping
+        columns=[ColumnInfo(name="1-0`.0-ugly-column", type_name=ColumnTypeName.STRING)],
     )
 
     dst_catalog = make_catalog()
