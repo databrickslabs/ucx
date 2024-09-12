@@ -146,9 +146,3 @@ class CrawlerBase(ABC, Generic[Result]):
     def _update_snapshot(self, items: Sequence[Result], mode: Literal["append", "overwrite"] = "append") -> None:
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self.full_name, items, self._klass, mode=mode)
-
-    def _append_records(self, items: Sequence[Result]):
-        self._update_snapshot(items, mode="append")
-
-    def _overwrite_records(self, items: Sequence[Result]):
-        self._update_snapshot(items, mode="overwrite")
