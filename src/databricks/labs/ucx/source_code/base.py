@@ -349,13 +349,13 @@ class DirectFsAccess:
     is_read: bool
     is_write: bool
     source_id: str = UNKNOWN
-    source_timestamp: int = -1
-    source_lineage: str = UNKNOWN
+    source_timestamp: datetime.datetime
+    source_lineage: list[LineageAtom]
     job_id: int = -1
     job_name: str = UNKNOWN
     task_key: str = UNKNOWN
-    assessment_start_timestamp: int = -1
-    assessment_end_timestamp: int = -1
+    assessment_start_timestamp: datetime.datetime
+    assessment_end_timestamp: datetime.datetime
 
     def replace_source(
         self,
