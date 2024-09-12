@@ -8,7 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class Redash:
     MIGRATED_TAG = "Migrated by UCX"
 
-    def __init__(self, index: MigrationIndex, ws: WorkspaceClient, installation: Installation):
+    def __init__(self, index: TableMigrationIndex, ws: WorkspaceClient, installation: Installation):
         self._index = index
         self._ws = ws
         self._installation = installation

@@ -6,9 +6,9 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants, ACLMigrator, Grant
-from databricks.labs.ucx.hive_metastore.migration_status import (
-    MigrationStatusRefresher,
-    MigrationIndex,
+from databricks.labs.ucx.hive_metastore.table_migration_status import (
+    TableMigrationStatusRefresher,
+    TableMigrationIndex,
 )
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, Table
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
@@ -36,7 +36,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, caplog):
     table_crawler.snapshot.return_value = [src]
 
     workspace_info = ws_info
-    migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
 
     migrate_grants = create_autospec(MigrateGrants)
     acl_migrate = ACLMigrator(
@@ -59,10 +59,10 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     workspace_info = ws_info
     migrate_grants = create_autospec(MigrateGrants)
 
-    migration_index = create_autospec(MigrationIndex)
+    migration_index = create_autospec(TableMigrationIndex)
     migration_index.is_migrated.return_value = True
 
-    migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs",
     }

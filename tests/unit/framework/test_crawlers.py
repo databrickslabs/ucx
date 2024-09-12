@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from unittest.mock import Mock
 
 import pytest
 from databricks.labs.lsql import Row
@@ -61,17 +62,87 @@ def test_full_name():
     assert cb.full_name == "a.b.c"
 
 
-def test_snapshot_appends_to_existing_table():
+def test_snapshot_crawls_when_no_prior_crawl() -> None:
+    """Check that the crawler is invoked when the fetcher reports that the inventory doesn't exist."""
+    mock_backend = MockBackend()
+    mock_fetcher = Mock(side_effect=NotFound(".. TABLE_OR_VIEW_NOT_FOUND .."))
+    mock_loader = Mock(return_value=[Baz(first="first")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+
+    result = cb.snapshot()
+
+    mock_fetcher.assert_called_once()
+    mock_loader.assert_called_once()
+    assert [Baz(first="first")] == result
+
+
+def test_snapshot_crawls_when_prior_crawl_yielded_no_data() -> None:
+    """Check that the crawler is invoked when the fetcher reports that the inventory exists but doesn't contain data."""
+    mock_backend = MockBackend()
+    mock_fetcher = Mock(return_value=[])
+    mock_loader = Mock(return_value=[Baz(first="first")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+
+    result = cb.snapshot()
+
+    mock_fetcher.assert_called_once()
+    mock_loader.assert_called_once()
+    assert [Baz(first="first")] == result
+
+
+def test_snapshot_doesnt_crawl_if_previous_crawl_yielded_data() -> None:
+    """Check that existing data is used (with no crawl) if the fetcher can load the snapshot data."""
+    mock_backend = MockBackend()
+    mock_fetcher = Mock(return_value=[Baz(first="first")])
+    mock_loader = Mock(return_value=[Baz(first="second")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+
+    result = cb.snapshot()
+
+    mock_fetcher.assert_called_once()
+    mock_loader.assert_not_called()
+    assert [Baz(first="first")] == result
+
+
+def test_snapshot_crawls_if_refresh_forced() -> None:
+    """Check that a crawl happens (without even checking existing data) if a refresh is forced."""
+    mock_backend = MockBackend()
+    mock_fetcher = Mock(return_value=[Baz(first="first")])
+    mock_loader = Mock(return_value=[Baz(first="second")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+
+    result = cb.snapshot(force_refresh=True)
+
+    mock_fetcher.assert_not_called()
+    mock_loader.assert_called_once()
+    assert [Baz(first="second")] == result
+
+
+def test_snapshot_force_refresh_replaces_prior_data() -> None:
+    """Check that when refreshing the new data replaces (via overwrite) any existing data."""
+    mock_backend = MockBackend()
+    mock_fetcher = Mock(side_effect=RuntimeError("never called"))
+    mock_loader = Mock(return_value=[Baz(first="second")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+
+    cb.snapshot(force_refresh=True)
+
+    mock_fetcher.assert_not_called()
+    mock_loader.assert_called_once()
+    assert [Row(first="second", second=None)] == mock_backend.rows_written_for("a.b.c", mode="overwrite")
+
+
+def test_snapshot_updates_existing_table() -> None:
     mock_backend = MockBackend()
     cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, loader=lambda: [Baz(first="first")])
 
     result = cb.snapshot()
 
     assert [Baz(first="first")] == result
-    assert [Row(first="first", second=None)] == mock_backend.rows_written_for("a.b.c", "append")
+    assert [Row(first="first", second=None)] == mock_backend.rows_written_for("a.b.c", "overwrite")
 
 
-def test_snapshot_appends_to_new_table():
+def test_snapshot_updates_new_table() -> None:
     mock_backend = MockBackend()
 
     def fetcher():
@@ -85,10 +156,10 @@ def test_snapshot_appends_to_new_table():
     result = cb.snapshot()
 
     assert [Foo(first="first", second=True)] == result
-    assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
+    assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "overwrite")
 
 
-def test_snapshot_wrong_error():
+def test_snapshot_wrong_error() -> None:
     sql_backend = MockBackend()
 
     def fetcher():

@@ -38,7 +38,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
     Mounts,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -207,9 +207,9 @@ class GrantsCrawler(CrawlerBase[Grant]):
         self._udf = udf
         self._include_databases = include_databases
 
-    def snapshot(self) -> Iterable[Grant]:
+    def snapshot(self, *, force_refresh: bool = False) -> Iterable[Grant]:
         try:
-            return super().snapshot()
+            return super().snapshot(force_refresh=force_refresh)
         except Exception as e:  # pylint: disable=broad-exception-caught
             log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
             log_fn(f"Couldn't fetch grants snapshot: {e}")
@@ -786,7 +786,7 @@ class ACLMigrator:
         self,
         tables_crawler: TablesCrawler,
         workspace_info: WorkspaceInfo,
-        migration_status_refresher: MigrationStatusRefresher,
+        migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
     ):
         self._table_crawler = tables_crawler
