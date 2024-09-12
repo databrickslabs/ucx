@@ -9,7 +9,7 @@ from sqlglot import ParseError, expressions
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTableSqlLinter
+from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 logger = logging.getLogger(__name__)
 
