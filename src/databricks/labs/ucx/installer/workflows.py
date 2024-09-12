@@ -129,8 +129,8 @@ EXPORT_TO_EXCEL_NOTEBOOK = """
 # COMMAND ----------
 
 # DBTITLE 1,Installing Packages
-# MAGIC %pip install {remote_wheel} -q -q -q
-# MAGIC %pip install xlsxwriter -q -q -q
+# MAGIC %pip install {remote_wheel} -qqq
+# MAGIC %pip install xlsxwriter -qqq
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------

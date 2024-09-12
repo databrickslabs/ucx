@@ -20,7 +20,9 @@ class AssessmentExporter:
 
     def export_results(self, prompts: Prompts):
         """Main method to export results to CSV files inside a ZIP archive."""
-        valid_queries = {"azure", "estimates", "interactive", "main"}
+        project_root = Path(__file__).resolve().parents[3]
+        queries_path_root = project_root / f"labs/ucx/queries/assessment"
+        valid_queries = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
 
         export_path = Path(
             prompts.question(
@@ -36,10 +38,9 @@ class AssessmentExporter:
             validate=lambda q: q in valid_queries,
         )
 
-        project_root = Path(__file__).resolve().parents[3]
-        queries_path = project_root / f"labs/ucx/queries/assessment/{query_choice}"
 
         # Initialize and export results
+        queries_path = queries_path_root / query_choice
         dashboard_metadata = DashboardMetadata(display_name="UCX Assessment Results")
         assessment_results = dashboard_metadata.from_path(queries_path)
         assessment_results = assessment_results.replace_database(
