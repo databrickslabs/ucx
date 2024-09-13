@@ -25,6 +25,7 @@ from databricks.sdk.service.catalog import (
     AwsIamRoleRequest,
     AzureServicePrincipal,
     CatalogInfo,
+    ColumnInfo,
     DataSourceFormat,
     FunctionInfo,
     SchemaInfo,
@@ -56,6 +57,7 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
@@ -1038,6 +1040,37 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
+    def generate_sql_schema(columns: list[ColumnInfo]) -> str:
+        """Generate a SQL schema from columns."""
+        schema = "("
+        for index, column in enumerate(columns):
+            schema += escape_sql_identifier(column.name or str(index), maxsplit=0)
+            if column.type_name is None:
+                type_name = "STRING"
+            else:
+                type_name = column.type_name.value
+            schema += f" {type_name}, "
+        schema = schema[:-2] + ")"  # Remove the last ', '
+        return schema
+
+    def generate_sql_column_casting(existing_columns: list[ColumnInfo], new_columns: list[ColumnInfo]) -> str:
+        """Generate the SQL to cast columns"""
+        if any(column.name is None for column in existing_columns):
+            raise ValueError(f"Columns should have a name: {existing_columns}")
+        if len(new_columns) > len(existing_columns):
+            raise ValueError(f"Too many columns: {new_columns}")
+        select_expressions = []
+        for index, (existing_column, new_column) in enumerate(zip(existing_columns, new_columns)):
+            column_name_new = escape_sql_identifier(new_column.name or str(index), maxsplit=0)
+            if new_column.type_name is None:
+                type_name = "STRING"
+            else:
+                type_name = new_column.type_name.value
+            select_expression = f"CAST({existing_column.name} AS {type_name}) AS {column_name_new}"
+            select_expressions.append(select_expression)
+        select = ", ".join(select_expressions)
+        return select
+
     def create(  # pylint: disable=too-many-locals,too-many-arguments,too-many-statements
         *,
         catalog_name="hive_metastore",
@@ -1052,6 +1085,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         tbl_properties: dict[str, str] | None = None,
         hiveserde_ddl: str | None = None,
         storage_override: str | None = None,
+        columns: list[ColumnInfo] | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1065,6 +1099,10 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         view_text = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
+        if columns is None:
+            schema = "(id INT, value STRING)"
+        else:
+            schema = generate_sql_schema(columns)
         if view:
             table_type = TableType.VIEW
             view_text = ctas
@@ -1076,21 +1114,36 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             data_source_format = DataSourceFormat.JSON
             # DBFS locations are not purged; no suffix necessary.
             storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
+            if columns is None:
+                select = "*"
+            else:
+                # These are the columns from the JSON dataset below
+                dataset_columns = [
+                    ColumnInfo(name="calories_burnt"),
+                    ColumnInfo(name="device_id"),
+                    ColumnInfo(name="id"),
+                    ColumnInfo(name="miles_walked"),
+                    ColumnInfo(name="num_steps"),
+                    ColumnInfo(name="timestamp"),
+                    ColumnInfo(name="user_id"),
+                    ColumnInfo(name="value"),
+                ]
+                select = generate_sql_column_casting(dataset_columns, columns)
             # Modified, otherwise it will identify the table as a DB Dataset
             ddl = (
-                f"{ddl} USING json location '{storage_location}' as SELECT * FROM "
+                f"{ddl} USING json location '{storage_location}' as SELECT {select} FROM "
                 f"JSON.`dbfs:/databricks-datasets/iot-stream/data-device`"
             )
         elif external_csv is not None:
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.CSV
             storage_location = external_csv
-            ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
+            ddl = f"{ddl} {schema} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
         elif external_delta is not None:
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.DELTA
             storage_location = external_delta
-            ddl = f"{ddl} (id string) LOCATION '{storage_location}'"
+            ddl = f"{ddl} {schema} LOCATION '{storage_location}'"
         elif external:
             # external table
             table_type = TableType.EXTERNAL
@@ -1103,7 +1156,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             table_type = TableType.MANAGED
             data_source_format = DataSourceFormat.DELTA
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
-            ddl = f"{ddl} (id INT, value STRING)"
+            ddl = f"{ddl} {schema}"
         if tbl_properties:
             tbl_properties.update({"RemoveAfter": get_test_purge_time()})
         else:
