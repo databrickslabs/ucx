@@ -971,6 +971,12 @@ def inventory_schema(make_schema):
 
 
 @pytest.fixture
+def inventory_catalog():
+    # TODO: use make_catalog
+    return "hive_metastore"
+
+
+@pytest.fixture
 def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., CatalogInfo], None, None]:
     def create() -> CatalogInfo:
         # Warning: As of 2024-09-04 there is no way to mark this catalog for protection against the watchdog.
