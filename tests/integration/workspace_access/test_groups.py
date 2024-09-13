@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import timedelta
 from typing import NoReturn
 
@@ -8,6 +9,7 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
+from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
@@ -199,14 +201,12 @@ def test_group_matching_names(
     ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
     rand_elem = make_random(4)
-    workspace_group_name = f"test_group_{rand_elem}"
-    account_group_name = f"same_group_[{rand_elem}]"
+    purge_suffix = get_purge_suffix()
+    workspace_group_name = f"test_group_{rand_elem}_{purge_suffix}"
+    account_group_name = f"same_group_[{rand_elem}]_{purge_suffix}"
     user1 = make_user()
     members1 = [user1.id]
-    members2 = [user1.id]
-    if not same_user:
-        user2 = make_user()
-        members2 = [user2.id]
+    members2 = [user1.id] if same_user else [make_user().id]
     ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
     acc_group = make_acc_group(display_name=account_group_name, members=members2)
 
@@ -217,11 +217,11 @@ def test_group_matching_names(
         sql_backend,
         ws,
         inventory_schema,
-        [ws_group.display_name],
-        "ucx-temp-",
-        r"([0-9a-zA-Z]*)$",
-        None,
-        r"\[([0-9a-zA-Z]*)\]",
+        include_group_names=[ws_group.display_name],
+        renamed_group_prefix="ucx-temp-",
+        workspace_group_regex=r"([0-9a-zA-Z]*)_" + re.escape(purge_suffix) + "$",
+        workspace_group_replace=None,
+        account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
 
     membership = group_manager.validate_group_membership()
