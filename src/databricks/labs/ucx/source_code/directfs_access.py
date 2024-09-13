@@ -39,6 +39,11 @@ class DirectFsAccess:
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
+    def _as_dict(self):
+        result = asdict(self)
+        result["source_lineage"] = self.source_lineage
+        return result
+
     def from_dict(self, data: dict[str, Any]):
         return DirectFsAccess(**data)
 
@@ -49,7 +54,7 @@ class DirectFsAccess:
         source_timestamp: datetime | None = None,
     ):
         data = {
-            **asdict(self),
+            **self._as_dict(),
             "source_id": source_id or self.source_id,
             "source_timestamp": source_timestamp or self.source_timestamp,
             "source_lineage": source_lineage or self.source_lineage,
@@ -60,7 +65,7 @@ class DirectFsAccess:
         self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
     ):
         data = {
-            **asdict(self),
+            **self._as_dict(),
             "assessment_start_timestamp": assessment_start or self.assessment_start_timestamp,
             "assessment_end_timestamp": assessment_end or self.assessment_end_timestamp,
         }
@@ -90,7 +95,7 @@ class DirectFsAccessInPath(DirectFsAccess):
         task_key: str | None = None,
     ):
         data = {
-            **asdict(self),
+            **self._as_dict(),
             "job_id": job_id or self.job_id,
             "job_name": job_name or self.job_name,
             "task_key": task_key or self.task_key,
@@ -134,7 +139,12 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
 
     def _try_fetch(self) -> Iterable[T]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
-        return self._backend.fetch(sql)
+        for row in self._backend.fetch(sql):
+            # deserialize LineageAtom from dict
+            row_dict = row.as_dict()
+            lineage_dicts = row_dict["source_lineage"]
+            row_dict["source_lineage"] = [LineageAtom(*lineage_dict) for lineage_dict in lineage_dicts]
+            yield self._klass(**row_dict)
 
     def _crawl(self) -> Iterable[T]:
         return []
