@@ -265,9 +265,10 @@ def test_manual_workspace_info(ws):
     manual_workspace_info(ws, prompts)
 
 
-def test_create_table_mapping(ws):
+def test_create_table_mapping(ws, acc_client):
+    ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
-        create_table_mapping(ws)
+        create_table_mapping(ws, ctx, False, acc_client)
 
 
 def test_validate_external_locations(ws):
@@ -384,6 +385,7 @@ def test_alias(ws):
 
 def test_save_storage_and_principal_azure_no_azure_cli(ws):
     ws.config.is_azure = True
+    ws.config.is_aws = False
     ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx, False)
@@ -413,7 +415,9 @@ def test_save_storage_and_principal_aws(ws, acc_client):
 
 
 def test_save_storage_and_principal_gcp(ws):
-    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx=ctx)
 

@@ -65,6 +65,9 @@ commands:
 
   - name: create-table-mapping
     description: create initial table mapping for review
+    flags:
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace

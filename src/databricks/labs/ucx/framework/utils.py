@@ -4,19 +4,20 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 
-def escape_sql_identifier(path: str) -> str:
+def escape_sql_identifier(path: str, *, maxsplit: int = 2) -> str:
     """
     Escapes the path components to make them SQL safe.
 
     Args:
         path (str): The dot-separated path of a catalog object.
+        maxsplit (int): The maximum number of splits to perform.
 
     Returns:
          str: The path with all parts escaped in backticks.
     """
     if not path:
         return path
-    parts = path.split(".", maxsplit=2)
+    parts = path.split(".", maxsplit=maxsplit)
     escaped = [f"`{part.strip('`').replace('`', '``')}`" for part in parts]
     return ".".join(escaped)
 
