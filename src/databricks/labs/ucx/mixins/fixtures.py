@@ -50,7 +50,8 @@ from databricks.sdk.service.sql import (
     ObjectTypePlural,
     WidgetOptions,
     WidgetPosition,
-    LegacyQuery, CreateQueryRequestQuery,
+    LegacyQuery,
+    CreateQueryRequestQuery,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -850,15 +851,14 @@ def make_ws_query(ws, make_random):
             kwargs["tags"].append(remove_after_tag)
         kwargs["query_text"] = query_text
         request = CreateQueryRequestQuery(
-            display_name=kwargs["display_name"],
-            query_text=query_text,
-            tags=[str(tag) for tag in kwargs["tags"]]
+            display_name=kwargs["display_name"], query_text=query_text, tags=[str(tag) for tag in kwargs["tags"]]
         )
         query = ws.queries.create(query=request)
         logger.info(f"Query: {ws.config.host}#job/{query.id}")
         return query
 
     yield from factory("query", create, lambda item: ws.queries.delete(item.id))
+
 
 @pytest.fixture
 def make_model(ws, make_random):
