@@ -60,14 +60,14 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_reflect_account_groups_on_workspace_skips_account_groups_when_a_workspace_group_has_same_name(
+def test_reflect_account_groups_on_workspace_warns_skipping_when_a_workspace_group_has_same_name(
     caplog,
     ws,
     make_ucx_group,
     sql_backend,
     inventory_schema,
 ):
-    """We should warn about groups for which a workspace group with the same name already exists."""
+    """Warn about groups for which a workspace group with the same name exists."""
     ws_group, acc_group = make_ucx_group(wait_for_provisioning=True)
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
@@ -77,14 +77,14 @@ def test_reflect_account_groups_on_workspace_skips_account_groups_when_a_workspa
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_reflect_account_groups_on_workspace_skips_account_groups_when_already_reflected_on_workspace(
+def test_reflect_account_groups_on_workspace_logs_skipping_groups_when_already_reflected_on_workspace(
     caplog,
     ws,
     make_acc_group,
     sql_backend,
     inventory_schema,
 ):
-    """We should skip groups which are already reflected on the workspace."""
+    """Log skipping groups which are reflected on the workspace already."""
     acc_group = make_acc_group(wait_for_provisioning=True)
 
     sql_backend.save_table(
