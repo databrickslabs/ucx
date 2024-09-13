@@ -204,10 +204,7 @@ def test_group_matching_names(
     account_group_name = f"same_group_[{rand_elem}]"
     user1 = make_user()
     members1 = [user1.id]
-    members2 = [user1.id]
-    if not same_user:
-        user2 = make_user()
-        members2 = [user2.id]
+    members2 = [user1.id] if same_user else [make_user().id]
     ws_group = make_group(
         display_name=workspace_group_name,
         members=members1,
