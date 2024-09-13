@@ -19,7 +19,7 @@ def test_running_real_migrate_groups_job(
     make_secret_scope,
     make_secret_scope_acl,
 ):
-    ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
+    ws_group_a, acc_group_a = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
