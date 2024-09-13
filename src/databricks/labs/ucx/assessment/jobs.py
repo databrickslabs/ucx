@@ -71,8 +71,8 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, catalog, schema):
+        super().__init__(sbe, catalog, schema, "jobs", JobInfo)
         self._ws = ws
 
     def _crawl(self) -> Iterable[JobInfo]:
