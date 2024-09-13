@@ -13,7 +13,7 @@ def test_job_assessment():
         cluster_ids=['simplest-autoscale', 'outdated-autoscale'],
     )
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 2
     assert result_set[0].success == 1
     assert result_set[1].success == 0
@@ -22,7 +22,7 @@ def test_job_assessment():
 def test_job_assessment_no_job_tasks():
     ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 1
     assert result_set[0].success == 1
 
@@ -30,14 +30,14 @@ def test_job_assessment_no_job_tasks():
 def test_job_assessment_no_job_settings():
     ws = mock_workspace_client(job_ids=['no-settings'])
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 0
 
 
 def test_spark_jar_task_failures():
     ws = mock_workspace_client(job_ids=['spark-jar-task'], cluster_ids=['azure-spn-secret'])
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 1
     assert result_set[0].success == 0
     assert "task spark_jar_task is a jar task" in result_set[0].failures
@@ -46,7 +46,7 @@ def test_spark_jar_task_failures():
 def test_job_assessment_for_azure_spark_config():
     ws = mock_workspace_client(job_ids=['on-azure-spn-secret'], cluster_ids=['azure-spn-secret'])
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 1
     assert result_set[0].success == 0
 
@@ -54,7 +54,7 @@ def test_job_assessment_for_azure_spark_config():
 def test_jobs_assessment_with_spn_cluster_no_job_tasks():
     ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
-    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    result_set = JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     assert len(result_set) == 1
     assert result_set[0].success == 1
 
@@ -62,7 +62,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks():
 def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
-    JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    JobsCrawler(ws, sql_backend, "hive_metastore", "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "overwrite")
     assert result == [Row(job_id='9001', success=1, failures='[]', job_name='No Tasks', creator=None)]
 
