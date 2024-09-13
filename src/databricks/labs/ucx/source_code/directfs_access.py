@@ -100,7 +100,7 @@ class DirectFsAccessInPath(DirectFsAccess):
             "job_name": job_name or self.job_name,
             "task_key": task_key or self.task_key,
         }
-        return self.from_dict(**data)
+        return self.from_dict(data)
 
 
 T = TypeVar("T", bound=DirectFsAccess)
