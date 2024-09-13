@@ -674,7 +674,7 @@ def _make_group(name, cfg, interface, make_random):
         roles: list[str] | None = None,
         entitlements: list[str] | None = None,
         display_name: str | None = None,
-        wait_for_provisioning: bool = False,
+        wait_for_provisioning: bool = True,
         **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}-{get_purge_suffix()}" if display_name is None else display_name
