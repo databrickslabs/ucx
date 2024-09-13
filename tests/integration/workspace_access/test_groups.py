@@ -60,13 +60,20 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
-    ws, make_ucx_group, sql_backend, inventory_schema
+def test_reflect_account_groups_on_workspace_skips_groups_that_already_exists_in_the_workspace(
+    caplog,
+    ws,
+    make_ucx_group,
+    sql_backend,
+    inventory_schema,
 ):
-    ws_group, _ = make_ucx_group()
+    """The groups that already are reflected in the workspace should be skipped."""
+    ws_group, acc_group = make_ucx_group(wait_for_provisioning=True)
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
-    group_manager.reflect_account_groups_on_workspace()
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.workspace_access.groups"):
+        group_manager.reflect_account_groups_on_workspace()
+    assert f"Skipping {acc_group.display_name}: already in workspace" in caplog.text
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

@@ -108,3 +108,8 @@ def mock_notebook_resolver():
     resolver = create_autospec(BaseNotebookResolver)
     resolver.resolve_notebook.return_value = None
     return resolver
+
+
+@pytest.fixture
+def mock_backend():
+    return MockBackend()
