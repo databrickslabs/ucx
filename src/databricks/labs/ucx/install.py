@@ -123,7 +123,6 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
-            functools.partial(table, "recon_results", ReconResult),
             functools.partial(table, "direct_file_system_access_in_paths", DirectFsAccessInPath),
             functools.partial(table, "direct_file_system_access_in_queries", DirectFsAccessInQuery),
         ],
