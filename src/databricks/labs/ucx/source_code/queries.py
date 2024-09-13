@@ -75,15 +75,30 @@ class QueryLinter:
                 message=advice.message,
             )
 
-    def collect_dfsas_from_query(self, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccessInQuery]:
+    @classmethod
+    def collect_dfsas_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccessInQuery]:
         if query.query_text is None:
             return
         linter = DirectFsAccessSqlLinter()
         source_id = query.id or "no id"
         source_name = query.display_name or "<anonymous>"
-        source_timestamp = datetime.now() if query.update_time is None else datetime.fromisoformat(query.update_time)
+        source_timestamp = cls._read_timestamp(query.update_time)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"query_name": source_name})]
         for dfsa in linter.collect_dfsas(query.query_text):
             yield DirectFsAccessInQuery(**asdict(dfsa)).replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
             )
+
+    @classmethod
+    def _read_timestamp(cls, timestamp: str | None) -> datetime:
+        if timestamp is not None:
+            methods = [
+                lambda s: datetime.fromisoformat(s),
+                lambda s: datetime.fromisoformat(s[:-1]),  # ipython breaks on final 'Z'
+            ]
+            for method in methods:
+                try:
+                    return method(timestamp)
+                except ValueError:
+                    pass
+        return datetime.now()
