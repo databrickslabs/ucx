@@ -11,6 +11,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
+    inventory_catalog: str = "hive_metastore"
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None
@@ -71,7 +72,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_object_permissions: list[str] | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
-        return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
+        return text.replace("$inventory", f"{self.inventory_catalog}.{self.inventory_database}")
 
     @classmethod
     def v1_migrate(cls, raw: dict) -> dict:
