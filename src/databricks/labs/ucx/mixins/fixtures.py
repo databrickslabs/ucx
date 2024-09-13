@@ -15,7 +15,7 @@ from typing import BinaryIO
 import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.blueprint.commands import CommandExecutor
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient, GroupsAPI, AccountGroupsAPI
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
@@ -34,6 +34,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.iam import Group
 from databricks.sdk.service.ml import ModelTag
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
@@ -638,6 +639,33 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
+def wait_group_provisioned(interface: AccountGroupsAPI | GroupsAPI, *groups: Group) -> None:
+    # The groups API is eventually consistent, but not monotonically consistent. Here we try to compensate for
+    # the lack of monotonic consistency by requiring that two subsequent calls confirm it exists. REST API
+    # internals cache things for up to 60s, we see times close to this during tests. The retry timeout reflects
+    # this: if it's taking much longer then something else is wrong.
+
+    @retried(on=[NotFound], timeout=timedelta(seconds=90))
+    def _get_group(group: Group) -> None:
+        assert group.id
+        interface.get(group.id)
+        interface.get(group.id)
+
+    @retried(on=[NotFound], timeout=timedelta(seconds=90))
+    def _check_groups_in_listing() -> None:
+        expected_ids = {group.id for group in groups}
+        found_groups = interface.list(attributes="id")
+        found_ids = {group.id for group in found_groups}
+        if not expected_ids.issubset(found_ids):
+            missing_groups = [group for group in groups if group.id not in found_ids]
+            msg = f"Group ids not (yet) found in group listing: {missing_groups}"
+            raise NotFound(msg)
+
+    for group in groups:
+        _get_group(group)
+    _check_groups_in_listing()
+
+
 def _make_group(name, cfg, interface, make_random):
     @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(
@@ -663,12 +691,8 @@ def _make_group(name, cfg, interface, make_random):
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
 
-        @retried(on=[NotFound], timeout=timedelta(minutes=2))
-        def _wait_for_provisioning() -> None:
-            interface.get(group.id)
-
         if wait_for_provisioning:
-            _wait_for_provisioning()
+            wait_group_provisioned(interface, group)
 
         return group
 
