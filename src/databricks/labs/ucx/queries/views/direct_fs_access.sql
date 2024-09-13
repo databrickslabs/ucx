@@ -1,7 +1,7 @@
 SELECT
     *
-FROM direct_file_system_access_in_paths
-UNION
+FROM $inventory.direct_file_system_access_in_paths
+UNION ALL
 SELECT
-    *
-FROM direct_file_system_access_in_queries
+    *, NULL as job_id, NULL as job_name, null as task_key
+FROM $inventory.direct_file_system_access_in_queries
