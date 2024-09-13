@@ -79,9 +79,10 @@ class QueryLinter:
         if query.query_text is None:
             return
         linter = DirectFsAccessSqlLinter()
-        source_id = query.display_name or "<anonymous>"
+        source_id = query.id or "no id"
+        source_name = query.display_name or "<anonymous>"
         source_timestamp = datetime.now() if query.update_time is None else datetime.fromisoformat(query.update_time)
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=str(query.id), other={"query_name": query.display_name})]
+        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"query_name": source_name})]
         for dfsa in linter.collect_dfsas(query.query_text):
             yield DirectFsAccessInQuery(**asdict(dfsa)).replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
