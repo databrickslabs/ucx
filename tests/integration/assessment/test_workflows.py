@@ -40,11 +40,8 @@ def test_running_real_assessment_job(
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
 
 
-    tables_crawler = TablesCrawler(sql_backend, inventory_schema, [source_schema.name])
-    tables_crawled = tables_crawler.snapshot()
-
     tables = []
-    for _ in tables_crawled:
+    for _ in TablesCrawler(sql_backend, inventory_schema, [source_schema.name]).snapshot():
         tables.append(_.name)
 
     assert len(tables) == 5
