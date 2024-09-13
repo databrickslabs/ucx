@@ -11,7 +11,8 @@ def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, sql_backend
     problems = [row for row in all_problems if row["query_name"]==query.display_name]
     assert len(problems) == 1
     crawler = DirectFsAccessCrawler.for_queries(sql_backend, simple_ctx.inventory_database)
-    dfsas = list(crawler.snapshot())
+    all_dfsas = crawler.snapshot()
+    dfsas = [dfsa for dfsa in all_dfsas if dfsa.source_id==query.id]
     assert len(dfsas) == 1
 
 
