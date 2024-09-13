@@ -93,7 +93,7 @@ class QueryLinter:
     def _read_timestamp(cls, timestamp: str | None) -> datetime:
         if timestamp is not None:
             methods = [
-                lambda s: datetime.fromisoformat(s),
+                datetime.fromisoformat,
                 lambda s: datetime.fromisoformat(s[:-1]),  # ipython breaks on final 'Z'
             ]
             for method in methods:
