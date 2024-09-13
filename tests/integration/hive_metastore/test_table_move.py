@@ -7,6 +7,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
+from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +29,11 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_move_tables(
-    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
+    acc, ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
 ):  # pylint: disable=too-many-locals
     table_move = TableMove(ws, sql_backend)
-    group_a = make_acc_group()
-    group_b = make_acc_group()
+    group_a = make_acc_group(wait_for_provisioning=False)
+    group_b = make_acc_group(wait_for_provisioning=False)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
     from_table_1 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
@@ -48,6 +49,7 @@ def test_move_tables(
     to_schema = make_schema(catalog_name=to_catalog.name)
     # creating a table in target schema to test skipping
     to_table_3 = make_table(catalog_name=to_catalog.name, schema_name=to_schema.name, name=from_table_3.name)
+    wait_group_provisioned(acc.groups, group_a, group_b)
     sql_backend.execute(f"GRANT SELECT ON TABLE {from_table_1.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT,MODIFY ON TABLE {from_table_2.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
@@ -147,11 +149,11 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_alias_tables(
-    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
+    acc, ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group
 ):  # pylint: disable=too-many-locals
     table_move = TableMove(ws, sql_backend)
-    group_a = make_acc_group()
-    group_b = make_acc_group()
+    group_a = make_acc_group(wait_for_provisioning=False)
+    group_b = make_acc_group(wait_for_provisioning=False)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
     from_table_1 = make_table(catalog_name=from_catalog.name, schema_name=from_schema.name)
@@ -167,6 +169,7 @@ def test_alias_tables(
     to_schema = make_schema(catalog_name=to_catalog.name)
     # creating a table in target schema to test skipping
     to_table_3 = make_table(catalog_name=to_catalog.name, schema_name=to_schema.name, name=from_table_3.name)
+    wait_group_provisioned(acc.groups, group_a, group_b)
     sql_backend.execute(f"GRANT SELECT ON TABLE {from_table_1.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT,MODIFY ON TABLE {from_table_2.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")

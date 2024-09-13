@@ -8,6 +8,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql
 
+from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
@@ -81,8 +82,10 @@ def test_permissions_for_redash_after_group_is_renamed(
     This test validates that Redash Permissions Support is able to apply and validate permissions correctly
     after rename operation.
     """
-    ws_group = make_group()
-    acc_group = make_group()
+    ws_group = make_group(wait_for_provisioning=False)
+    acc_group = make_group(wait_for_provisioning=False)
+
+    wait_group_provisioned(ws.groups, ws_group, acc_group)
 
     query = make_query()
     make_query_permissions(

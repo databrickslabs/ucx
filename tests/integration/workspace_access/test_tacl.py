@@ -2,6 +2,7 @@ import json
 import logging
 from collections import defaultdict
 
+from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
@@ -92,10 +93,12 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
     assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group):
-    old = make_group()
-    new = make_group()
+def test_permission_for_files_anonymous_func(ws, sql_backend, runtime_ctx, make_group):
+    old = make_group(wait_group_provisioned=False)
+    new = make_group(wait_group_provisioned=False)
     logger.debug(f"old={old.display_name}, new={new.display_name}")
+
+    wait_group_provisioned(ws.groups, old, new)
 
     sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{old.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{old.display_name}`")

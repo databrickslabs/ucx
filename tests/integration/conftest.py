@@ -98,8 +98,13 @@ def sql_fetch_all(sql_backend):
 
 
 @pytest.fixture
-def make_ucx_group(make_random, make_group, make_acc_group, make_user):
-    def inner(workspace_group_name=None, account_group_name=None, **kwargs):
+def make_ucx_group(acc, ws, make_random, make_group, make_acc_group, make_user):
+    def inner(
+        workspace_group_name: str | None = None,
+        account_group_name: str | None = None,
+        wait_for_provisioning: bool = True,
+        **kwargs,
+    ):
         if not workspace_group_name:
             workspace_group_name = f"ucx_G{make_random(4)}-{get_purge_suffix()}"  # noqa: F405
         if not account_group_name:
@@ -110,20 +115,33 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
+            wait_for_provisioning=False,
             **kwargs,
         )
-        acc_group = make_acc_group(display_name=account_group_name, members=members, **kwargs)
+        acc_group = make_acc_group(
+            display_name=account_group_name,
+            members=members,
+            wait_for_provisioning=False,
+            **kwargs,
+        )
+        if wait_for_provisioning:
+            wait_group_provisioned(ws.groups, ws_group)  # noqa: F405
+            wait_group_provisioned(acc.groups, acc_group)  # noqa: F405
         return ws_group, acc_group
 
     return inner
 
 
 @pytest.fixture
-def make_group_pair(make_random, make_group):
+def make_group_pair(acc, ws, make_random, make_group):
     def inner() -> MigratedGroup:
         suffix = make_random(4)
-        ws_group = make_group(display_name=f"old_{suffix}", entitlements=["allow-cluster-create"])
-        acc_group = make_group(display_name=f"new_{suffix}")
+        ws_group = make_group(
+            display_name=f"old_{suffix}", entitlements=["allow-cluster-create"], wait_for_provisioning=False
+        )
+        acc_group = make_group(display_name=f"new_{suffix}", wait_for_provisioning=False)
+        wait_group_provisioned(ws.groups, ws_group.id)  # noqa: F405
+        wait_group_provisioned(acc.groups, acc_group.id)  # noqa: F405
         return MigratedGroup.partial_info(ws_group, acc_group)
 
     return inner

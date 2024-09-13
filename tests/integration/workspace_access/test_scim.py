@@ -6,6 +6,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
+from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
@@ -22,8 +23,10 @@ def test_some_entitlements(
     make_acc_group,
     use_permission_migration_api: bool,
 ):
-    ws_group = make_group()
-    acc_group = make_acc_group()
+    ws_group = make_group(wait_for_provisioning=False)
+    acc_group = make_acc_group(wait_for_provisioning=False)
+    wait_group_provisioned(ws.groups, ws_group)
+    wait_group_provisioned(acc.groups, acc_group)
     acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
     ws.groups.patch(

@@ -8,6 +8,7 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
+from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
@@ -196,7 +197,7 @@ def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, ma
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 @pytest.mark.parametrize("same_user", [True, False])
 def test_group_matching_names(
-    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
+    acc, ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
     rand_elem = make_random(4)
     workspace_group_name = f"test_group_{rand_elem}"
@@ -207,8 +208,16 @@ def test_group_matching_names(
     if not same_user:
         user2 = make_user()
         members2 = [user2.id]
-    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
-    acc_group = make_acc_group(display_name=account_group_name, members=members2)
+    ws_group = make_group(
+        display_name=workspace_group_name,
+        members=members1,
+        entitlements=["allow-cluster-create"],
+        wait_for_provisioning=False,
+    )
+    acc_group = make_acc_group(display_name=account_group_name, members=members2, wait_for_provisioning=False)
+
+    wait_group_provisioned(ws.groups, ws_group)
+    wait_group_provisioned(acc.groups, acc_group)
 
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to Account Group {acc_group.display_name}"
