@@ -47,6 +47,7 @@ def test_running_real_migrate_groups_job(
     installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
     found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert acc_group_a.display_name in found, "Group not found in cluster policies"
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
     assert found[f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
