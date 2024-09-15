@@ -6,7 +6,7 @@ from pylsp.config.config import Config  # type: ignore
 from pylsp.workspace import Document  # type: ignore
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.lsp import Diagnostic
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def pylsp_lint(config: Config, document: Document) -> list[dict]:
     cfg = config.plugin_settings('pylsp_ucx', document_path=document.uri)
 
-    migration_index = MigrationIndex([MigrationStatus.from_json(st) for st in cfg.get('migration_index', [])])
+    migration_index = TableMigrationIndex([TableMigrationStatus.from_json(st) for st in cfg.get('migration_index', [])])
 
     session_state = CurrentSessionState(
         data_security_mode=CurrentSessionState.parse_security_mode(cfg.get('dataSecurityMode', None)),

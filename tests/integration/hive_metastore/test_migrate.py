@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
-from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
+from databricks.sdk.service.catalog import ColumnInfo, ColumnTypeName, Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -20,7 +20,11 @@ _SPARK_CONF = get_azure_spark_conf()
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    src_managed_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        columns=[ColumnInfo(name="-das-hes-", type_name=ColumnTypeName.STRING)],  # Test with column that needs escaping
+    )
 
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -48,7 +52,11 @@ def test_migrate_dbfs_non_delta_tables(ws, sql_backend, runtime_ctx, make_catalo
         pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(
-        catalog_name=src_schema.catalog_name, non_delta=True, schema_name=src_schema.name
+        catalog_name=src_schema.catalog_name,
+        non_delta=True,
+        schema_name=src_schema.name,
+        # Test with column that needs escaping
+        columns=[ColumnInfo(name="1-0`.0-ugly-column", type_name=ColumnTypeName.STRING)],
     )
 
     dst_catalog = make_catalog()
@@ -134,7 +142,12 @@ def test_migrate_external_table(
     make_mounted_location,
 ):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=make_mounted_location)
+    src_external_table = runtime_ctx.make_table(
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+        # Test with column that needs escaping
+        columns=[ColumnInfo(name="`back`ticks`", type_name=ColumnTypeName.STRING)],
+    )
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
@@ -667,6 +680,8 @@ def test_migrate_table_in_mount(
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
         external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
+        # Test with column that needs escaping
+        columns=[ColumnInfo(name="1-0`.0-ugly-column", type_name=ColumnTypeName.STRING)],
     )
     table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
     # TODO: Remove this hack below

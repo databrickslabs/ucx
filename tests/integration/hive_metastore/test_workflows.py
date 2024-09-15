@@ -101,7 +101,7 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
 
 
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_table_migration_job_publishes_remianed_tables(
+def test_table_migration_job_publishes_remaining_tables(
     ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog
 ):
     tables, dst_schema = prepare_tables_for_migration
@@ -118,7 +118,7 @@ def test_table_migration_job_publishes_remianed_tables(
     installation_ctx.deployed_workflows.run_workflow("migrate-tables")
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
-    remained_tables = list(
+    remaining_tables = list(
         sql_backend.fetch(
             f"""
                 SELECT
@@ -129,4 +129,4 @@ def test_table_migration_job_publishes_remianed_tables(
             """
         )
     )
-    assert remained_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'
+    assert remaining_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'

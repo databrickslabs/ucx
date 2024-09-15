@@ -26,8 +26,9 @@ def test_user(make_user):
     logger.info(f"created {make_user()}")
 
 
-def test_group(make_group, make_user):
-    logger.info(f'created {make_group(display_name="abc", members=[make_user().id])}')
+def test_group(make_group, make_user, make_random):
+    display_name = f"abc-{make_random(4)}"
+    logger.info(f'created {make_group(display_name=display_name, members=[make_user().id])}')
 
 
 def test_secret_scope(make_secret_scope):

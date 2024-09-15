@@ -92,7 +92,7 @@ def test_init_script_without_config_should_have_empty_creator_name():
     mockbackend = MockBackend()
     crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
     crawler.snapshot()
-    result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
+    result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "overwrite")
 
     assert result == [
         Row(script_id="222", success=1, failures="[]", script_name="newscript", enabled=False, created_by=None),

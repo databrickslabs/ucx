@@ -8,7 +8,7 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 
 logger = logging.getLogger(__name__)
@@ -60,13 +60,52 @@ def test_rename_groups(ws, make_ucx_group, sql_backend, inventory_schema):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_reflect_account_groups_on_workspace_recovers_when_group_already_exists(
-    ws, make_ucx_group, sql_backend, inventory_schema
+def test_reflect_account_groups_on_workspace_warns_skipping_when_a_workspace_group_has_same_name(
+    caplog,
+    ws,
+    make_ucx_group,
+    sql_backend,
+    inventory_schema,
 ):
-    ws_group, _ = make_ucx_group()
+    """Warn about groups for which a workspace group with the same name exists."""
+    ws_group, acc_group = make_ucx_group(wait_for_provisioning=True)
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    with caplog.at_level(logging.WARN, logger="databricks.labs.ucx.workspace_access.groups"):
+        group_manager.reflect_account_groups_on_workspace()
+    assert f"Skipping {acc_group.display_name}: group already exists in workspace" in caplog.text
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_reflect_account_groups_on_workspace_logs_skipping_groups_when_already_reflected_on_workspace(
+    caplog,
+    ws,
+    make_acc_group,
+    sql_backend,
+    inventory_schema,
+):
+    """Log skipping groups which are reflected on the workspace already."""
+    acc_group = make_acc_group(wait_for_provisioning=True)
+
+    sql_backend.save_table(
+        f"{inventory_schema}.groups",
+        [
+            MigratedGroup(
+                acc_group.id,
+                acc_group.display_name,
+                acc_group.display_name,
+                "ucx-temp-" + acc_group.display_name,
+            )
+        ],
+        MigratedGroup,
+    )
+
+    group_manager = GroupManager(sql_backend, ws, inventory_schema, [acc_group.display_name], "ucx-temp-")
     group_manager.reflect_account_groups_on_workspace()
+
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.workspace_access.groups"):
+        group_manager.reflect_account_groups_on_workspace()
+    assert f"Skipping {acc_group.display_name}: already in workspace" in caplog.text
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
