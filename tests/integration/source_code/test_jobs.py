@@ -18,7 +18,7 @@ from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat, Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency
@@ -188,7 +188,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
 def test_lint_local_code(simple_ctx):
     # no need to connect
     session_state = CurrentSessionState()
-    linter_context = LinterContext(MigrationIndex([]), session_state)
+    linter_context = LinterContext(TableMigrationIndex([]), session_state)
     light_ctx = simple_ctx
     ucx_path = Path(__file__).parent.parent.parent.parent
     path_to_scan = Path(ucx_path, "src")

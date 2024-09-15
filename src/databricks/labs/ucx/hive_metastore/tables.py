@@ -305,17 +305,17 @@ class Table:
     def sql_migrate_table_in_mount(self, target_table_key: str, table_schema: Iterator[typing.Any]):
         fields = []
         partitioned_fields = []
-        next_fileds_are_partitioned = False
+        next_fields_are_partitioned = False
         for key, value, _ in table_schema:
             if key == "# Partition Information":
                 continue
             if key == "# col_name":
-                next_fileds_are_partitioned = True
+                next_fields_are_partitioned = True
                 continue
-            if next_fileds_are_partitioned:
-                partitioned_fields.append(f"{key}")
+            if next_fields_are_partitioned:
+                partitioned_fields.append(escape_sql_identifier(key, maxsplit=0))
             else:
-                fields.append(f"{key} {value}")
+                fields.append(f"{escape_sql_identifier(key, maxsplit=0)} {value}")
 
         partitioned_str = ""
         if partitioned_fields:
@@ -562,7 +562,7 @@ class FasterTableScanCrawler(CrawlerBase):
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database."""
         tasks = []
-        catalog_tables: Collection[Table] = []
+        catalog_tables: Collection[Table]
         catalog = "hive_metastore"
         databases = self._all_databases()
         for database in databases:

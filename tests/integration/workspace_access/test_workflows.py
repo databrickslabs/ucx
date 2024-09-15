@@ -19,7 +19,7 @@ def test_running_real_migrate_groups_job(
     make_secret_scope,
     make_secret_scope_acl,
 ):
-    ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
+    ws_group_a, acc_group_a = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -47,6 +47,7 @@ def test_running_real_migrate_groups_job(
     installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
     found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert acc_group_a.display_name in found, "Group not found in cluster policies"
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
     assert found[f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 

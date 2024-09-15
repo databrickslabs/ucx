@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.known import KnownList
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.files import (
     LocalFileMigrator,
     FileLoader,
@@ -28,21 +28,21 @@ from tests.unit import locate_site_packages, _samples_path
 
 
 def test_notebook_migrator_ignores_unsupported_extensions():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
 def test_file_migrator_fix_ignores_unsupported_extensions():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
 def test_file_migrator_fix_ignores_unsupported_language():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
@@ -66,7 +66,7 @@ def test_file_migrator_supported_language_no_diagnostics():
 
 
 def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup):
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = mock_path_lookup.resolve(Path("root1.run.py"))
     assert not migrator.apply(path)

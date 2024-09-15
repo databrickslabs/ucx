@@ -557,11 +557,15 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         tasks = []
         account_groups_in_account = self._account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
+        workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
         logger.info(f"Starting to reflect {len(groups_to_migrate)} account groups into workspace for migration...")
         for migrated_group in groups_to_migrate:
             if migrated_group.name_in_account in account_groups_in_workspace:
                 logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
+                continue
+            if migrated_group.name_in_account in workspace_groups_in_workspace:
+                logger.error(f"Skipping {migrated_group.name_in_account}: group already exists in workspace")
                 continue
             if migrated_group.name_in_account not in account_groups_in_account:
                 logger.warning(f"Skipping {migrated_group.name_in_account}: not in account")

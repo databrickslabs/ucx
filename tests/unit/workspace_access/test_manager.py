@@ -14,11 +14,6 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup, Migration
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 
-@pytest.fixture
-def mock_backend():
-    return MockBackend()
-
-
 def test_inventory_permission_manager_init(mock_backend):
     permission_manager = PermissionManager(mock_backend, "test_database", [])
 
@@ -53,7 +48,7 @@ def test_snapshot_crawl_fallback(mocker) -> None:
     permission_manager.snapshot()
 
     assert [Row(object_id="a", object_type="b", raw="c")] == sql_backend.rows_written_for(
-        "hive_metastore.test_database.permissions", "append"
+        "hive_metastore.test_database.permissions", "overwrite"
     )
 
 
@@ -72,7 +67,7 @@ def test_manager_snapshot_crawl_ignore_disabled_features(mock_backend, mocker):
     permission_manager.snapshot()
 
     assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
-        "hive_metastore.test_database.permissions", "append"
+        "hive_metastore.test_database.permissions", "overwrite"
     )
 
 

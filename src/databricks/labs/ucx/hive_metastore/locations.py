@@ -2,7 +2,7 @@ import dataclasses
 import logging
 import os
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
@@ -304,7 +304,8 @@ class Mounts(CrawlerBase[Mount]):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
-    def _deduplicate_mounts(self, mounts: list) -> list:
+    @staticmethod
+    def _deduplicate_mounts(mounts: list) -> list:
         seen = set()
         deduplicated_mounts = []
         for obj in mounts:
@@ -335,6 +336,14 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
+    """Experimental scanner for tables that can be found on mounts.
+
+    This crawler was developed with a specific use-case in mind and isn't currently in use. It does not conform to the
+    design of other crawlers. In particular:
+     - It depends on the `tables` inventory, but without verifying the tables crawler has run.
+     - Rather than have its own table it will blindly overwrite the existing content of the tables inventory.
+    """
+
     TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
@@ -359,18 +368,20 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
-    def snapshot(self) -> list[Table]:
-        updated_records = self._crawl()
-        self._overwrite_records(updated_records)
-        return updated_records
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
+        if not force_refresh:
+            msg = "This crawler only supports forced refresh; refer to source implementation for details."
+            raise NotImplementedError(msg)
+        return list(super().snapshot(force_refresh=force_refresh))
 
     def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
-        cached_results = []
         try:
             cached_results = list(self._try_fetch())
         except NotFound:
-            pass
+            # This happens when the table crawler hasn't run yet, and is arguably incorrect:
+            # rather than pretending there are no tables it should instead trigger a crawl.
+            cached_results = []
         table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
         loaded_records = list(self._crawl_tables(table_paths))
@@ -385,7 +396,8 @@ class TablesInMounts(CrawlerBase[Table]):
         ):
             yield Table(*row)
 
-    def _get_tables_paths_from_assessment(self, loaded_records: Iterable[Table]) -> dict[str, str]:
+    @staticmethod
+    def _get_tables_paths_from_assessment(loaded_records: Iterable[Table]) -> dict[str, str]:
         seen = {}
         for rec in loaded_records:
             if not rec.location:
@@ -393,19 +405,15 @@ class TablesInMounts(CrawlerBase[Table]):
             seen[rec.location] = rec.key
         return seen
 
-    def _overwrite_records(self, items: Sequence[Table]):
-        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
-
-    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]):
+    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]) -> list[Table]:
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
             if self._include_mounts and mount.name not in self._include_mounts:
                 logger.info(f"Filtering mount {mount.name}")
                 continue
-            table_paths = {}
             if self._include_paths_in_mount:
+                table_paths = {}
                 for path in self._include_paths_in_mount:
                     table_paths.update(self._find_delta_log_folders(path))
             else:
@@ -440,7 +448,8 @@ class TablesInMounts(CrawlerBase[Table]):
         logger.info(f"Found a total of {len(all_tables)} tables in mount points")
         return all_tables
 
-    def _get_table_location(self, mount: Mount, path: str):
+    @staticmethod
+    def _get_table_location(mount: Mount, path: str) -> str:
         """
         There can be different cases for mounts:
             - Mount(name='/mnt/things/a', source='abfss://things@labsazurethings.dfs.core.windows.net/a')
@@ -451,7 +460,11 @@ class TablesInMounts(CrawlerBase[Table]):
             return path.replace(f"dbfs:{mount.name}/", mount.source)
         return path.replace(f"dbfs:{mount.name}", mount.source)
 
-    def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(
+        self,
+        root_dir: str,
+        delta_log_folders: dict[str, TableInMount] | None = None,
+    ) -> dict[str, TableInMount]:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
@@ -513,18 +526,22 @@ class TablesInMounts(CrawlerBase[Table]):
             return TableInMount(format="PARQUET", is_partitioned=False)
         return None
 
-    def _is_partitioned(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_partitioned(file_name: str) -> bool:
         return '=' in file_name
 
-    def _is_parquet(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_parquet(file_name: str) -> bool:
         parquet_patterns = {'.parquet'}
         return any(pattern in file_name for pattern in parquet_patterns)
 
-    def _is_csv(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_csv(file_name: str) -> bool:
         csv_patterns = {'.csv'}
         return any(pattern in file_name for pattern in csv_patterns)
 
-    def _is_json(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_json(file_name: str) -> bool:
         json_patterns = {'.json'}
         return any(pattern in file_name for pattern in json_patterns)
 
