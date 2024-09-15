@@ -1111,16 +1111,12 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 ```
 
 [[back to top](#databricks-labs-ucx)]
-
 ## `export-assessment` command
 
 ```commandline
 databricks labs ucx export-assessment
 ```
 The `export-assessment` command exports UCX results to a specified location and prompts for details on the path and report type. If not specified, it defaults to exporting the main results to the current directory as `export_to_zipped_csv.zip`.
-
-### Prompts
-
 - **Choose a path to save the UCX Assessment results:**
     - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
 
@@ -1133,7 +1129,6 @@ The `export-assessment` command exports UCX results to a specified location and 
     - **Default:** `main`
 
 [[back to top](#databricks-labs-ucx)]
-
 
 # Metastore related commands
 
