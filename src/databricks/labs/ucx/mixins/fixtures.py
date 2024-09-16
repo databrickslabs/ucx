@@ -640,10 +640,32 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
 
 
 def wait_group_provisioned(interface: AccountGroupsAPI | GroupsAPI, *groups: Group) -> None:
-    # The groups API is eventually consistent, but not monotonically consistent. Here we try to compensate for
-    # the lack of monotonic consistency by requiring that two subsequent calls confirm it exists. REST API
-    # internals cache things for up to 60s, we see times close to this during tests. The retry timeout reflects
-    # this: if it's taking much longer then something else is wrong.
+    """Wait for a set of groups to be visible via the supplied group interface.
+
+    Due to consistency issues in the group-management APIs, new groups are not always visible in a consistent manner
+    after being created or modified. This method can be used to mitigate against this by checking that the set of
+    groups:
+
+     - Is visible via the `.get()` interface;
+     - Is visible via the `.list()` interface that enumerates groups.
+
+    Visibility is assumed when 2 calls in a row return the expected results.
+
+    Note: this method should only be used by tests when more than a single group is being created and needs to be waited
+    for. Test fixtures that create groups (eg. `make_group()` and `make_acc_group`) default to invoking this internally.
+    (Both support a `wait_for_provisioning` argument that defaults to `True` and controls this behaviour.)
+
+    Args:
+          interface: the group-management interface to use for checking whether the groups are visible.
+          groups: the set of groups whose visibility should be verified.
+    Raises:
+          NotFound: this is thrown if it takes longer than 90 seconds for any of the groups to become visible via the
+          management interface.
+    """
+    # Use double-checking to try and compensate for the lack of monotonic consistency with the group-management
+    # interfaces: two subsequent calls need to succeed for us to proceed. (This is probabilistic, and not a guarantee.)
+    # The REST API internals cache things for up to 60s, and we see times close to this during tests. The retry timeout
+    # reflects this: if it's taking much longer then something else is wrong.
 
     @retried(on=[NotFound], timeout=timedelta(seconds=90))
     def _get_group(group: Group) -> None:
