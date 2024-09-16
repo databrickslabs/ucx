@@ -584,13 +584,11 @@ def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_mi
 
 
 def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
-    azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
         azure_subscription_id="id",
-        azure_resources=azurerm,
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
 
@@ -604,7 +602,13 @@ def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(w
         ws.config.auth_type = "azure-cli"
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
 
-    create_uber_principal(workspace_clients[0], prompts, run_as_collection=True, a=acc_client, subscription_id="test",)
+    create_uber_principal(
+        workspace_clients[0],
+        prompts,
+        run_as_collection=True,
+        a=acc_client,
+        subscription_id="test",
+    )
 
     for workspace_client in workspace_clients:
         workspace_client.get_workspace_id.assert_called()
