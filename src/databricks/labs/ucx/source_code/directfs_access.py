@@ -47,13 +47,10 @@ class DirectFsAccess:
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
-    def _as_dict(self):
-        result = asdict(self)
+    def as_dict(self):
+        result = dataclasses.asdict(self)
         result["source_lineage"] = self.source_lineage
         return result
-
-    def from_dict(self, data: dict[str, Any]):
-        return DirectFsAccess(**data)
 
     def replace_source(
         self,
@@ -148,11 +145,7 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
     def _try_fetch(self) -> Iterable[T]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
         for row in self._backend.fetch(sql):
-            # deserialize LineageAtom from dict
-            row_dict = row.as_dict()
-            lineage_dicts = row_dict["source_lineage"]
-            row_dict["source_lineage"] = [LineageAtom(*lineage_dict) for lineage_dict in lineage_dicts]
-            yield self._klass(**row_dict)
+            yield self._klass.from_dict(row.as_dict())
 
     def _crawl(self) -> Iterable[T]:
         return []
