@@ -32,7 +32,7 @@ class QueryLinter:
             dfsas.append(
                 dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
             )
-        self._directfs_crawler.append(dfsas)
+        self._directfs_crawler.dump_all(dfsas)
         return dfsas
 
     def _collect_dfsas_from_queries(self) -> Iterable[DirectFsAccessInQuery]:

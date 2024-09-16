@@ -374,7 +374,7 @@ class WorkflowLinter:
             JobProblem,
             mode='overwrite',
         )
-        self._directfs_crawler.for_paths().dump_all(job_dfsas)
+        self._directfs_crawler.dump_all(job_dfsas)
         if len(errors) > 0:
             raise ManyError(errors)
 
