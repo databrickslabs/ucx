@@ -57,11 +57,6 @@ class DirectFsAccess:
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
-    def as_dict(self):
-        result = dataclasses.asdict(self)
-        result["source_lineage"] = self.source_lineage
-        return result
-
     def replace_source(
         self,
         source_id: str | None = None,
