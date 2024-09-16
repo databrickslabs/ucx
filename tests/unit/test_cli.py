@@ -598,8 +598,9 @@ def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
 
 
 def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(workspace_clients, acc_client) -> None:
-    for ws in workspace_clients:
-        ws.config.auth_type = "azure-cli"
+    for workspace_client in workspace_clients:
+        # Setting the auth as follows as we (currently) do not support injecting multiple workspace contexts
+        workspace_client.config.auth_type = "azure-cli"
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
 
     create_uber_principal(
