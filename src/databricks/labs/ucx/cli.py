@@ -298,22 +298,28 @@ def alias(
 
 @ucx.command
 def create_uber_principal(
-    w: WorkspaceClient,
     prompts: Prompts,
+    w: WorkspaceClient,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     **named_parameters,
 ):
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
     it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
     Pass subscription_id for azure and aws_profile for aws."""
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_resource_permissions.create_uber_principal(prompts)
-    if ctx.is_aws:
-        return ctx.aws_resource_permissions.create_uber_principal(prompts)
-    raise ValueError("Unsupported cloud provider")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for ctx in workspace_contexts:
+        if ctx.is_azure:
+            ctx.azure_resource_permissions.create_uber_principal(prompts)
+        if ctx.is_aws:
+            ctx.aws_resource_permissions.create_uber_principal(prompts)
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
