@@ -23,8 +23,10 @@ class PermissionManager(CrawlerBase[Permissions]):
 
     ERRORS_TO_IGNORE = ["FEATURE_DISABLED"]
 
-    def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
-        super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
+    def __init__(
+        self, backend: SqlBackend, inventory_catalog: str, inventory_database: str, crawlers: list[AclSupport]
+    ):
+        super().__init__(backend, inventory_catalog, inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
 
     def _crawl(self) -> Iterable[Permissions]:

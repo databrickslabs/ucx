@@ -135,6 +135,10 @@ class GlobalContext(abc.ABC):
         return self.config.inventory_database
 
     @cached_property
+    def inventory_catalog(self) -> str:
+        return self.config.inventory_catalog
+
+    @cached_property
     def workspace_listing(self):
         return generic.WorkspaceListing(
             self.workspace_client,
@@ -204,6 +208,7 @@ class GlobalContext(abc.ABC):
     def permission_manager(self):
         return PermissionManager(
             self.sql_backend,
+            self.inventory_catalog,
             self.inventory_database,
             [
                 self.generic_permissions_support,
