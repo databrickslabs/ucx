@@ -714,8 +714,8 @@ def migrated_group(acc, ws, make_group, make_acc_group):
     """Create a pair of groups in workspace and account. Assign account group to workspace."""
     ws_group = make_group(wait_for_provisioning=False)
     acc_group = make_acc_group(wait_for_provisioning=False)
-    wait_group_provisioned(ws.groups, ws_group.id)
-    wait_group_provisioned(acc.groups, acc_group.id)
+    wait_group_provisioned(ws.groups, ws_group)
+    wait_group_provisioned(acc.groups, acc_group)
     acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
     return MigratedGroup.partial_info(ws_group, acc_group)
 
