@@ -121,7 +121,7 @@ def local_code_linter(mock_path_lookup, migration_index):
         mock_path_lookup,
     )
     return LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
+        notebook_loader, file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
 
 
@@ -194,6 +194,7 @@ site_packages = locate_site_packages()
     "path", [Path("/Users/eric.vergnaud/development/ucx/.venv/lib/python3.10/site-packages/spacy/pipe_analysis.py")]
 )
 def test_known_issues(path: Path, migration_index):
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
@@ -205,6 +206,7 @@ def test_known_issues(path: Path, migration_index):
     pip_resolver = PythonLibraryResolver(allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
+        notebook_loader,
         file_loader,
         folder_loader,
         path_lookup,
