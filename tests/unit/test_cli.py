@@ -625,6 +625,29 @@ def test_create_aws_uber_principal_raises_value_error_if_aws_profile_is_missing(
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
+def successful_aws_cli_call(_):
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+    return 0, successful_return, ""
+
+
+def test_create_aws_uber_principal_calls_dbutils_fs_mounts(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+        aws_profile="test",
+        aws_cli_run_command=successful_aws_cli_call,
+    )
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, ctx=ctx)
+    ws.dbutils.fs.mounts.assert_called_once()
+
+
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
     ctx = WorkspaceContext(ws).replace(is_azure=False, is_aws=False)
     with pytest.raises(ValueError, match="Unsupported cloud provider"):
@@ -690,7 +713,7 @@ def test_migrate_locations_aws(ws, caplog) -> None:
         is_aws=True,
         is_azure=False,
         aws_profile="profile",
-        aws_cli_run_command=successful_call,
+        aws_cli_run_command=successful_aws_cli_call,
     )
 
     migrate_locations(ws, ctx=ctx)
