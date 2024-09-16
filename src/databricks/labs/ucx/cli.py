@@ -298,8 +298,8 @@ def alias(
 
 @ucx.command
 def create_uber_principal(
-    prompts: Prompts,
     w: WorkspaceClient,
+    prompts: Prompts,
     ctx: WorkspaceContext | None = None,
     run_as_collection: bool = False,
     a: AccountClient | None = None,
