@@ -125,7 +125,11 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
         """
         super().__init__(backend, "hive_metastore", schema, table, klass)
 
-    def append(self, dfsas: Sequence[T]):
+    def dump_all(self, dfsas: Sequence[T]):
+        """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
+        It's not **bad** because all records are pushed at once.
+        Providing a multi-entity crawler is out-of-scope of this PR
+        """
         try:
             # TODO until we historize data, we append all DFSAs
             self._update_snapshot(dfsas, mode="append")
