@@ -8,7 +8,7 @@ SELECT
     assessment_start_timestamp,
     assessment_end_timestamp,
     job_id,
-    job_id,
+    job_name,
     task_key
 FROM $inventory.directfs_in_paths
 UNION ALL
