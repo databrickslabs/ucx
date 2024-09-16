@@ -75,12 +75,13 @@ class AccountAggregate:
                         TableMigrationStatus(
                             src_schema=inventory_database,
                             src_table=table_name,
-                            dst_catalog='hive_metastore',
+                            dst_catalog=ctx.config.inventory_catalog,
                             dst_schema=inventory_database,
                             dst_table=table_name,
                         )
                     ]
                 )
+                # TODO: check whether to add catalog here as well
                 from_table = FromTableSqlLinter(stub_index, CurrentSessionState(schema=inventory_database))
                 logger.info(f"Querying Schema {inventory_database}")
 
