@@ -4,8 +4,8 @@ from abc import ABC
 from collections.abc import Iterable
 
 from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
-from sqlglot import Expression
-from sqlglot.expressions import Table
+from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
+from sqlglot.expressions import Alter, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -14,6 +14,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
 )
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
@@ -54,11 +55,6 @@ DIRECT_FS_ACCESS_PATTERNS = [
     # "/mnt/" is detected by the below pattern,
     RootPattern("/", ["Volumes/", "Workspace/"]),
 ]
-
-
-@dataclass
-class DirectFsAccess:
-    path: str
 
 
 @dataclass
@@ -108,8 +104,14 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         for pattern in DIRECT_FS_ACCESS_PATTERNS:
             if not pattern.matches(value):
                 continue
-            dfsa = DirectFsAccess(path=value)
-            self.directfs_nodes.append(DirectFsAccessNode(dfsa, source_node))
+            # since we're normally filtering out spark calls, we're dealing with dfsas we know little about
+            # notable we don't know is_read or is_write
+            dfsa = DirectFsAccess(
+                path=value,
+                is_read=True,
+                is_write=False,
+            )
+            self._directfs_nodes.append(DirectFsAccessNode(dfsa, source_node))
             self._reported_locations.add((source_node.lineno, source_node.col_offset))
 
     def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
@@ -141,26 +143,84 @@ class DirectFsAccessPyLinter(PythonLinter):
             )
             yield advisory
 
+    def collect_dfsas(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
+        tree = Tree.new_module()
+        if inherited_tree:
+            tree.append_tree(inherited_tree)
+        tree.append_tree(Tree.normalize_and_parse(python_code))
+        visitor = _DetectDirectFsAccessVisitor(self._session_state, self._prevent_spark_duplicates)
+        visitor.visit(tree.node)
+        yield from visitor.directfs_nodes
+
 
 class DirectFsAccessSqlLinter(SqlLinter):
 
-    def lint_expression(self, expression: Expression):
-        for table in expression.find_all(Table):
-            # Check table names for direct file system access
-            yield from self._check_dfsa(table)
-
-    def _check_dfsa(self, table: Table) -> Iterable[Advice]:
-        """
-        Check if the table is a DBFS table or reference in some way
-        and yield a deprecation message if it is
-        """
-        if any(pattern.matches(table.name) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+    def lint_expression(self, expression: SqlExpression):
+        for dfsa in self._collect_dfsas(expression):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
-                message=f"The use of direct filesystem references is deprecated: {table.name}",
+                message=f"The use of direct filesystem references is deprecated: {dfsa.path}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
                 end_line=0,
                 end_col=1024,
             )
+
+    def collect_dfsas(self, sql_code: str):
+        try:
+            expressions = parse_sql(sql_code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self._collect_dfsas(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
+
+    @classmethod
+    def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+        yield from cls._collect_dfsas_from_literals(expression)
+        yield from cls._collect_dfsas_from_identifiers(expression)
+
+    @classmethod
+    def _collect_dfsas_from_literals(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+        for literal in expression.find_all(Literal):
+            if not isinstance(literal.this, str):
+                logger.warning(f"Can't interpret {type(literal.this).__name__}")
+            yield from cls._collect_dfsa_from_node(literal, literal.this)
+
+    @classmethod
+    def _collect_dfsas_from_identifiers(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
+        for identifier in expression.find_all(Identifier):
+            if not isinstance(identifier.this, str):
+                logger.warning(f"Can't interpret {type(identifier.this).__name__}")
+            yield from cls._collect_dfsa_from_node(identifier, identifier.this)
+
+    @classmethod
+    def _collect_dfsa_from_node(cls, expression: SqlExpression, path: str) -> Iterable[DirectFsAccess]:
+        if any(pattern.matches(path) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+            is_read = cls._is_read(expression)
+            is_write = cls._is_write(expression)
+            yield DirectFsAccess(
+                path=path,
+                is_read=is_read,
+                is_write=is_write,
+            )
+
+    @classmethod
+    def _is_read(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, Select)
+
+    @classmethod
+    def _is_write(cls, expression: SqlExpression | None) -> bool:
+        expression = cls._walk_up(expression)
+        return isinstance(expression, (Create, Alter, Drop, Insert, Delete))
+
+    @classmethod
+    def _walk_up(cls, expression: SqlExpression | None) -> SqlExpression | None:
+        if expression is None:
+            return None
+        if isinstance(expression, (Create, Alter, Drop, Insert, Delete, Select)):
+            return expression
+        return cls._walk_up(expression.parent)
