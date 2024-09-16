@@ -121,7 +121,13 @@ def local_code_linter(mock_path_lookup, migration_index):
         mock_path_lookup,
     )
     return LocalCodeLinter(
-        notebook_loader, file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
+        notebook_loader,
+        file_loader,
+        folder_loader,
+        mock_path_lookup,
+        session_state,
+        resolver,
+        lambda: LinterContext(migration_index),
     )
 
 
