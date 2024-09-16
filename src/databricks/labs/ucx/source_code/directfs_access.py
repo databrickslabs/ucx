@@ -158,16 +158,3 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
 
     def _crawl(self) -> Iterable[T]:
         raise NotImplementedError()
-
-
-class DirectFsAccessCrawlers:
-
-    def __init__(self, sql_backend: SqlBackend, schema: str):
-        self._sql_backend = sql_backend
-        self._schema = schema
-
-    def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_paths")
-
-    def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_queries")

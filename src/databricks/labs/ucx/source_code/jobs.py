@@ -378,7 +378,6 @@ class WorkflowLinter:
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
     def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         try:
             job = self._ws.jobs.get(job_id)
@@ -394,7 +393,6 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
     def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccessInPath] = []

@@ -25,8 +25,6 @@ def test_crawler_appends_dfsas():
             job_id=222,
             job_name="JOB",
             task_key="TASK",
-            assessment_start_timestamp=datetime.now(),
-            assessment_end_timestamp=datetime.now(),
         )
         for path in ("a", "b", "c")
     )
