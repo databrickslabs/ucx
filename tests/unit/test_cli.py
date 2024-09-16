@@ -568,7 +568,7 @@ def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws):
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_uber_principal_raises_value_error_if_azure_subscription_id_is_missing(ws):
+def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_missing(ws) -> None:
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     prompts = MockPrompts({})
