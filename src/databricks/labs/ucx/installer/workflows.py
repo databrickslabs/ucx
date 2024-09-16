@@ -136,24 +136,22 @@ EXPORT_TO_EXCEL_NOTEBOOK = """
 # COMMAND ----------
 
 # DBTITLE 1,Libraries Import and Setting UCX
-# Standard library imports
 import os
 import logging
 import threading
 import shutil
+from pathlib import Path
 from threading import Lock
 from functools import partial
 
-
-# third party Libraries imports
 import pandas as pd
 import xlsxwriter
 
-# Databricks imports
 from databricks.sdk.config import with_user_agent_extra
 from databricks.labs.blueprint.logger import install_logger
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.dashboards import QueryTile
+from databricks.labs.lsql.dashboards import Dashboards
+from databricks.labs.lsql.lakeview.model import Dataset
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
 # ctx
@@ -166,48 +164,58 @@ lock = Lock()
 # COMMAND ----------
 
 # DBTITLE 1,Assessment Export
-
-# File and Path Constants
-FILE_NAME = "assessment_results.xlsx"
-TMP_PATH = TMP_PATH = f"/tmp/{ctx.installation.install_folder()}/excel-export"
+FILE_NAME = "ucx_assessment_main.xlsx"
+TMP_PATH = f"/Workspace{ctx.installation.install_folder()}/tmp/"
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
+
 def _cleanup() -> None:
-    \"\"\"Move the temporary results file to the download path and clean up the temp directory.\"\"\"
+    '''Move the temporary results file to the download path and clean up the temp directory.'''
     shutil.move(
         os.path.join(TMP_PATH, FILE_NAME),
         os.path.join(DOWNLOAD_PATH, FILE_NAME),
     )
     shutil.rmtree(TMP_PATH)
 
+
 def _prepare_directories() -> None:
-    \"\"\"Ensure that the necessary directories exist.\"\"\"
+    '''Ensure that the necessary directories exist.'''
     os.makedirs(TMP_PATH, exist_ok=True)
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
-def _to_excel(tile: QueryTile, writer: ...) -> None:
-    \"\"\"Execute a SQL query and write the result to an Excel sheet.\"\"\"
-    sdf = spark.sql(tile.content)
-    df = sdf.toPandas()
+
+def _to_excel(dataset: Dataset, writer: ...) -> None:
+    '''Execute a SQL query and write the result to an Excel sheet.'''
+    worksheet_name = dataset.display_name[:31]
+    df = spark.sql(dataset.query).toPandas()
     with lock:
-        df.to_excel(writer, sheet_name=tile.metadata.title, index=False)
+        df.to_excel(writer, sheet_name=worksheet_name, index=False)
+
 
 def _render_export() -> None:
-    \"\"\"Render an HTML link for downloading the results.\"\"\"
+    '''Render an HTML link for downloading the results.'''
     html_content = f'''
-            <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform 0.3s ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style><div class="export-container"><h2>Export Results</h2><a href='{workspace_host}files/excel-export/assessment_results.xlsx?o={workspace_id}' target='_blank' download>Download UCX Results </a></div>
+            <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform 0.3s ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style><div class="export-container"><h2>Export Results</h2><a href='{workspace_host}files/excel-export/ucx_assessment_main.xlsx?o={workspace_id}' target='_blank' download>Download Results</a></div>
     '''
     displayHTML(html_content)
 
+
 def export_results() -> None:
-    \"\"\"Main method to export results to an Excel file.\"\"\"
+    '''Main method to export results to an Excel file.'''
     _prepare_directories()
+
+    dashboard_path = (
+        Path(ctx.installation.install_folder())
+        / "dashboards/[UCX] UCX  Assessment (Main).lvdash.json"
+    )
+    dashboard = Dashboards(ctx.workspace_client)
+    dashboard_datasets = dashboard.get_dashboard(dashboard_path).datasets
     try:
-        target = TMP_PATH + '/assessment_results.xlsx'
+        target = TMP_PATH + "/ucx_assessment_main.xlsx"
         with pd.ExcelWriter(target, engine="xlsxwriter") as writer:
             tasks = []
-            for query_tile in ctx.assessment_exporter.queries():
-                tasks.append(partial(_to_excel, query_tile, writer))
+            for dataset in dashboard_datasets:
+                tasks.append(partial(_to_excel, dataset, writer))
                 Threads.strict("exporting", tasks)
         _cleanup()
         _render_export()
@@ -901,8 +909,9 @@ class WorkflowsDeployment(InstallationMixin):
         self._installation.upload('DEBUG.py', content)
 
     def _create_export(self, remote_wheels: list[str]):
+        remote_wheels_str = " ".join(remote_wheels)
         content = EXPORT_TO_EXCEL_NOTEBOOK.format(
-            remote_wheel=remote_wheels,
+            remote_wheel=remote_wheels_str,
             config_file=self._config_file,
             workspace_host=self._ws.config.host,
             workspace_id=self._ws.get_workspace_id(),
