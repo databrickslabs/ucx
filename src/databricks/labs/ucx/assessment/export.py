@@ -41,9 +41,8 @@ class AssessmentExporter:
         queries_path = queries_path_root / query_choice
         display_name = "UCX Assessment Results"
         dashboard_metadata = DashboardMetadata(display_name)
-        assessment_results = (
-            DashboardMetadata.from_path(queries_path)
-                .replace_database(catalog="hive_metastore", database=self._config.inventory_database)
+        assessment_results = dashboard_metadata.from_path(queries_path).replace_database(
+            catalog="hive_metastore", database=self._config.inventory_database
         )
 
         logger.info("Exporting assessment results....")
