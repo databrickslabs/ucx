@@ -5,7 +5,12 @@ import logging
 from collections.abc import Sequence, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypeVar, Self
+from typing import Any, TypeVar
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
