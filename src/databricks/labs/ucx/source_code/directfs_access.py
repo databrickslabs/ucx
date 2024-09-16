@@ -109,7 +109,7 @@ class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         """
         super().__init__(backend, "hive_metastore", schema, table, DirectFsAccess)
 
-    def append(self, dfsas: Sequence[DirectFsAccess]):
+    def dump_all(self, dfsas: Sequence[DirectFsAccess]):
         try:
             # TODO until we historize data, we append all DFSAs
             self._update_snapshot(dfsas, mode="append")
