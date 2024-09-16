@@ -332,7 +332,7 @@ def test_revert_migrated_tables(ws, caplog):
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
-        azure_subscription_id=["test"],
+        azure_subscription_ids=["test"],
         is_gcp=False,
     )
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
