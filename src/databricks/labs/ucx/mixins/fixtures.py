@@ -881,7 +881,7 @@ def make_job(ws, make_random, make_notebook):
 
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
-        return job
+        return ws.jobs.get(job.job_id)
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
 
