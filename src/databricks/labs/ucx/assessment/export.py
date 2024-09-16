@@ -22,7 +22,7 @@ class AssessmentExporter:
         """Main method to export results to CSV files inside a ZIP archive."""
         project_root = Path(__file__).resolve().parents[3]
         queries_path_root = project_root / f"labs/ucx/queries/assessment"
-        valid_queries = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
+        valid_queries_dirs = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
 
         export_path = Path(
             prompts.question(
@@ -35,7 +35,7 @@ class AssessmentExporter:
         query_choice = prompts.question(
             "Choose which assessment results to export",
             default="main",
-            validate=lambda q: q in valid_queries,
+            validate=lambda q: q in valid_queries_dirs,
         )
 
         queries_path = queries_path_root / query_choice
