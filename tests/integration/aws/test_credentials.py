@@ -29,7 +29,7 @@ def run_migration(ws, sql_backend, env_or_skip, aws_cli_ctx):
         )
 
         aws = AWSResources(env_or_skip("AWS_DEFAULT_PROFILE"))
-        location = ExternalLocations(ws, sql_backend, "inventory_schema")
+        location = ExternalLocations(ws, sql_backend, "hive_metastore", "inventory_schema")
         resource_permissions = AWSResourcePermissions(
             installation,
             ws,

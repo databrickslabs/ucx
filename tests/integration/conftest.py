@@ -174,14 +174,16 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
 
 class StaticMountCrawler(Mounts):
+    # TODO: find workaround to the pylint disable
     def __init__(
         self,
         mounts: list[Mount],
         sb: SqlBackend,
         workspace_client: WorkspaceClient,
+        inventory_catalog: str,  # pylint: disable=redefined-outer-name
         inventory_database: str,
     ):
-        super().__init__(sb, workspace_client, inventory_database)
+        super().__init__(sb, workspace_client, inventory_catalog, inventory_database)
         self._mounts = mounts
 
     def snapshot(self, *, force_refresh: bool = False) -> list[Mount]:
@@ -464,6 +466,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
             [mount],
             self.sql_backend,
             self.workspace_client,
+            self.inventory_catalog,
             self.inventory_database,
         )
 
@@ -576,7 +579,10 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
             installation_ctx.workspace_client,
             AWSResources(aws_profile()),
             ExternalLocations(
-                installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database
+                installation_ctx.workspace_client,
+                installation_ctx.sql_backend,
+                installation_ctx.inventory_catalog,
+                installation_ctx.inventory_database,
             ),
         )
 

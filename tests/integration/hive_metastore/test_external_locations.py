@@ -12,7 +12,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
-def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
+def test_external_locations(ws, sql_backend, inventory_catalog, inventory_schema, env_or_skip):
     logger.info("setting up fixtures")
     tables = [
         Table("hive_metastore", "foo", "bar", "MANAGED", "delta", location="s3://test_location/test1/table1"),
@@ -75,7 +75,7 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     sql_backend.save_table(f"{inventory_schema}.tables", tables, Table)
     sql_backend.save_table(f"{inventory_schema}.mounts", [Mount("/mnt/foo", "s3://bar")], Mount)
 
-    crawler = ExternalLocations(ws, sql_backend, inventory_schema)
+    crawler = ExternalLocations(ws, sql_backend, inventory_catalog, inventory_schema)
     results = crawler.snapshot()
     assert len(results) == 6
     assert results[1].location == "s3://bar/test3/"
@@ -89,13 +89,15 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     assert results[5].location == "jdbc://providerunknown//somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
-def test_save_external_location_mapping_missing_location(ws, sql_backend, inventory_schema, make_random):
+def test_save_external_location_mapping_missing_location(
+    ws, sql_backend, inventory_catalog, inventory_schema, make_random
+):
     locations = [
         ExternalLocation("abfss://cont1@storage123/test_location", 2),
         ExternalLocation("abfss://cont1@storage456/test_location2", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
-    location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
+    location_crawler = ExternalLocations(ws, sql_backend, inventory_catalog, inventory_schema)
     installation = Installation(ws, make_random)
     path = location_crawler.save_as_terraform_definitions_on_workspace(installation)
     assert ws.workspace.get_status(path)

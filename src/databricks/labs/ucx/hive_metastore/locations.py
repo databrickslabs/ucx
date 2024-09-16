@@ -116,8 +116,8 @@ class LocationTrie:
 class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
-        super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, catalog: str, schema: str):
+        super().__init__(sbe, catalog, schema, "external_locations", ExternalLocation)
         self._ws = ws
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
@@ -208,7 +208,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 f"SELECT location, storage_properties FROM {tables_identifier} WHERE location IS NOT NULL"
             )
         )
-        mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
+        mounts = Mounts(self._backend, self._ws, self._catalog, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
@@ -300,8 +300,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
 
 
 class Mounts(CrawlerBase[Mount]):
-    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
-        super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
+    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_catalog: str, inventory_database: str):
+        super().__init__(backend, inventory_catalog, inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
     @staticmethod
@@ -350,13 +350,14 @@ class TablesInMounts(CrawlerBase[Table]):
         self,
         backend: SqlBackend,
         ws: WorkspaceClient,
+        inventory_catalog: str,
         inventory_database: str,
         mc: Mounts,
         include_mounts: list[str] | None = None,
         exclude_paths_in_mount: list[str] | None = None,
         include_paths_in_mount: list[str] | None = None,
     ):
-        super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
+        super().__init__(backend, inventory_catalog, inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
         self._mounts_crawler = mc
         self._include_mounts = include_mounts

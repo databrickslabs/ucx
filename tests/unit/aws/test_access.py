@@ -110,7 +110,7 @@ def backend():
 
 @pytest.fixture
 def locations(mock_ws, backend):
-    return ExternalLocations(mock_ws, backend, "ucx")
+    return ExternalLocations(mock_ws, backend, "hive_metastore", "ucx")
 
 
 def test_create_external_locations(mock_ws, installation_multiple_roles, backend, locations):
@@ -214,7 +214,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    locations = ExternalLocations(mock_ws, backend, "hive_metastore", "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
@@ -243,7 +243,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    locations = ExternalLocations(mock_ws, backend, "hive_metastore", "ucx")
     prompts = MockPrompts(
         {
             "There is an existing instance profile *": "yes",
@@ -283,7 +283,7 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws.create_migration_role.return_value = instance_profile_arn
     aws.create_instance_profile.return_value = instance_profile_arn
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    locations = ExternalLocations(mock_ws, backend, "hive_metastore", "ucx")
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
@@ -331,7 +331,7 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
 
     aws = AWSResources("profile", command_call)
 
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    locations = ExternalLocations(mock_ws, backend, "hive_metastore", "ucx")
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
@@ -372,7 +372,7 @@ def test_create_uber_principal_set_warehouse_config_security_policy(
         mock_installation,
         mock_ws,
         aws,
-        ExternalLocations(mock_ws, backend, "ucx"),
+        ExternalLocations(mock_ws, backend, "hive_metastore", "ucx"),
     )
     aws_resource_permissions.create_uber_principal(MockPrompts({".*": "yes"}))
 
@@ -384,7 +384,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
-    locations = ExternalLocations(mock_ws, MockBackend(), "ucx")
+    locations = ExternalLocations(mock_ws, MockBackend(), "hive_metastore", "ucx")
     prompts = MockPrompts({})
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
@@ -440,7 +440,7 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     sql_backend = MockBackend(rows={}, fails_on_first={})
-    external_locations = ExternalLocations(mock_ws, sql_backend, "ucx")
+    external_locations = ExternalLocations(mock_ws, sql_backend, "hive_metastore", "ucx")
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_no_roles,
@@ -926,7 +926,7 @@ def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
         return 0, '{"account":"1234"}', ""
 
     aws = AWSResources("profile", command_call)
-    external_locations = ExternalLocations(mock_ws, backend, 'ucx')
+    external_locations = ExternalLocations(mock_ws, backend, "hive_metastore", 'ucx')
     resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
     assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls

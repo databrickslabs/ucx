@@ -284,7 +284,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def mounts_crawler(self):
-        return Mounts(self.sql_backend, self.workspace_client, self.inventory_database)
+        return Mounts(self.sql_backend, self.workspace_client, self.inventory_catalog, self.inventory_database)
 
     @cached_property
     def azure_service_principal_crawler(self):
@@ -292,7 +292,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def external_locations(self):
-        return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
+        return ExternalLocations(
+            self.workspace_client, self.sql_backend, self.inventory_catalog, self.inventory_database
+        )
 
     @cached_property
     def azure_acl(self):

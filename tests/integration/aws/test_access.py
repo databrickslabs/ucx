@@ -16,7 +16,9 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
-def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
+def test_create_external_location(
+    ws, env_or_skip, make_random, inventory_catalog, inventory_schema, sql_backend, aws_cli_ctx
+):
     profile = env_or_skip("AWS_PROFILE")
     aws_cli_ctx.workspace_installation.run()
     rand = make_random(5).lower()
@@ -31,7 +33,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     account_id = aws.validate_connection().get("Account")
     s3_prefixes = {f"s3://bucket{rand}"}
 
-    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
+    external_location = ExternalLocations(ws, sql_backend, inventory_catalog, inventory_schema)
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
         ws,
@@ -105,6 +107,9 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster
     AWSResources(aws_cli_ctx.aws_profile()).delete_instance_profile(role_name, role_name)
 
 
+# TODO remove the disables and use ctx fixtures
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-locals
 def test_create_external_location_validate_acl(
     make_cluster_permissions,
     ws,
@@ -114,6 +119,7 @@ def test_create_external_location_validate_acl(
     sql_backend,
     aws_cli_ctx,
     env_or_skip,
+    inventory_catalog,
     inventory_schema,
 ):
     aws_cli_ctx.workspace_installation.run()
@@ -137,7 +143,7 @@ def test_create_external_location_validate_acl(
         permission_level=PermissionLevel.CAN_RESTART,
         user_name=cluster_user.user_name,
     )
-    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
+    external_location = ExternalLocations(ws, sql_backend, inventory_catalog, inventory_schema)
     account_id = aws_cli_ctx.aws.validate_connection().get("Account")
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
