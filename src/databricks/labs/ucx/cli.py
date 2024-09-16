@@ -313,11 +313,11 @@ def create_uber_principal(
         workspace_contexts = [ctx]
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
-    for ctx in workspace_contexts:
-        if ctx.is_azure:
-            ctx.azure_resource_permissions.create_uber_principal(prompts)
-        if ctx.is_aws:
-            ctx.aws_resource_permissions.create_uber_principal(prompts)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure:
+            workspace_context.azure_resource_permissions.create_uber_principal(prompts)
+        if workspace_context.is_aws:
+            workspace_context.aws_resource_permissions.create_uber_principal(prompts)
         else:
             raise ValueError("Unsupported cloud provider")
 
