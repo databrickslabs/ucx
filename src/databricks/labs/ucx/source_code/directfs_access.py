@@ -2,16 +2,23 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import sys
 from collections.abc import Sequence, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypeVar, Self
+from typing import Any, TypeVar
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 
 logger = logging.getLogger(__name__)
 
