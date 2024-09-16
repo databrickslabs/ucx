@@ -51,6 +51,9 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_timestamp: datetime = datetime.fromtimestamp(0)
     source_lineage: list[LineageAtom] = field(default_factory=list)
+    job_id: int = -1
+    job_name: str = UNKNOWN
+    task_key: str = UNKNOWN
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
@@ -65,6 +68,11 @@ class DirectFsAccess:
             source_id=source_id or self.source_id,
             source_timestamp=source_timestamp or self.source_timestamp,
             source_lineage=source_lineage or self.source_lineage,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
         )
 
     def replace_assessment_infos(
@@ -150,3 +158,16 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
 
     def _crawl(self) -> Iterable[T]:
         raise NotImplementedError()
+
+
+class DirectFsAccessCrawlers:
+
+    def __init__(self, sql_backend: SqlBackend, schema: str):
+        self._sql_backend = sql_backend
+        self._schema = schema
+
+    def for_paths(self) -> _DirectFsAccessCrawler:
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_paths")
+
+    def for_queries(self) -> _DirectFsAccessCrawler:
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_queries")
