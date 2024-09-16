@@ -80,7 +80,7 @@ class WorkflowTask(Dependency):
 
     @property
     def lineage(self) -> list[LineageAtom]:
-        job_name = ("" if self._job.settings is None else self._job.settings.name) or "unknown job"
+        job_name = (None if self._job.settings is None else self._job.settings.name) or "unknown job"
         job_lineage = LineageAtom("job", str(self._job.job_id), {"name": job_name})
         task_lineage = LineageAtom("task", self._task.task_key)
         return [job_lineage, task_lineage]
