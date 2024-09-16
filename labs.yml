@@ -172,8 +172,8 @@ commands:
       used by tables in the workspace and stores the service principal information in the UCX cluster policy.
       For aws, indentify all s3 buckets used by the Instance Profiles configured in the workspace.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection

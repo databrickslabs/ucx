@@ -58,7 +58,7 @@ def test_replace_installation():
     )
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
-        azure_subscription_id='foo',
+        azure_subscription_ids=["test"],
         installation=mock_installation,
         sql_backend=MockBackend(
             rows={

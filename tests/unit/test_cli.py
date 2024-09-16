@@ -330,7 +330,10 @@ def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
     ctx = WorkspaceContext(ws).replace(
-        is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test', is_gcp=False
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_id=["test"],
+        is_gcp=False,
     )
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
@@ -481,7 +484,7 @@ def test_migrate_credentials_azure(ws, acc_client):
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azure_resources,
     )
     migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
@@ -528,7 +531,7 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azure_resources,
         external_locations=external_locations,
     )
@@ -695,7 +698,7 @@ def test_migrate_locations_azure(ws) -> None:
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azurerm,
     )
 

@@ -707,7 +707,7 @@ class MockLocalAzureCli(MockWorkspaceContext):
         return True
 
     @cached_property
-    def azure_subscription_id(self):
+    def azure_subscription_id(self) -> str:
         return self._env_or_skip("TEST_SUBSCRIPTION_ID")
 
 
