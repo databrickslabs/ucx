@@ -496,15 +496,14 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
 
 
 def _get_path_modified_datetime(path: Path) -> datetime:
-    unix_time = 0.0
     if isinstance(path, WorkspacePath):
         # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/142
         # pylint: disable=protected-access
-        unix_time += float(path._object_info.modified_at) / 1000.0 if path._object_info.modified_at else 0.0
+        unix_time = float(path._object_info.modified_at) / 1000.0 if path._object_info.modified_at else 0.0
     elif isinstance(path, DBFSPath):
         # TODO add stats method in blueprint, see https://github.com/databrickslabs/blueprint/issues/143
         # pylint: disable=protected-access
-        unix_time += float(path._file_info.modification_time) / 1000.0 if path._file_info.modification_time else 0.0
+        unix_time = float(path._file_info.modification_time) / 1000.0 if path._file_info.modification_time else 0.0
     else:
         unix_time = path.stat().st_mtime
     return datetime.fromtimestamp(unix_time, timezone.utc)
