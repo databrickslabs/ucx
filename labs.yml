@@ -163,14 +163,17 @@ commands:
         description: AWS Profile to use for authentication
 
   - name: create-uber-principal
-    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
-      used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
-      it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+    description: |
+      For azure cloud, creates a service principal and gives `STORAGE_BLOB_READER` access on all the storage account
+      used by tables in the workspace and stores the service principal information in the UCX cluster policy.
+      For aws, indentify all s3 buckets used by the Instance Profiles configured in the workspace.
     flags:
       - name: subscription-id
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: validate-groups-membership
     description: Validate groups to check if the groups at account level and workspace level have different memberships
