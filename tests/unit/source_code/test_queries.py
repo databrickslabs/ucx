@@ -32,5 +32,5 @@ def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_re
     ws.assert_not_called()
     crawlers.assert_not_called()
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
-    assert not any(dfsa for dfsa in dfsas if dfsa.is_read != is_read)
-    assert not any(dfsa for dfsa in dfsas if dfsa.is_write != is_write)
+    assert all(dfsa.is_read == is_read for dfsa in dfsas)
+    assert all(dfsa.is_write == is_write for dfsa in dfsas)
