@@ -51,6 +51,9 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_timestamp: datetime = datetime.fromtimestamp(0)
     source_lineage: list[LineageAtom] = field(default_factory=list)
+    job_id: int = -1
+    job_name: str = UNKNOWN
+    task_key: str = UNKNOWN
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
@@ -70,6 +73,11 @@ class DirectFsAccess:
             source_id=source_id or self.source_id,
             source_timestamp=source_timestamp or self.source_timestamp,
             source_lineage=source_lineage or self.source_lineage,
+            job_id=self.job_id,
+            job_name=self.job_name,
+            task_key=self.task_key,
+            assessment_start_timestamp=self.assessment_start_timestamp,
+            assessment_end_timestamp=self.assessment_start_timestamp,
         )
 
     def replace_assessment_infos(
