@@ -569,12 +569,14 @@ def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws):
 
 
 def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_missing(ws) -> None:
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
     with pytest.raises(ValueError, match="Please enter subscription id to scan storage accounts in."):
-        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
+        create_uber_principal(ws, prompts, ctx=ctx)
 
 
 def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts(ws) -> None:
