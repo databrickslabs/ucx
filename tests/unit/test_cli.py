@@ -615,6 +615,16 @@ def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(w
         workspace_client.get_workspace_id.assert_called()
 
 
+def test_create_aws_uber_principal_raises_value_error_if_aws_profile_is_missing(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+    )
+    prompts = MockPrompts({})
+    with pytest.raises(ValueError, match="AWS Profile is not specified. .*"):
+        create_uber_principal(ws, prompts, ctx=ctx)
+
+
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
     ctx = WorkspaceContext(ws).replace(is_azure=False, is_aws=False)
     with pytest.raises(ValueError, match="Unsupported cloud provider"):
