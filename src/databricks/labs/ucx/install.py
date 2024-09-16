@@ -512,6 +512,8 @@ class WorkspaceInstallation(InstallationMixin):
         self._create_database()  # Need the database before creating the dashboards
         Threads.strict("installing dashboards", list(self._get_create_dashboard_tasks()))
 
+    # InternalError are retried for resilience on sporadic Databricks issues
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _create_database(self):
         try:
             deploy_schema(self._sql_backend, self._config.inventory_database)
