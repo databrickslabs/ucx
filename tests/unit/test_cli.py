@@ -87,6 +87,8 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                 },
                 'installed_workspace_ids': installed_workspace_ids,
                 'policy_id': '01234567A8BCDEF9',
+                # Exit Azure's `create_uber_principal` early by setting the uber service principal in the configuration
+                # to isolate cli testing as much as possible to the cli commands and not the invoked ucx functionality.
                 'uber_spn_id': '0123456789',
             }
         ),
