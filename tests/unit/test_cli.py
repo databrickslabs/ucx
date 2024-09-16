@@ -86,6 +86,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     'token': 'bar',
                 },
                 'installed_workspace_ids': installed_workspace_ids,
+                'policy_id': '01234567A8BCDEF9',
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -576,12 +577,21 @@ def test_create_uber_principal_raises_value_error_if_azure_subscription_id_is_mi
         create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
 
 
-def test_create_uber_principal(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, subscription_id="12")
+def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts(ws) -> None:
+    azurerm = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id="id",
+        azure_resources=azurerm,
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(ws, prompts, ctx=ctx)
+
+    ws.get_workspace_id.assert_called_once()
+    azurerm.storage_accounts.assert_called_once()
 
 
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
