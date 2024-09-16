@@ -131,7 +131,7 @@ class DirectFsAccessCrawlers:
         self._schema = schema
 
     def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_paths")
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_paths")
 
     def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "direct_file_system_access_in_queries")
+        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_queries")

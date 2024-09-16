@@ -122,8 +122,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
             functools.partial(
-                table, "direct_file_system_access_in_paths", DirectFsAccess
-            ),  # direct_file_system_access_in_queries will be added in upcoming PR
+                table, "directfs_in_paths", DirectFsAccess
+            ),  # directfs_in_queries will be added in upcoming PR
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
