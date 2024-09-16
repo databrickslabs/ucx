@@ -158,8 +158,8 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         "fs.adl",
     ]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str, num_days_history: int):
-        super().__init__(sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, catalog: str, schema: str, num_days_history: int):
+        super().__init__(sbe, catalog, schema, "submit_runs", SubmitRunInfo)
         self._ws = ws
         self._num_days_history = num_days_history
 

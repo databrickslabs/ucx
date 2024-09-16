@@ -29,7 +29,7 @@ def test_job_crawler(ws, make_job, inventory_catalog, inventory_schema, sql_back
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_job_run_crawler(ws, env_or_skip, inventory_schema, sql_backend):
+def test_job_run_crawler(ws, env_or_skip, inventory_schema, inventory_catalog, sql_backend):
     cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
     dummy_notebook = """# Databricks notebook source
 # MAGIC
@@ -53,7 +53,9 @@ pass
     assert run
     run_id = run.run_id
 
-    job_run_crawler = SubmitRunsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema, num_days_history=1)
+    job_run_crawler = SubmitRunsCrawler(
+        ws=ws, sbe=sql_backend, catalog=inventory_catalog, schema=inventory_schema, num_days_history=1
+    )
     job_runs = job_run_crawler.snapshot()
 
     assert len(job_runs) >= 1

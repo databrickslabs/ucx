@@ -118,7 +118,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
 def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
     ws = mock_workspace_client(jobruns_ids=jobruns_ids, cluster_ids=cluster_ids)
     sql_backend = MockBackend()
-    SubmitRunsCrawler(ws, sql_backend, "ucx", 10).snapshot()
+    SubmitRunsCrawler(ws, sql_backend, "hive_metastore", "ucx", 10).snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.submit_runs", "overwrite")
     assert len(result) == 1
     assert result[0].run_ids == run_ids

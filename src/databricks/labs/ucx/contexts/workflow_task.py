@@ -50,15 +50,14 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def jobs_crawler(self):
-        return JobsCrawler(
-            self.workspace_client, self.sql_backend, self.inventory_catalog, self.inventory_database
-        )
+        return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_catalog, self.inventory_database)
 
     @cached_property
     def submit_runs_crawler(self):
         return SubmitRunsCrawler(
             self.workspace_client,
             self.sql_backend,
+            self.inventory_catalog,
             self.inventory_database,
             self.config.num_days_submit_runs_history,
         )
