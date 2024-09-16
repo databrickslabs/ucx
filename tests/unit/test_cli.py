@@ -87,6 +87,7 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                 },
                 'installed_workspace_ids': installed_workspace_ids,
                 'policy_id': '01234567A8BCDEF9',
+                'uber_spn_id': '0123456789',
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -580,7 +581,7 @@ def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_mi
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts(ws) -> None:
+def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts() -> None:
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -595,6 +596,17 @@ def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts(ws)
 
     ws.get_workspace_id.assert_called_once()
     azurerm.storage_accounts.assert_called_once()
+
+
+def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(workspace_clients, acc_client) -> None:
+    for ws in workspace_clients:
+        ws.config.auth_type = "azure-cli"
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(workspace_clients[0], prompts, run_as_collection=True, a=acc_client, subscription_id="test",)
+
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
 
 
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
