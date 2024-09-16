@@ -33,7 +33,7 @@ def test_create_account_level_groups(
     make_random,
     clean_account_level_groups,
 ):
-    suffix = get_purge_suffix()
+    suffix = f"{make_random(4).lower()}-{get_purge_suffix()}"
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"
