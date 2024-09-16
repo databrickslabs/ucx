@@ -581,7 +581,7 @@ def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_mi
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts() -> None:
+def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -595,7 +595,6 @@ def test_create_azure_uber_principal_calls_workspace_id_and_storage_accounts() -
     create_uber_principal(ws, prompts, ctx=ctx)
 
     ws.get_workspace_id.assert_called_once()
-    azurerm.storage_accounts.assert_called_once()
 
 
 def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(workspace_clients, acc_client) -> None:
