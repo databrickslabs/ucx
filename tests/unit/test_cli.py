@@ -559,11 +559,12 @@ def test_migrate_credentials_limit_aws(ws, acc_client):
         migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
 
 
-def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
+def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=False,
+    )
     prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError, match="Unsupported cloud provider"):
         create_uber_principal(ws, prompts, ctx=ctx)
 
