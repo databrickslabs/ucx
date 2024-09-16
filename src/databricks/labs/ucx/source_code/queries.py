@@ -10,6 +10,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessInQuery, LineageAtom
@@ -58,7 +59,7 @@ class QueryLinter:
                 )
         logger.info(f"Saving {len(query_problems)} linting problems...")
         sql_backend.save_table(
-            f'{inventory_database}.query_problems',
+            f'{escape_sql_identifier(inventory_database)}.query_problems',
             query_problems,
             QueryProblem,
             mode='overwrite',
