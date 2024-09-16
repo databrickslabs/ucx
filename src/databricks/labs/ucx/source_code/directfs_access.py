@@ -73,11 +73,6 @@ class DirectFsAccess:
             source_id=source_id or self.source_id,
             source_timestamp=source_timestamp or self.source_timestamp,
             source_lineage=source_lineage or self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
         )
 
     def replace_assessment_infos(
