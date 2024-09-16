@@ -325,6 +325,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         self,
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
+        inventory_catalog: str,
         inventory_database: str,
         num_threads=20,
         start_path: str | None = "/",
@@ -333,7 +334,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         CrawlerBase.__init__(
             self,
             backend=sql_backend,
-            catalog="hive_metastore",
+            catalog=inventory_catalog,
             schema=inventory_database,
             table="workspace_objects",
             klass=WorkspaceObjectInfo,
@@ -342,6 +343,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         self._num_threads = num_threads
         self._start_path = start_path
         self._sql_backend = sql_backend
+        self._inventory_catalog = inventory_catalog
         self._inventory_database = inventory_database
 
     def _crawl(self) -> Iterable[WorkspaceObjectInfo]:

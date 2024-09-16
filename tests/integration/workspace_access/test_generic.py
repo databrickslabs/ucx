@@ -294,6 +294,7 @@ def test_experiments(
 def test_directories(
     ws: WorkspaceClient,
     sql_backend,
+    inventory_catalog,
     inventory_schema,
     migrated_group,
     make_directory,
@@ -313,6 +314,7 @@ def test_directories(
             WorkspaceListing(
                 ws,
                 sql_backend=sql_backend,
+                inventory_catalog=inventory_catalog,
                 inventory_database=inventory_schema,
                 num_threads=10,
                 start_path="/",
@@ -337,6 +339,7 @@ def test_directories(
 def test_notebooks(
     ws: WorkspaceClient,
     sql_backend,
+    inventory_catalog,
     inventory_schema,
     migrated_group,
     make_notebook,
@@ -356,6 +359,7 @@ def test_notebooks(
             WorkspaceListing(
                 ws,
                 sql_backend=sql_backend,
+                inventory_catalog=inventory_catalog,
                 inventory_database=inventory_schema,
                 num_threads=10,
                 start_path="/",

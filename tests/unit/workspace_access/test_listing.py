@@ -20,8 +20,14 @@ def test_workspace_listing():
     # TODO: there's a huge chance that we'll be rewriting this code to use WSFS FUSE listing, so it'll be irrelevant
     # pylint: disable-next=explicit-dependency-required
     with patch("databricks.labs.ucx.workspace_access.generic.WorkspaceListing.snapshot", return_value=listing_instance):
-        # pylint: disable-next=obscure-mock
-        results = generic.WorkspaceListing(ws=MagicMock(), sql_backend=MagicMock(), inventory_database=MagicMock())
+        # pylint: disable=obscure-mock
+        results = generic.WorkspaceListing(
+            ws=MagicMock(),
+            sql_backend=MagicMock(),
+            inventory_database=MagicMock(),
+            inventory_catalog="hive_metastore",
+        )
+        # pylint: enable=obscure-mock
         assert len(list(results)) == 4
         for res in results:
             assert res.request_type in {

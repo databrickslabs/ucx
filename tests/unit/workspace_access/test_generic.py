@@ -621,7 +621,7 @@ def test_workspaceobject_crawl():
     ]
     ws = Mock()
     ws.workspace.list.return_value = sample_objects
-    crawler = WorkspaceListing(ws, MockBackend(), "ucx").snapshot()
+    crawler = WorkspaceListing(ws, MockBackend(), "hive_metastore", "ucx").snapshot()
     result_set = list(crawler)
 
     assert len(result_set) == 2

@@ -143,6 +143,7 @@ class GlobalContext(abc.ABC):
         return generic.WorkspaceListing(
             self.workspace_client,
             self.sql_backend,
+            self.inventory_catalog,
             self.inventory_database,
             self.config.num_threads,
             self.config.workspace_start_path,

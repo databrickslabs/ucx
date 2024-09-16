@@ -40,9 +40,9 @@ _SPARK_CONF = {
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backend):
+def test_workspace_object_crawler(ws, make_notebook, inventory_catalog, inventory_schema, sql_backend):
     notebook = make_notebook()
-    workspace_listing = WorkspaceListing(ws, sql_backend, inventory_schema)
+    workspace_listing = WorkspaceListing(ws, sql_backend, inventory_catalog, inventory_schema)
     workspace_objects = {_.path: _ for _ in workspace_listing.snapshot()}
 
     assert notebook in workspace_objects
