@@ -316,7 +316,7 @@ def create_uber_principal(
     for workspace_context in workspace_contexts:
         if workspace_context.is_azure:
             workspace_context.azure_resource_permissions.create_uber_principal(prompts)
-        if workspace_context.is_aws:
+        elif workspace_context.is_aws:
             workspace_context.aws_resource_permissions.create_uber_principal(prompts)
         else:
             raise ValueError("Unsupported cloud provider")
