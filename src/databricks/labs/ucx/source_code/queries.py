@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -51,7 +52,7 @@ class QueryLinter:
             assessment_end = datetime.now()
             for dfsa in dfsas:
                 query_dfsas.append(
-                    dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
+                    dataclasses.replace(dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end)
                 )
         logger.info(f"Saving {len(query_problems)} linting problems...")
         sql_backend.save_table(
