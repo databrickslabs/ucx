@@ -60,7 +60,7 @@ class QueryLinter:
             QueryProblem,
             mode='overwrite',
         )
-        self._directfs_crawler.append(query_dfsas)
+        self._directfs_crawler.dump_all(query_dfsas)
 
     def lint_query(self, query: ListQueryObjectsResponseQuery) -> Iterable[QueryProblem]:
         if not query.query_text:
