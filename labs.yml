@@ -262,6 +262,8 @@ commands:
     flags:
       - name: dashboard-id
         description: (Optional) DBSQL dashboard ID to migrate. If no dashboard ID is provided, all DBSQL dashboards in the workspace will be migrated.
+      - name: run-as-collection
+        description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: revert-dbsql-dashboards
     description: Revert DBSQL dashboards that have been migrated to their original state before the migration.
