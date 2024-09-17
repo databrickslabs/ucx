@@ -441,10 +441,21 @@ def test_save_storage_and_principal_gcp(ws):
         principal_prefix_access(ws, ctx=ctx)
 
 
-def test_migrate_acls_calls_workspace_id(ws) -> None:
-    ctx = WorkspaceContext(ws)
-    migrate_acls(ws, ctx=ctx)
-    ws.get_workspace_id.assert_called()
+@pytest.mark.parametrize("run_as_collection", [True, False])
+def test_migrate_acls_calls_workspace_id(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    migrate_acls(
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
 
 
 def test_migrate_credentials_azure(ws, acc_client):
