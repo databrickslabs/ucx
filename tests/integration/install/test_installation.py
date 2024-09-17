@@ -187,7 +187,7 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
     # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
-    @retried(on=[KeyError], timeout=timedelta(seconds=90))
+    @retried(on=[KeyError], timeout=timedelta(minutes=3))
     def get_group(group_id: str) -> NoReturn:
         _ = ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
