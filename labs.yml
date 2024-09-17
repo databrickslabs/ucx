@@ -178,6 +178,9 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count\tDifference
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
+    flags:
+    - name: run-as-collection
+      description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
