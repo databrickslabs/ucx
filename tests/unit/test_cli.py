@@ -572,6 +572,12 @@ def test_create_uber_principal(ws):
         create_uber_principal(ws, prompts, subscription_id="12")
 
 
+def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(is_azure=False, is_aws=False)
+    with pytest.raises(ValueError, match="Unsupported cloud provider"):
+        migrate_locations(ws, ctx=ctx)
+
+
 def test_migrate_locations_azure(ws) -> None:
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
