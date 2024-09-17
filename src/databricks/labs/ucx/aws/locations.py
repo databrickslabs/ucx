@@ -27,7 +27,7 @@ class AWSExternalLocationsMigration:
         self._aws_resource_permissions = aws_resource_permissions
         self._principal_acl = principal_acl
 
-    def run(self):
+    def run(self) -> None:
         """
         For each path find out the role that has access to it
         Find out the credential that is pointing to this path
