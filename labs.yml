@@ -205,6 +205,8 @@ commands:
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
