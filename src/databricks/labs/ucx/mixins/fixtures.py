@@ -52,7 +52,6 @@ from databricks.sdk.service.sql import (
     WidgetOptions,
     WidgetPosition,
     LegacyQuery,
-    CreateQueryRequestQuery,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -840,29 +839,6 @@ def make_job(ws, make_random, make_notebook):
 
 
 @pytest.fixture
-def make_query(ws, make_random):
-    def create(query_text: str, **kwargs):
-        if "display_name" not in kwargs:
-            kwargs["display_name"] = f"query-{make_random(4)}"
-        # add RemoveAfter tag for watchdog
-        date_to_remove = get_test_purge_time()
-        remove_after_tag = json.dumps({"key": "RemoveAfter", "value": date_to_remove})
-        if 'tags' not in kwargs:
-            kwargs["tags"] = [remove_after_tag]
-        else:
-            kwargs["tags"].append(remove_after_tag)
-        kwargs["query_text"] = query_text
-        request = CreateQueryRequestQuery(
-            display_name=kwargs["display_name"], query_text=query_text, tags=[str(tag) for tag in kwargs["tags"]]
-        )
-        query = ws.queries.create(query=request)
-        logger.info(f"Query: {ws.config.host}#job/{query.id}")
-        return query
-
-    yield from factory("query", create, lambda item: ws.queries.delete(item.id))
-
-
-@pytest.fixture
 def make_model(ws, make_random):
     def create(
         *,
@@ -1278,17 +1254,27 @@ def make_udf(
 
 
 @pytest.fixture
-def make_random_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
-    def create() -> LegacyQuery:
-        table = make_table()
-        query_name = f"ucx_query_Q{make_random(4)}_{get_purge_suffix()}"
+def make_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
+    def create(**kwargs) -> LegacyQuery:
+        if "name" not in kwargs:
+            kwargs["name"] = f"query-{make_random(4)}"
+        if "query" not in kwargs:
+            table = make_table()
+            kwargs["query"] = f"SELECT * FROM {table.schema_name}.{table.name}"
+        # add RemoveAfter tag for watchdog
+        date_to_remove = get_test_purge_time()
+        remove_after_tag = json.dumps({"key": "RemoveAfter", "value": date_to_remove})
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
         query = ws.queries_legacy.create(
-            name=query_name,
+            name=kwargs["name"],
             description="TEST QUERY FOR UCX",
-            query=f"SELECT * FROM {table.schema_name}.{table.name}",
-            tags=["original_query_tag"],
+            query=kwargs["query"],
+            tags=kwargs["tags"],
         )
-        logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
+        logger.info(f"Query Created {query.name}: {ws.config.host}/sql/editor/{query.id}")
         return query
 
     def remove(query: LegacyQuery):
@@ -1446,14 +1432,17 @@ def make_storage_dir(ws, env_or_skip):
 
 
 @pytest.fixture
-def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_random_query):
+def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_query):
     """Create a legacy dashboard.
 
     This fixture is used to test migrating legacy dashboards to Lakeview.
     """
 
-    def create() -> Dashboard:
-        query = make_random_query()
+    def create(**kwargs) -> Dashboard:
+        if "query" in kwargs:
+            query = kwargs["query"]
+        else:
+            query = make_query()
         viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,

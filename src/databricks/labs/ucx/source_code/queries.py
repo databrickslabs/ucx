@@ -47,21 +47,26 @@ class QueryLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now()
-        linted_queries: set[LegacyQuery] = set()
+        linted_queries: set[str] = set()
         all_dashboards = list(self._ws.dashboards.list())
         logger.info(f"Running {len(all_dashboards)} linting tasks...")
         all_problems: list[QueryProblem] = []
         all_dfsas: list[DirectFsAccessInQuery] = []
+        # first lint and collect queries from dashboards
         for dashboard in all_dashboards:
+            dashboard = self._ws.dashboards.get(dashboard_id=dashboard.id)
             problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
             all_problems.extend(problems)
-            assessment_end = datetime.now()
-            for dfsa in dfsas:
-                all_dfsas.append(
-                    dataclasses.replace(
-                        dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
-                    )
-                )
+            all_dfsas.extend(dfsas)
+        for query in self._ws.queries_legacy.list():
+            if query.id in linted_queries:
+                continue
+            linted_queries.add(query.id)
+            problems = self.lint_query(query)
+            all_problems.extend(problems)
+            dfsas = self.collect_dfsas_from_query(query)
+            all_dfsas.extend(dfsas)
+        # dump problems
         logger.info(f"Saving {len(all_problems)} linting problems...")
         sql_backend.save_table(
             f'{escape_sql_identifier(inventory_database)}.query_problems',
@@ -69,10 +74,15 @@ class QueryLinter:
             QueryProblem,
             mode='overwrite',
         )
+        # dump dfsas
+        assessment_end = datetime.now()
+        all_dfsas = [dataclasses.replace(
+                    dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
+                ) for dfsa in all_dfsas]
         self._directfs_crawler.dump_all(all_dfsas)
 
     def _lint_and_collect_from_dashboard(
-        self, dashboard: Dashboard, linted_queries: set[LegacyQuery]
+        self, dashboard: Dashboard, linted_queries: set[str]
     ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccessInQuery]]:
         dashboard_queries = Redash.get_queries_from_dashboard(dashboard)
         query_problems: list[QueryProblem] = []
@@ -81,9 +91,9 @@ class QueryLinter:
         dashboard_parent = dashboard.parent or "<orphan>"
         dashboard_name = dashboard.name or "<anonymous>"
         for query in dashboard_queries:
-            if query in linted_queries:
+            if query.id in linted_queries:
                 continue
-            linted_queries.add(query)
+            linted_queries.add(query.id)
             problems = self.lint_query(query)
             for problem in problems:
                 query_problems.append(

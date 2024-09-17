@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import pytest
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import Query, ListQueryObjectsResponseQuery, LegacyQuery
+from databricks.sdk.service.sql import LegacyQuery
 
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryLinter
