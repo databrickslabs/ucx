@@ -572,7 +572,7 @@ def test_create_uber_principal(ws):
         create_uber_principal(ws, prompts, subscription_id="12")
 
 
-def test_migrate_locations_azure(ws):
+def test_migrate_locations_azure(ws) -> None:
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -581,12 +581,14 @@ def test_migrate_locations_azure(ws):
         azure_subscription_id='test',
         azure_resources=azurerm,
     )
+
     migrate_locations(ws, ctx=ctx)
+
     ws.external_locations.list.assert_called()
     azurerm.storage_accounts.assert_called()
 
 
-def test_migrate_locations_aws(ws, caplog):
+def test_migrate_locations_aws(ws, caplog) -> None:
     successful_return = """
     {
         "UserId": "uu@mail.com",
@@ -604,7 +606,9 @@ def test_migrate_locations_aws(ws, caplog):
         aws_profile="profile",
         aws_cli_run_command=successful_call,
     )
+
     migrate_locations(ws, ctx=ctx)
+
     ws.external_locations.list.assert_called()
 
 
