@@ -731,6 +731,7 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
+    # TODO: Test for running on a collection when context injection for multiple workspaces is supported.
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
         catalog="hive_metastore",
@@ -761,6 +762,7 @@ def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
 
 
 def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
+    # TODO: Test for running on a collection when context injection for multiple workspaces is supported.
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
         catalog="hive_metastore",
