@@ -26,7 +26,7 @@ def test_running_real_assessment_job_ext_hms(
             r"Choose a cluster policy": "0",
         },
     )
-    ws_group_a, _ = ext_hms_ctx.make_ucx_group(wait_for_provisioning=True)
+    ws_group_a, _ = ext_hms_ctx.make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(

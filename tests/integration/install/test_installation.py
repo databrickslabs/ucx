@@ -172,7 +172,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
-    ws_group_a, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
+    ws_group_a, _ = installation_ctx.make_ucx_group()
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.workspace_installation.run()

@@ -2,12 +2,10 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.labs.ucx.mixins.fixtures import wait_group_provisioned
 from ..conftest import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -15,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
 def test_all_grants_in_databases(ws, runtime_ctx, sql_backend, make_group):
-    group_a = make_group(wait_for_provisioning=False)
-    group_b = make_group(wait_for_provisioning=False)
+    group_a = make_group()
+    group_b = make_group()
     schema_a = runtime_ctx.make_schema()
     schema_b = runtime_ctx.make_schema()
     schema_c = runtime_ctx.make_schema()
@@ -26,8 +24,6 @@ def test_all_grants_in_databases(ws, runtime_ctx, sql_backend, make_group):
     view_c = runtime_ctx.make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
     view_d = runtime_ctx.make_table(schema_name=schema_a.name, view=True, ctas="SELECT id FROM range(10)")
     table_e = runtime_ctx.make_table(schema_name=schema_c.name)
-
-    wait_group_provisioned(ws.groups, group_a, group_b)
 
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_b.display_name}`")
@@ -59,13 +55,11 @@ def test_all_grants_in_databases(ws, runtime_ctx, sql_backend, make_group):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_udfs_in_databases(ws, runtime_ctx, sql_backend, make_group):
-    group_a = make_group(wait_for_provisioning=False)
-    group_b = make_group(wait_for_provisioning=False)
+    group_a = make_group()
+    group_b = make_group()
     schema = runtime_ctx.make_schema()
     udf_a = runtime_ctx.make_udf(schema_name=schema.name)
     udf_b = runtime_ctx.make_udf(schema_name=schema.name)
-
-    wait_group_provisioned(ws.groups, group_a, group_b)
 
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group_a.display_name}`")
@@ -86,16 +80,12 @@ def test_all_grants_for_udfs_in_databases(ws, runtime_ctx, sql_backend, make_gro
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_other_objects(
-    ws: WorkspaceClient,
-    runtime_ctx: MockRuntimeContext,
-    sql_backend: StatementExecutionBackend,
-    make_group,
+    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, make_group
 ) -> None:
-    group_a = make_group(wait_for_provisioning=False)
-    group_b = make_group(wait_for_provisioning=False)
-    group_c = make_group(wait_for_provisioning=False)
-    group_d = make_group(wait_for_provisioning=False)
-    wait_group_provisioned(ws.groups, group_a, group_b, group_c, group_d)
+    group_a = make_group()
+    group_b = make_group()
+    group_c = make_group()
+    group_d = make_group()
 
     sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON ANY FILE TO `{group_a.display_name}`")

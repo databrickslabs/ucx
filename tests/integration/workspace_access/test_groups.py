@@ -9,7 +9,7 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, wait_group_provisioned
+from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 
@@ -70,7 +70,7 @@ def test_reflect_account_groups_on_workspace_warns_skipping_when_a_workspace_gro
     inventory_schema,
 ):
     """Warn about groups for which a workspace group with the same name exists."""
-    ws_group, acc_group = make_ucx_group(wait_for_provisioning=True)
+    ws_group, acc_group = make_ucx_group()
 
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
     with caplog.at_level(logging.WARN, logger="databricks.labs.ucx.workspace_access.groups"):
@@ -87,7 +87,7 @@ def test_reflect_account_groups_on_workspace_logs_skipping_groups_when_already_r
     inventory_schema,
 ):
     """Log skipping groups which are reflected on the workspace already."""
-    acc_group = make_acc_group(wait_for_provisioning=True)
+    acc_group = make_acc_group()
 
     sql_backend.save_table(
         f"{inventory_schema}.groups",
@@ -134,7 +134,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
-    ws_group, _ = make_ucx_group(wait_for_provisioning=True)
+    ws_group, _ = make_ucx_group()
 
     group_manager = GroupManager(
         sql_backend,
@@ -230,7 +230,7 @@ def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, ma
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 @pytest.mark.parametrize("same_user", [True, False])
 def test_group_matching_names(
-    acc, ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
+    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
 ):
     rand_elem = make_random(4)
     purge_suffix = get_purge_suffix()
@@ -239,16 +239,8 @@ def test_group_matching_names(
     user1 = make_user()
     members1 = [user1.id]
     members2 = [user1.id] if same_user else [make_user().id]
-    ws_group = make_group(
-        display_name=workspace_group_name,
-        members=members1,
-        entitlements=["allow-cluster-create"],
-        wait_for_provisioning=False,
-    )
-    acc_group = make_acc_group(display_name=account_group_name, members=members2, wait_for_provisioning=False)
-
-    wait_group_provisioned(ws.groups, ws_group)
-    wait_group_provisioned(acc.groups, acc_group)
+    ws_group = make_group(display_name=workspace_group_name, members=members1, entitlements=["allow-cluster-create"])
+    acc_group = make_acc_group(display_name=account_group_name, members=members2)
 
     logger.info(
         f"Attempting Mapping From Workspace Group {ws_group.display_name} to Account Group {acc_group.display_name}"
