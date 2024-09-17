@@ -36,7 +36,10 @@ class AWSExternalLocationsMigration:
         credential_dict = self._get_existing_credentials_dict()
         external_locations = self._external_locations.snapshot()
         existing_external_locations = self._ws.external_locations.list()
-        existing_paths = [external_location.url for external_location in existing_external_locations]
+        existing_paths = []
+        for external_location in existing_external_locations:
+            if external_location.url is not None:
+                existing_paths.append(external_location.url)
         compatible_roles = self._aws_resource_permissions.load_uc_compatible_roles()
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
         for path, role_arn in missing_paths:
