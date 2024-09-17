@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import ListQueryObjectsResponseQuery
+from databricks.sdk.service.sql import Dashboard, LegacyQuery
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -16,12 +16,17 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessInQuery, LineageAtom
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessSqlLinter
+from databricks.labs.ucx.source_code.redash import Redash
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class QueryProblem:
+    dashboard_id: str
+    dashboard_parent: str
+    dashboard_name: str
+    query_id: str
     query_parent: str
     query_name: str
     code: str
@@ -42,53 +47,94 @@ class QueryLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now()
-        all_queries = list(self._ws.queries.list())
-        logger.info(f"Running {len(all_queries)} linting tasks...")
-        query_problems: list[QueryProblem] = []
-        query_dfsas: list[DirectFsAccessInQuery] = []
-        for query in all_queries:
-            problems = self.lint_query(query)
-            query_problems.extend(problems)
-            dfsas = self.collect_dfsas_from_query(query)
+        linted_queries: set[LegacyQuery] = set()
+        all_dashboards = list(self._ws.dashboards.list())
+        logger.info(f"Running {len(all_dashboards)} linting tasks...")
+        all_problems: list[QueryProblem] = []
+        all_dfsas: list[DirectFsAccessInQuery] = []
+        for dashboard in all_dashboards:
+            problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
+            all_problems.extend(problems)
             assessment_end = datetime.now()
             for dfsa in dfsas:
-                query_dfsas.append(
+                all_dfsas.append(
                     dataclasses.replace(
                         dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
                     )
                 )
-        logger.info(f"Saving {len(query_problems)} linting problems...")
+        logger.info(f"Saving {len(all_problems)} linting problems...")
         sql_backend.save_table(
             f'{escape_sql_identifier(inventory_database)}.query_problems',
-            query_problems,
+            all_problems,
             QueryProblem,
             mode='overwrite',
         )
-        self._directfs_crawler.dump_all(query_dfsas)
+        self._directfs_crawler.dump_all(all_dfsas)
 
-    def lint_query(self, query: ListQueryObjectsResponseQuery) -> Iterable[QueryProblem]:
-        if not query.query_text:
+    def _lint_and_collect_from_dashboard(
+        self, dashboard: Dashboard, linted_queries: set[LegacyQuery]
+    ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccessInQuery]]:
+        dashboard_queries = Redash.get_queries_from_dashboard(dashboard)
+        query_problems: list[QueryProblem] = []
+        query_dfsas: list[DirectFsAccessInQuery] = []
+        dashboard_id = dashboard.id or "<no-id>"
+        dashboard_parent = dashboard.parent or "<orphan>"
+        dashboard_name = dashboard.name or "<anonymous>"
+        for query in dashboard_queries:
+            if query in linted_queries:
+                continue
+            linted_queries.add(query)
+            problems = self.lint_query(query)
+            for problem in problems:
+                query_problems.append(
+                    dataclasses.replace(
+                        problem,
+                        dashboard_id=dashboard_id,
+                        dashboard_parent=dashboard_parent,
+                        dashboard_name=dashboard_name,
+                    )
+                )
+            dfsas = self.collect_dfsas_from_query(query)
+            for dfsa in dfsas:
+                atom = LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard_id,
+                    other={"parent": dashboard_parent, "name": dashboard_name},
+                )
+                source_lineage = [atom] + dfsa.source_lineage
+                query_dfsas.append(dataclasses.replace(dfsa, source_lineage=source_lineage))
+        return query_problems, query_dfsas
+
+    def lint_query(self, query: LegacyQuery) -> Iterable[QueryProblem]:
+        if not query.query:
             return
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         linter = ctx.linter(Language.SQL)
-        for advice in linter.lint(query.query_text):
+        query_id = query.id or "<no-id>"
+        query_parent = query.parent or "<orphan>"
+        query_name = query.name or "<anonymous>"
+        for advice in linter.lint(query.query):
             yield QueryProblem(
-                query_parent="",  # TODO get from sdk once 'path_parent' in query field is added to ListQueryObjectsResponseQuery
-                query_name=query.display_name or "unnamed query",
+                dashboard_id="",
+                dashboard_parent="",
+                dashboard_name="",
+                query_id=query_id,
+                query_parent=query_parent,
+                query_name=query_name,
                 code=advice.code,
                 message=advice.message,
             )
 
     @classmethod
-    def collect_dfsas_from_query(cls, query: ListQueryObjectsResponseQuery) -> Iterable[DirectFsAccessInQuery]:
-        if query.query_text is None:
+    def collect_dfsas_from_query(cls, query: LegacyQuery) -> Iterable[DirectFsAccessInQuery]:
+        if query.query is None:
             return
         linter = DirectFsAccessSqlLinter()
         source_id = query.id or "no id"
-        source_name = query.display_name or "<anonymous>"
-        source_timestamp = cls._read_timestamp(query.update_time)
+        source_name = query.name or "<anonymous>"
+        source_timestamp = cls._read_timestamp(query.updated_at)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"query_name": source_name})]
-        for dfsa in linter.collect_dfsas(query.query_text):
+        for dfsa in linter.collect_dfsas(query.query):
             yield DirectFsAccessInQuery(**asdict(dfsa)).replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
             )
