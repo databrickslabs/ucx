@@ -787,7 +787,7 @@ def test_create_missing_principal_azure(ws, caplog):
     assert str(failure.value) == "Unsupported cloud provider"
 
 
-def test_migrate_dbsql_dashboards(ws, caplog):
+def test_migrate_dbsql_dashboards_list_dashboards(ws, caplog) -> None:
     migrate_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
 
