@@ -75,7 +75,7 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessInPath, DirectFsAccessInQuery
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
@@ -121,9 +121,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
-            functools.partial(
-                table, "directfs_in_paths", DirectFsAccess
-            ),  # directfs_in_queries will be added in upcoming PR
+            functools.partial(table, "directfs_in_paths", DirectFsAccessInPath),
+            functools.partial(table, "directfs_in_queries", DirectFsAccessInQuery),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -132,7 +131,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
-    # direct_file_system_access view will be added in upcoming PR
+    deployer.deploy_view("directfs", "queries/views/directfs.sql")
 
 
 def extract_major_minor(version_string):
