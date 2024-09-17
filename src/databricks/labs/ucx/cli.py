@@ -536,7 +536,7 @@ def migrate_tables(
             percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
             if prompts.confirm(
                 f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables in "
-                f"{ctx.workspace_client.config.host}, do you want to run "
+                f"{workspace_context.workspace_client.config.host}, do you want to run "
                 f"the `migrate-external-hiveserde-tables-in-place-experimental` workflow?"
             ):
                 deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
@@ -546,8 +546,8 @@ def migrate_tables(
             percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
             if prompts.confirm(
                 f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which "
-                f"cannot be migrated using sync in {ctx.workspace_client.config.host}, do you want to run the "
-                "`migrate-external-tables-ctas workflow`?"
+                f"cannot be migrated using sync in {workspace_context.workspace_client.config.host}, do you want to "
+                "run the `migrate-external-tables-ctas workflow`?"
             ):
                 deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
