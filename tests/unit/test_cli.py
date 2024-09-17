@@ -277,6 +277,18 @@ def test_validate_external_locations(ws):
     ws.statement_execution.execute_statement.assert_called()
 
 
+def test_validate_external_locations_runs_as_collection(workspace_clients, acc_client) -> None:
+    validate_external_locations(
+        workspace_clients[0],
+        MockPrompts({}),
+        run_as_collection=True,
+        a=acc_client,
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.statement_execution.execute_statement.assert_called()
+
+
 def test_ensure_assessment_run(ws, acc_client):
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
