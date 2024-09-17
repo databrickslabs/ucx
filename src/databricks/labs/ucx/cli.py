@@ -419,17 +419,27 @@ def migrate_credentials(
 
 
 @ucx.command
-def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_locations(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """This command creates UC external locations. The candidate locations to be created are extracted from
     guess_external_locations task in the assessment job. You can run validate_external_locations command to check
     the candidate locations. Please make sure the credentials haven migrated before running this command. The command
     will only create the locations that have corresponded UC Storage Credentials.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure or ctx.is_aws:
-        return ctx.external_locations_migration.run()
-    raise ValueError("Unsupported cloud provider")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure or workspace_context.is_aws:
+            workspace_context.external_locations_migration.run()
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
