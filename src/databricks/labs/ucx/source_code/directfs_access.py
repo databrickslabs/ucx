@@ -1,14 +1,24 @@
 from __future__ import annotations
 
-
+import dataclasses
 import logging
+import sys
 from collections.abc import Sequence, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, TypeVar
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +35,14 @@ class LineageAtom:
 class DirectFsAccess:
     """A record describing a Direct File System Access"""
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        source_lineage = data.get("source_lineage", None)
+        if isinstance(source_lineage, list) and len(source_lineage) > 0 and isinstance(source_lineage[0], dict):
+            lineage_atoms = [LineageAtom(*lineage) for lineage in source_lineage]
+            data["source_lineage"] = lineage_atoms
+        return cls(**data)
+
     UNKNOWN = "unknown"
 
     path: str
@@ -33,9 +51,6 @@ class DirectFsAccess:
     source_id: str = UNKNOWN
     source_timestamp: datetime = datetime.fromtimestamp(0)
     source_lineage: list[LineageAtom] = field(default_factory=list)
-    job_id: int = -1
-    job_name: str = UNKNOWN
-    task_key: str = UNKNOWN
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
@@ -45,19 +60,34 @@ class DirectFsAccess:
         source_lineage: list[LineageAtom] | None = None,
         source_timestamp: datetime | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
+        return dataclasses.replace(
+            self,
             source_id=source_id or self.source_id,
             source_timestamp=source_timestamp or self.source_timestamp,
             source_lineage=source_lineage or self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
         )
+
+    def replace_assessment_infos(
+        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
+    ):
+        return dataclasses.replace(
+            self,
+            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
+            assessment_end_timestamp=assessment_end or self.assessment_end_timestamp,
+        )
+
+
+@dataclass
+class DirectFsAccessInQuery(DirectFsAccess):
+
+    pass
+
+
+@dataclass
+class DirectFsAccessInPath(DirectFsAccess):
+    job_id: int = -1
+    job_name: str = DirectFsAccess.UNKNOWN
+    task_key: str = DirectFsAccess.UNKNOWN
 
     def replace_job_infos(
         self,
@@ -65,41 +95,35 @@ class DirectFsAccess:
         job_name: str | None = None,
         task_key: str | None = None,
     ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=job_id or self.job_id,
-            job_name=job_name or self.job_name,
-            task_key=task_key or self.task_key,
-            assessment_start_timestamp=self.assessment_start_timestamp,
-            assessment_end_timestamp=self.assessment_start_timestamp,
-        )
-
-    def replace_assessment_infos(
-        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
-    ):
-        return DirectFsAccess(
-            path=self.path,
-            is_read=self.is_read,
-            is_write=self.is_write,
-            source_id=self.source_id,
-            source_timestamp=self.source_timestamp,
-            source_lineage=self.source_lineage,
-            job_id=self.job_id,
-            job_name=self.job_name,
-            task_key=self.task_key,
-            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
-            assessment_end_timestamp=assessment_end or self.assessment_start_timestamp,
+        return dataclasses.replace(
+            self, job_id=job_id or self.job_id, job_name=job_name or self.job_name, task_key=task_key or self.task_key
         )
 
 
-class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
+T = TypeVar("T", bound=DirectFsAccess)
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+
+class DirectFsAccessCrawler(CrawlerBase[T]):
+
+    @classmethod
+    def for_paths(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler[DirectFsAccessInPath](
+            backend,
+            schema,
+            "directfs_in_paths",
+            DirectFsAccessInPath,
+        )
+
+    @classmethod
+    def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler[DirectFsAccessInQuery](
+            backend,
+            schema,
+            "directfs_in_queries",
+            DirectFsAccessInQuery,
+        )
+
+    def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type[T]):
         """
         Initializes a DFSACrawler instance.
 
@@ -107,9 +131,9 @@ class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, table, DirectFsAccess)
+        super().__init__(backend, "hive_metastore", schema, table, klass)
 
-    def dump_all(self, dfsas: Sequence[DirectFsAccess]):
+    def dump_all(self, dfsas: Sequence[T]):
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR
@@ -120,22 +144,9 @@ class _DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
-    def _try_fetch(self) -> Iterable[DirectFsAccess]:
-        sql = f"SELECT * FROM {self.full_name}"
+    def _try_fetch(self) -> Iterable[T]:
+        sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
         yield from self._backend.fetch(sql)
 
-    def _crawl(self) -> Iterable[DirectFsAccess]:
+    def _crawl(self) -> Iterable[T]:
         raise NotImplementedError()
-
-
-class DirectFsAccessCrawlers:
-
-    def __init__(self, sql_backend: SqlBackend, schema: str):
-        self._sql_backend = sql_backend
-        self._schema = schema
-
-    def for_paths(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_paths")
-
-    def for_queries(self) -> _DirectFsAccessCrawler:
-        return _DirectFsAccessCrawler(self._sql_backend, self._schema, "directfs_in_queries")
