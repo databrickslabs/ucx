@@ -203,11 +203,20 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
-def validate_groups_membership(w: WorkspaceClient):
+def validate_groups_membership(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
-    ctx = WorkspaceContext(w)
-    mismatch_groups = ctx.group_manager.validate_group_membership()
-    print(json.dumps(mismatch_groups))
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        mismatch_groups = workspace_context.group_manager.validate_group_membership()
+        print(json.dumps(mismatch_groups))
 
 
 @ucx.command
