@@ -92,6 +92,19 @@ class CrawlerBase(ABC, Generic[Result]):
         return cls._valid(name)
 
     def snapshot(self, *, force_refresh: bool = False) -> Iterable[Result]:
+        """Obtain a snapshot of the data that is captured by this crawler.
+
+        If this crawler has already captured data, by default this previously-captured data is returned.
+        However if there is no captured data or the `force_refresh` argument is true a (potentially expensive)
+        crawl is performed to obtain a fresh snapshot.
+
+        Args:
+            force_refresh (bool, optional): If true, the crawler will capture a new snapshot previously-captured
+                data is available. If this crawler depends on other crawlers, this argument is _not_ passed on:
+                a forced refresh is shallow in nature.
+        Returns:
+            Iterable[Result]: A snapshot of the data that is captured by this crawler.
+        """
         return self._snapshot(self._try_fetch, self._crawl, force_refresh=force_refresh)
 
     @abstractmethod
@@ -105,6 +118,9 @@ class CrawlerBase(ABC, Generic[Result]):
     @abstractmethod
     def _crawl(self) -> Iterable[Result]:
         """Perform the (potentially slow) crawling necessary to capture the current state of the environment.
+
+        If this operation depends on the results of other crawlers these MUST NOT force a refresh of the subordinate
+        crawler.
 
         Returns:
             Iterable[Result]: Records that capture the results of crawling the environment.
