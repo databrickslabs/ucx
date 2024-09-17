@@ -400,7 +400,7 @@ def test_save_storage_and_principal_azure(ws, caplog, acc_client):
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
-def test_validate_groups_membership(ws):
+def test_validate_groups_membership_lists_groups(ws) -> None:
     validate_groups_membership(ws)
     ws.groups.list.assert_called()
 
