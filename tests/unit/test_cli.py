@@ -689,14 +689,14 @@ def test_migrate_locations_gcp(ws):
         migrate_locations(ws, ctx=ctx)
 
 
-def test_create_catalogs_schemas(ws):
+def test_create_catalogs_schemas_lists_catalogs(ws) -> None:
     prompts = MockPrompts({'.*': 's3://test'})
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     create_catalogs_schemas(ws, prompts)
     ws.catalogs.list.assert_called_once()
 
 
-def test_create_catalogs_schemas_handles_existing(ws, caplog):
+def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     prompts = MockPrompts({'.*': 's3://test'})
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
