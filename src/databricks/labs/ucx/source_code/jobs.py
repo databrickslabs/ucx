@@ -1,3 +1,4 @@
+import dataclasses
 import functools
 import logging
 import shutil
@@ -419,9 +420,9 @@ class WorkflowLinter:
                     end_col=advice.advice.end_col,
                 )
                 problems.append(job_problem)
-            assessment_start = datetime.now()
-            task_dfsas = self._collect_task_dfsas(graph, session_state)
-            assessment_end = datetime.now()
+            assessment_start = datetime.now(timezone.utc)
+            task_dfsas = self._collect_task_dfsas(job, task, graph, session_state)
+            assessment_end = datetime.now(timezone.utc)
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
@@ -461,9 +462,13 @@ class WorkflowLinter:
         yield from walker
 
     def _collect_task_dfsas(
-        self, graph: DependencyGraph, session_state: CurrentSessionState
+        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
     ) -> Iterable[DirectFsAccess]:
-        yield from DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
+        # walker doesn't register lineage for job/task
+        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
+            atoms = [ LineageAtom(object_type="job", object_id=str(job.job_id), other={"name": job.settings.name}),
+                      LineageAtom(object_type="task", object_id=task.task_key) ]
+            yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
@@ -539,11 +544,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
-        src_timestamp = _get_path_modified_datetime(path)
-        src_id = str(path)
         for cell in notebook.cells:
-            for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+            yield from self._collect_from_source(cell.original_code, cell.language, path, inherited_tree)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()

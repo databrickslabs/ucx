@@ -2,7 +2,7 @@ import dataclasses
 import logging
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery
@@ -46,7 +46,7 @@ class QueryLinter:
         self._directfs_crawler = directfs_crawler
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
-        assessment_start = datetime.now()
+        assessment_start = datetime.now(timezone.utc)
         linted_queries: set[str] = set()
         all_dashboards = list(self._ws.dashboards.list())
         logger.info(f"Running {len(all_dashboards)} linting tasks...")
@@ -79,7 +79,7 @@ class QueryLinter:
             mode='overwrite',
         )
         # dump dfsas
-        assessment_end = datetime.now()
+        assessment_end = datetime.now(timezone.utc)
         all_dfsas = [
             dataclasses.replace(
                 dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
