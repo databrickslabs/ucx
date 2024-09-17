@@ -706,25 +706,37 @@ def test_assign_metastore(acc_client, caplog):
         assign_metastore(acc_client, "123")
 
 
-def test_migrate_tables(ws):
+def test_migrate_tables_calls_migrate_table_job_run_now(ws) -> None:
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
     prompts = MockPrompts({})
+
     migrate_tables(ws, prompts)
+
     ws.jobs.run_now.assert_called_with(456)
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_migrate_external_hiveserde_tables_in_place(ws):
+def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
-        catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
+        catalog="hive_metastore",
+        database="test",
+        name="hiveserde",
+        object_type="UNKNOWN",
+        table_format="HIVE",
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
 
     prompt = (
@@ -739,15 +751,22 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
-def test_migrate_external_tables_ctas(ws):
+def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
-        catalog="hive_metastore", database="test", name="externalctas", object_type="UNKNOWN", table_format="EXTERNAL"
+        catalog="hive_metastore",
+        database="test",
+        name="externalctas",
+        object_type="UNKNOWN",
+        table_format="EXTERNAL",
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
 
     prompt = (
