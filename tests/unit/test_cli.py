@@ -39,6 +39,7 @@ from databricks.labs.ucx.cli import (
     join_collection,
     logs,
     manual_workspace_info,
+    migrate_acls,
     migrate_credentials,
     migrate_dbsql_dashboards,
     migrate_local_code,
@@ -99,6 +100,12 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     }
                 }
             }
+        ),
+        '/Users/foo/.ucx/workspaces.json': json.dumps(
+            [
+                {'workspace_id': 123, 'workspace_name': '123'},
+                {'workspace_id': 456, 'workspace_name': '456'},
+            ]
         ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
@@ -432,6 +439,12 @@ def test_save_storage_and_principal_gcp(ws):
     ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx=ctx)
+
+
+def test_migrate_acls_calls_workspace_id(ws) -> None:
+    ctx = WorkspaceContext(ws)
+    migrate_acls(ws, ctx=ctx)
+    ws.get_workspace_id.assert_called()
 
 
 def test_migrate_credentials_azure(ws, acc_client):
