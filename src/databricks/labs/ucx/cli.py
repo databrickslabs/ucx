@@ -547,7 +547,7 @@ def migrate_tables(
             if prompts.confirm(
                 f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which "
                 f"cannot be migrated using sync in {workspace_context.workspace_client.config.host}, do you want to "
-                "run the `migrate-external-tables-ctas workflow`?"
+                "run the `migrate-external-tables-ctas` workflow?"
             ):
                 deployed_workflows.run_workflow("migrate-external-tables-ctas")
 

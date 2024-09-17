@@ -750,8 +750,8 @@ def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
     )
 
     prompt = (
-        "Found 1 (.*) hiveserde tables, do you want to run the "
-        "migrate-external-hiveserde-tables-in-place-experimental workflow?"
+        "Found 1 (.*) hiveserde tables in https://localhost, do you want to run the "
+        "`migrate-external-hiveserde-tables-in-place-experimental` workflow?"
     )
     prompts = MockPrompts({prompt: "Yes"})
 
@@ -781,8 +781,8 @@ def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
     )
 
     prompt = (
-        "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
-        "migrate-external-tables-ctas workflow?"
+        "Found 1 (.*) external tables which cannot be migrated using sync in https://localhost, do you want to run the "
+        "`migrate-external-tables-ctas` workflow?"
     )
 
     prompts = MockPrompts({prompt: "Yes"})
