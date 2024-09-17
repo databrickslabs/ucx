@@ -10,8 +10,8 @@ from databricks.sdk.service.jobs import RunLifecycleStateV2State, TerminationCod
 def _assert_run_success(ws: WorkspaceClient, run_id: int) -> None:
     """Verify that a job run completed successfully."""
     run = ws.jobs.get_run(run_id=run_id)
-    assert run.status.state == RunLifecycleStateV2State.TERMINATED
-    assert run.status.termination_details.code == TerminationCodeCode.SUCCESS
+    assert run.status and run.status.state == RunLifecycleStateV2State.TERMINATED
+    assert run.status.termination_details and run.status.termination_details.code == TerminationCodeCode.SUCCESS
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
