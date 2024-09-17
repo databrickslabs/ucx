@@ -4,9 +4,8 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.core import Row
 
-
 def test_export(tmp_path):
-    """Test the export_results method of the AssessmentExport class."""
+    """Test the export_results method of the AssessmentExporter class."""
     query = {
         "SELECT\n  one\nFROM ucx.external_locations": [
             Row(location="s3://bucket1/folder1", table_count=1),
@@ -24,10 +23,11 @@ def test_export(tmp_path):
 
     # Mock backend and prompts
     mock_backend = MockBackend(rows=query)
+    query_choice = "main"  # Mocking the choice here
     mock_prompts = MockPrompts(
         {
             "Choose a path to save the UCX Assessment results": export_path.as_posix(),
-            "Choose which assessment results to export": "main",
+            "Choose which assessment results to export": query_choice,
         }
     )
 
@@ -35,6 +35,6 @@ def test_export(tmp_path):
     export = AssessmentExporter(mock_backend, config)
     exported = export.export_results(mock_prompts)
 
-    # Assertions
-    assert exported == export_path / "export_to_zipped_csv.zip"
-
+    # Assertion based on the query_choice
+    expected_file_name = f"export_{query_choice}_results.zip"  # Adjusted filename
+    assert exported == export_path / expected_file_name

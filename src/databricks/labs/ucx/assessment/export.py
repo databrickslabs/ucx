@@ -47,6 +47,20 @@ class AssessmentExporter:
 
         logger.info("Exporting assessment results....")
         results_path = assessment_results.export_to_zipped_csv(self._sql_backend, export_path)
+        print("results_path", results_path)
         logger.info(f"Results exported to {results_path}")
 
-        return results_path
+        ##rename the zipped file
+        old_file_path = Path(results_path)
+
+        # New file name based on query_choice
+        new_file_name = f"export_{query_choice}_results.zip"
+        new_file_path = old_file_path.with_name(new_file_name)
+
+        try:
+            old_file_path.rename(new_file_path)
+            logger.info(f"File renamed to {new_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to rename file: {e}")
+
+        return new_file_path
