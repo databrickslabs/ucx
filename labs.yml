@@ -73,7 +73,16 @@ commands:
     description: ensure the assessment job was run on a workspace
     flags:
       - name: run-as-collection
-        description: boolean flag to indicate to run the cmd as a collection. Default is False.
+        description: boolean flag to indicate whether the workflow should be checked (and run if necessary) in all
+          workspaces (true) or not (false). Default is False.
+
+  - name: migration_progress
+    description: trigger the migration-progress-experimental job to refresh the inventory that tracks the workspace
+      resources and their migration status.
+    flags:
+      - name: run-as-collection
+        description: boolean flag to indicate whether the workflow should be run in all workspaces (true) or not
+          (false). Default is False.
 
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts

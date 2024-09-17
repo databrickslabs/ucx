@@ -179,17 +179,35 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
         webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
-@ucx.command
-def ensure_assessment_run(w: WorkspaceClient, *, run_as_collection: bool = False, a: AccountClient | None = None):
-    """ensure the assessment job was run on a workspace"""
-    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
-    # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
-    skip_job_status = bool(run_as_collection)
+def _workflow_trigger(
+    ws: WorkspaceClient,
+    workflow_name: str,
+    a: AccountClient | None = None,
+    *,
+    run_as_collection: bool = False,
+    force_run: bool,
+) -> None:
+    """Trigger a workflow, by default only if not already run."""
+    workspace_contexts = _get_workspace_contexts(ws, a, run_as_collection)
+    # If running the cmd as a collection, don't wait for each assessment job to finish as that will take long time.
+    skip_job_wait = bool(run_as_collection)
     for ctx in workspace_contexts:
-        logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
+        logger.info(f"Starting {workflow_name} workflow in workspace: {ctx.workspace_client.get_workspace_id()}")
         deployed_workflows = ctx.deployed_workflows
-        if not deployed_workflows.validate_step("assessment"):
-            deployed_workflows.run_workflow("assessment", skip_job_status)
+        if force_run or not deployed_workflows.validate_step(workflow_name):
+            deployed_workflows.run_workflow(workflow_name, skip_job_wait=skip_job_wait)
+
+
+@ucx.command
+def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
+    """ensure the assessment job was run on a workspace"""
+    _workflow_trigger(w, "assessment", a, run_as_collection=run_as_collection, force_run=False)
+
+
+@ucx.command
+def migration_progress(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None) -> None:
+    """Manually trigger the migration-progress-experimental job."""
+    _workflow_trigger(w, "migration-progress-experimental", a, run_as_collection=run_as_collection, force_run=True)
 
 
 @ucx.command
