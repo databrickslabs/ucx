@@ -846,7 +846,7 @@ def make_ws_query(ws, make_random):
             kwargs["display_name"] = f"query-{make_random(4)}"
         # add RemoveAfter tag for test job cleanup
         date_to_remove = get_test_purge_time()
-        remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
+        remove_after_tag = json.dumps({"key": "RemoveAfter", "value": date_to_remove})
         if 'tags' not in kwargs:
             kwargs["tags"] = [remove_after_tag]
         else:
