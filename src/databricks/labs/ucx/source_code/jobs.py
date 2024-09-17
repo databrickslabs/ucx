@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -28,10 +28,9 @@ from databricks.labs.ucx.source_code.base import (
     guess_encoding,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
-    DirectFsAccess,
     LineageAtom,
     DirectFsAccessCrawler,
-    DirectFsAccessInPath,
+    DirectFsAccess,
 )
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -363,7 +362,7 @@ class WorkflowLinter:
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
-        job_dfsas: list[DirectFsAccessInPath] = []
+        job_dfsas: list[DirectFsAccess] = []
         for problems, dfsas in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
@@ -378,7 +377,7 @@ class WorkflowLinter:
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
@@ -393,9 +392,9 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         problems: list[JobProblem] = []
-        dfsas: list[DirectFsAccessInPath] = []
+        dfsas: list[DirectFsAccess] = []
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -421,7 +420,7 @@ class WorkflowLinter:
                 )
                 problems.append(job_problem)
             assessment_start = datetime.now()
-            task_dfsas = self._collect_task_dfsas(task, job, graph, session_state)
+            task_dfsas = self._collect_task_dfsas(graph, session_state)
             assessment_end = datetime.now()
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
@@ -462,15 +461,9 @@ class WorkflowLinter:
         yield from walker
 
     def _collect_task_dfsas(
-        self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[DirectFsAccessInPath]:
-        collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
-        assert job.settings is not None  # as already done in _lint_job
-        job_name = job.settings.name
-        for dfsa in collector:
-            yield DirectFsAccessInPath(**asdict(dfsa)).replace_job_infos(
-                job_id=job.job_id, job_name=job_name, task_key=task.task_key
-            )
+        self, graph: DependencyGraph, session_state: CurrentSessionState
+    ) -> Iterable[DirectFsAccess]:
+        yield from DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):

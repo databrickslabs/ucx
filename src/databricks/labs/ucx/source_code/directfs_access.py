@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
@@ -77,53 +77,17 @@ class DirectFsAccess:
         )
 
 
-@dataclass
-class DirectFsAccessInQuery(DirectFsAccess):
-
-    pass
-
-
-@dataclass
-class DirectFsAccessInPath(DirectFsAccess):
-    job_id: int = -1
-    job_name: str = DirectFsAccess.UNKNOWN
-    task_key: str = DirectFsAccess.UNKNOWN
-
-    def replace_job_infos(
-        self,
-        job_id: int | None = None,
-        job_name: str | None = None,
-        task_key: str | None = None,
-    ):
-        return dataclasses.replace(
-            self, job_id=job_id or self.job_id, job_name=job_name or self.job_name, task_key=task_key or self.task_key
-        )
-
-
-T = TypeVar("T", bound=DirectFsAccess)
-
-
-class DirectFsAccessCrawler(CrawlerBase[T]):
+class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     @classmethod
     def for_paths(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler[DirectFsAccessInPath](
-            backend,
-            schema,
-            "directfs_in_paths",
-            DirectFsAccessInPath,
-        )
+        return DirectFsAccessCrawler(backend, schema, "directfs_in_paths")
 
     @classmethod
     def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler[DirectFsAccessInQuery](
-            backend,
-            schema,
-            "directfs_in_queries",
-            DirectFsAccessInQuery,
-        )
+        return DirectFsAccessCrawler(backend, schema, "directfs_in_queries")
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str, klass: type[T]):
+    def __init__(self, backend: SqlBackend, schema: str, table: str):
         """
         Initializes a DFSACrawler instance.
 
@@ -131,9 +95,9 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, table, klass)
+        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
 
-    def dump_all(self, dfsas: Sequence[T]):
+    def dump_all(self, dfsas: Sequence[DirectFsAccess]):
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR
@@ -144,11 +108,11 @@ class DirectFsAccessCrawler(CrawlerBase[T]):
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
-    def _try_fetch(self) -> Iterable[T]:
+    def _try_fetch(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
         for row in self._backend.fetch(sql):
             yield self._klass.from_dict(row.as_dict())
 
-    def _crawl(self) -> Iterable[T]:
+    def _crawl(self) -> Iterable[DirectFsAccess]:
         return []
         # TODO raise NotImplementedError() once CrawlerBase supports empty snapshots
