@@ -102,7 +102,6 @@ def make_ucx_group(acc, ws, make_random, make_group, make_acc_group, make_user):
     def inner(
         workspace_group_name: str | None = None,
         account_group_name: str | None = None,
-        wait_for_provisioning: bool = True,
         **kwargs,
     ):
         if not workspace_group_name:
@@ -115,18 +114,13 @@ def make_ucx_group(acc, ws, make_random, make_group, make_acc_group, make_user):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
-            wait_for_provisioning=False,
             **kwargs,
         )
         acc_group = make_acc_group(
             display_name=account_group_name,
             members=members,
-            wait_for_provisioning=False,
             **kwargs,
         )
-        if wait_for_provisioning:
-            wait_group_provisioned(ws.groups, ws_group)  # noqa: F405
-            wait_group_provisioned(acc.groups, acc_group)  # noqa: F405
         return ws_group, acc_group
 
     return inner
@@ -136,12 +130,8 @@ def make_ucx_group(acc, ws, make_random, make_group, make_acc_group, make_user):
 def make_group_pair(acc, ws, make_random, make_group):
     def inner() -> MigratedGroup:
         suffix = make_random(4)
-        ws_group = make_group(
-            display_name=f"old_{suffix}", entitlements=["allow-cluster-create"], wait_for_provisioning=False
-        )
-        acc_group = make_group(display_name=f"new_{suffix}", wait_for_provisioning=False)
-        wait_group_provisioned(ws.groups, ws_group.id)  # noqa: F405
-        wait_group_provisioned(acc.groups, acc_group.id)  # noqa: F405
+        ws_group = make_group(display_name=f"old_{suffix}", entitlements=["allow-cluster-create"])
+        acc_group = make_group(display_name=f"new_{suffix}")
         return MigratedGroup.partial_info(ws_group, acc_group)
 
     return inner
@@ -633,7 +623,7 @@ class MockInstallationContext(MockRuntimeContext):
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
 
-    def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
+    def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
             workspace_group_name = f"ucx-{self._make_random(4)}-{get_purge_suffix()}"  # noqa: F405
         if not account_group_name:
@@ -644,11 +634,8 @@ class MockInstallationContext(MockRuntimeContext):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
-            wait_for_provisioning=wait_for_provisioning,
         )
-        acc_group = self._make_acc_group(
-            display_name=account_group_name, members=members, wait_for_provisioning=wait_for_provisioning
-        )
+        acc_group = self._make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
 
     @cached_property

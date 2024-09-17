@@ -639,27 +639,22 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
     return [iam.ComplexValue(value=x) for x in ids]
 
 
-def wait_group_provisioned(interface: AccountGroupsAPI | GroupsAPI, *groups: Group) -> None:
-    """Wait for a set of groups to be visible via the supplied group interface.
+def _wait_group_provisioned(interface: AccountGroupsAPI | GroupsAPI, group: Group) -> None:
+    """Wait for a group to be visible via the supplied group interface.
 
     Due to consistency issues in the group-management APIs, new groups are not always visible in a consistent manner
-    after being created or modified. This method can be used to mitigate against this by checking that the set of
-    groups:
+    after being created or modified. This method can be used to mitigate against this by checking that a group:
 
      - Is visible via the `.get()` interface;
      - Is visible via the `.list()` interface that enumerates groups.
 
     Visibility is assumed when 2 calls in a row return the expected results.
 
-    Note: this method should only be used by tests when more than a single group is being created and needs to be waited
-    for. Test fixtures that create groups (eg. `make_group()` and `make_acc_group`) default to invoking this internally.
-    (Both support a `wait_for_provisioning` argument that defaults to `True` and controls this behaviour.)
-
     Args:
           interface: the group-management interface to use for checking whether the groups are visible.
-          groups: the set of groups whose visibility should be verified.
+          group: the group whose visibility should be verified.
     Raises:
-          NotFound: this is thrown if it takes longer than 90 seconds for any of the groups to become visible via the
+          NotFound: this is thrown if it takes longer than 90 seconds for the group to become visible via the
           management interface.
     """
     # Use double-checking to try and compensate for the lack of monotonic consistency with the group-management
@@ -674,18 +669,15 @@ def wait_group_provisioned(interface: AccountGroupsAPI | GroupsAPI, *groups: Gro
         interface.get(group.id)
 
     @retried(on=[NotFound], timeout=timedelta(seconds=90))
-    def _check_groups_in_listing() -> None:
-        expected_ids = {group.id for group in groups}
-        found_groups = interface.list(attributes="id")
+    def _check_group_in_listing() -> None:
+        found_groups = interface.list(attributes="id", filter=f'id eq "{group.id}"')
         found_ids = {group.id for group in found_groups}
-        if not expected_ids.issubset(found_ids):
-            missing_groups = [group for group in groups if group.id not in found_ids]
-            msg = f"Group ids not (yet) found in group listing: {missing_groups}"
+        if group.id not in found_ids:
+            msg = f"Group id not (yet) found in group listing: {group.id}"
             raise NotFound(msg)
 
-    for group in groups:
-        _get_group(group)
-    _check_groups_in_listing()
+    _get_group(group)
+    _check_group_in_listing()
 
 
 def _make_group(name, cfg, interface, make_random):
@@ -696,7 +688,6 @@ def _make_group(name, cfg, interface, make_random):
         roles: list[str] | None = None,
         entitlements: list[str] | None = None,
         display_name: str | None = None,
-        wait_for_provisioning: bool = True,
         **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}-{get_purge_suffix()}" if display_name is None else display_name
@@ -713,8 +704,7 @@ def _make_group(name, cfg, interface, make_random):
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
 
-        if wait_for_provisioning:
-            wait_group_provisioned(interface, group)
+        _wait_group_provisioned(interface, group)
 
         return group
 
@@ -734,10 +724,8 @@ def make_acc_group(acc, make_random):
 @pytest.fixture
 def migrated_group(acc, ws, make_group, make_acc_group):
     """Create a pair of groups in workspace and account. Assign account group to workspace."""
-    ws_group = make_group(wait_for_provisioning=False)
-    acc_group = make_acc_group(wait_for_provisioning=False)
-    wait_group_provisioned(ws.groups, ws_group)
-    wait_group_provisioned(acc.groups, acc_group)
+    ws_group = make_group()
+    acc_group = make_acc_group()
     acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
     return MigratedGroup.partial_info(ws_group, acc_group)
 
