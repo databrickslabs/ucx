@@ -1439,9 +1439,8 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
     """
 
     def create(**kwargs) -> Dashboard:
-        if "query" in kwargs:
-            query = kwargs["query"]
-        else:
+        query = kwargs.get("query", None)
+        if not query:
             query = make_query()
         viz = ws.query_visualizations_legacy.create(
             type="table",

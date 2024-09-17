@@ -54,11 +54,15 @@ class QueryLinter:
         all_dfsas: list[DirectFsAccessInQuery] = []
         # first lint and collect queries from dashboards
         for dashboard in all_dashboards:
+            if not dashboard.id:
+                continue
             dashboard = self._ws.dashboards.get(dashboard_id=dashboard.id)
             problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
             all_problems.extend(problems)
             all_dfsas.extend(dfsas)
         for query in self._ws.queries_legacy.list():
+            if query.id is None:
+                continue
             if query.id in linted_queries:
                 continue
             linted_queries.add(query.id)
@@ -76,9 +80,12 @@ class QueryLinter:
         )
         # dump dfsas
         assessment_end = datetime.now()
-        all_dfsas = [dataclasses.replace(
-                    dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
-                ) for dfsa in all_dfsas]
+        all_dfsas = [
+            dataclasses.replace(
+                dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
+            )
+            for dfsa in all_dfsas
+        ]
         self._directfs_crawler.dump_all(all_dfsas)
 
     def _lint_and_collect_from_dashboard(
@@ -91,6 +98,8 @@ class QueryLinter:
         dashboard_parent = dashboard.parent or "<orphan>"
         dashboard_name = dashboard.name or "<anonymous>"
         for query in dashboard_queries:
+            if query.id is None:
+                continue
             if query.id in linted_queries:
                 continue
             linted_queries.add(query.id)
