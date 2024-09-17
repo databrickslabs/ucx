@@ -452,10 +452,20 @@ def migrate_locations(
 
 
 @ucx.command
-def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
+def create_catalogs_schemas(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    ctx = WorkspaceContext(w)
-    ctx.catalog_schema.create_all_catalogs_schemas(prompts)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command
