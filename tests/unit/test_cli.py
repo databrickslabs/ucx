@@ -706,19 +706,28 @@ def test_assign_metastore(acc_client, caplog):
         assign_metastore(acc_client, "123")
 
 
-def test_migrate_tables_calls_migrate_table_job_run_now(ws) -> None:
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_migrate_tables_calls_migrate_table_job_run_now(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    run = Run(
         state=RunState(result_state=RunResultState.SUCCESS),
         start_time=0,
         end_time=1000,
         run_duration=1000,
     )
-    prompts = MockPrompts({})
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
 
-    migrate_tables(ws, prompts)
+    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
 
-    ws.jobs.run_now.assert_called_with(456)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.run_now.assert_called_with(456)
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
