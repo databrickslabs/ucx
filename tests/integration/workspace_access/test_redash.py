@@ -25,14 +25,14 @@ def test_permissions_for_redash(
     make_group,
     migrated_group,
     make_user,
-    make_query,
+    make_random_query,
     make_query_permissions,
     use_permission_migration_api,
 ):
     ws_group_temp = make_group()  # simulate temp/backup group
     user = make_user()
 
-    query = make_query()
+    query = make_random_query()
     make_query_permissions(
         object_id=query.id,
         permission_level=sql.PermissionLevel.CAN_EDIT,
@@ -72,7 +72,7 @@ def test_permissions_for_redash(
 def test_permissions_for_redash_after_group_is_renamed(
     ws,
     make_group,
-    make_query,
+    make_random_query,
     make_query_permissions,
 ):
     """
@@ -84,7 +84,7 @@ def test_permissions_for_redash_after_group_is_renamed(
     ws_group = make_group()
     acc_group = make_group()
 
-    query = make_query()
+    query = make_random_query()
     make_query_permissions(
         object_id=query.id,
         permission_level=sql.PermissionLevel.CAN_EDIT,
@@ -118,12 +118,12 @@ def test_permissions_for_redash_after_group_is_renamed(
 def test_verify_permissions_for_redash(
     ws,
     make_group,
-    make_query,
+    make_random_query,
     make_query_permissions,
 ):
     ws_group = make_group()
 
-    query = make_query()
+    query = make_random_query()
     make_query_permissions(
         object_id=query.id,
         permission_level=sql.PermissionLevel.CAN_EDIT,

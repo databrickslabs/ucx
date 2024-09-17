@@ -55,7 +55,7 @@ def test_running_real_migrate_groups_job(
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
     installation_ctx,
-    make_query,
+    make_random_query,
     make_query_permissions,
     make_cluster_policy,
     make_cluster_policy_permissions,
@@ -64,7 +64,7 @@ def test_running_real_validate_groups_permissions_job(
 ):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
-    query = make_query()
+    query = make_random_query()
     make_query_permissions(
         object_id=query.id,
         permission_level=sql.PermissionLevel.CAN_EDIT,

@@ -5,9 +5,11 @@ from databricks.sdk.service.sql import Query, Dashboard
 from ..conftest import MockInstallationContext
 
 
-def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: MockInstallationContext, make_dashboard, make_query):
+def test_fix_dashboard(
+    ws: WorkspaceClient, installation_ctx: MockInstallationContext, make_dashboard, make_random_query
+):
     dashboard: Dashboard = make_dashboard()
-    another_query: Query = make_query()
+    another_query: Query = make_random_query()
     installation_ctx.workspace_installation.run()
     installation_ctx.redash.migrate_dashboards(dashboard.id)
     # make sure the query is marked as migrated

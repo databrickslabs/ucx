@@ -840,11 +840,11 @@ def make_job(ws, make_random, make_notebook):
 
 
 @pytest.fixture
-def make_ws_query(ws, make_random):
+def make_query(ws, make_random):
     def create(query_text: str, **kwargs):
         if "display_name" not in kwargs:
             kwargs["display_name"] = f"query-{make_random(4)}"
-        # add RemoveAfter tag for test job cleanup
+        # add RemoveAfter tag for watchdog
         date_to_remove = get_test_purge_time()
         remove_after_tag = json.dumps({"key": "RemoveAfter", "value": date_to_remove})
         if 'tags' not in kwargs:
@@ -1278,7 +1278,7 @@ def make_udf(
 
 
 @pytest.fixture
-def make_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
+def make_random_query(ws, make_table, make_random) -> Generator[LegacyQuery, None, None]:
     def create() -> LegacyQuery:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}_{get_purge_suffix()}"
@@ -1446,14 +1446,14 @@ def make_storage_dir(ws, env_or_skip):
 
 
 @pytest.fixture
-def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_query):
+def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_random_query):
     """Create a legacy dashboard.
 
     This fixture is used to test migrating legacy dashboards to Lakeview.
     """
 
     def create() -> Dashboard:
-        query = make_query()
+        query = make_random_query()
         viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,
