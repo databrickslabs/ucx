@@ -320,7 +320,7 @@ def create_uber_principal(
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
     it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
-    Pass subscription ids for Azure and aws_profile for aws."""
+    Pass subscription ids for Azure and aws_profile for AWS."""
     if ctx:
         workspace_contexts = [ctx]
     else:
@@ -346,7 +346,7 @@ def principal_prefix_access(
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
-    Pass subscription ids for Azure and aws_profile for aws."""
+    Pass subscription ids for Azure and aws_profile for AWS."""
     workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
     if ctx:
         workspace_contexts = [ctx]
