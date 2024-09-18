@@ -718,30 +718,52 @@ def test_assign_metastore(acc_client, caplog):
         assign_metastore(acc_client, "123")
 
 
-def test_migrate_tables(ws):
-    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_migrate_tables_calls_migrate_table_job_run_now(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    run = Run(
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
-    prompts = MockPrompts({})
-    migrate_tables(ws, prompts)
-    ws.jobs.run_now.assert_called_with(456)
-    ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
+
+    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.run_now.assert_called_with(456)
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-def test_migrate_external_hiveserde_tables_in_place(ws):
+def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
+    # TODO: Test for running on a collection when context injection for multiple workspaces is supported.
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
-        catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
+        catalog="hive_metastore",
+        database="test",
+        name="hiveserde",
+        object_type="UNKNOWN",
+        table_format="HIVE",
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
 
     prompt = (
-        "Found 1 (.*) hiveserde tables, do you want to run the "
-        "migrate-external-hiveserde-tables-in-place-experimental workflow?"
+        "Found 1 (.*) hiveserde tables in https://localhost, do you want to run the "
+        "`migrate-external-hiveserde-tables-in-place-experimental` workflow?"
     )
     prompts = MockPrompts({prompt: "Yes"})
 
@@ -751,20 +773,28 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
-def test_migrate_external_tables_ctas(ws):
+def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
+    # TODO: Test for running on a collection when context injection for multiple workspaces is supported.
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
-        catalog="hive_metastore", database="test", name="externalctas", object_type="UNKNOWN", table_format="EXTERNAL"
+        catalog="hive_metastore",
+        database="test",
+        name="externalctas",
+        object_type="UNKNOWN",
+        table_format="EXTERNAL",
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
-        state=RunState(result_state=RunResultState.SUCCESS), start_time=0, end_time=1000, run_duration=1000
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
     )
 
     prompt = (
-        "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
-        "migrate-external-tables-ctas workflow?"
+        "Found 1 (.*) external tables which cannot be migrated using sync in https://localhost, do you want to run the "
+        "`migrate-external-tables-ctas` workflow?"
     )
 
     prompts = MockPrompts({prompt: "Yes"})

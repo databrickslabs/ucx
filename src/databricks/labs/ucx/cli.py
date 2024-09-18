@@ -519,34 +519,46 @@ def assign_metastore(
 
 
 @ucx.command
-def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
+def migrate_tables(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
     workflow and migrate-external-tables-ctas.
     """
-    if ctx is None:
-        ctx = WorkspaceContext(w)
-    deployed_workflows = ctx.deployed_workflows
-    deployed_workflows.run_workflow("migrate-tables")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        deployed_workflows = workspace_context.deployed_workflows
+        deployed_workflows.run_workflow("migrate-tables")
 
-    tables = ctx.tables_crawler.snapshot()
-    hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
-    if len(hiveserde_tables) > 0:
-        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
-            f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+        tables = workspace_context.tables_crawler.snapshot()
+        hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
+        if len(hiveserde_tables) > 0:
+            percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables in "
+                f"{workspace_context.workspace_client.config.host}, do you want to run "
+                f"the `migrate-external-hiveserde-tables-in-place-experimental` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
-    external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
-    if len(external_ctas_tables) > 0:
-        percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which cannot be migrated using sync"
-            f", do you want to run the migrate-external-tables-ctas workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-tables-ctas")
+        external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
+        if len(external_ctas_tables) > 0:
+            percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which "
+                f"cannot be migrated using sync in {workspace_context.workspace_client.config.host}, do you want to "
+                "run the `migrate-external-tables-ctas` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
 
 @ucx.command
