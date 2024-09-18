@@ -38,17 +38,8 @@ def test_running_real_migration_progress_job(
     ws,
     installation_ctx,
     make_cluster_policy,
-    make_cluster_policy_permissions,
 ) -> None:
     """Ensure that the migration-progress workflow can complete successfully."""
-    ws_group_a, _ = installation_ctx.make_ucx_group()
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=PermissionLevel.CAN_USE,
-        group_name=ws_group_a.display_name,
-    )
-    installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     installation_ctx.workspace_installation.run()
 
     # The assessment workflow needs to successfully complete before we can test migration progress.
