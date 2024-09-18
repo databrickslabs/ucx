@@ -608,7 +608,13 @@ def test_create_uber_principal(ws):
         create_uber_principal(ws, prompts, subscription_id="12")
 
 
-def test_migrate_locations_azure(ws):
+def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(is_azure=False, is_aws=False)
+    with pytest.raises(ValueError, match="Unsupported cloud provider"):
+        migrate_locations(ws, ctx=ctx)
+
+
+def test_migrate_locations_azure(ws) -> None:
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -617,12 +623,41 @@ def test_migrate_locations_azure(ws):
         azure_subscription_id='test',
         azure_resources=azurerm,
     )
+
     migrate_locations(ws, ctx=ctx)
+
     ws.external_locations.list.assert_called()
     azurerm.storage_accounts.assert_called()
 
 
-def test_migrate_locations_aws(ws, caplog):
+@pytest.mark.xfail(reason="Currently not supported in unit tests see TODO")
+def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client) -> None:
+    """Test migrate locations for a collection of workspaces
+
+    The "run as collection" test should run the same as the test `test_migrate_locations_azure`, but the assert should
+    be called on **all** workspace clients.
+    """
+    for workspace_client in workspace_clients:
+        # Setting the auth as follows as we (currently) do not support injecting multiple workspace contexts
+        workspace_client.config.is_aws = False
+        workspace_client.config.auth_type = "azure-cli"
+
+    # TODO: Migrate locations fails in unit testing as we currently not support injecting multiple workspace contexts
+    # thus we cannot mock azure-cli login for multiple workspaces.
+    # If we support this in the future, the `pytest.raises` can be removed and the test should pass
+    with pytest.raises(OSError, match=".*The provided request must include a 'scope' input parameter.*"):
+        migrate_locations(
+            workspace_clients[0],
+            run_as_collection=True,
+            a=acc_client,
+            subscription_id="test",
+        )
+
+    for workspace_client in workspace_clients:
+        workspace_client.external_locations.list.assert_called()
+
+
+def test_migrate_locations_aws(ws, caplog) -> None:
     successful_return = """
     {
         "UserId": "uu@mail.com",
@@ -640,8 +675,36 @@ def test_migrate_locations_aws(ws, caplog):
         aws_profile="profile",
         aws_cli_run_command=successful_call,
     )
+
     migrate_locations(ws, ctx=ctx)
+
     ws.external_locations.list.assert_called()
+
+
+@pytest.mark.xfail(reason="Currently not supported in unit tests see TODO")
+def test_migrate_locations_run_as_collection(workspace_clients, acc_client) -> None:
+    """Test migrate locations for a collection of workspaces
+
+    The "run as collection" test should run the same as the test `test_migrate_locations_aws`, but the assert should
+    be called on **all** workspace clients.
+    """
+    for workspace_client in workspace_clients:
+        # Setting the auth as follows as we (currently) do not support injecting multiple workspace contexts
+        workspace_client.config.is_azure = False
+
+    # TODO: Migrate locations fails in unit testing as we currently not support injecting multiple workspace contexts
+    # thus we cannot mock AWS login for multiple workspaces.
+    # If we support this in the future, the `pytest.raises` can be removed and the test should pass
+    with pytest.raises(AttributeError, match="'NoneType' object has no attribute 'get'"):
+        migrate_locations(
+            workspace_clients[0],
+            run_as_collection=True,
+            a=acc_client,
+            aws_profile="profile",
+        )
+
+    for workspace_client in workspace_clients:
+        workspace_client.external_locations.list.assert_called()
 
 
 def test_migrate_locations_gcp(ws):
