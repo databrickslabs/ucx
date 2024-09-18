@@ -165,7 +165,9 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.assessment_start_timestamp > yesterday
         assert dfsa.assessment_end_timestamp > yesterday
         assert str(j.job_id) in [atom.object_id for atom in dfsa.source_lineage]
-        assert j.settings.name in [atom.other.get("name", None) for atom in dfsa.source_lineage if atom.other is not None]
+        assert j.settings.name in [
+            atom.other.get("name", None) for atom in dfsa.source_lineage if atom.other is not None
+        ]
         assert all(task_key in [atom.object_id for atom in dfsa.source_lineage] for task_key in task_keys)
 
 

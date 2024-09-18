@@ -465,9 +465,13 @@ class WorkflowLinter:
         self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
     ) -> Iterable[DirectFsAccess]:
         # walker doesn't register lineage for job/task
+        job_id = str(job.job_id)
+        job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
         for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
-            atoms = [ LineageAtom(object_type="job", object_id=str(job.job_id), other={"name": job.settings.name}),
-                      LineageAtom(object_type="task", object_id=task.task_key) ]
+            atoms = [
+                LineageAtom(object_type="job", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="task", object_id=task.task_key),
+            ]
             yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 
 
