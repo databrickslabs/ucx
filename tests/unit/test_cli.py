@@ -87,6 +87,10 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     'token': 'bar',
                 },
                 'installed_workspace_ids': installed_workspace_ids,
+                'policy_id': '01234567A8BCDEF9',
+                # Exit Azure's `create_uber_principal` early by setting the uber service principal id
+                # to isolate cli testing as much as possible to the cli commands and not the invoked ucx functionality.
+                'uber_spn_id': '0123456789',
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -593,30 +597,90 @@ def test_migrate_credentials_limit_aws(ws, acc_client):
         migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
 
 
-def test_create_master_principal_not_azure(ws):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
+def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=False,
+    )
     prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported cloud provider"):
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_master_principal_no_subscription(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
+def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_missing(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+    with pytest.raises(ValueError, match="Please enter subscription id to scan storage accounts in."):
+        create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_uber_principal(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
+def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id="id",
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(ws, prompts, ctx=ctx)
+
+    ws.get_workspace_id.assert_called_once()
+
+
+def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(workspace_clients, acc_client) -> None:
+    for workspace_client in workspace_clients:
+        # Setting the auth as follows as we (currently) do not support injecting multiple workspace contexts
+        workspace_client.config.auth_type = "azure-cli"
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(
+        workspace_clients[0],
+        prompts,
+        run_as_collection=True,
+        a=acc_client,
+        subscription_id="test",
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
+
+
+def test_create_aws_uber_principal_raises_value_error_if_aws_profile_is_missing(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+    )
     prompts = MockPrompts({})
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, subscription_id="12")
+    with pytest.raises(ValueError, match="AWS Profile is not specified. .*"):
+        create_uber_principal(ws, prompts, ctx=ctx)
+
+
+def successful_aws_cli_call(_):
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+    return 0, successful_return, ""
+
+
+def test_create_aws_uber_principal_calls_dbutils_fs_mounts(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+        aws_profile="test",
+        aws_cli_run_command=successful_aws_cli_call,
+    )
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, ctx=ctx)
+    ws.dbutils.fs.mounts.assert_called_once()
 
 
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
@@ -669,22 +733,11 @@ def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client
 
 
 def test_migrate_locations_aws(ws, caplog) -> None:
-    successful_return = """
-    {
-        "UserId": "uu@mail.com",
-        "Account": "1234",
-        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
-    }
-    """
-
-    def successful_call(_):
-        return 0, successful_return, ""
-
     ctx = WorkspaceContext(ws).replace(
         is_aws=True,
         is_azure=False,
         aws_profile="profile",
-        aws_cli_run_command=successful_call,
+        aws_cli_run_command=successful_aws_cli_call,
     )
 
     migrate_locations(ws, ctx=ctx)
