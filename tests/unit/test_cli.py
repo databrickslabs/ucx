@@ -713,19 +713,26 @@ def test_migrate_locations_gcp(ws):
         migrate_locations(ws, ctx=ctx)
 
 
-def test_create_catalogs_schemas(ws):
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_create_catalogs_schemas_lists_catalogs(run_as_collection, workspace_clients, acc_client) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    for workspace_client in workspace_clients:
+        workspace_client.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     prompts = MockPrompts({'.*': 's3://test'})
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
-    create_catalogs_schemas(ws, prompts)
-    ws.catalogs.list.assert_called_once()
+
+    create_catalogs_schemas(workspace_clients[0], prompts, run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.catalogs.list.assert_called_once()
 
 
-def test_create_catalogs_schemas_handles_existing(ws, caplog):
+def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     prompts = MockPrompts({'.*': 's3://test'})
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
     ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
-    create_catalogs_schemas(ws, prompts)
+    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
     assert "Catalog test already exists. Skipping." in caplog.messages

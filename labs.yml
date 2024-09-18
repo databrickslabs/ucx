@@ -212,8 +212,12 @@ commands:
         description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: create-catalogs-schemas
-    description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
-      This command is supposed to be run before migrating tables to UC.
+    description: |
+      Create UC external catalogs and schemas based on the destinations created from `create_table_mapping` command.
+      This command should be executed before migrating tables to Unity Catalog.
+    flags:
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: cluster-remap
     description: Re-mapping the cluster to UC
