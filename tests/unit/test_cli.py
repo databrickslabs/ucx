@@ -272,9 +272,9 @@ def test_manual_workspace_info(ws):
     manual_workspace_info(ws, prompts)
 
 
-def test_create_table_mapping(ws, acc_client):
+def test_create_table_mapping_raises_value_error_because_no_tables_found(ws, acc_client) -> None:
     ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
+    with pytest.raises(ValueError, match="No tables found. .*"):
         create_table_mapping(ws, ctx, False, acc_client)
 
 
