@@ -400,9 +400,21 @@ def test_save_storage_and_principal_azure(ws, caplog, acc_client):
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
-def test_validate_groups_membership(ws):
-    validate_groups_membership(ws)
-    ws.groups.list.assert_called()
+@pytest.mark.parametrize("run_as_collection", [True, False])
+def test_validate_groups_membership_lists_groups(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    validate_groups_membership(
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.groups.list.assert_called()
 
 
 def test_save_storage_and_principal_aws(ws, acc_client):
