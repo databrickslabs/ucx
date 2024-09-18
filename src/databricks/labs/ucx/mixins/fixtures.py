@@ -15,7 +15,7 @@ from typing import BinaryIO
 import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.blueprint.commands import CommandExecutor
-from databricks.sdk import AccountClient, WorkspaceClient, GroupsAPI, AccountGroupsAPI
+from databricks.sdk import AccountClient, AccountGroupsAPI, GroupsAPI, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
