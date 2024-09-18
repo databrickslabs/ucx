@@ -104,7 +104,7 @@ class MigrationProgress(Workflow):
     def setup_table_migration(self, ctx: RuntimeContext) -> None:
         """(Optimization) Starts `table_migration` job cluster in parallel to crawling tables."""
 
-    @job_task(depends_on=[crawl_tables], job_cluster="table_migration")
+    @job_task(depends_on=[crawl_tables, setup_table_migration], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not.
 
