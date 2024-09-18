@@ -187,6 +187,9 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count\tDifference
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
+    flags:
+    - name: run-as-collection
+      description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
@@ -214,6 +217,8 @@ commands:
         description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
@@ -254,8 +259,11 @@ commands:
 
   - name: migrate-tables
     description: |
-      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental
-      workflow and migrate-external-tables-ctas workflow.
+      Trigger the `migrate-tables` workflow and, optionally, `migrate-external-hiveserde-tables-in-place-experimental`
+      workflow and `migrate-external-tables-ctas workflow`.
+    flags:
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: migrate-acls
     description: |
@@ -271,6 +279,8 @@ commands:
     flags:
       - name: dashboard-id
         description: (Optional) DBSQL dashboard ID to migrate. If no dashboard ID is provided, all DBSQL dashboards in the workspace will be migrated.
+      - name: run-as-collection
+        description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: revert-dbsql-dashboards
     description: Revert DBSQL dashboards that have been migrated to their original state before the migration.

@@ -18,11 +18,18 @@ class Assessment(Workflow):
         `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
 
+    @job_task
+    def crawl_udfs(self, ctx: RuntimeContext):
+        """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
+        table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
+        issues with grants that cannot be migrated to Unit Catalog."""
+        ctx.udfs_crawler.snapshot()
+
     @job_task(job_cluster="tacl")
     def setup_tacl(self, ctx: RuntimeContext):
         """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
-    @job_task(depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
+    @job_task(depends_on=[crawl_tables, crawl_udfs, setup_tacl], job_cluster="tacl")
     def crawl_grants(self, ctx: RuntimeContext):
         """Scans all securable objects for permissions that have been assigned: this include database-level permissions,
         as well permissions directly configured on objects in the (already gathered) table and UDF inventories. The

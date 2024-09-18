@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Iterable
 from pathlib import Path
@@ -48,7 +49,8 @@ class PythonCodeAnalyzer:
         for base_node in nodes:
             for problem in self._build_graph_from_node(base_node):
                 # Astroid line numbers are 1-based.
-                problem = problem.replace(
+                problem = dataclasses.replace(
+                    problem,
                     start_line=base_node.node.lineno - 1,
                     start_col=base_node.node.col_offset,
                     end_line=(base_node.node.end_lineno or 1) - 1,

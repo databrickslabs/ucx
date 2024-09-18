@@ -223,11 +223,20 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
-def validate_groups_membership(w: WorkspaceClient):
+def validate_groups_membership(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
-    ctx = WorkspaceContext(w)
-    mismatch_groups = ctx.group_manager.validate_group_membership()
-    print(json.dumps(mismatch_groups))
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        mismatch_groups = workspace_context.group_manager.validate_group_membership()
+        print(json.dumps(mismatch_groups))
 
 
 @ucx.command
@@ -439,17 +448,27 @@ def migrate_credentials(
 
 
 @ucx.command
-def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_locations(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """This command creates UC external locations. The candidate locations to be created are extracted from
     guess_external_locations task in the assessment job. You can run validate_external_locations command to check
     the candidate locations. Please make sure the credentials haven migrated before running this command. The command
     will only create the locations that have corresponded UC Storage Credentials.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure or ctx.is_aws:
-        return ctx.external_locations_migration.run()
-    raise ValueError("Unsupported cloud provider")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure or workspace_context.is_aws:
+            workspace_context.external_locations_migration.run()
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
@@ -530,34 +549,46 @@ def assign_metastore(
 
 
 @ucx.command
-def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
+def migrate_tables(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
     workflow and migrate-external-tables-ctas.
     """
-    if ctx is None:
-        ctx = WorkspaceContext(w)
-    deployed_workflows = ctx.deployed_workflows
-    deployed_workflows.run_workflow("migrate-tables")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        deployed_workflows = workspace_context.deployed_workflows
+        deployed_workflows.run_workflow("migrate-tables")
 
-    tables = ctx.tables_crawler.snapshot()
-    hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
-    if len(hiveserde_tables) > 0:
-        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
-            f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+        tables = workspace_context.tables_crawler.snapshot()
+        hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
+        if len(hiveserde_tables) > 0:
+            percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables in "
+                f"{workspace_context.workspace_client.config.host}, do you want to run "
+                f"the `migrate-external-hiveserde-tables-in-place-experimental` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
-    external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
-    if len(external_ctas_tables) > 0:
-        percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which cannot be migrated using sync"
-            f", do you want to run the migrate-external-tables-ctas workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-tables-ctas")
+        external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
+        if len(external_ctas_tables) > 0:
+            percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which "
+                f"cannot be migrated using sync in {workspace_context.workspace_client.config.host}, do you want to "
+                "run the `migrate-external-tables-ctas` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
 
 @ucx.command
@@ -574,10 +605,20 @@ def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **n
 
 
 @ucx.command
-def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
+def migrate_dbsql_dashboards(
+    w: WorkspaceClient,
+    dashboard_id: str | None = None,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Migrate table references in DBSQL Dashboard queries"""
-    ctx = WorkspaceContext(w)
-    ctx.redash.migrate_dashboards(dashboard_id)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.redash.migrate_dashboards(dashboard_id)
 
 
 @ucx.command
