@@ -4,18 +4,23 @@ import collections
 import os
 import logging
 from dataclasses import replace
-from functools import partial, cached_property
+from datetime import timedelta
+from functools import cached_property
 import shutil
 import subprocess
-import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.iam import Group
 
@@ -39,8 +44,6 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
-# pylint: disable-next=unused-wildcard-import,wildcard-import
-from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
@@ -50,9 +53,86 @@ logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():  # pylint: disable=function-redefined
+@pytest.fixture
+def debug_env_name():
     return "ucws"
+
+
+@pytest.fixture
+def product_info():
+    return "ucx", __version__
+
+
+@pytest.fixture
+def inventory_schema(make_schema):
+    return make_schema(catalog_name="hive_metastore").name
+
+
+@pytest.fixture
+def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    _ = make_cluster  # Need cluster to copy data
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, src_path: str, dst_path: str, wait_for_provisioning=True):
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning(path) -> None:
+            if not ws.dbfs.exists(path):
+                raise NotFound(f"Location not found: {path}")
+
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.copy(src_path, dst_path, recursive=True)
+            if wait_for_provisioning:
+                _wait_for_provisioning(dst_path)
+        return dst_path
+
+    def remove(dst_path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.delete(dst_path, recursive=True)
+
+    yield from factory("make_dbfs_data_copy", create, remove)
+
+
+@pytest.fixture
+def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip, watchdog_purge_suffix):
+    """Make a copy of source data to a new location
+
+    Use the fixture to avoid overlapping UC table path that will fail other external table migration tests.
+
+    Note:
+        This fixture is different to the other `make_` fixtures as it does not return a `Callable` to make the mounted
+        location; the mounted location is made with fixture setup already.
+    """
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    # DBFS locations are not purged; no suffix necessary.
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}-{watchdog_purge_suffix}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    return new_mounted_location
+
+
+@pytest.fixture
+def make_storage_dir(ws, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.mkdirs('{path}')")
+        else:
+            ws.dbfs.mkdirs(path)
+        return path
+
+    def remove(path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{path}', recurse=True)")
+        else:
+            ws.dbfs.delete(path, recursive=True)
+
+    yield from factory("make_storage_dir", create, remove)
 
 
 def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup"):
@@ -69,39 +149,20 @@ def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup")
     return membership
 
 
-def account_host(self: databricks.sdk.core.Config) -> str:
-    if self.is_azure:
-        return "https://accounts.azuredatabricks.net"
-    if self.is_gcp:
-        return "https://accounts.gcp.databricks.com/"
-    return "https://accounts.cloud.databricks.com"
-
-
-@pytest.fixture(scope="session")  # type: ignore[no-redef]
-def product_info():  # pylint: disable=function-redefined
-    return "ucx", __version__
-
-
-@pytest.fixture  # type: ignore[no-redef]
-def acc(ws) -> AccountClient:  # pylint: disable=function-redefined
-    return AccountClient(host=ws.config.environment.deployment_url('accounts'))
+@pytest.fixture
+def migrated_group(acc, ws, make_group, make_acc_group):
+    """Create a pair of groups in workspace and account. Assign account group to workspace."""
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
+    return MigratedGroup.partial_info(ws_group, acc_group)
 
 
 @pytest.fixture
-def sql_exec(sql_backend):
-    return partial(sql_backend.execute)
-
-
-@pytest.fixture
-def sql_fetch_all(sql_backend):
-    return partial(sql_backend.fetch)
-
-
-@pytest.fixture
-def make_ucx_group(make_random, make_group, make_acc_group, make_user):
+def make_ucx_group(make_random, make_group, make_acc_group, make_user, watchdog_purge_suffix):
     def inner(workspace_group_name=None, account_group_name=None, **kwargs):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_G{make_random(4)}-{get_purge_suffix()}"  # noqa: F405
+            workspace_group_name = f"ucx_G{make_random(4)}-{watchdog_purge_suffix}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
@@ -602,6 +663,7 @@ class MockInstallationContext(MockRuntimeContext):
         make_acc_group_fixture,
         make_user_fixture,
         ws_fixture,
+        watchdog_purge_suffix,
     ):
         super().__init__(
             make_table_fixture,
@@ -614,10 +676,11 @@ class MockInstallationContext(MockRuntimeContext):
         self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
+        self._watchdog_purge_suffix = watchdog_purge_suffix
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
         if not workspace_group_name:
-            workspace_group_name = f"ucx-{self._make_random(4)}-{get_purge_suffix()}"  # noqa: F405
+            workspace_group_name = f"ucx-{self._make_random(4)}-{self._watchdog_purge_suffix}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
@@ -774,6 +837,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_random,
     make_acc_group,
     make_user,
+    watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
         make_table,
@@ -785,6 +849,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_acc_group,
         make_user,
         ws,
+        watchdog_purge_suffix,
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
