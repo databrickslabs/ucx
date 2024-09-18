@@ -77,7 +77,7 @@ commands:
           with ucx installed. Default is false.
 
   - name: update-migration-progress
-    description: trigger the migration-progress-experimental job to refresh the inventory that tracks the workspace
+    description: trigger the `migration-progress-experimental` job to refresh the inventory that tracks the workspace
       resources and their migration status.
     flags:
       - name: run-as-collection
