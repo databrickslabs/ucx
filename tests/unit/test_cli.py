@@ -272,8 +272,7 @@ def test_create_table_mapping(ws, acc_client):
 
 
 def test_validate_external_locations(ws) -> None:
-    validate_external_locations(ws, MockPrompts({}))
-
+    validate_external_locations(ws, MockPrompts({}), ctx=WorkspaceContext(ws))
     ws.statement_execution.execute_statement.assert_called()
 
 
