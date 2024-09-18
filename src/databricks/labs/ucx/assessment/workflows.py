@@ -14,10 +14,9 @@ class Assessment(Workflow):
     @job_task(notebook="hive_metastore/tables.scala")
     def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
-        as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
-        `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
-        stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
-        cannot easily be migrated to Unity Catalog."""
+        as _database name_, _table name_, _table type_, _table location_, etc., in the table named
+        `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
+        example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
 
     @job_task(job_cluster="tacl")
     def setup_tacl(self, ctx: RuntimeContext):
@@ -197,18 +196,16 @@ class MigrationProgress(Workflow):
     @job_task
     def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
-        as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
-        `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
-        stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
-        cannot easily be migrated to Unity Catalog."""
+        as _database name_, _table name_, _table type_, _table location_, etc., in the table named
+        `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
+        example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
         ctx.tables_crawler.snapshot(force_refresh=True)
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
-        Delta table named `$inventory_database.udfs`. (The `inventory_database` is set in the configuration file.)
-        This inventory is currently used when scanning securable objects for issues with grants that cannot be migrated
-        to Unit Catalog."""
+        table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
+        issues with grants that cannot be migrated to Unit Catalog."""
         ctx.udfs_crawler.snapshot(force_refresh=True)
 
     @job_task(job_cluster="tacl")
