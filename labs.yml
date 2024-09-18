@@ -76,7 +76,7 @@ commands:
         description: boolean flag to indicate whether the workflow should be checked (and run if necessary) in all
           workspaces (true) or not (false). Default is False.
 
-  - name: migration_progress
+  - name: migration-progress
     description: trigger the migration-progress-experimental job to refresh the inventory that tracks the workspace
       resources and their migration status.
     flags:
