@@ -212,7 +212,7 @@ commands:
     description: Create UC external locations based on the output of guess_external_locations assessment task.
     flags:
       - name: subscription-ids
-        description: Subscription to scan storage account in
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection
