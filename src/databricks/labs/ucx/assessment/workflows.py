@@ -18,7 +18,7 @@ class Assessment(Workflow):
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
         stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
         cannot easily be migrated to Unity Catalog."""
-        ctx.py4j_table_crawler.snapshot()
+        ctx.table_crawler.snapshot()
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):
