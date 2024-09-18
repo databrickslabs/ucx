@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
-def test_all_grants_in_databases(ws, runtime_ctx, sql_backend, make_group):
+def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     group_a = make_group()
     group_b = make_group()
     schema_a = runtime_ctx.make_schema()
@@ -54,7 +54,7 @@ def test_all_grants_in_databases(ws, runtime_ctx, sql_backend, make_group):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_all_grants_for_udfs_in_databases(ws, runtime_ctx, sql_backend, make_group):
+def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
     group_a = make_group()
     group_b = make_group()
     schema = runtime_ctx.make_schema()

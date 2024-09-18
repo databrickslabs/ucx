@@ -92,7 +92,7 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
     assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func(ws, sql_backend, runtime_ctx, make_group):
+def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group):
     old = make_group()
     new = make_group()
     logger.debug(f"old={old.display_name}, new={new.display_name}")
