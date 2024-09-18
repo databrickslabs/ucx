@@ -330,7 +330,10 @@ def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
     ctx = WorkspaceContext(ws).replace(
-        is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test', is_gcp=False
+        is_azure=True,
+        azure_cli_authenticated=True,
+        azure_subscription_ids=["test"],
+        is_gcp=False,
     )
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
@@ -481,7 +484,7 @@ def test_migrate_credentials_azure(ws, acc_client):
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azure_resources,
     )
     migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
@@ -528,7 +531,7 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azure_resources,
         external_locations=external_locations,
     )
@@ -614,7 +617,7 @@ def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_mi
         azure_cli_authenticated=True,
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
-    with pytest.raises(ValueError, match="Please enter subscription id to scan storage accounts in."):
+    with pytest.raises(ValueError, match="Please enter subscription ids to scan storage accounts in."):
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
@@ -623,7 +626,7 @@ def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
-        azure_subscription_id="id",
+        azure_subscription_ids=["id"],
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
 
@@ -643,7 +646,7 @@ def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(w
         prompts,
         run_as_collection=True,
         a=acc_client,
-        subscription_id="test",
+        subscription_ids="test",
     )
 
     for workspace_client in workspace_clients:
@@ -695,7 +698,7 @@ def test_migrate_locations_azure(ws) -> None:
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
-        azure_subscription_id='test',
+        azure_subscription_ids=["test"],
         azure_resources=azurerm,
     )
 
@@ -725,7 +728,7 @@ def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client
             workspace_clients[0],
             run_as_collection=True,
             a=acc_client,
-            subscription_id="test",
+            subscription_ids=["test"],
         )
 
     for workspace_client in workspace_clients:
