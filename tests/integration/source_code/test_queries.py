@@ -4,7 +4,7 @@ from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
 def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, sql_backend, make_query, make_dashboard):
-    query = make_query(query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
+    query = make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
     _dashboard = make_dashboard(query=query)
     linter = QueryLinter(ws, TableMigrationIndex([]), simple_ctx.directfs_access_crawler_for_queries)
     linter.refresh_report(sql_backend, simple_ctx.inventory_database)

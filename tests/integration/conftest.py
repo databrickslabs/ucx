@@ -25,7 +25,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.iam import Group
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
-from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions
+from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
@@ -138,8 +138,9 @@ def make_dashboard(
     This fixture is used to test migrating legacy dashboards to Lakeview.
     """
 
-    def create() -> Dashboard:
-        query = make_query()
+    def create(query: LegacyQuery | None = None) -> Dashboard:
+        if not query:
+            query = make_query()
         viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,
