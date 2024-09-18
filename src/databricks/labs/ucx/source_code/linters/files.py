@@ -104,6 +104,7 @@ class LocalCodeLinter:
 
     def __init__(
         self,
+        notebook_loader: NotebookLoader,
         file_loader: FileLoader,
         folder_loader: FolderLoader,
         path_lookup: PathLookup,
@@ -111,6 +112,7 @@ class LocalCodeLinter:
         dependency_resolver: DependencyResolver,
         context_factory: Callable[[], LinterContext],
     ) -> None:
+        self._notebook_loader = notebook_loader
         self._file_loader = file_loader
         self._folder_loader = folder_loader
         self._path_lookup = path_lookup
@@ -141,7 +143,13 @@ class LocalCodeLinter:
 
     def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         is_dir = path.is_dir()
-        loader = self._folder_loader if is_dir else self._file_loader
+        loader: DependencyLoader
+        if is_a_notebook(path):
+            loader = self._notebook_loader
+        elif path.is_dir():
+            loader = self._folder_loader
+        else:
+            loader = self._file_loader
         path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
         root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
         graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
