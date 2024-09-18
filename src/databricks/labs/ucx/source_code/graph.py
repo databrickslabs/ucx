@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
@@ -95,7 +96,8 @@ class DependencyGraph:
         return MaybeGraph(
             child_graph,
             [
-                problem.replace(
+                dataclasses.replace(
+                    problem,
                     source_path=dependency.path if problem.is_path_missing() else problem.source_path,
                 )
                 for problem in problems
@@ -473,7 +475,7 @@ class DependencyResolver:
             out_path = path if problem.is_path_missing() else problem.source_path
             if out_path.is_absolute() and out_path.is_relative_to(self._path_lookup.cwd):
                 out_path = out_path.relative_to(self._path_lookup.cwd)
-            adjusted_problems.append(problem.replace(source_path=out_path))
+            adjusted_problems.append(dataclasses.replace(problem, source_path=out_path))
         return adjusted_problems
 
     def __repr__(self):
@@ -496,26 +498,6 @@ class DependencyProblem:
 
     def is_path_missing(self):
         return self.source_path == Path(MISSING_SOURCE_PATH)
-
-    def replace(
-        self,
-        code: str | None = None,
-        message: str | None = None,
-        source_path: Path | None = None,
-        start_line: int | None = None,
-        start_col: int | None = None,
-        end_line: int | None = None,
-        end_col: int | None = None,
-    ) -> DependencyProblem:
-        return DependencyProblem(
-            code if code is not None else self.code,
-            message if message is not None else self.message,
-            source_path if source_path is not None else self.source_path,
-            start_line if start_line is not None else self.start_line,
-            start_col if start_col is not None else self.start_col,
-            end_line if end_line is not None else self.end_line,
-            end_col if end_col is not None else self.end_col,
-        )
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(
