@@ -3,7 +3,7 @@ import logging
 import shutil
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
@@ -157,15 +157,18 @@ display(spark.read.parquet("/mnt/something"))
 
     assert len(dfsas) == 2
     task_keys = set(task.task_key for task in j.settings.tasks)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     for dfsa in dfsas:
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
-        assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
-        assert dfsa.source_timestamp != -1
-        assert dfsa.job_id == j.job_id
-        assert dfsa.job_name == j.settings.name
-        assert dfsa.task_key in task_keys
-        assert dfsa.assessment_start_timestamp != -1
-        assert dfsa.assessment_end_timestamp != -1
+        assert len(dfsa.source_lineage)
+        assert dfsa.source_timestamp > yesterday
+        assert dfsa.assessment_start_timestamp > yesterday
+        assert dfsa.assessment_end_timestamp > yesterday
+        assert str(j.job_id) in [atom.object_id for atom in dfsa.source_lineage]
+        assert j.settings.name in [
+            atom.other.get("name", None) for atom in dfsa.source_lineage if atom.other is not None
+        ]
+        assert all(task_key in [atom.object_id for atom in dfsa.source_lineage] for task_key in task_keys)
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(

@@ -1,10 +1,11 @@
+import dataclasses
 import functools
 import logging
 import shutil
 import tempfile
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -28,10 +29,9 @@ from databricks.labs.ucx.source_code.base import (
     guess_encoding,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
-    DirectFsAccess,
     LineageAtom,
     DirectFsAccessCrawler,
-    DirectFsAccessInPath,
+    DirectFsAccess,
 )
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -363,7 +363,7 @@ class WorkflowLinter:
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
-        job_dfsas: list[DirectFsAccessInPath] = []
+        job_dfsas: list[DirectFsAccess] = []
         for problems, dfsas in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
@@ -378,7 +378,7 @@ class WorkflowLinter:
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
@@ -393,9 +393,9 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccessInPath]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
         problems: list[JobProblem] = []
-        dfsas: list[DirectFsAccessInPath] = []
+        dfsas: list[DirectFsAccess] = []
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -420,9 +420,9 @@ class WorkflowLinter:
                     end_col=advice.advice.end_col,
                 )
                 problems.append(job_problem)
-            assessment_start = datetime.now()
-            task_dfsas = self._collect_task_dfsas(task, job, graph, session_state)
-            assessment_end = datetime.now()
+            assessment_start = datetime.now(timezone.utc)
+            task_dfsas = self._collect_task_dfsas(job, task, graph, session_state)
+            assessment_end = datetime.now(timezone.utc)
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
@@ -462,15 +462,17 @@ class WorkflowLinter:
         yield from walker
 
     def _collect_task_dfsas(
-        self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[DirectFsAccessInPath]:
-        collector = DfsaCollectorWalker(graph, set(), self._path_lookup, session_state)
-        assert job.settings is not None  # as already done in _lint_job
-        job_name = job.settings.name
-        for dfsa in collector:
-            yield DirectFsAccessInPath(**asdict(dfsa)).replace_job_infos(
-                job_id=job.job_id, job_name=job_name, task_key=task.task_key
-            )
+        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
+    ) -> Iterable[DirectFsAccess]:
+        # walker doesn't register lineage for job/task
+        job_id = str(job.job_id)
+        job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
+        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
+            atoms = [
+                LineageAtom(object_type="job", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="task", object_id=task.task_key),
+            ]
+            yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
@@ -546,11 +548,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
     ) -> Iterable[DirectFsAccess]:
         notebook = Notebook.parse(path, source, language.language)
-        src_timestamp = _get_path_modified_datetime(path)
-        src_id = str(path)
         for cell in notebook.cells:
-            for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+            yield from self._collect_from_source(cell.original_code, cell.language, path, inherited_tree)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
