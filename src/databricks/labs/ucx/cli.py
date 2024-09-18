@@ -563,10 +563,20 @@ def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **n
 
 
 @ucx.command
-def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
+def migrate_dbsql_dashboards(
+    w: WorkspaceClient,
+    dashboard_id: str | None = None,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Migrate table references in DBSQL Dashboard queries"""
-    ctx = WorkspaceContext(w)
-    ctx.redash.migrate_dashboards(dashboard_id)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.redash.migrate_dashboards(dashboard_id)
 
 
 @ucx.command

@@ -799,9 +799,21 @@ def test_create_missing_principal_azure(ws, caplog):
     assert str(failure.value) == "Unsupported cloud provider"
 
 
-def test_migrate_dbsql_dashboards(ws, caplog):
-    migrate_dbsql_dashboards(ws)
-    ws.dashboards.list.assert_called_once()
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_migrate_dbsql_dashboards_list_dashboards(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    migrate_dbsql_dashboards(
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.dashboards.list.assert_called_once()
 
 
 def test_revert_dbsql_dashboards(ws, caplog):
