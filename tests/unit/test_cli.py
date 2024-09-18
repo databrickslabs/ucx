@@ -39,6 +39,7 @@ from databricks.labs.ucx.cli import (
     join_collection,
     logs,
     manual_workspace_info,
+    migrate_acls,
     migrate_credentials,
     migrate_dbsql_dashboards,
     migrate_local_code,
@@ -99,6 +100,12 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     }
                 }
             }
+        ),
+        '/Users/foo/.ucx/workspaces.json': json.dumps(
+            [
+                {'workspace_id': 123, 'workspace_name': '123'},
+                {'workspace_id': 456, 'workspace_name': '456'},
+            ]
         ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
@@ -265,9 +272,9 @@ def test_manual_workspace_info(ws):
     manual_workspace_info(ws, prompts)
 
 
-def test_create_table_mapping(ws, acc_client):
+def test_create_table_mapping_raises_value_error_because_no_tables_found(ws, acc_client) -> None:
     ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
+    with pytest.raises(ValueError, match="No tables found. .*"):
         create_table_mapping(ws, ctx, False, acc_client)
 
 
@@ -432,6 +439,23 @@ def test_save_storage_and_principal_gcp(ws):
     ctx = WorkspaceContext(ws)
     with pytest.raises(ValueError):
         principal_prefix_access(ws, ctx=ctx)
+
+
+@pytest.mark.parametrize("run_as_collection", [True, False])
+def test_migrate_acls_calls_workspace_id(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    migrate_acls(
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
 
 
 def test_migrate_credentials_azure(ws, acc_client):
