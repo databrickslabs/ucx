@@ -6,7 +6,6 @@ from databricks.sdk.retries import retried
 from ..conftest import MockInstallationContext
 
 
-
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=12))
 def test_running_real_migration_progress_job(installation_ctx: MockInstallationContext) -> None:
     """Ensure that the migration-progress workflow can complete successfully."""
