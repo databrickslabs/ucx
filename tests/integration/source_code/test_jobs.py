@@ -11,6 +11,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -19,7 +20,6 @@ from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix, factory
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
@@ -121,13 +121,21 @@ def test_job_task_linter_library_installed_cluster(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
+def test_job_linter_some_notebook_graph_with_problems(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+    caplog,
+    watchdog_purge_suffix,
+):
     expected_messages = {
         'some_file.py:0 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/foo/bar',
         'second_notebook:3 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/something',
     }
 
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
     entrypoint.mkdir()
 
     main_notebook = entrypoint / 'main'
@@ -142,8 +150,7 @@ display(spark.read.parquet("/mnt/something"))
 """,
     )
 
-    some_file = entrypoint / 'some_file.py'
-    some_file.write_text('display(spark.read.parquet("/mnt/foo/bar"))')
+    (entrypoint / 'some_file.py').write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         problems, dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
@@ -177,8 +184,9 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_job,
     make_notebook,
     make_random,
+    watchdog_purge_suffix,
 ):
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{get_purge_suffix()}").expanduser()
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
@@ -210,6 +218,7 @@ def test_lint_local_code(simple_ctx):
     path_to_scan = Path(ucx_path, "src")
     # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
     linter = LocalCodeLinter(
+        light_ctx.notebook_loader,
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
@@ -266,32 +275,20 @@ def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx,
 
 
 @pytest.fixture
-def make_dbfs_directory(ws: WorkspaceClient, make_random: Callable[[int], str]):
+def make_dbfs_directory(ws: WorkspaceClient, make_random: Callable[[int], str], watchdog_purge_suffix):
     def create() -> DBFSPath:
-        path = DBFSPath(ws, f"~/sdk-{make_random(4)}-{get_purge_suffix()}").expanduser()
+        path = DBFSPath(ws, f"~/sdk-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
         path.mkdir()
         return path
 
     yield from factory("dbfs-directory", create, lambda p: p.rmdir(recursive=True))
 
 
-@pytest.fixture
-def make_workspace_directory(ws: WorkspaceClient, make_random: Callable[[int], str]):
-    def create() -> WorkspacePath:
-        path = WorkspacePath(ws, f"~/sdk-{make_random(4)}-{get_purge_suffix()}").expanduser()
-        path.mkdir()
-        return path
-
-    yield from factory("workspace-directory", create, lambda p: p.rmdir(recursive=True))
-
-
 def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     simple_ctx,
-    ws,
     make_job,
     make_notebook,
     make_directory,
-    make_workspace_directory,
 ):
     # A requirement that can definitely not be found.
     requirements = "a_package_that_does_not_exist\n"
@@ -299,7 +296,7 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     # Notebook code: yaml is part of DBR, and shouldn't trigger an error but the other module will.
     python_code = "import yaml\nimport module_that_does_not_exist\n"
 
-    remote_requirements_path = make_workspace_directory() / "requirements.txt"
+    remote_requirements_path = make_directory() / "requirements.txt"
     remote_requirements_path.write_text(requirements)
     library = compute.Library(requirements=remote_requirements_path.as_posix())
 
@@ -321,7 +318,6 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
 
 def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     simple_ctx,
-    ws,
     make_job,
     make_notebook,
     make_directory,
@@ -355,16 +351,14 @@ def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
 
 def test_workflow_linter_lints_job_with_workspace_egg_dependency(
     simple_ctx,
-    ws,
     make_job,
     make_notebook,
     make_directory,
-    make_workspace_directory,
 ):
     expected_problem_message = "Could not locate import: thingy"
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
 
-    remote_egg_path = make_workspace_directory() / egg_file.name
+    remote_egg_path = make_directory() / egg_file.name
     with egg_file.open("rb") as src, remote_egg_path.open("wb") as dst:
         shutil.copyfileobj(src, dst)
     library = compute.Library(egg=remote_egg_path.as_posix())
@@ -380,7 +374,6 @@ def test_workflow_linter_lints_job_with_workspace_egg_dependency(
 
 def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
     simple_ctx,
-    ws,
     make_job,
     make_notebook,
     make_directory,
@@ -530,9 +523,9 @@ def test_job_spark_python_task_workspace_linter_happy_path(
     make_job,
     make_random,
     make_cluster,
-    make_workspace_directory,
+    make_directory,
 ) -> None:
-    pyspark_job_path = make_workspace_directory() / "spark_job.py"
+    pyspark_job_path = make_directory() / "spark_job.py"
     pyspark_job_path.write_text("import greenlet\n")
 
     new_cluster = make_cluster(single_node=True)
@@ -649,7 +642,7 @@ def test_job_dlt_task_linter_happy_path(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, make_notebook, make_random, simple_ctx, ws):
+def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, simple_ctx, ws):
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     entrypoint = make_directory()
     remote_egg_file = f"{entrypoint}/{egg_file.name}"

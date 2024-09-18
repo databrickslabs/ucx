@@ -132,7 +132,7 @@ class WorkspaceContext(CliContext):
         return run_command
 
     @cached_property
-    def aws_profile(self):
+    def aws_profile(self) -> str:
         aws_profile = self.named_parameters.get("aws_profile")
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
@@ -202,6 +202,7 @@ class LocalCheckoutContext(WorkspaceContext):
     def local_code_linter(self):
         session_state = CurrentSessionState()
         return LocalCodeLinter(
+            self.notebook_loader,
             self.file_loader,
             self.folder_loader,
             self.path_lookup,

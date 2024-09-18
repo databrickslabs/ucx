@@ -119,8 +119,6 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def is_azure(self) -> bool:
-        if self.is_aws:
-            return False
         return self.connect_config.is_azure
 
     @cached_property
