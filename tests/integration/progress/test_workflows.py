@@ -5,6 +5,7 @@ from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.jobs import RunLifecycleStateV2State, TerminationCodeCode
 
+from ..conftest import MockInstallationContext
 
 def _assert_run_success(ws: WorkspaceClient, run_id: int) -> None:
     """Verify that a job run completed successfully."""
@@ -14,11 +15,7 @@ def _assert_run_success(ws: WorkspaceClient, run_id: int) -> None:
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=12))
-def test_running_real_migration_progress_job(
-    ws,
-    installation_ctx,
-    make_cluster_policy,
-) -> None:
+def test_running_real_migration_progress_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
     """Ensure that the migration-progress workflow can complete successfully."""
     installation_ctx.workspace_installation.run()
 
