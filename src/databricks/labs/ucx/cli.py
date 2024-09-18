@@ -171,12 +171,24 @@ def create_table_mapping(
 
 
 @ucx.command
-def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
+def validate_external_locations(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    ctx = WorkspaceContext(w)
-    path = ctx.external_locations.save_as_terraform_definitions_on_workspace(ctx.installation)
-    if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
-        webbrowser.open(f"{w.config.host}/#workspace{path}")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        path = workspace_context.external_locations.save_as_terraform_definitions_on_workspace(
+            workspace_context.installation
+        )
+        if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
+            webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
 @ucx.command

@@ -278,10 +278,21 @@ def test_create_table_mapping_raises_value_error_because_no_tables_found(ws, acc
         create_table_mapping(ws, ctx, False, acc_client)
 
 
-def test_validate_external_locations(ws):
-    validate_external_locations(ws, MockPrompts({}))
-
+def test_validate_external_locations(ws) -> None:
+    validate_external_locations(ws, MockPrompts({}), ctx=WorkspaceContext(ws))
     ws.statement_execution.execute_statement.assert_called()
+
+
+def test_validate_external_locations_runs_as_collection(workspace_clients, acc_client) -> None:
+    validate_external_locations(
+        workspace_clients[0],
+        MockPrompts({}),
+        run_as_collection=True,
+        a=acc_client,
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.statement_execution.execute_statement.assert_called()
 
 
 def test_ensure_assessment_run(ws, acc_client):
