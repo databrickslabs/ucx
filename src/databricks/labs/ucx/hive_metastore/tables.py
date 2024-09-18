@@ -475,6 +475,15 @@ class TablesCrawler(CrawlerBase[Table]):
 
 
 class FasterTableScanCrawler(CrawlerBase):
+    """
+    FasterTableScanCrawler is a specialized version of TablesCrawler that uses spark._jsparkSession to utilize
+    faster scanning with Scala APIs.
+
+    For integration testing, FasterTableScanCrawler is tested using the larger assessment test rather than
+    just the class. Testing the class individually would require utilizing a remote spark connection with the
+    Databricks workspace.
+    """
+
     def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         self._backend = backend
         self._include_database = include_databases
