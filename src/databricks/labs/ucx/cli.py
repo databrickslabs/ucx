@@ -179,29 +179,21 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
         webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
-def _workflow_trigger(
-    ws: WorkspaceClient,
-    workflow_name: str,
-    a: AccountClient | None = None,
-    *,
-    run_as_collection: bool = False,
-    force_run: bool,
-) -> None:
-    """Trigger a workflow, by default only if not already run."""
-    workspace_contexts = _get_workspace_contexts(ws, a, run_as_collection)
-    # If running the cmd as a collection, don't wait for each assessment job to finish as that will take long time.
-    skip_job_wait = bool(run_as_collection)
-    for ctx in workspace_contexts:
-        logger.info(f"Starting {workflow_name} workflow in workspace: {ctx.workspace_client.get_workspace_id()}")
-        deployed_workflows = ctx.deployed_workflows
-        if force_run or not deployed_workflows.validate_step(workflow_name):
-            deployed_workflows.run_workflow(workflow_name, skip_job_wait=skip_job_wait)
-
-
 @ucx.command
 def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
-    _workflow_trigger(w, "assessment", a, run_as_collection=run_as_collection, force_run=False)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Checking assessment workflow in workspace: {workspace_id}")
+        deployed_workflows = ctx.deployed_workflows
+        # Note: will block if the workflow is already underway but not completed.
+        if deployed_workflows.validate_step("assessment"):
+            logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
+        else:
+            logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
+            # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
+            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
 
 
 @ucx.command
@@ -211,7 +203,13 @@ def update_migration_progress(
     a: AccountClient | None = None,
 ) -> None:
     """Manually trigger the migration-progress-experimental job."""
-    _workflow_trigger(w, "migration-progress-experimental", a, run_as_collection=run_as_collection, force_run=True)
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Starting 'migration-progress-experimental' workflow in workspace: {workspace_id}")
+        deployed_workflows = ctx.deployed_workflows
+        # If running for a collection, don't wait for each migration-progress job to finish as that will take long time.
+        deployed_workflows.run_workflow("migration-progress-experimental", skip_job_wait=run_as_collection)
 
 
 @ucx.command
