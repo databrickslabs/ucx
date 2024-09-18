@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import locale
 import logging
 from collections.abc import Iterable
@@ -173,7 +174,8 @@ class NotebookLinter:
                 linter = self._linter(cell.language.language)
                 advices = linter.lint(cell.original_code)
             for advice in advices:
-                yield advice.replace(
+                yield dataclasses.replace(
+                    advice,
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
