@@ -617,7 +617,7 @@ def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_mi
         azure_cli_authenticated=True,
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
-    with pytest.raises(ValueError, match="Please enter subscription id to scan storage accounts in."):
+    with pytest.raises(ValueError, match="Please enter subscription ids to scan storage accounts in."):
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
@@ -646,7 +646,7 @@ def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(w
         prompts,
         run_as_collection=True,
         a=acc_client,
-        subscription_ids=["test"],
+        subscription_ids="test",
     )
 
     for workspace_client in workspace_clients:
