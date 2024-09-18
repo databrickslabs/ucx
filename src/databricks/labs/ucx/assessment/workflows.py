@@ -22,9 +22,8 @@ class Assessment(Workflow):
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
-        Delta table named `$inventory_database.udfs`. (The `inventory_database` is set in the configuration file.)
-        This inventory is currently used when scanning securable objects for issues with grants that cannot be migrated
-        to Unit Catalog."""
+        table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
+        issues with grants that cannot be migrated to Unit Catalog."""
         ctx.udfs_crawler.snapshot()
 
     @job_task(job_cluster="tacl")
