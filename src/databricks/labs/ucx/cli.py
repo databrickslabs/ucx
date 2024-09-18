@@ -171,12 +171,24 @@ def create_table_mapping(
 
 
 @ucx.command
-def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
+def validate_external_locations(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    ctx = WorkspaceContext(w)
-    path = ctx.external_locations.save_as_terraform_definitions_on_workspace(ctx.installation)
-    if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
-        webbrowser.open(f"{w.config.host}/#workspace{path}")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        path = workspace_context.external_locations.save_as_terraform_definitions_on_workspace(
+            workspace_context.installation
+        )
+        if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
+            webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
 @ucx.command
@@ -321,19 +333,25 @@ def create_uber_principal(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     **named_parameters,
 ):
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
     it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
     Pass subscription_id for azure and aws_profile for aws."""
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_resource_permissions.create_uber_principal(prompts)
-    if ctx.is_aws:
-        return ctx.aws_resource_permissions.create_uber_principal(prompts)
-    raise ValueError("Unsupported cloud provider")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure:
+            workspace_context.azure_resource_permissions.create_uber_principal(prompts)
+        elif workspace_context.is_aws:
+            workspace_context.aws_resource_permissions.create_uber_principal(prompts)
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
@@ -472,10 +490,20 @@ def migrate_locations(
 
 
 @ucx.command
-def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
+def create_catalogs_schemas(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    ctx = WorkspaceContext(w)
-    ctx.catalog_schema.create_all_catalogs_schemas(prompts)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command
@@ -592,16 +620,24 @@ def migrate_tables(
 
 
 @ucx.command
-def migrate_acls(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_acls(
+    w: WorkspaceClient,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """
     Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
     """
-    if ctx is None:
-        ctx = WorkspaceContext(w)
-    ctx.acl_migrator.migrate_acls(
-        target_catalog=named_parameters.get("target_catalog"),
-        hms_fed=named_parameters.get("hms_fed", False),
-    )
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    target_catalog, hms_fed = named_parameters.get("target_catalog"), named_parameters.get("hms_fed", False)
+    for workspace_context in workspace_contexts:
+        workspace_context.acl_migrator.migrate_acls(target_catalog=target_catalog, hms_fed=hms_fed)
 
 
 @ucx.command

@@ -39,6 +39,7 @@ from databricks.labs.ucx.cli import (
     join_collection,
     logs,
     manual_workspace_info,
+    migrate_acls,
     migrate_credentials,
     migrate_dbsql_dashboards,
     migrate_local_code,
@@ -86,6 +87,10 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     'token': 'bar',
                 },
                 'installed_workspace_ids': installed_workspace_ids,
+                'policy_id': '01234567A8BCDEF9',
+                # Exit Azure's `create_uber_principal` early by setting the uber service principal id
+                # to isolate cli testing as much as possible to the cli commands and not the invoked ucx functionality.
+                'uber_spn_id': '0123456789',
             }
         ),
         '/Users/foo/.ucx/state.json': json.dumps(
@@ -99,6 +104,12 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
                     }
                 }
             }
+        ),
+        '/Users/foo/.ucx/workspaces.json': json.dumps(
+            [
+                {'workspace_id': 123, 'workspace_name': '123'},
+                {'workspace_id': 456, 'workspace_name': '456'},
+            ]
         ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
@@ -265,16 +276,27 @@ def test_manual_workspace_info(ws):
     manual_workspace_info(ws, prompts)
 
 
-def test_create_table_mapping(ws, acc_client):
+def test_create_table_mapping_raises_value_error_because_no_tables_found(ws, acc_client) -> None:
     ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
+    with pytest.raises(ValueError, match="No tables found. .*"):
         create_table_mapping(ws, ctx, False, acc_client)
 
 
-def test_validate_external_locations(ws):
-    validate_external_locations(ws, MockPrompts({}))
-
+def test_validate_external_locations(ws) -> None:
+    validate_external_locations(ws, MockPrompts({}), ctx=WorkspaceContext(ws))
     ws.statement_execution.execute_statement.assert_called()
+
+
+def test_validate_external_locations_runs_as_collection(workspace_clients, acc_client) -> None:
+    validate_external_locations(
+        workspace_clients[0],
+        MockPrompts({}),
+        run_as_collection=True,
+        a=acc_client,
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.statement_execution.execute_statement.assert_called()
 
 
 def test_ensure_assessment_run(ws, acc_client):
@@ -434,6 +456,23 @@ def test_save_storage_and_principal_gcp(ws):
         principal_prefix_access(ws, ctx=ctx)
 
 
+@pytest.mark.parametrize("run_as_collection", [True, False])
+def test_migrate_acls_calls_workspace_id(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    migrate_acls(
+        workspace_clients[0],
+        run_as_collection=run_as_collection,
+        a=acc_client,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
+
+
 def test_migrate_credentials_azure(ws, acc_client):
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
@@ -558,30 +597,90 @@ def test_migrate_credentials_limit_aws(ws, acc_client):
         migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
 
 
-def test_create_master_principal_not_azure(ws):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
+def test_create_uber_principal_raises_value_error_for_unsupported_cloud(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=False,
+    )
     prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported cloud provider"):
         create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_master_principal_no_subscription(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    ctx = WorkspaceContext(ws)
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
+def test_create_azure_uber_principal_raises_value_error_if_subscription_id_is_missing(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+    with pytest.raises(ValueError, match="Please enter subscription id to scan storage accounts in."):
+        create_uber_principal(ws, prompts, ctx=ctx)
 
 
-def test_create_uber_principal(ws):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
+def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id="id",
+    )
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(ws, prompts, ctx=ctx)
+
+    ws.get_workspace_id.assert_called_once()
+
+
+def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(workspace_clients, acc_client) -> None:
+    for workspace_client in workspace_clients:
+        # Setting the auth as follows as we (currently) do not support injecting multiple workspace contexts
+        workspace_client.config.auth_type = "azure-cli"
+    prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
+
+    create_uber_principal(
+        workspace_clients[0],
+        prompts,
+        run_as_collection=True,
+        a=acc_client,
+        subscription_id="test",
+    )
+
+    for workspace_client in workspace_clients:
+        workspace_client.get_workspace_id.assert_called()
+
+
+def test_create_aws_uber_principal_raises_value_error_if_aws_profile_is_missing(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+    )
     prompts = MockPrompts({})
-    with pytest.raises(ValueError):
-        create_uber_principal(ws, prompts, subscription_id="12")
+    with pytest.raises(ValueError, match="AWS Profile is not specified. .*"):
+        create_uber_principal(ws, prompts, ctx=ctx)
+
+
+def successful_aws_cli_call(_):
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+    return 0, successful_return, ""
+
+
+def test_create_aws_uber_principal_calls_dbutils_fs_mounts(ws) -> None:
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=False,
+        is_aws=True,
+        aws_profile="test",
+        aws_cli_run_command=successful_aws_cli_call,
+    )
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, ctx=ctx)
+    ws.dbutils.fs.mounts.assert_called_once()
 
 
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
@@ -634,22 +733,11 @@ def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client
 
 
 def test_migrate_locations_aws(ws, caplog) -> None:
-    successful_return = """
-    {
-        "UserId": "uu@mail.com",
-        "Account": "1234",
-        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
-    }
-    """
-
-    def successful_call(_):
-        return 0, successful_return, ""
-
     ctx = WorkspaceContext(ws).replace(
         is_aws=True,
         is_azure=False,
         aws_profile="profile",
-        aws_cli_run_command=successful_call,
+        aws_cli_run_command=successful_aws_cli_call,
     )
 
     migrate_locations(ws, ctx=ctx)
@@ -689,19 +777,26 @@ def test_migrate_locations_gcp(ws):
         migrate_locations(ws, ctx=ctx)
 
 
-def test_create_catalogs_schemas(ws):
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_create_catalogs_schemas_lists_catalogs(run_as_collection, workspace_clients, acc_client) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    for workspace_client in workspace_clients:
+        workspace_client.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     prompts = MockPrompts({'.*': 's3://test'})
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
-    create_catalogs_schemas(ws, prompts)
-    ws.catalogs.list.assert_called_once()
+
+    create_catalogs_schemas(workspace_clients[0], prompts, run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.catalogs.list.assert_called_once()
 
 
-def test_create_catalogs_schemas_handles_existing(ws, caplog):
+def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     prompts = MockPrompts({'.*': 's3://test'})
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
     ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
-    create_catalogs_schemas(ws, prompts)
+    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
     assert "Catalog test already exists. Skipping." in caplog.messages

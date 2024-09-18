@@ -9,7 +9,6 @@ from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 
@@ -230,12 +229,19 @@ def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, ma
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 @pytest.mark.parametrize("same_user", [True, False])
 def test_group_matching_names(
-    ws, sql_backend, inventory_schema, make_random, make_user, make_group, make_acc_group, same_user
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_random,
+    make_user,
+    make_group,
+    make_acc_group,
+    same_user,
+    watchdog_purge_suffix,
 ):
     rand_elem = make_random(4)
-    purge_suffix = get_purge_suffix()
-    workspace_group_name = f"test_group_{rand_elem}_{purge_suffix}"
-    account_group_name = f"same_group_[{rand_elem}]_{purge_suffix}"
+    workspace_group_name = f"test_group_{rand_elem}_{watchdog_purge_suffix}"
+    account_group_name = f"same_group_[{rand_elem}]_{watchdog_purge_suffix}"
     user1 = make_user()
     members1 = [user1.id]
     members2 = [user1.id] if same_user else [make_user().id]
@@ -251,7 +257,7 @@ def test_group_matching_names(
         inventory_schema,
         include_group_names=[ws_group.display_name],
         renamed_group_prefix="ucx-temp-",
-        workspace_group_regex=r"([0-9a-zA-Z]*)_" + re.escape(purge_suffix) + "$",
+        workspace_group_regex=r"([0-9a-zA-Z]*)_" + re.escape(watchdog_purge_suffix) + "$",
         workspace_group_replace=None,
         account_group_regex=r"\[([0-9a-zA-Z]*)\]",
     )
