@@ -207,6 +207,7 @@ def test_lint_local_code(simple_ctx):
     path_to_scan = Path(ucx_path, "src")
     # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
     linter = LocalCodeLinter(
+        light_ctx.notebook_loader,
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,

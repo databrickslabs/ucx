@@ -202,6 +202,7 @@ class LocalCheckoutContext(WorkspaceContext):
     def local_code_linter(self):
         session_state = CurrentSessionState()
         return LocalCodeLinter(
+            self.notebook_loader,
             self.file_loader,
             self.folder_loader,
             self.path_lookup,
