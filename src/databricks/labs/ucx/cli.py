@@ -205,7 +205,11 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
 
 
 @ucx.command
-def update_migration_progress(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None) -> None:
+def update_migration_progress(
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Manually trigger the migration-progress-experimental job."""
     _workflow_trigger(w, "migration-progress-experimental", a, run_as_collection=run_as_collection, force_run=True)
 
