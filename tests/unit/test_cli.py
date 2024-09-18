@@ -698,17 +698,6 @@ def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client
 
 
 def test_migrate_locations_aws(ws, caplog) -> None:
-    successful_return = """
-    {
-        "UserId": "uu@mail.com",
-        "Account": "1234",
-        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
-    }
-    """
-
-    def successful_call(_):
-        return 0, successful_return, ""
-
     ctx = WorkspaceContext(ws).replace(
         is_aws=True,
         is_azure=False,
