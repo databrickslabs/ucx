@@ -626,7 +626,7 @@ def test_create_azure_uber_principal_calls_workspace_id(ws) -> None:
         is_azure=True,
         is_aws=False,
         azure_cli_authenticated=True,
-        azure_subscription_id="id",
+        azure_subscription_ids=["id"],
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created": "test"})
 
@@ -646,7 +646,7 @@ def test_create_azure_uber_principal_runs_as_collection_requests_workspace_ids(w
         prompts,
         run_as_collection=True,
         a=acc_client,
-        subscription_id="test",
+        subscription_ids=["test"],
     )
 
     for workspace_client in workspace_clients:
@@ -728,7 +728,7 @@ def test_migrate_locations_azure_run_as_collection(workspace_clients, acc_client
             workspace_clients[0],
             run_as_collection=True,
             a=acc_client,
-            subscription_id="test",
+            subscription_ids=["test"],
         )
 
     for workspace_client in workspace_clients:
