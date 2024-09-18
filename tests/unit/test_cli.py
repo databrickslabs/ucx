@@ -708,7 +708,7 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
     ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
-    create_catalogs_schemas(ws, prompts)
+    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
     assert "Catalog test already exists. Skipping." in caplog.messages
