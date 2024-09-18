@@ -39,7 +39,7 @@ class DirectFsAccess:
     def from_dict(cls, data: dict[str, Any]) -> Self:
         source_lineage = data.get("source_lineage", None)
         if isinstance(source_lineage, list) and len(source_lineage) > 0 and isinstance(source_lineage[0], dict):
-            lineage_atoms = [LineageAtom(*lineage) for lineage in source_lineage]
+            lineage_atoms = [LineageAtom(**lineage) for lineage in source_lineage]
             data["source_lineage"] = lineage_atoms
         return cls(**data)
 

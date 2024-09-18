@@ -141,6 +141,8 @@ def make_dashboard(
     def create(query: LegacyQuery | None = None) -> Dashboard:
         if not query:
             query = make_query()
+        assert query
+        assert query.id
         viz = ws.query_visualizations_legacy.create(
             type="table",
             query_id=query.id,

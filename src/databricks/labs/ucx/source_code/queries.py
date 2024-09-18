@@ -152,7 +152,7 @@ class QueryLinter:
         source_id = query.id or "no id"
         source_name = query.name or "<anonymous>"
         source_timestamp = cls._read_timestamp(query.updated_at)
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"query_name": source_name})]
+        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
         for dfsa in linter.collect_dfsas(query.query):
             yield DirectFsAccess(**asdict(dfsa)).replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage

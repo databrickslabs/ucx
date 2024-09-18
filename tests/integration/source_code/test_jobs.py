@@ -21,7 +21,7 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
@@ -171,11 +171,11 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.source_timestamp > yesterday
         assert dfsa.assessment_start_timestamp > yesterday
         assert dfsa.assessment_end_timestamp > yesterday
-        assert str(j.job_id) in [atom.object_id for atom in dfsa.source_lineage]
-        assert j.settings.name in [
-            atom.other.get("name", None) for atom in dfsa.source_lineage if atom.other is not None
-        ]
-        assert all(task_key in [atom.object_id for atom in dfsa.source_lineage] for task_key in task_keys)
+        assert dfsa.source_lineage[0] == LineageAtom(
+            object_type="JOB", object_id=str(j.job_id), other={"name": j.settings.name}
+        )
+        assert dfsa.source_lineage[1].object_type == "TASK"
+        assert dfsa.source_lineage[1].object_id in task_keys
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(

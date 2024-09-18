@@ -15,3 +15,16 @@ def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, sql_backend
     all_dfsas = crawler.snapshot()
     dfsas = [dfsa for dfsa in all_dfsas if dfsa.source_id == query.id]
     assert len(dfsas) == 1
+    dfsa = dfsas[0]
+    assert len(dfsa.source_lineage) == 2
+    lineage = dfsa.source_lineage[0]
+    assert lineage.object_type == "DASHBOARD"
+    assert lineage.object_id == _dashboard.id
+    assert lineage.other
+    assert lineage.other.get("parent", None) == _dashboard.parent
+    assert lineage.other.get("name", None) == _dashboard.name
+    lineage = dfsa.source_lineage[1]
+    assert lineage.object_type == "QUERY"
+    assert lineage.object_id == query.id
+    assert lineage.other
+    assert lineage.other.get("name", None) == query.name
