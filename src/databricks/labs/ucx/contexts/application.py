@@ -15,7 +15,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawlers
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
@@ -54,6 +54,7 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoad
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -426,13 +427,21 @@ class GlobalContext(abc.ABC):
             self.dependency_resolver,
             self.path_lookup,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
-            self.directfs_access_crawlers,
+            self.directfs_access_crawler_for_paths,
             self.config.include_job_ids,
         )
 
     @cached_property
-    def directfs_access_crawlers(self):
-        return DirectFsAccessCrawlers(self.sql_backend, self.inventory_database)
+    def query_linter(self):
+        return QueryLinter(self.workspace_client, self.directfs_access_crawler_for_queries)
+
+    @cached_property
+    def directfs_access_crawler_for_paths(self):
+        return DirectFsAccessCrawler.for_paths(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def directfs_access_crawler_for_queries(self):
+        return DirectFsAccessCrawler.for_queries(self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self):
