@@ -431,7 +431,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def query_linter(self):
-        return QueryLinter(self.workspace_client, self.directfs_access_crawler_for_queries)
+        return QueryLinter(
+            self.workspace_client,
+            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.directfs_access_crawler_for_queries,
+        )
 
     @cached_property
     def directfs_access_crawler_for_paths(self):

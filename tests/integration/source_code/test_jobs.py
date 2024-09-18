@@ -3,7 +3,7 @@ import logging
 import shutil
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
@@ -21,7 +21,7 @@ from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
@@ -150,8 +150,7 @@ display(spark.read.parquet("/mnt/something"))
 """,
     )
 
-    some_file = entrypoint / 'some_file.py'
-    some_file.write_text('display(spark.read.parquet("/mnt/foo/bar"))')
+    (entrypoint / 'some_file.py').write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         problems, dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
@@ -165,15 +164,18 @@ display(spark.read.parquet("/mnt/something"))
 
     assert len(dfsas) == 2
     task_keys = set(task.task_key for task in j.settings.tasks)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     for dfsa in dfsas:
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
-        assert dfsa.source_lineage != DirectFsAccess.UNKNOWN
-        assert dfsa.source_timestamp != -1
-        assert dfsa.job_id == j.job_id
-        assert dfsa.job_name == j.settings.name
-        assert dfsa.task_key in task_keys
-        assert dfsa.assessment_start_timestamp != -1
-        assert dfsa.assessment_end_timestamp != -1
+        assert len(dfsa.source_lineage)
+        assert dfsa.source_timestamp > yesterday
+        assert dfsa.assessment_start_timestamp > yesterday
+        assert dfsa.assessment_end_timestamp > yesterday
+        assert dfsa.source_lineage[0] == LineageAtom(
+            object_type="JOB", object_id=str(j.job_id), other={"name": j.settings.name}
+        )
+        assert dfsa.source_lineage[1].object_type == "TASK"
+        assert dfsa.source_lineage[1].object_id in task_keys
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
