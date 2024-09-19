@@ -26,6 +26,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -249,6 +250,21 @@ After the first installation, UCX will prompt the user to confirm whether to ins
 This installation mode will automatically select the following options:
 * Automatically create and enable HMS lineage init script
 * Automatically create a new SQL warehouse for UCX assessment
+
+[[back to top](#databricks-labs-ucx)]
+
+## [ADVANCED] Installing UCX with company hosted PYPI mirror
+
+Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
+company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
+"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+hosted PYPI mirror URL while installing UCX:
+
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx.
+```
+
+During installation reply *yes* to the question "Does the given workspace block internet access"?
 
 [[back to top](#databricks-labs-ucx)]
 
