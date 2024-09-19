@@ -18,6 +18,7 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
     installation_ctx.workspace_installation.run()
 
     installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment")
 
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert after[ws_group_a.display_name] == PermissionLevel.CAN_USE

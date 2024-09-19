@@ -995,6 +995,20 @@ listed with the [`workflows` command](#workflows-command).
 
 [[back to top](#databricks-labs-ucx)]
 
+## `update-migration-progress` command
+
+```commandline
+databricks labs ucx update-migration-progress
+```
+
+This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+
+_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
+
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `repair-run` command
 
 ```commandline
@@ -1573,7 +1587,7 @@ workspace information with the UCX installations. Once the workspace information
 ## `sync-workspace-info` command
 
 ```text
-databricks labs ucx sync-workspace-info
+databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
 14:07:07  INFO [d.labs.ucx] Account ID: ...
 14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
@@ -1582,9 +1596,12 @@ databricks labs ucx sync-workspace-info
 ...
 ```
 
-**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces
-in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](#Table-Migration) process and is the prerequisite
+> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
+> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
+> or "https://accounts.azuredatabricks.net").
+
+This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
+necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
