@@ -43,6 +43,7 @@ _SPARK_CONF = {
 def test_workspace_object_crawler(ws, make_notebook, inventory_schema, sql_backend):
     notebook = make_notebook()
     workspace_listing = WorkspaceListing(ws, sql_backend, inventory_schema)
+        start_path=str(notebook.parent),
     workspace_objects = {_.path: _ for _ in workspace_listing.snapshot()}
     assert str(notebook) in workspace_objects
     assert workspace_objects[str(notebook)].object_type == "NOTEBOOK"
