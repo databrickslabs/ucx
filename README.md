@@ -1812,10 +1812,9 @@ from a VPC, or from a specific IP range.
 the Databricks account and workspace. If not, you might need to be
 connected to a VPN or configure an HTTP proxy to access your workspace.
 
-**From local machine to GitHub:** UCX needs internet access to connect
-to [<u>github.com</u>](https://github.com) (to download the tool) from
-the machine running the installation. The installation will fail if
-there is no internet connectivity.
+**From local machine to GitHub:** UCX needs internet access to connect to GitHub (https://api.github.com
+and https://raw.githubusercontent.com) for downloading the tool from the machine running the installation. The
+installation will fail if there is no internet connectivity to these URLs.
 
 **Solution:** Ensure that GitHub is reachable from the local machine. If
 not, make necessary changes to the network/firewall settings.
@@ -1829,7 +1828,7 @@ NO_MATCHING_DISTRIBUTION_ERROR.
 
 **Solution:** Version 0.24.0 of UCX supports workspace with no internet
 access. Please upgrade UCX and rerun the installation. Reply *yes* to
-the question "Does the given workspace block Internet access?" asked
+the question "Does the given workspace block internet access?" asked
 during installation. It will then upload all necessary dependencies to
 the workspace. Also, please note that UCX uses both UC and non-UC
 enabled clusters. If you have different proxy settings for each, then
