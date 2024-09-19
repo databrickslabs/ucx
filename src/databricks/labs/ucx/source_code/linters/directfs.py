@@ -3,7 +3,7 @@ import logging
 from abc import ABC
 from collections.abc import Iterable
 
-from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Call, Const, InferenceError, JoinedStr, NodeNG  # type: ignore
 from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Alter, Create, Delete, Drop, Identifier, Insert, Literal, Select
 
@@ -96,6 +96,9 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
 
     def _check_str_constant(self, source_node, inferred: InferredValue):
         if self._already_reported(source_node, inferred):
+            return
+        # don't report on JoinedStr fragments
+        if isinstance(source_node.parent, JoinedStr):
             return
         # avoid duplicate advices that are reported by SparkSqlPyLinter
         if self._prevent_spark_duplicates and Tree(source_node).is_from_module("spark"):
