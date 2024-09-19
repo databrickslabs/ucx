@@ -46,8 +46,12 @@ class CatalogSchema:
                             f"Schema {candidate_schema} in catalog {candidate_catalog} " f"already exists. Skipping."
                         )
                         continue
+        self._update_grants_acl()
         self._update_principal_acl()
 
+    def _update_grants_acl(self):
+        # todo
+        pass
     def _update_principal_acl(self):
         grants = self._get_catalog_schema_grants()
         for grant in grants:
