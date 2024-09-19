@@ -536,6 +536,9 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog and database.
         """
         full_name = f"{catalog}.{database}.{table}"
+        if catalog != "hive_metastore":
+            msg = f"Only tables in the hive_metastore catalog can be described: {full_name}"
+            raise ValueError(msg)
         logger.debug(f"Fetching metadata for table: {full_name}")
         try:
             raw_table = self._external_catalog.getTable(database, table)
@@ -546,7 +549,7 @@ class FasterTableScanCrawler(CrawlerBase):
             is_partitioned = len(list(self._iterator(raw_table.partitionColumnNames()))) > 0
 
             return Table(
-                catalog='hive_metastore',
+                catalog=catalog,
                 database=database,
                 name=table,
                 object_type=raw_table.tableType().name(),
