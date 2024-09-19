@@ -11,6 +11,7 @@ from astroid import (  # type: ignore
     decorators,
     Dict,
     FormattedValue,
+    Instance,
     JoinedStr,
     Name,
     NodeNG,
@@ -68,19 +69,27 @@ class InferredValue:
         elif isinstance(node, FormattedValue):
             yield from _LocalInferredValue.do_infer_values(node.value)
         else:
-            yield from cls._infer_internal(node)
+            yield from cls._safe_infer_internal(node)
 
     @classmethod
-    def _infer_internal(cls, node: NodeNG):
+    def _safe_infer_internal(cls, node: NodeNG):
         try:
-            for inferred in node.inferred():
-                # work around infinite recursion of empty lists
-                if inferred == node:
-                    continue
-                yield from _LocalInferredValue.do_infer_values(inferred)
+            yield from cls._unsafe_infer_internal(node)
         except InferenceError as e:
             logger.debug(f"When inferring {node}", exc_info=e)
             yield [Uninferable]
+
+    @classmethod
+    def _unsafe_infer_internal(cls, node: NodeNG):
+        all_inferred = node.inferred()
+        if len(all_inferred) == 0 and isinstance(node, Instance):
+            yield [node]
+            return
+        for inferred in all_inferred:
+            # work around infinite recursion of empty lists
+            if inferred == node:
+                continue
+            yield from _LocalInferredValue.do_infer_values(inferred)
 
     @classmethod
     def _infer_values_from_joined_string(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
