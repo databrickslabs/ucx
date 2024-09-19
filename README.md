@@ -261,7 +261,7 @@ company hosted PYPI mirror for finding its dependencies, add all UCX dependencie
 hosted PYPI mirror URL while installing UCX:
 
 ```commandline
-PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx.
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
 ```
 
 During installation reply *yes* to the question "Does the given workspace block internet access"?
