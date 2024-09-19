@@ -182,6 +182,14 @@ class Assessment(Workflow):
         """Scans all groups for the local group migration scope"""
         ctx.group_manager.snapshot()
 
+    @job_task
+    def assess_dashboards(self, ctx: RuntimeContext):
+        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
+    @job_task
+    def assess_workflows(self, ctx: RuntimeContext):
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
 
 class Failing(Workflow):
     def __init__(self):
