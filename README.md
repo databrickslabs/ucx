@@ -264,7 +264,7 @@ hosted PYPI mirror URL while installing UCX:
 PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
 ```
 
-During installation reply *yes* to the question "Does the given workspace block internet access"?
+During installation reply *yes* to the question "Does the given workspace block Internet access"?
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1821,7 +1821,7 @@ NO_MATCHING_DISTRIBUTION_ERROR.
 
 **Solution:** Version 0.24.0 of UCX supports workspace with no internet
 access. Please upgrade UCX and rerun the installation. Reply *yes* to
-the question "Does the given workspace block internet access?" asked
+the question "Does the given workspace block Internet access?" asked
 during installation. It will then upload all necessary dependencies to
 the workspace. Also, please note that UCX uses both UC and non-UC
 enabled clusters. If you have different proxy settings for each, then
