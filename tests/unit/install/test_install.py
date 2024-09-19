@@ -34,6 +34,7 @@ from databricks.sdk.service.sql import EndpointInfo, EndpointInfoWarehouseType
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.install import AccountInstaller, WorkspaceInstallation, WorkspaceInstaller, extract_major_minor
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
@@ -86,7 +87,7 @@ def mock_installation_extra_jobs():
         {
             'state.json': {
                 'resources': {
-                    'jobs': {"assessment": "123", "extra_job": "123"},
+                    'jobs': {"assessment": "123", "extra_job": "124", "other_job": "125"},
                     'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'},
                 }
             }
@@ -617,7 +618,8 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
 
     with caplog.at_level('WARNING'):
         workspace_installation.uninstall()
-        assert 'step=assessment does not exist anymore for some reason' in caplog.messages
+        failure = 'Corrupt installation state. Skipping job_id=123 as it is not managed by UCX'
+        assert failure in caplog.messages
 
     mock_installation_with_jobs.assert_removed()
     wheels.upload_to_wsfs.assert_not_called()
@@ -1282,6 +1284,10 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
+
+    def dummy_task(*_):
+        pass
+
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation_extra_jobs,
@@ -1289,7 +1295,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        [Task('assessment', 'some', '...', dummy_task)],
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -1303,9 +1309,28 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         PRODUCT_INFO,
     )
 
-    workspace_installation.run()
-    ws.jobs.delete.assert_called_with("123")
+    def job_side_effect(job_id):
+        tasks = {
+            123: [jobs.Task('x', notebook_task=jobs.NotebookTask(notebook_path='~/mock/assessment'))],
+            124: [jobs.Task('y', python_wheel_task=jobs.PythonWheelTask('databricks_labs_ucx', 'runtime'))],
+            125: [jobs.Task('z', notebook_task=jobs.NotebookTask(notebook_path='outside-of-ucx'))],
+        }
+        return jobs.Job(
+            settings=jobs.JobSettings(
+                tasks=tasks[job_id],
+            ),
+        )
+
+    ws.jobs.get.side_effect = job_side_effect
+
+    with caplog.at_level('WARNING'):
+        workspace_installation.run()
+
+    job_deletes = {_.args[0] for _ in ws.jobs.delete.mock_calls}
+    assert len(job_deletes) == 1
+    assert '124' in job_deletes
     wheels.upload_to_wsfs.assert_called()
+    assert 'Corrupt installation state. Skipping job_id=125 as it is not managed by UCX' in caplog.messages
 
 
 def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
