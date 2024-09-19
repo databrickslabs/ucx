@@ -478,18 +478,21 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             self._deploy_workflow(workflow_name, settings)
 
-        for workflow_name, job_id in self._install_state.jobs.items():
-            if workflow_name not in desired_workflows:
-                try:
-                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                    self._ws.jobs.delete(job_id)
-                except InvalidParameterValue:
-                    logger.warning(f"step={workflow_name} does not exist anymore for some reason")
-                    continue
-
+        self.remove_jobs(keep=desired_workflows)
         self._install_state.save()
         self._create_debug(remote_wheels)
         self._create_readme()
+
+    def remove_jobs(self, *, keep: set[str] | None = None) -> None:
+        for workflow_name, job_id in self._install_state.jobs.items():
+            if keep and workflow_name in keep:
+                continue
+            try:
+                logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                self._ws.jobs.delete(job_id)
+            except InvalidParameterValue:
+                logger.warning(f"step={workflow_name} does not exist anymore for some reason")
+                continue
 
     @property
     def _config_file(self):

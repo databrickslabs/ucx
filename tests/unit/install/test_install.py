@@ -615,9 +615,9 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         config, mock_installation_with_jobs, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
-    with caplog.at_level('ERROR'):
+    with caplog.at_level('WARNING'):
         workspace_installation.uninstall()
-        assert 'Already deleted: assessment job_id=123.' in caplog.messages
+        assert 'step=assessment does not exist anymore for some reason' in caplog.messages
 
     mock_installation_with_jobs.assert_removed()
     wheels.upload_to_wsfs.assert_not_called()
