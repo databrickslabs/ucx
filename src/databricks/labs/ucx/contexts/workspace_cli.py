@@ -68,18 +68,18 @@ class WorkspaceContext(CliContext):
         return AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
 
     @cached_property
-    def azure_subscription_id(self):
-        subscription_id = self.named_parameters.get("subscription_id")
-        if not subscription_id:
-            raise ValueError("Please enter subscription id to scan storage accounts in.")
-        return subscription_id
+    def azure_subscription_ids(self) -> list[str]:
+        subscription_ids = self.named_parameters.get("subscription_ids", "")
+        if not subscription_ids:
+            raise ValueError("Please enter subscription ids to scan storage accounts in.")
+        return subscription_ids.split(",")
 
     @cached_property
     def azure_resources(self):
         return AzureResources(
             self.azure_management_client,
             self.microsoft_graph_client,
-            [self.azure_subscription_id],
+            self.azure_subscription_ids,
         )
 
     @cached_property

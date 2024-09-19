@@ -152,8 +152,8 @@ class CrawlerBase(ABC, Generic[Result]):
                 cached_results = list(fetcher())
                 if cached_results:
                     return cached_results
-            except NotFound:
-                pass
+            except NotFound as e:
+                logger.debug("Inventory table not found", exc_info=e)
         logger.debug(f"[{self.full_name}] crawling new set of snapshot data for {self._table}")
         loaded_records = list(loader())
         self._update_snapshot(loaded_records, mode="overwrite")

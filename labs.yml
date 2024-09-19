@@ -144,8 +144,8 @@ commands:
       its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
       The output is stored in the workspace install folder.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection
@@ -181,8 +181,8 @@ commands:
       used by tables in the workspace and stores the service principal information in the UCX cluster policy.
       For aws, indentify all s3 buckets used by the Instance Profiles configured in the workspace.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection
@@ -201,8 +201,8 @@ commands:
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection
@@ -220,8 +220,8 @@ commands:
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: run-as-collection

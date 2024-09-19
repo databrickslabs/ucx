@@ -1188,7 +1188,7 @@ Once you're done with the table migration, proceed to the [code migration](#code
 ## `principal-prefix-access` command
 
 ```text
-databricks labs ucx principal-prefix-access [--subscription-id <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
+databricks labs ucx principal-prefix-access [--subscription-ids <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
 ```
 
 This command depends on results from the [assessment workflow](#assessment-workflow) and requires [AWS CLI](#access-for-aws-s3-buckets)
@@ -1224,7 +1224,7 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 ### Access for Azure Storage Accounts
 
 ```commandline
-databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
+databricks labs ucx principal-prefix-access --subscription-ids test-subscription-id
 ```
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions
@@ -1267,7 +1267,7 @@ and asks for confirmation from user. Once confirmed, it deletes the role and its
 ## `create-uber-principal` command
 
 ```text
-databricks labs ucx create-uber-principal [--subscription-id X]
+databricks labs ucx create-uber-principal [--subscription-ids X]
 ```
 
 **Requires Cloud IAM admin privileges.**
