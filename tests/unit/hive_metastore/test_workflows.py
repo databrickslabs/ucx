@@ -1,5 +1,4 @@
 import pytest
-from databricks.labs.lsql.backends import DataclassInstance, MockBackend
 
 from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
