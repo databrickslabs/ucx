@@ -893,11 +893,20 @@ def test_delete_principals(ws):
     delete_missing_principals(ws, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
 
+
 def test_export_assessment(ws, tmp_path):
-    mock_prompts = MockPrompts({
+    query_choice = "main"
+    mock_prompts = MockPrompts(
+        {
             "Choose a path to save the UCX Assessment results": tmp_path.as_posix(),
-            "Choose which assessment results to export": "main",
-        })
+            "Choose which assessment results to export": query_choice,
+        }
+    )
 
     export_assessment(ws, mock_prompts)
-    assert len(list(tmp_path.glob("export_to_zipped_csv.zip"))) == 1
+    # Construct the expected filename based on the query_choice
+    expected_filename = f"export_{query_choice}_results.zip"
+    # Assert that the file exists in the temporary path
+    assert len(list(tmp_path.glob(expected_filename))) == 1
+
+
