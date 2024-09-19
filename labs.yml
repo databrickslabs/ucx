@@ -157,6 +157,8 @@ commands:
         description: (Optional) IAM policy Name to be specified for the UC roles. (default:UC_POLICY)
       - name: single-role
         description: (Optional) Create a single role for all S3 locations. (default:False)
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: delete-missing-principals
     description: For AWS, this command identifies all the UC roles that are created through the create-missing-principals
