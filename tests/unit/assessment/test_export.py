@@ -4,6 +4,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.core import Row
 
+
 def test_export(tmp_path):
     """Test the export_results method of the AssessmentExporter class."""
     query = {

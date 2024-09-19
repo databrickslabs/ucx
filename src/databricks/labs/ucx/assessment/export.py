@@ -21,10 +21,10 @@ class AssessmentExporter:
     def export_results(self, prompts: Prompts):
         """Main method to export results to CSV files inside a ZIP archive."""
         project_root = Path(__file__).resolve().parents[3]
-        queries_path_root = project_root / f"labs/ucx/queries/assessment"
+        queries_path_root = project_root / "labs/ucx/queries/assessment"
         valid_queries_dirs = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
 
-        export_path = Path(
+        results_directory  = Path(
             prompts.question(
                 "Choose a path to save the UCX Assessment results",
                 default=Path.cwd().as_posix(),
@@ -38,6 +38,7 @@ class AssessmentExporter:
             validate=lambda q: q in valid_queries_dirs,
         )
 
+        export_path = results_directory / f"export_{query_choice}_results.zip"
         queries_path = queries_path_root / query_choice
         display_name = "UCX Assessment Results"
         dashboard_metadata = DashboardMetadata(display_name)
@@ -50,17 +51,4 @@ class AssessmentExporter:
         print("results_path", results_path)
         logger.info(f"Results exported to {results_path}")
 
-        ##rename the zipped file
-        old_file_path = Path(results_path)
-
-        # New file name based on query_choice
-        new_file_name = f"export_{query_choice}_results.zip"
-        new_file_path = old_file_path.with_name(new_file_name)
-
-        try:
-            old_file_path.rename(new_file_path)
-            logger.info(f"File renamed to {new_file_path}")
-        except Exception as e:
-            logger.error(f"Failed to rename file: {e}")
-
-        return new_file_path
+        return results_path
