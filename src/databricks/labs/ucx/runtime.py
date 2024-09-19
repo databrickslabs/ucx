@@ -19,7 +19,6 @@ from databricks.labs.ucx.hive_metastore.workflows import (
     MigrateExternalTablesCTAS,
 )
 from databricks.labs.ucx.recon.workflows import MigrationRecon
-from databricks.labs.ucx.source_code.workflows import ExperimentalWorkflowLinter
 from databricks.labs.ucx.workspace_access.workflows import (
     GroupMigration,
     PermissionsMigrationAPI,
@@ -56,7 +55,6 @@ class Workflows:
                 ScanTablesInMounts(),
                 MigrateTablesInMounts(),
                 PermissionsMigrationAPI(),
-                ExperimentalWorkflowLinter(),
                 MigrationRecon(),
                 Failing(),
             ]
