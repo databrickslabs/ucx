@@ -478,18 +478,45 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             self._deploy_workflow(workflow_name, settings)
 
-        for workflow_name, job_id in self._install_state.jobs.items():
-            if workflow_name not in desired_workflows:
-                try:
-                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                    self._ws.jobs.delete(job_id)
-                except InvalidParameterValue:
-                    logger.warning(f"step={workflow_name} does not exist anymore for some reason")
-                    continue
-
+        self.remove_jobs(keep=desired_workflows)
         self._install_state.save()
         self._create_debug(remote_wheels)
         self._create_readme()
+
+    def remove_jobs(self, *, keep: set[str] | None = None) -> None:
+        for workflow_name, job_id in self._install_state.jobs.items():
+            if keep and workflow_name in keep:
+                continue
+            try:
+                if not self._is_managed_job_failsafe(int(job_id)):
+                    logger.warning(f"Corrupt installation state. Skipping job_id={job_id} as it is not managed by UCX")
+                    continue
+                logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                self._ws.jobs.delete(job_id)
+            except InvalidParameterValue:
+                logger.warning(f"step={workflow_name} does not exist anymore for some reason")
+                continue
+
+    # see https://github.com/databrickslabs/ucx/issues/2667
+    def _is_managed_job_failsafe(self, job_id: int) -> bool:
+        install_folder = self._installation.install_folder()
+        try:
+            return self._is_managed_job(job_id, install_folder)
+        except ResourceDoesNotExist:
+            return False
+        except InvalidParameterValue:
+            return False
+
+    def _is_managed_job(self, job_id: int, install_folder: str) -> bool:
+        job = self._ws.jobs.get(job_id)
+        if not job.settings or not job.settings.tasks:
+            return False
+        for task in job.settings.tasks:
+            if task.notebook_task and task.notebook_task.notebook_path.startswith(install_folder):
+                return True
+            if task.python_wheel_task and task.python_wheel_task.package_name == "databricks_labs_ucx":
+                return True
+        return False
 
     @property
     def _config_file(self):

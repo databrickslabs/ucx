@@ -391,6 +391,8 @@ def create_missing_principals(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     single_role: bool = False,
     role_name="UC_ROLE",
     policy_name="UC_POLICY",
@@ -400,11 +402,17 @@ def create_missing_principals(
     For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
     By default, it will create a  role per S3 location. Set the optional single_role parameter to True to create a single role for all S3 locations.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_aws:
-        return ctx.iam_role_creation.run(prompts, single_role=single_role, role_name=role_name, policy_name=policy_name)
-    raise ValueError("Unsupported cloud provider")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_creation.run(
+                prompts, single_role=single_role, role_name=role_name, policy_name=policy_name
+            )
+    else:
+        raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
