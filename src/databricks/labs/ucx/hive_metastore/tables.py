@@ -536,6 +536,7 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog and database.
         """
         full_name = f"{catalog}.{database}.{table}"
+        logger.debug(f"Fetching metadata for table: {full_name}")
         try:
             raw_table = self._external_catalog.getTable(database, table)
             table_format = raw_table.provider().getOrElse(None) or "UNKNOWN"
