@@ -55,7 +55,7 @@ def test_detects_dfsa_paths(code, expected):
         ('spark.read.parquet("dbfs:/mnt/foo/bar")', 1),
         ('spark.read.parquet("dbfs://mnt/foo/bar")', 1),
         ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 1),
-        ('a=f"/Repos/{thing1}/sdk-{thing2}-{thing3}"', 0)
+        ('a=f"/Repos/{thing1}/sdk-{thing2}-{thing3}"', 0),
     ],
 )
 def test_directfs_linter(code, expected):
