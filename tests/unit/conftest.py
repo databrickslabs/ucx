@@ -8,6 +8,7 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import WorkspaceClient, AccountClient
@@ -139,21 +140,20 @@ def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
             current_task = getattr(workflow, method)
 
             ctx = RuntimeContext().replace(**replace)
-            mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock = spark_table_crawl_mocker
-
-            # pylint: disable=protected-access
-            ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = (
-                mock_list_databases_iterator
-            )
-            ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = (
-                mock_list_tables_iterator
-            )
-            ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = (
-                get_table_mock
-            )
-            # pylint: enable=protected-access
+            if isinstance(ctx.tables_crawler, FasterTableScanCrawler):
+                mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock = spark_table_crawl_mocker
+                # pylint: disable=protected-access
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = (
+                    mock_list_databases_iterator
+                )
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = (
+                    mock_list_tables_iterator
+                )
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = (
+                    get_table_mock
+                )
+                # pylint: enable=protected-access
             current_task(ctx)
-
             return ctx
 
     yield inner
