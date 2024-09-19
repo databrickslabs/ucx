@@ -555,8 +555,8 @@ class FasterTableScanCrawler(CrawlerBase):
                 storage_properties=self._format_properties_list(list(self._iterator(raw_table.properties()))),
                 is_partitioned=is_partitioned,
             )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Couldn't fetch information for table {full_name} : {e}")
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Couldn't fetch information for table: {full_name}", exc_info=True)
             return None
 
     def _crawl(self) -> Iterable[Table]:
