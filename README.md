@@ -27,7 +27,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
   * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
-  * [Installation troubleshooting](#installation-troubleshooting)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -266,12 +265,6 @@ PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs inst
 ```
 
 During installation reply *yes* to the question "Does the given workspace block internet access"?
-
-[[back to top](#databricks-labs-ucx)]
-
-## Installation troubleshooting
-
-See [Network Connectivity Issues](#network-connectivity-issues) for resolving network connectivity related issues.
 
 [[back to top](#databricks-labs-ucx)]
 
