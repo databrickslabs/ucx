@@ -806,7 +806,7 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
 
 
-def test_create_ucx_catalog_calls_create_catalog(ws: WorkspaceClient) -> None:
+def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
