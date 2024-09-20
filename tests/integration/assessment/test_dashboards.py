@@ -1,5 +1,3 @@
-import pytest
-
 from datetime import datetime, timezone, timedelta
 
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
@@ -35,14 +33,14 @@ def _populate_workflow_problems(installation_ctx):
 def _populate_dashboard_problems(installation_ctx):
     query_problems = [
         QueryProblem(
-            dashboard_id = "12345",
-            dashboard_parent = "dashbards/parent",
-            dashboard_name = "my_dashboard",
+            dashboard_id="12345",
+            dashboard_parent="dashbards/parent",
+            dashboard_name="my_dashboard",
             query_id="23456",
-            query_parent= "queries/parent",
+            query_parent="queries/parent",
             query_name="my_query",
             code="sql-parse-error",
-            message="Could not parse SQL"
+            message="Could not parse SQL",
         )
     ]
     installation_ctx.sql_backend.save_table(
@@ -55,30 +53,38 @@ def _populate_dashboard_problems(installation_ctx):
 
 def _populate_directfs_problems(installation_ctx):
     dfsas = [
-        DirectFsAccess(path="some_path",
-                       is_read=False,
-                       is_write=True,
-                       source_id="xyz.py",
-                       source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
-                       source_lineage=[ LineageAtom(object_type="WORKFLOW", object_id="my workflow"),
-                                        LineageAtom(object_type="TASK", object_id="my task"),
-                                        LineageAtom(object_type="PATH", object_id="my notebook")],
-                       assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-                       assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0)
-                       )
-     ]
+        DirectFsAccess(
+            path="some_path",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow"),
+                LineageAtom(object_type="TASK", object_id="my_workflow/my_task"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook"),
+                LineageAtom(object_type="FILE", object_id="my file"),
+
+            ],
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
+            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+        )
+    ]
     installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas)
     dfsas = [
-        DirectFsAccess(path="some_path",
-                       is_read=False,
-                       is_write=True,
-                       source_id="xyz.py",
-                       source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
-                       source_lineage=[LineageAtom(object_type="DASHBOARD", object_id="my dashboard"),
-                                       LineageAtom(object_type="QUERY", object_id="my query")],
-                       assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-                       assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0)
-                       )
+        DirectFsAccess(
+            path="some_path",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard"),
+                LineageAtom(object_type="QUERY", object_id="my_dashboard/my_query"),
+            ],
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
+            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+        )
     ]
     installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas)
 
