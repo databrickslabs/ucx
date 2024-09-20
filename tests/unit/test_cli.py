@@ -802,8 +802,8 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
-    assert "Catalog test already exists. Skipping." in caplog.messages
-    assert "Schema test in catalog test already exists. Skipping." in caplog.messages
+    assert "Catalog 'test' already exists. Skipping." in caplog.messages
+    assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
 
 
 def test_create_ucx_catalog_calls_create_catalog(ws: WorkspaceClient) -> None:

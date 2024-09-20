@@ -61,7 +61,7 @@ class CatalogSchema:
                 except BadRequest as e:
                     if "already exists" in str(e):
                         logger.warning(
-                            f"Schema {candidate_schema} in catalog {candidate_catalog} " f"already exists. Skipping."
+                            f"Schema '{candidate_schema}' in catalog '{candidate_catalog}' already exists. Skipping."
                         )
                         continue
         self._apply_from_legacy_table_acls()
