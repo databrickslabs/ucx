@@ -1587,7 +1587,7 @@ workspace information with the UCX installations. Once the workspace information
 ## `sync-workspace-info` command
 
 ```text
-databricks labs ucx sync-workspace-info
+databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
 14:07:07  INFO [d.labs.ucx] Account ID: ...
 14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
@@ -1596,9 +1596,12 @@ databricks labs ucx sync-workspace-info
 ...
 ```
 
-**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces
-in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](#Table-Migration) process and is the prerequisite
+> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
+> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
+> or "https://accounts.azuredatabricks.net").
+
+This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
+necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
