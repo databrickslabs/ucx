@@ -528,10 +528,10 @@ def create_catalogs_schemas(
 
 
 @ucx.command
-def create_ucx_catalog(w: WorkspaceClient, ctx: WorkspaceContext | None = None) -> None:
+def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
     """Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces."""
     workspace_context = ctx or WorkspaceContext(w)
-    workspace_context.catalog_schema.create_ucx_catalog()
+    workspace_context.catalog_schema.create_ucx_catalog(prompts)
 
 
 @ucx.command
