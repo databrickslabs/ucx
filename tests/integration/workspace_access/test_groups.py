@@ -152,7 +152,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
     @retried(on=[KeyError], timeout=timedelta(seconds=90))
     def get_group(group_id: str) -> NoReturn:
-        _ = ws.groups.get(group_id)
+        ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
     with pytest.raises(NotFound):

@@ -26,6 +26,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -64,11 +65,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
       * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
       * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-      * [`default-format-changed-in-dbr8`](#default-format-changed-in-dbr8)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`dependency-not-found`](#dependency-not-found)
-      * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
       * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
       * [`not-supported`](#not-supported)
       * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
@@ -83,6 +83,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`update-migration-progress` command](#update-migration-progress-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
@@ -249,6 +250,21 @@ After the first installation, UCX will prompt the user to confirm whether to ins
 This installation mode will automatically select the following options:
 * Automatically create and enable HMS lineage init script
 * Automatically create a new SQL warehouse for UCX assessment
+
+[[back to top](#databricks-labs-ucx)]
+
+## [ADVANCED] Installing UCX with company hosted PYPI mirror
+
+Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
+company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
+"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+hosted PYPI mirror URL while installing UCX:
+
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
+```
+
+During installation reply *yes* to the question "Does the given workspace block Internet access"?
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1789,10 +1805,9 @@ from a VPC, or from a specific IP range.
 the Databricks account and workspace. If not, you might need to be
 connected to a VPN or configure an HTTP proxy to access your workspace.
 
-**From local machine to GitHub:** UCX needs internet access to connect
-to [<u>github.com</u>](https://github.com) (to download the tool) from
-the machine running the installation. The installation will fail if
-there is no internet connectivity.
+**From local machine to GitHub:** UCX needs internet access to connect to GitHub (https://api.github.com
+and https://raw.githubusercontent.com) for downloading the tool from the machine running the installation. The
+installation will fail if there is no internet connectivity to these URLs.
 
 **Solution:** Ensure that GitHub is reachable from the local machine. If
 not, make necessary changes to the network/firewall settings.
