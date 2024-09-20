@@ -20,6 +20,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "catalog1":
             raise BadRequest("Catalog 'catalog1' already exists")
+
     ws.catalogs.create.side_effect = raise_catalog_exists
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
@@ -138,12 +139,12 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
             raise BadRequest("Catalog 'ucx' already exists")
+
     ws.catalogs.create.side_effect = raise_catalog_exists
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_ucx_catalog(mock_prompts)
     assert "Catalog 'ucx' already exists. Skipping" in caplog.text
-
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
