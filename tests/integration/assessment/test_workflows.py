@@ -44,7 +44,6 @@ def test_running_real_assessment_job(
     for _ in TablesCrawler(sql_backend, inventory_schema, [source_schema.name]).snapshot():
         tables.append(_.name)
 
-    expected_tables = {managed_table, external_table, tmp_table, view, non_delta}
-    expected_table_names = {table.name for table in expected_tables}
-    assert len(tables) == len(expected_table_names)
-    assert set(tables) == expected_table_names
+    expected_tables = {managed_table.name, external_table.name, tmp_table.name, view.name, non_delta.name}
+    assert len(tables) == len(expected_tables)
+    assert set(tables) == expected_tables
