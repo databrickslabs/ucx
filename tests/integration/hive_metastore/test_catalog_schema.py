@@ -19,7 +19,6 @@ _SPARK_CONF = get_azure_spark_conf()
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx) -> None:
-    runtime_ctx.with_dummy_resource_permission()
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts)
