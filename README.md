@@ -1609,7 +1609,7 @@ workspace information with the UCX installations. Once the workspace information
 databricks labs ucx create-ucx-catalog
 ```
 
-Create ucx catalog for tracking the migration progress (possibly) across multiple workspaces.
+Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
 
 ## `sync-workspace-info` command
 
