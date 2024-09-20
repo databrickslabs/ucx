@@ -32,6 +32,7 @@ def test_create_ucx_catalog_creates_catalog(
     ws,
     runtime_ctx,
     make_random,
+    watchdog_remove_after,
     clean_up_test_catalogs,
 ) -> None:
     _ = clean_up_test_catalogs
@@ -39,7 +40,7 @@ def test_create_ucx_catalog_creates_catalog(
 
     catalog_name = f"{TEST_CATALOG_PREFIX}-{make_random(5)}"
     runtime_ctx.catalog_schema.UCX_CATALOG = catalog_name
-    runtime_ctx.catalog_schema.create_ucx_catalog(prompts)
+    runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
 
     @retried(on=[KeyError], timeout=timedelta(seconds=20))
     def get_catalog(catalog_name: str) -> CatalogInfo:
