@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -23,7 +23,7 @@ def clean_up_test_catalogs(ws) -> Iterator[None]:
     yield
     for catalog in ws.catalogs.list():
         if catalog.name.startswith(TEST_CATALOG_PREFIX):
-            logger.info("Deleting catalog: {catalog.name}")
+            logger.info(f"Deleting catalog: {catalog.name}")
             ws.catalogs.delete(catalog.name, force=True)
 
 
