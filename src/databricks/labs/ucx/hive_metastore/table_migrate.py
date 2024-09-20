@@ -52,7 +52,7 @@ class TablesMigrator:
         self._migrate_grants = migrate_grants
 
     def get_remaining_tables(self) -> list[Table]:
-        self.index_full_refresh()
+        self.index(force_refresh=True)
         table_rows = []
         for crawled_table in self._tc.snapshot():
             if not self._is_migrated(crawled_table.database, crawled_table.name):
@@ -60,13 +60,8 @@ class TablesMigrator:
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
         return table_rows
 
-    def index(self):
-        return self._migration_status_refresher.index()
-
-    def index_full_refresh(self):
-        # when we want the latest up-to-date status, e.g. to determine whether views dependencies have been migrated
-        self._migration_status_refresher.reset()
-        return self._migration_status_refresher.index()
+    def index(self, *, force_refresh: bool = False):
+        return self._migration_status_refresher.index(force_refresh=force_refresh)
 
     def migrate_tables(
         self,
@@ -101,7 +96,9 @@ class TablesMigrator:
     def _migrate_views(self):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        sequencer = ViewsMigrationSequencer(tables_to_migrate, migration_index=self.index_full_refresh())
+        # Every batch of views to migrate needs an up-to-date table migration index
+        # to determine if the dependencies have been migrated
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, migration_index=self.index(force_refresh=True))
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []
@@ -109,7 +106,7 @@ class TablesMigrator:
                 tasks.append(partial(self._migrate_view, view))
             Threads.strict("migrate views", tasks)
             all_tasks.extend(tasks)
-            self.index_full_refresh()
+            self.index(force_refresh=True)
         return all_tasks
 
     def _migrate_table(self, src_table: TableToMigrate, mounts: list[Mount], hiveserde_in_place_migrate: bool = False):
