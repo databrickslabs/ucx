@@ -68,7 +68,7 @@ class QueryLinter:
             linted_queries.add(query.id)
             problems = self.lint_query(query)
             all_problems.extend(problems)
-            dfsas = self.collect_dfsas_from_query(query)
+            dfsas = self.collect_dfsas_from_query("no-dashboard-id", query)
             all_dfsas.extend(dfsas)
         # dump problems
         logger.info(f"Saving {len(all_problems)} linting problems...")
@@ -113,7 +113,7 @@ class QueryLinter:
                         dashboard_name=dashboard_name,
                     )
                 )
-            dfsas = self.collect_dfsas_from_query(query)
+            dfsas = self.collect_dfsas_from_query(dashboard_id, query)
             for dfsa in dfsas:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
@@ -145,11 +145,11 @@ class QueryLinter:
             )
 
     @classmethod
-    def collect_dfsas_from_query(cls, query: LegacyQuery) -> Iterable[DirectFsAccess]:
+    def collect_dfsas_from_query(cls, dashboard_id: str, query: LegacyQuery) -> Iterable[DirectFsAccess]:
         if query.query is None:
             return
         linter = DirectFsAccessSqlLinter()
-        source_id = query.id or "no id"
+        source_id = f"{dashboard_id}/{query.id}"
         source_name = query.name or "<anonymous>"
         source_timestamp = cls._read_timestamp(query.updated_at)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]

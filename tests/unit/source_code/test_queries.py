@@ -27,7 +27,7 @@ def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_re
     crawlers = create_autospec(DirectFsAccessCrawler)
     query = LegacyQuery.from_dict({"parent": "workspace", "name": name, "query": query})
     linter = QueryLinter(ws, migration_index, crawlers)
-    dfsas = linter.collect_dfsas_from_query(query)
+    dfsas = linter.collect_dfsas_from_query("no-dashboard-id", query)
     ws.assert_not_called()
     crawlers.assert_not_called()
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
