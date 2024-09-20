@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import call, create_autospec
 
 import pytest
@@ -127,6 +128,22 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
     catalog_schema.create_ucx_catalog(mock_prompts)
 
     ws.catalogs.create.assert_called_with("ucx", comment="Created by UCX")
+
+
+def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    catalog_schema = prepare_test(ws)
+
+    def raise_catalog_exists(catalog: str, *_, **__) -> None:
+        if catalog == "ucx":
+            raise BadRequest("Catalog 'ucx' already exists")
+    ws.catalogs.create.side_effect = raise_catalog_exists
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
+        catalog_schema.create_ucx_catalog(mock_prompts)
+    assert "Catalog 'ucx' already exists. Skipping" in caplog.text
+
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])

@@ -41,7 +41,7 @@ class CatalogSchema:
             self._create_catalog_validate(self._UCX_CATALOG, prompts)
         except BadRequest as e:
             if "already exists" in str(e):
-                logger.warning(f"Catalog {self._UCX_CATALOG} already exists. Skipping.")
+                logger.warning(f"Catalog '{self._UCX_CATALOG}' already exists. Skipping.")
                 return
             raise
 
@@ -52,7 +52,7 @@ class CatalogSchema:
                 self._create_catalog_validate(candidate_catalog, prompts)
             except BadRequest as e:
                 if "already exists" in str(e):
-                    logger.warning(f"Catalog {candidate_catalog} already exists. Skipping.")
+                    logger.warning(f"Catalog '{candidate_catalog}' already exists. Skipping.")
                     continue
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
