@@ -439,6 +439,12 @@ class DeployedWorkflows:
         return Unknown(haystack)
 
 
+from databricks.bundles.jobs.models.email_notifications import EmailNotifications
+from databricks.bundles.jobs.models.task import Task as BundleTask
+from databricks.bundles.jobs.models.task_dependency import TaskDependency
+from databricks.bundles.jobs.models.job_cluster import JobCluster, ClusterSpec
+
+
 class WorkflowsDeployment(InstallationMixin):
     def __init__(
         self,
@@ -678,7 +684,7 @@ class WorkflowsDeployment(InstallationMixin):
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
-            email_notifications = jobs.JobEmailNotifications(
+            email_notifications = EmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
 
@@ -705,35 +711,16 @@ class WorkflowsDeployment(InstallationMixin):
             "tasks": job_tasks,
         }
 
-    def _job_task(self, task: Task, remote_wheels: list[str]) -> jobs.Task:
-        jobs_task = jobs.Task(
+    def _job_task(self, task: Task, remote_wheels: list[str]) -> BundleTask:
+        jobs_task = BundleTask(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in task.dependencies()],
+            depends_on=[TaskDependency(task_key=d) for d in task.dependencies()],
         )
-        if task.notebook:
-            return self._job_notebook_task(jobs_task, task)
         return self._job_wheel_task(jobs_task, task.workflow, remote_wheels)
 
-    def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
-        assert task.notebook is not None
-        local_notebook = self._this_file.parent.parent / task.notebook
-        with local_notebook.open("rb") as f:
-            remote_notebook = self._installation.upload(local_notebook.name, f.read())
-        return replace(
-            jobs_task,
-            notebook_task=jobs.NotebookTask(
-                notebook_path=remote_notebook,
-                # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={
-                    "task": task.name,
-                    "config": f"/Workspace{self._config_file}",
-                }
-                | EXTRA_TASK_PARAMS,
-            ),
-        )
-
     def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheels: list[str]) -> jobs.Task:
+        # TODO: use notebook-scoped libraries only, skip wheel task, as it has problems with internet connectivity
         libraries = []
         for wheel in remote_wheels:
             libraries.append(compute.Library(whl=wheel))
@@ -756,9 +743,9 @@ class WorkflowsDeployment(InstallationMixin):
         clusters = []
         if "main" in names:
             clusters.append(
-                jobs.JobCluster(
+                JobCluster(
                     job_cluster_key="main",
-                    new_cluster=compute.ClusterSpec(
+                    new_cluster=ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD,
                         spark_conf=self._job_cluster_spark_conf("main"),
                         custom_tags={"ResourceClass": "SingleNode"},
@@ -769,9 +756,9 @@ class WorkflowsDeployment(InstallationMixin):
             )
         if "tacl" in names:
             clusters.append(
-                jobs.JobCluster(
+                JobCluster(
                     job_cluster_key="tacl",
-                    new_cluster=compute.ClusterSpec(
+                    new_cluster=ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
                         spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
@@ -782,13 +769,13 @@ class WorkflowsDeployment(InstallationMixin):
         if "table_migration" in names:
             # TODO: rename to "user-isolation", so that we can use it in group migration workflows
             clusters.append(
-                jobs.JobCluster(
+                JobCluster(
                     job_cluster_key="table_migration",
-                    new_cluster=compute.ClusterSpec(
+                    new_cluster=ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
                         spark_conf=self._job_cluster_spark_conf("table_migration"),
                         policy_id=self._config.policy_id,
-                        autoscale=compute.AutoScale(
+                        autoscale=AutoScale(
                             max_workers=self._config.max_workers,
                             min_workers=self._config.min_workers,
                         ),
@@ -797,12 +784,12 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheels: list[str]) -> jobs.Task:
-        jobs_task = jobs.Task(
+    def _job_parse_logs_task(self, job_tasks: list[BundleTask], workflow: str, remote_wheels: list[str]) -> BundleTask:
+        jobs_task = BundleTask(
             task_key="parse_logs",
             job_cluster_key=Task.job_cluster,
             # The task dependents on all previous tasks.
-            depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
+            depends_on=[TaskDependency(task_key=task.task_key) for task in job_tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
         return self._job_wheel_task(jobs_task, workflow, remote_wheels)
