@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
-    _UCX_CATALOG = "ucx"
+    UCX_CATALOG = "ucx"
 
     def __init__(
         self,
@@ -38,10 +38,10 @@ class CatalogSchema:
     def create_ucx_catalog(self, prompts: Prompts) -> None:
         """Create the UCX catalog"""
         try:
-            self._create_catalog_validate(self._UCX_CATALOG, prompts)
+            self._create_catalog_validate(self.UCX_CATALOG, prompts)
         except BadRequest as e:
             if "already exists" in str(e):
-                logger.warning(f"Catalog '{self._UCX_CATALOG}' already exists. Skipping.")
+                logger.warning(f"Catalog '{self.UCX_CATALOG}' already exists. Skipping.")
                 return
             raise
 
