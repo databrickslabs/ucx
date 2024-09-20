@@ -3,7 +3,6 @@ from datetime import timedelta
 import pytest
 
 from databricks.labs.blueprint.tui import MockPrompts
-
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import CatalogInfo
@@ -11,6 +10,7 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.hive_metastore.mapping import Rule
 from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
@@ -18,15 +18,13 @@ _SPARK_CONF = get_azure_spark_conf()
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_create_ucx_catalog_creates_catalog(ws, prepared_principal_acl) -> None:
-    if not ws.config.is_azure:
-        pytest.skip("only works in azure test env")
-    ctx, *_ = prepared_principal_acl
+def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx) -> None:
+    runtime_ctx.with_dummy_resource_permission()
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
-    ctx.catalog_schema.create_ucx_catalog(prompts)
+    runtime_ctx.catalog_schema.create_ucx_catalog(prompts)
 
-    @retried(on=[KeyError], timeout=timedelta(minutes=3))
+    @retried(on=[KeyError], timeout=timedelta(seconds=20))
     def get_catalog(catalog_name: str) -> CatalogInfo:
         return ws.catalogs.get(catalog_name)
 
