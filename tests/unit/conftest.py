@@ -106,10 +106,12 @@ def spark_table_crawl_mocker(mocker):
     mock_partition_col_iterator.iterator.return_value = CustomIterator(["age", "name"])
 
     get_table_mock = mocker.Mock()
-    get_table_mock.provider().getOrElse.return_value = "delta"
-    get_table_mock.storage().locationUri().getOrElse.return_value = None
+    get_table_mock.provider().isDefined.return_value = True
+    get_table_mock.provider().get.return_value = "delta"
+    get_table_mock.storage().locationUri().isDefined.return_value = False
 
-    get_table_mock.viewText().getOrElse.return_value = "mock table text"
+    get_table_mock.viewText().isDefined.return_value = True
+    get_table_mock.viewText().get.return_value = "mock table text"
     get_table_mock.properties.return_value = mock_properties_iterator
     get_table_mock.partitionColumnNames.return_value = mock_partition_col_iterator
 

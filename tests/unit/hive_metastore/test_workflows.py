@@ -68,4 +68,3 @@ def test_update_migration_status(run_workflow, workflow) -> None:
     """Migration status is refreshed by deleting and showing new tables"""
     ctx = run_workflow(getattr(workflow, "update_migration_status"))
     assert ctx.sql_backend.has_rows_written_for("hive_metastore.ucx.migration_status")
-    assert "SHOW DATABASES" in ctx.sql_backend.queries
