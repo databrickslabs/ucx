@@ -5,7 +5,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -15,6 +15,11 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
+
+    def raise_catalog_exists(catalog: str, *_, **__) -> None:
+        if catalog == "catalog1":
+            raise BadRequest("Catalog 'catalog1' already exists")
+    ws.catalogs.create.side_effect = raise_catalog_exists
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
     if backend is None:
