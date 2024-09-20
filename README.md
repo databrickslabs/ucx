@@ -115,6 +115,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
   * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
 * [Cross-workspace installations](#cross-workspace-installations)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
   * [`sync-workspace-info` command](#sync-workspace-info-command)
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
@@ -1601,6 +1602,14 @@ workspace information with the UCX installations. Once the workspace information
 [`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog.
 
 [[back to top](#databricks-labs-ucx)]
+
+## `create-ucx-catalog` command
+
+```commandline
+databricks labs ucx create-ucx-catalog
+```
+
+Create ucx catalog for tracking the migration progress (possibly) across multiple workspaces.
 
 ## `sync-workspace-info` command
 
