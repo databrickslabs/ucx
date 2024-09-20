@@ -128,7 +128,7 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
     catalog_schema = prepare_test(ws)
     catalog_schema.create_ucx_catalog(mock_prompts)
 
-    ws.catalogs.create.assert_called_with("ucx", comment="Created by UCX")
+    ws.catalogs.create.assert_called_with("ucx", comment="Created by UCX", properties=None)
 
 
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
@@ -157,9 +157,9 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str):
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     calls = [
-        call("catalog2", storage_root=location, comment="Created by UCX"),
-        call("catalog3", storage_root=location, comment="Created by UCX"),
-        call("catalog4", storage_root=location, comment="Created by UCX"),
+        call("catalog2", storage_root=location, comment="Created by UCX", properties=None),
+        call("catalog3", storage_root=location, comment="Created by UCX", properties=None),
+        call("catalog4", storage_root=location, comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
@@ -198,8 +198,8 @@ def test_no_catalog_storage():
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     calls = [
-        call("catalog2", comment="Created by UCX"),
-        call("catalog3", comment="Created by UCX"),
+        call("catalog2", comment="Created by UCX", properties=None),
+        call("catalog3", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
@@ -213,8 +213,8 @@ def test_catalog_schema_acl():
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     calls = [
-        call("catalog2", comment="Created by UCX"),
-        call("catalog3", comment="Created by UCX"),
+        call("catalog2", comment="Created by UCX", properties=None),
+        call("catalog3", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")

@@ -35,10 +35,17 @@ class CatalogSchema:
         self._backend = sql_backend
         self._hive_grants_crawler = grants_crawler
 
-    def create_ucx_catalog(self, prompts: Prompts) -> None:
-        """Create the UCX catalog"""
+    def create_ucx_catalog(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
+        """Create the UCX catalog.
+
+        Args:
+            prompts : Prompts
+                The prompts object to use for interactive input.
+            properties : (dict[str, str] | None), default None
+                The properties to pass to the catalog. If None, no properties are passed.
+        """
         try:
-            self._create_catalog_validate(self.UCX_CATALOG, prompts)
+            self._create_catalog_validate(self.UCX_CATALOG, prompts, properties=properties)
         except BadRequest as e:
             if "already exists" in str(e):
                 logger.warning(f"Catalog '{self.UCX_CATALOG}' already exists. Skipping.")
@@ -49,7 +56,7 @@ class CatalogSchema:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             try:
-                self._create_catalog_validate(candidate_catalog, prompts)
+                self._create_catalog_validate(candidate_catalog, prompts, properties=None)
             except BadRequest as e:
                 if "already exists" in str(e):
                     logger.warning(f"Catalog '{candidate_catalog}' already exists. Skipping.")
@@ -133,7 +140,7 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog: str, prompts: Prompts) -> None:
+    def _create_catalog_validate(self, catalog: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
         logger.info(f"Validating UC catalog: {catalog}")
         attempts = 3
         while True:
@@ -145,7 +152,7 @@ class CatalogSchema:
             attempts -= 1
             if attempts == 0:
                 raise NotFound(f"Failed to validate location for {catalog} catalog")
-        self._create_catalog(catalog, catalog_storage)
+        self._create_catalog(catalog, catalog_storage, properties=properties)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
         """generate a list of existing UC catalogs and schema."""
@@ -210,12 +217,17 @@ class CatalogSchema:
                 return True
         return False
 
-    def _create_catalog(self, catalog: str, catalog_storage: str) -> None:
+    def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None = None) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
         if catalog_storage == "metastore":
-            self._ws.catalogs.create(catalog, comment="Created by UCX")
+            self._ws.catalogs.create(catalog, comment="Created by UCX", properties=properties)
         else:
-            self._ws.catalogs.create(catalog, storage_root=catalog_storage, comment="Created by UCX")
+            self._ws.catalogs.create(
+                catalog,
+                storage_root=catalog_storage,
+                comment="Created by UCX",
+                properties=properties,
+            )
 
     def _create_schema(self, catalog, schema):
         logger.info(f"Creating UC schema: {schema} in catalog: {catalog}")
