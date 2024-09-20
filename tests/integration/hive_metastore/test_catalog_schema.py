@@ -1,7 +1,8 @@
 import logging
 from datetime import timedelta
-import pytest
+from typing import Iterator
 
+import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -10,18 +11,33 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.mapping import Rule
 from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
+TEST_CATALOG_PREFIX = "test-ucx"
+
+
+@pytest.fixture
+def clean_up_test_catalogs(ws) -> Iterator[None]:
+    yield
+    for catalog in ws.catalogs.list():
+        if catalog.name.startswith(TEST_CATALOG_PREFIX):
+            logger.info("Deleting catalog: {catalog.name}")
+            ws.catalogs.delete(catalog.name, force=True)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, make_random) -> None:
+def test_create_ucx_catalog_creates_catalog(
+    ws,
+    runtime_ctx,
+    make_random,
+    clean_up_test_catalogs,
+) -> None:
+    _ = clean_up_test_catalogs
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
-    catalog_name = f"ucx-test-{make_random(5)}"
+    catalog_name = f"{TEST_CATALOG_PREFIX}-{make_random(5)}"
     runtime_ctx.catalog_schema.UCX_CATALOG = catalog_name
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts)
 
