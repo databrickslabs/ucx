@@ -114,6 +114,16 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl)
 
 
+def test_create_ucx_catalog_creates_ucx_catalog() -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_ucx_catalog(mock_prompts)
+
+    ws.catalogs.create.assert_called_with("ucx", comment="Created by UCX")
+
+
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
 def test_create_all_catalogs_schemas_creates_catalogs(location: str):
     """Catalog 2-4 should be created; catalog 1 already exists."""
