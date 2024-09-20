@@ -528,6 +528,13 @@ def create_catalogs_schemas(
 
 
 @ucx.command
+def create_ucx_catalog(w: WorkspaceClient, ctx: WorkspaceContext | None = None) -> None:
+    """Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces."""
+    workspace_context = ctx or WorkspaceContext(w)
+    workspace_context.catalog_schema.create_ucx_catalog()
+
+
+@ucx.command
 def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Re-mapping the cluster to UC"""
     logger.info("Remapping the Clusters to UC")

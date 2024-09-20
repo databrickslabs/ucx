@@ -33,6 +33,9 @@ class CatalogSchema:
         self._backend = sql_backend
         self._hive_grants_crawler = grants_crawler
 
+    def create_ucx_catalog(self) -> None:
+        """Create the UCX catalog"""
+
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
