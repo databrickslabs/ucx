@@ -145,7 +145,7 @@ class CatalogSchema:
         attempts = 3
         while True:
             catalog_storage = prompts.question(
-                f"Please provide storage location url for catalog: {catalog}.", default="metastore"
+                f"Please provide storage location url for catalog: {catalog}", default="metastore"
             )
             if self._validate_location(catalog_storage):
                 break

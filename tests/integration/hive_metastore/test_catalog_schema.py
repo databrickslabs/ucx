@@ -15,31 +15,29 @@ from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
-TEST_CATALOG_PREFIX = "test-ucx"
 
 
 @pytest.fixture
-def clean_up_test_catalogs(ws) -> Iterator[None]:
-    yield
-    for catalog in ws.catalogs.list():
-        if catalog.name.startswith(TEST_CATALOG_PREFIX):
-            logger.info(f"Deleting catalog: {catalog.name}")
-            ws.catalogs.delete(catalog.name, force=True)
+def catalog_name(ws, make_random) -> Iterator[str]:
+    name = f"test-catalog-{make_random(5)}"
+    yield name
+    try:
+        ws.catalogs.delete(name, force=True)
+        logger.info(f"Deleted test catalog: {name}")
+    except NotFound:
+        pass
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_ucx_catalog_creates_catalog(
     ws,
     runtime_ctx,
-    make_random,
     watchdog_remove_after,
-    clean_up_test_catalogs,
+    catalog_name,
 ) -> None:
-    _ = clean_up_test_catalogs
-    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
-
-    catalog_name = f"{TEST_CATALOG_PREFIX}-{make_random(5)}"
+    prompts = MockPrompts({f"Please provide storage location url for catalog: {catalog_name}": "metastore"})
     runtime_ctx.catalog_schema.UCX_CATALOG = catalog_name
+
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
 
     @retried(on=[KeyError], timeout=timedelta(seconds=20))
