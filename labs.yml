@@ -237,6 +237,9 @@ commands:
       - name: run-as-collection
         description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
+  - name: create-ucx-catalog
+    description: Create ucx catalog for tracking the migration progress (possibly) across multiple workspaces.
+
   - name: cluster-remap
     description: Re-mapping the cluster to UC
 
