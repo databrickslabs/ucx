@@ -563,6 +563,10 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
             include_databases=self.created_databases,
         )
 
+    @cached_property
+    def tables_crawler(self) -> TablesCrawler:
+        return TablesCrawler(self.sql_backend, self.inventory_database)
+
     def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
         default_table_format = "HIVE" if is_hiveserde else ""
