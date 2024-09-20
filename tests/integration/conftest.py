@@ -565,7 +565,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
     @cached_property
     def tables_crawler(self) -> TablesCrawler:
-        return TablesCrawler(self.sql_backend, self.inventory_database)
+        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
