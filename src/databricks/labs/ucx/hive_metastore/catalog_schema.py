@@ -124,9 +124,8 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog, prompts: Prompts):
+    def _create_catalog_validate(self, catalog, prompts: Prompts) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
-        # create catalogs
         attempts = 3
         while True:
             catalog_storage = prompts.question(
@@ -202,7 +201,7 @@ class CatalogSchema:
                 return True
         return False
 
-    def _create_catalog(self, catalog, catalog_storage):
+    def _create_catalog(self, catalog, catalog_storage) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
         if catalog_storage == "metastore":
             self._ws.catalogs.create(catalog, comment="Created by UCX")
