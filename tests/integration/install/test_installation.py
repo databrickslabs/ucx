@@ -183,6 +183,8 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
+    assert installation_ctx.deployed_workflows.validate_step("remove-workspace-local-backup-groups")
+
     # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
