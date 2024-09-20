@@ -806,6 +806,14 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     assert "Schema test in catalog test already exists. Skipping." in caplog.messages
 
 
+def test_create_ucx_catalog_calls_create_catalog(ws: WorkspaceClient) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
+
+    ws.catalogs.create.assert_called_once()
+
+
 def test_cluster_remap(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
