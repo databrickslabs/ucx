@@ -186,10 +186,10 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
     # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
-    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
+    # Note: If you are adjusting this, also look at: test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only
     @retried(on=[KeyError], timeout=timedelta(minutes=3))
     def get_group(group_id: str) -> NoReturn:
-        _ = ws.groups.get(group_id)
+        ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
     with pytest.raises(NotFound):
