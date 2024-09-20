@@ -1607,6 +1607,9 @@ workspace information with the UCX installations. Once the workspace information
 
 ```commandline
 databricks labs ucx create-ucx-catalog
+16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
+Please provide storage location url for catalog: ucx (default: metastore): ...
+16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
 ```
 
 Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
