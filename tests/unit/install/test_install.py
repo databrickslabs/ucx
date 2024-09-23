@@ -354,6 +354,22 @@ def test_save_config_should_overwrite_value(
     prompt_answer,
     workspace_config_overwrite,
 ) -> None:
+    workspace_config_default = {
+        "version": 2,
+        "default_catalog": "ucx_default",
+        "ucx_catalog": "ucx",
+        "inventory_database": "ucx",
+        "log_level": "INFO",
+        "num_threads": 8,
+        "min_workers": 1,
+        "max_workers": 10,
+        "policy_id": "foo",
+        "renamed_group_prefix": "db-temp-",
+        "warehouse_id": "abc",
+        "workspace_start_path": "/",
+        "num_days_submit_runs_history": 30,
+        "recon_tolerance_percent": 5,
+    }
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -367,26 +383,8 @@ def test_save_config_should_overwrite_value(
 
     install.configure()
 
-    expected_config = {
-        **{
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'ucx_catalog': 'ucx',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'num_days_submit_runs_history': 30,
-            'recon_tolerance_percent': 5,
-        },
-        **workspace_config_overwrite,
-    }
-    mock_installation.assert_file_written('config.yml', expected_config)
+    workspace_config_expected = {**workspace_config_default, **workspace_config_overwrite}
+    mock_installation.assert_file_written("config.yml", workspace_config_expected)
 
 
 def test_corrupted_config(ws, mock_installation, caplog):
