@@ -442,6 +442,10 @@ class CommonUtils:
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
+    def ucx_catalog(self) -> str:
+        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+
+    @cached_property
     def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
@@ -550,6 +554,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
