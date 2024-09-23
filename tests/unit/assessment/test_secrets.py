@@ -18,6 +18,6 @@ def test_secrets_mixin_gets_value_from_config_key(key, expected) -> None:
     }
     secrets_mixin = SecretsMixin()
 
-    value = secrets_mixin._get_value_from_config_key(config, key)
+    value = secrets_mixin._get_value_from_config_key(config, key)  # pylint: disable=protected-access
 
     assert value == expected
