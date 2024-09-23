@@ -1109,35 +1109,30 @@ def test_save_config_should_overwrite_value(
         }
     )
     ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
+    install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
+
     install.configure()
 
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            **{
-                'version': 2,
-                'default_catalog': 'ucx_default',
-                'ucx_catalog': 'ucx',
-                'inventory_database': 'ucx',
-                'log_level': 'INFO',
-                'num_threads': 8,
-                'min_workers': 1,
-                'max_workers': 10,
-                'policy_id': 'foo',
-                'renamed_group_prefix': 'db-temp-',
-                'warehouse_id': 'abc',
-                'workspace_start_path': '/',
-                'num_days_submit_runs_history': 30,
-                'recon_tolerance_percent': 5,
-            },
-            **workspace_config_overwrite,
+    expected_config = {
+        **{
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'min_workers': 1,
+            'max_workers': 10,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            'num_days_submit_runs_history': 30,
+            'recon_tolerance_percent': 5,
         },
-    )
+        **workspace_config_overwrite,
+    }
+    mock_installation.assert_file_written('config.yml', expected_config)
 
 
 def test_triggering_assessment_wf(ws, mocker, mock_installation):
