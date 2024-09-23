@@ -8,6 +8,7 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -135,6 +136,8 @@ def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
                 replace['config'] = mock_installation.load(WorkspaceConfig)
+            if 'tables_crawler' not in replace:
+                replace['tables_crawler'] = TablesCrawler(replace['sql_backend'], replace['config'].inventory_database)
 
             module = __import__(cb.__module__, fromlist=[cb.__name__])
             klass, method = cb.__qualname__.split('.', 1)
