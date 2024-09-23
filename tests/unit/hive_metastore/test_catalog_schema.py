@@ -118,12 +118,12 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     principal_acl.get_interactive_cluster_grants.return_value = grants
     hive_acl.snapshot.return_value = hive_grants
 
-    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl)
+    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl, "ucx")
 
 
 def test_create_ucx_catalog_creates_ucx_catalog() -> None:
     ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: ucx": "metastore"})
 
     catalog_schema = prepare_test(ws)
     catalog_schema.create_ucx_catalog(mock_prompts)
@@ -133,7 +133,7 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: ucx": "metastore"})
     catalog_schema = prepare_test(ws)
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
