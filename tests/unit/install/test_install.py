@@ -26,10 +26,9 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.compute import Policy, State
+from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.sql import EndpointInfo, EndpointInfoWarehouseType
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
@@ -333,38 +332,48 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
 
 
-def test_save_config(ws, mock_installation) -> None:
-    ws.workspace.get_status = not_found
-    ws.warehouses.list = lambda **_: [
-        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
-    ]
-    ws.workspace.download = not_found
-
+@pytest.mark.parametrize(
+    "prompt_question,prompt_answer,workspace_config_overwrite",
+    [
+        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
+        ("Catalog to store UCX artifacts in", "ucx-test", {"ucx_catalog": "ucx-test"}),
+        (
+            r"Parallelism for migrating.*",
+            "1000",
+            {"spark_conf": {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"}},
+        ),
+        (r"Min workers for auto-scale.*", "2", {"min_workers": 2}),
+        (r"Max workers for auto-scale.*", "20", {"max_workers": 20}),
+        (r".*workspace group names.*", "g1, g2, g99", {"include_group_names": ["g1", "g2", "g99"]}),
+    ],
+)
+def test_save_config_should_overwrite_value(
+    ws,
+    mock_installation,
+    prompt_question,
+    prompt_answer,
+    workspace_config_overwrite,
+) -> None:
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*": "",
-            r".*days to analyze submitted runs.*": "1",
-            r"Reconciliation threshold, in percentage.*": "5",
+            prompt_question: prompt_answer,
         }
     )
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
+    ws.workspace.get_status = not_found
+    install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
+
     install.configure()
 
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
+    expected_config = {
+        **{
             'version': 2,
             'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
             'ucx_catalog': 'ucx',
+            'inventory_database': 'ucx',
             'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
             'num_threads': 8,
             'min_workers': 1,
             'max_workers': 10,
@@ -372,9 +381,12 @@ def test_save_config(ws, mock_installation) -> None:
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'num_days_submit_runs_history': 30,
             'recon_tolerance_percent': 5,
         },
-    )
+        **workspace_config_overwrite,
+    }
+    mock_installation.assert_file_written('config.yml', expected_config)
 
 
 def test_corrupted_config(ws, mock_installation, caplog):
@@ -397,47 +409,6 @@ def test_corrupted_config(ws, mock_installation, caplog):
         install.configure()
 
     assert 'Existing installation at ~/mock is corrupted' in caplog.text
-
-
-def test_save_config_strip_group_names(ws, mock_installation) -> None:
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",  # specify names
-            r".*workspace group names.*": "g1, g2, g99",
-            r".*": "",
-            r"Reconciliation threshold, in percentage.*": "5",
-        }
-    )
-    ws.workspace.get_status = not_found
-
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'ucx_catalog': 'ucx',
-            'include_group_names': ['g1', 'g2', 'g99'],
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'recon_tolerance_percent': 5,
-        },
-    )
 
 
 def test_create_cluster_policy(ws, mock_installation) -> None:
@@ -1086,55 +1057,6 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-@pytest.mark.parametrize(
-    "prompt_question,prompt_answer,workspace_config_overwrite",
-    [
-        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
-        ("Catalog to store UCX artifacts in", "ucx-test", {"ucx_catalog": "ucx-test"}),
-    ],
-)
-def test_save_config_should_overwrite_value(
-    ws,
-    mock_installation,
-    prompt_question,
-    prompt_answer,
-    workspace_config_overwrite,
-) -> None:
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",  # specify names
-            r".*": "",
-            prompt_question: prompt_answer,
-        }
-    )
-    ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
-
-    install.configure()
-
-    expected_config = {
-        **{
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'ucx_catalog': 'ucx',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'num_days_submit_runs_history': 30,
-            'recon_tolerance_percent': 5,
-        },
-        **workspace_config_overwrite,
-    }
-    mock_installation.assert_file_written('config.yml', expected_config)
-
-
 def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
@@ -1248,50 +1170,6 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
 
     existing_installation.assert_file_uploaded('logs/README.md')
     wheels.upload_to_wsfs.assert_called()
-
-
-def test_fresh_install(ws, mock_installation) -> None:
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r"Open config file in.*": "no",
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r"Reconciliation threshold, in percentage.*": "5",
-            r".*": "",
-        }
-    )
-    ws.workspace.get_status = not_found
-
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
-            'ucx_catalog': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'policy_id': 'foo',
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
-            'min_workers': 2,
-            'max_workers': 20,
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'recon_tolerance_percent': 5,
-        },
-    )
 
 
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
