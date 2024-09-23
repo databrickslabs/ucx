@@ -26,6 +26,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     num_threads: int | None = 10
     database_to_catalog_mapping: dict[str, str] | None = None
     default_catalog: str | None = "ucx_default"
+    ucx_catalog: str | None = "ucx"
     log_level: str | None = "INFO"
 
     # Starting path for notebooks and directories crawler
