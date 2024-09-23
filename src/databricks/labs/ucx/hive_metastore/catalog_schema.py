@@ -27,6 +27,7 @@ class CatalogSchema:
         principal_grants: PrincipalACL,
         sql_backend: SqlBackend,
         grants_crawler: GrantsCrawler,
+        ucx_catalog: str,
     ):
         self._ws = ws
         self._table_mapping = table_mapping
@@ -34,6 +35,7 @@ class CatalogSchema:
         self._principal_grants = principal_grants
         self._backend = sql_backend
         self._hive_grants_crawler = grants_crawler
+        self._ucx_catalog = ucx_catalog
 
     def create_ucx_catalog(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
         """Create the UCX catalog.

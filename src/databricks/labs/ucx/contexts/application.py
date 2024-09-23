@@ -354,6 +354,7 @@ class GlobalContext(abc.ABC):
             self.principal_acl,
             self.sql_backend,
             self.grants_crawler,
+            self.config.ucx_catalog,
         )
 
     @cached_property
