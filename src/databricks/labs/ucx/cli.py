@@ -528,13 +528,6 @@ def create_catalogs_schemas(
 
 
 @ucx.command
-def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
-    """Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces."""
-    workspace_context = ctx or WorkspaceContext(w)
-    workspace_context.catalog_schema.create_ucx_catalog(prompts)
-
-
-@ucx.command
 def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Re-mapping the cluster to UC"""
     logger.info("Remapping the Clusters to UC")
@@ -602,6 +595,13 @@ def assign_metastore(
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = AccountContext(a)
     ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
+
+
+@ucx.command
+def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
+    """Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces."""
+    workspace_context = ctx or WorkspaceContext(w)
+    workspace_context.catalog_schema.create_ucx_catalog(prompts)
 
 
 @ucx.command

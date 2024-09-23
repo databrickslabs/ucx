@@ -237,9 +237,6 @@ commands:
       - name: run-as-collection
         description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
-  - name: create-ucx-catalog
-    description: Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
-
   - name: cluster-remap
     description: Re-mapping the cluster to UC
 
@@ -272,6 +269,9 @@ commands:
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
       - name: default-catalog
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
+
+  - name: create-ucx-catalog
+    description: Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
 
   - name: migrate-tables
     description: |
