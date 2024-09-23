@@ -18,4 +18,6 @@ def test_secrets_mixin_gets_value_from_config_key(key, expected) -> None:
     }
     secrets_mixin = SecretsMixin()
 
-    assert secrets_mixin._get_value_from_config_key(config, key) == expected
+    value = secrets_mixin._get_value_from_config_key(config, key)
+
+    assert value == expected
