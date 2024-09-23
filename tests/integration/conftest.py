@@ -1188,7 +1188,7 @@ def populator_for_linting(make_job, make_notebook, make_dashboard):
         dashboard = make_dashboard()
         config = installation.load(WorkspaceConfig)
         new_config = dataclasses.replace(
-            config, include_job_idsinclude_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
+            config, include_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
         )
         installation.save(new_config)
 
