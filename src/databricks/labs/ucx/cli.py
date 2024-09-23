@@ -192,16 +192,36 @@ def validate_external_locations(
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, *, run_as_collection: bool = False, a: AccountClient | None = None):
+def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
     workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
-    # if running the cmd as a collection, don't wait for each assessment job to finish as that will take long time
-    skip_job_status = bool(run_as_collection)
     for ctx in workspace_contexts:
-        logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Checking assessment workflow in workspace: {workspace_id}")
         deployed_workflows = ctx.deployed_workflows
-        if not deployed_workflows.validate_step("assessment"):
-            deployed_workflows.run_workflow("assessment", skip_job_status)
+        # Note: will block if the workflow is already underway but not completed.
+        if deployed_workflows.validate_step("assessment"):
+            logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
+        else:
+            logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
+            # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
+            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
+
+
+@ucx.command
+def update_migration_progress(
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
+    """Manually trigger the migration-progress-experimental job."""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Starting 'migration-progress-experimental' workflow in workspace: {workspace_id}")
+        deployed_workflows = ctx.deployed_workflows
+        # If running for a collection, don't wait for each migration-progress job to finish as that will take long time.
+        deployed_workflows.run_workflow("migration-progress-experimental", skip_job_wait=run_as_collection)
 
 
 @ucx.command
@@ -371,6 +391,8 @@ def create_missing_principals(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     single_role: bool = False,
     role_name="UC_ROLE",
     policy_name="UC_POLICY",
@@ -380,11 +402,17 @@ def create_missing_principals(
     For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
     By default, it will create a  role per S3 location. Set the optional single_role parameter to True to create a single role for all S3 locations.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_aws:
-        return ctx.iam_role_creation.run(prompts, single_role=single_role, role_name=role_name, policy_name=policy_name)
-    raise ValueError("Unsupported cloud provider")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_creation.run(
+                prompts, single_role=single_role, role_name=role_name, policy_name=policy_name
+            )
+    else:
+        raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command

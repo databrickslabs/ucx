@@ -73,7 +73,16 @@ commands:
     description: ensure the assessment job was run on a workspace
     flags:
       - name: run-as-collection
-        description: boolean flag to indicate to run the cmd as a collection. Default is False.
+        description: (Optional) Whether to check (and run if necessary) the assessment for the collection of workspaces
+          with ucx installed. Default is false.
+
+  - name: update-migration-progress
+    description: trigger the `migration-progress-experimental` job to refresh the inventory that tracks the workspace
+      resources and their migration status.
+    flags:
+      - name: run-as-collection
+        description: (Optional) Whether to update the migration progress for the collection of workspaces with ucx
+          installed. Default is False.
 
   - name: validate-external-locations
     description: |
@@ -157,6 +166,8 @@ commands:
         description: (Optional) IAM policy Name to be specified for the UC roles. (default:UC_POLICY)
       - name: single-role
         description: (Optional) Create a single role for all S3 locations. (default:False)
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: delete-missing-principals
     description: For AWS, this command identifies all the UC roles that are created through the create-missing-principals

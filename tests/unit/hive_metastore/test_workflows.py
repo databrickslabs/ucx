@@ -1,4 +1,5 @@
 import pytest
+
 from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
     MigrateExternalTablesCTAS,
@@ -63,8 +64,8 @@ def test_migrate_ctas_views(run_workflow):
         MigrateTablesInMounts,
     ],
 )
-def test_update_migration_status(run_workflow, workflow):
+def test_update_migration_status(run_workflow, workflow) -> None:
     """Migration status is refreshed by deleting and showing new tables"""
     ctx = run_workflow(getattr(workflow, "update_migration_status"))
-    assert "TRUNCATE TABLE `hive_metastore`.`ucx`.`migration_status`" in ctx.sql_backend.queries
+    assert ctx.sql_backend.has_rows_written_for("hive_metastore.ucx.migration_status")
     assert "SHOW DATABASES" in ctx.sql_backend.queries

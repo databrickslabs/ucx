@@ -26,6 +26,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -64,11 +65,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
       * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
       * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-      * [`default-format-changed-in-dbr8`](#default-format-changed-in-dbr8)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`dependency-not-found`](#dependency-not-found)
-      * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
       * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
       * [`not-supported`](#not-supported)
       * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
@@ -83,6 +83,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`update-migration-progress` command](#update-migration-progress-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
@@ -249,6 +250,21 @@ After the first installation, UCX will prompt the user to confirm whether to ins
 This installation mode will automatically select the following options:
 * Automatically create and enable HMS lineage init script
 * Automatically create a new SQL warehouse for UCX assessment
+
+[[back to top](#databricks-labs-ucx)]
+
+## [ADVANCED] Installing UCX with company hosted PYPI mirror
+
+Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
+company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
+"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+hosted PYPI mirror URL while installing UCX:
+
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
+```
+
+During installation reply *yes* to the question "Does the given workspace block Internet access"?
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -995,6 +1011,20 @@ listed with the [`workflows` command](#workflows-command).
 
 [[back to top](#databricks-labs-ucx)]
 
+## `update-migration-progress` command
+
+```commandline
+databricks labs ucx update-migration-progress
+```
+
+This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+
+_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
+
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `repair-run` command
 
 ```commandline
@@ -1573,7 +1603,7 @@ workspace information with the UCX installations. Once the workspace information
 ## `sync-workspace-info` command
 
 ```text
-databricks labs ucx sync-workspace-info
+databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
 14:07:07  INFO [d.labs.ucx] Account ID: ...
 14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
@@ -1582,9 +1612,12 @@ databricks labs ucx sync-workspace-info
 ...
 ```
 
-**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces
-in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](#Table-Migration) process and is the prerequisite
+> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
+> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
+> or "https://accounts.azuredatabricks.net").
+
+This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
+necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
@@ -1772,10 +1805,9 @@ from a VPC, or from a specific IP range.
 the Databricks account and workspace. If not, you might need to be
 connected to a VPN or configure an HTTP proxy to access your workspace.
 
-**From local machine to GitHub:** UCX needs internet access to connect
-to [<u>github.com</u>](https://github.com) (to download the tool) from
-the machine running the installation. The installation will fail if
-there is no internet connectivity.
+**From local machine to GitHub:** UCX needs internet access to connect to GitHub (https://api.github.com
+and https://raw.githubusercontent.com) for downloading the tool from the machine running the installation. The
+installation will fail if there is no internet connectivity to these URLs.
 
 **Solution:** Ensure that GitHub is reachable from the local machine. If
 not, make necessary changes to the network/firewall settings.

@@ -29,7 +29,7 @@ from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.core import with_user_agent_extra
+from databricks.sdk.useragent import with_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -87,7 +87,6 @@ WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 logger = logging.getLogger(__name__)
-with_user_agent_extra("cmd", "install")
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
@@ -241,7 +240,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         upload_dependencies = self.prompts.confirm(
-            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+            f"Does given workspace {self.workspace_client.get_workspace_id()} block Internet access?"
         )
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         recon_tolerance_percent = int(
@@ -679,17 +678,7 @@ class WorkspaceInstallation(InstallationMixin):
             logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
-        logger.info("Deleting jobs")
-        if not self._install_state.jobs:
-            logger.error("No jobs present or jobs already deleted")
-            return
-        for step_name, job_id in self._install_state.jobs.items():
-            try:
-                logger.info(f"Deleting {step_name} job_id={job_id}.")
-                self._ws.jobs.delete(job_id)
-            except InvalidParameterValue:
-                logger.error(f"Already deleted: {step_name} job_id={job_id}.")
-                continue
+        self._workflows_installer.remove_jobs()
 
     def _remove_warehouse(self):
         try:
@@ -894,6 +883,7 @@ class AccountInstaller(AccountContext):
 
 
 if __name__ == "__main__":
+    with_extra("cmd", "install")
     logger = get_logger(__file__)
     if is_in_debug():
         logging.getLogger('databricks').setLevel(logging.DEBUG)

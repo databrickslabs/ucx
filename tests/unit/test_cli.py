@@ -966,27 +966,30 @@ def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
     ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
-def test_create_missing_principal_aws(ws):
+def test_create_missing_principal_aws(ws, acc_client):
+    ws.config.is_aws = True
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
     ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
     prompts = MockPrompts({'.*': 'yes'})
-    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    create_missing_principals(ws, prompts=prompts, ctx=ctx, a=acc_client)
     aws_resource_permissions.create_uc_roles.assert_called_once()
 
 
-def test_create_missing_principal_aws_not_approved(ws):
+def test_create_missing_principal_aws_not_approved(ws, acc_client):
+    ws.config.is_aws = True
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
     ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
     prompts = MockPrompts({'.*': 'No'})
-    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    create_missing_principals(ws, prompts=prompts, ctx=ctx, a=acc_client)
     aws_resource_permissions.create_uc_roles.assert_not_called()
 
 
-def test_create_missing_principal_azure(ws, caplog):
+def test_create_missing_principal_azure(ws, caplog, acc_client):
+    ws.config.is_aws = False
     ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=True)
     prompts = MockPrompts({'.*': 'yes'})
     with pytest.raises(ValueError) as failure:
-        create_missing_principals(ws, prompts=prompts, ctx=ctx)
+        create_missing_principals(ws, prompts=prompts, ctx=ctx, a=acc_client)
     assert str(failure.value) == "Unsupported cloud provider"
 
 

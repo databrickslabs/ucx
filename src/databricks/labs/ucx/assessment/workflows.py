@@ -14,10 +14,9 @@ class Assessment(Workflow):
     @job_task(notebook="hive_metastore/tables.scala")
     def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
-        as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
-        `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
-        stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
-        cannot easily be migrated to Unity Catalog."""
+        as _database name_, _table name_, _table type_, _table location_, etc., in the table named
+        `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
+        example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):
@@ -181,6 +180,18 @@ class Assessment(Workflow):
     def crawl_groups(self, ctx: RuntimeContext):
         """Scans all groups for the local group migration scope"""
         ctx.group_manager.snapshot()
+
+    @job_task
+    def assess_dashboards(self, ctx: RuntimeContext):
+        """Scans all dashboards for migration issues in SQL code of embedded widgets.
+        Also stores direct filesystem accesses for display in the migration dashboard."""
+        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
+    @job_task
+    def assess_workflows(self, ctx: RuntimeContext):
+        """Scans all jobs for migration issues in notebooks.
+        Also stores direct filesystem accesses for display in the migration dashboard."""
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
 
 class Failing(Workflow):
