@@ -1,3 +1,5 @@
+import dataclasses
+import io
 import json
 from collections.abc import Callable, Generator
 import functools
@@ -1175,3 +1177,19 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
+
+
+@pytest.fixture
+def populator_for_linting(make_job, make_notebook, make_dashboard):
+    def populate_workspace(installation):
+        # keep linting scope to minimum to avoid test timeouts
+        notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
+        job = make_job(notebook_path=notebook_path)
+        dashboard = make_dashboard()
+        config = installation.load(WorkspaceConfig)
+        new_config = dataclasses.replace(
+            config, include_job_idsinclude_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
+        )
+        installation.save(new_config)
+
+    return populate_workspace

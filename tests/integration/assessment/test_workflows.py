@@ -1,12 +1,8 @@
-import dataclasses
-import io
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
-
-from databricks.labs.ucx.config import WorkspaceConfig
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
@@ -15,9 +11,7 @@ def test_running_real_assessment_job(
     installation_ctx,
     make_cluster_policy,
     make_cluster_policy_permissions,
-    make_job,
-    make_notebook,
-    make_dashboard,
+    populator_for_linting,
 ):
     ws_group, _ = installation_ctx.make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -29,16 +23,7 @@ def test_running_real_assessment_job(
     installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     installation_ctx.workspace_installation.run()
 
-    # keep linting scope to minimum to avoid test timeouts
-
-    notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
-    job = make_job(notebook_path=notebook_path)
-    dashboard = make_dashboard()
-    config = installation_ctx.installation.load(WorkspaceConfig)
-    new_config = dataclasses.replace(
-        config, include_job_idsinclude_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
-    )
-    installation_ctx.installation.save(new_config)
+    populator_for_linting(installation_ctx.installation)
 
     installation_ctx.deployed_workflows.run_workflow("assessment")
     assert installation_ctx.deployed_workflows.validate_step("assessment")

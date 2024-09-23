@@ -1,11 +1,8 @@
 import dataclasses
 import datetime as dt
-import io
 
 from databricks.labs.lsql.backends import CommandExecutionBackend
 from databricks.sdk.service.iam import PermissionLevel
-
-from databricks.labs.ucx.config import WorkspaceConfig
 
 
 def test_running_real_assessment_job_ext_hms(
@@ -15,9 +12,7 @@ def test_running_real_assessment_job_ext_hms(
     env_or_skip,
     make_cluster_policy,
     make_cluster_policy_permissions,
-    make_notebook,
-    make_job,
-    make_dashboard,
+    populator_for_linting,
 ):
     cluster_id = env_or_skip('TEST_EXT_HMS_CLUSTER_ID')
     ext_hms_ctx = installation_ctx.replace(
@@ -44,15 +39,7 @@ def test_running_real_assessment_job_ext_hms(
     ext_hms_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     ext_hms_ctx.workspace_installation.run()
 
-    # keep linting scope to minimum to avoid test timeouts
-    notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
-    job = make_job(notebook_path=notebook_path)
-    dashboard = make_dashboard()
-    config = installation_ctx.installation.load(WorkspaceConfig)
-    new_config = dataclasses.replace(
-        config, include_job_idsinclude_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
-    )
-    installation_ctx.installation.save(new_config)
+    populator_for_linting(installation_ctx.installation)
 
     # Under ideal circumstances this can take 10-16 minutes (depending on whether there are compute instances available
     # via the integration pool). Allow some margin to reduce spurious failures.
