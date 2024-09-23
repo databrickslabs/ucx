@@ -30,7 +30,12 @@ class SecretsMixin:
             )
             return None
 
-    def _get_value_from_config_key(self, config: dict, key: str, get_secret: bool = True) -> str | None:
+    def _get_value_from_config_key(
+        self,
+        config: dict[str, str | dict[str, str]],
+        key: str,
+        get_secret: bool = True,
+    ) -> str | None:
         """Get a config value based on its key, with some special handling:
         If the key is prefixed with spark_conf, i.e. this is in a cluster policy, the actual value is nested
         If the value is of format {{secret_scope/secret}}, we extract that as well
