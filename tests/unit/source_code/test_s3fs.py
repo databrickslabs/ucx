@@ -1,3 +1,4 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -126,7 +127,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
     maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
-    assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
+    assert maybe.problems == [dataclasses.replace(_, source_path=sample) for _ in expected]
 
 
 @pytest.mark.parametrize(

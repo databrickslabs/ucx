@@ -373,7 +373,7 @@ class AzureResourcePermissions:
             )
             raise error
 
-    def create_uber_principal(self, prompts: Prompts):
+    def create_uber_principal(self, prompts: Prompts) -> None:
         config = self._installation.load(WorkspaceConfig)
         inventory_database = config.inventory_database
         display_name = f"unity-catalog-migration-{inventory_database}-{self._ws.get_workspace_id()}"

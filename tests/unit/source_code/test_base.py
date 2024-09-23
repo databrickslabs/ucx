@@ -1,3 +1,5 @@
+import dataclasses
+
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
@@ -20,7 +22,7 @@ def test_message_initialization():
 def test_warning_initialization():
     warning = Advisory('code2', 'This is a warning', 1, 1, 2, 2)
 
-    copy_of = warning.replace(code='code3')
+    copy_of = dataclasses.replace(warning, code='code3')
     assert copy_of.code == 'code3'
     assert isinstance(copy_of, Advisory)
 

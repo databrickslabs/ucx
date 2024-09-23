@@ -11,14 +11,17 @@ from astroid import (  # type: ignore
     AssignName,
     Attribute,
     Call,
+    ClassDef,
     Const,
     Expr,
     Import,
     ImportFrom,
+    Instance,
     Module,
     Name,
     NodeNG,
     parse,
+    Uninferable,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,6 +162,16 @@ class Tree:
         for node in nodes:
             node.parent = self_module
             self_module.body.append(node)
+
+    def is_instance_of(self, class_name: str) -> bool:
+        for inferred in self.node.inferred():
+            if inferred is Uninferable:
+                continue
+            if not isinstance(inferred, (Const, Instance)):
+                return False
+            proxied = getattr(inferred, "_proxied", None)
+            return isinstance(proxied, ClassDef) and proxied.name == class_name
+        return False
 
     def is_from_module(self, module_name: str) -> bool:
         return self._is_from_module(module_name, set())

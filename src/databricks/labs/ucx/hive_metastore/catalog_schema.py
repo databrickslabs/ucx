@@ -27,7 +27,7 @@ class CatalogSchema:
         self._principal_grants = principal_grants
         self._backend = sql_backend
 
-    def create_all_catalogs_schemas(self, prompts: Prompts):
+    def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             try:

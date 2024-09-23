@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import shlex
@@ -105,8 +106,10 @@ class PythonCell(Cell):
         python_dependency_problems = analyzer.build_graph()
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
         return [
-            problem.replace(
-                start_line=self.original_offset + problem.start_line, end_line=self.original_offset + problem.end_line
+            dataclasses.replace(
+                problem,
+                start_line=self.original_offset + problem.start_line,
+                end_line=self.original_offset + problem.end_line,
             )
             for problem in python_dependency_problems
         ]
@@ -177,7 +180,7 @@ class RunCell(Cell):
             start_line = self._original_offset + idx
             problems = parent.register_notebook(path, True)
             return [
-                problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
+                dataclasses.replace(problem, start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
                 for problem in problems
             ]
         start_line = self._original_offset

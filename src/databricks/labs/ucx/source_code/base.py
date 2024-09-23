@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import codecs
+import dataclasses
 import locale
 import logging
 from abc import abstractmethod, ABC
@@ -15,6 +16,7 @@ from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
+
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -39,25 +41,6 @@ class Advice:
     start_col: int
     end_line: int
     end_col: int
-
-    def replace(
-        self,
-        *,
-        code: str | None = None,
-        message: str | None = None,
-        start_line: int | None = None,
-        start_col: int | None = None,
-        end_line: int | None = None,
-        end_col: int | None = None,
-    ) -> Advice:
-        return type(self)(
-            code=code if code is not None else self.code,
-            message=message if message is not None else self.message,
-            start_line=start_line if start_line is not None else self.start_line,
-            start_col=start_col if start_col is not None else self.start_col,
-            end_line=end_line if end_line is not None else self.end_line,
-            end_col=end_col if end_col is not None else self.end_col,
-        )
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(**self.__dict__)
@@ -88,7 +71,8 @@ class Advice:
 
     def replace_from_node(self, node: NodeNG) -> Advice:
         # Astroid lines are 1-based.
-        return self.replace(
+        return dataclasses.replace(
+            self,
             start_line=(node.lineno or 1) - 1,
             start_col=node.col_offset,
             end_line=(node.end_lineno or 1) - 1,

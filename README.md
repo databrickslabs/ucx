@@ -28,6 +28,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -66,11 +67,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
       * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
       * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-      * [`default-format-changed-in-dbr8`](#default-format-changed-in-dbr8)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
       * [`dependency-not-found`](#dependency-not-found)
-      * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
       * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
       * [`not-supported`](#not-supported)
       * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
@@ -85,6 +85,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`update-migration-progress` command](#update-migration-progress-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
@@ -255,6 +256,21 @@ This installation mode will automatically select the following options:
 
 [[back to top](#databricks-labs-ucx)]
 
+## [ADVANCED] Installing UCX with company hosted PYPI mirror
+
+Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
+company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
+"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+hosted PYPI mirror URL while installing UCX:
+
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
+```
+
+During installation reply *yes* to the question "Does the given workspace block Internet access"?
+
+[[back to top](#databricks-labs-ucx)]
+
 ## Upgrading UCX for newer versions
 
 Verify that UCX is installed
@@ -369,16 +385,17 @@ the assessment workflow can be executed in parallel or sequentially, depending o
 The output of each task is stored in Delta tables in the `$inventory_database` schema, that you specify during [installation](#install-ucx),
 which can be used for further analysis and decision-making through the [assessment report](docs/assessment.md).
 
-1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a Delta table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
-2. `crawl_grants`: This task scans the Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS` statement for every object to retrieve the permissions assigned to it. The permissions include information such as the principal, action type, and the table it applies to. This task persists the permissions in the Delta table `$inventory_database.grants`.
-3. `estimate_table_size_for_migration`: This task scans the Delta table named `$inventory_database.tables` and locates tables that cannot be synced. These tables will have to be cloned in the migration process. The task assesses the size of these tables and creates the `$inventory_database.table_size` table to list these sizes. The table size is a factor in deciding whether to clone these tables.
-4. `crawl_mounts`: This task scans the workspace to compile a list of all existing mount points and stores this information in the `$inventory.mounts` table. This is crucial for planning the migration.
-5. `guess_external_locations`: This task determines the shared path prefixes of all the tables that utilize mount points. The goal is to identify the external locations necessary for a successful migration and store this information in the `$inventory.external_locations` table.
-6. `assess_jobs`: This task scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is stored in the `$inventory.jobs` table.
-7. `assess_clusters`: This task scans through all the clusters and identifies those that are not compatible with UC. The list of all the clusters is stored in the `$inventory.clusters` table.
-8. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
-9. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
-10. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
+2. `crawl_udfs`: This task scans all UDFs in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.udfs`. This task assesses whether the UDFs can be easily migrated to Unity Catalog.
+3. `crawl_grants`: This task scans all securable objects (including tables/views and UDFs) to determine the directly assigned permissions. The scanned permissions metadata includes information such as the principal, action type, and the securable object to which it applies. This task persists the permissions in the `$inventory_database.grants` inventory table.
+4. `estimate_table_size_for_migration`: This task scans the Delta table named `$inventory_database.tables` and locates tables that cannot be synced. These tables will have to be cloned in the migration process. The task assesses the size of these tables and creates the `$inventory_database.table_size` table to list these sizes. The table size is a factor in deciding whether to clone these tables.
+5. `crawl_mounts`: This task scans the workspace to compile a list of all existing mount points and stores this information in the `$inventory.mounts` table. This is crucial for planning the migration.
+6. `guess_external_locations`: This task determines the shared path prefixes of all the tables that utilize mount points. The goal is to identify the external locations necessary for a successful migration and store this information in the `$inventory.external_locations` table.
+7. `assess_jobs`: This task scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is stored in the `$inventory.jobs` table.
+8. `assess_clusters`: This task scans through all the clusters and identifies those that are not compatible with UC. The list of all the clusters is stored in the `$inventory.clusters` table.
+9. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
+10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
+11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
 
 ![report](docs/assessment-report.png)
 
@@ -997,6 +1014,20 @@ listed with the [`workflows` command](#workflows-command).
 
 [[back to top](#databricks-labs-ucx)]
 
+## `update-migration-progress` command
+
+```commandline
+databricks labs ucx update-migration-progress
+```
+
+This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+
+_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
+
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `repair-run` command
 
 ```commandline
@@ -1194,7 +1225,7 @@ Once you're done with the table migration, proceed to the [code migration](#code
 ## `principal-prefix-access` command
 
 ```text
-databricks labs ucx principal-prefix-access [--subscription-id <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
+databricks labs ucx principal-prefix-access [--subscription-ids <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
 ```
 
 This command depends on results from the [assessment workflow](#assessment-workflow) and requires [AWS CLI](#access-for-aws-s3-buckets)
@@ -1230,7 +1261,7 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 ### Access for Azure Storage Accounts
 
 ```commandline
-databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
+databricks labs ucx principal-prefix-access --subscription-ids test-subscription-id
 ```
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions
@@ -1273,7 +1304,7 @@ and asks for confirmation from user. Once confirmed, it deletes the role and its
 ## `create-uber-principal` command
 
 ```text
-databricks labs ucx create-uber-principal [--subscription-id X]
+databricks labs ucx create-uber-principal [--subscription-ids X]
 ```
 
 **Requires Cloud IAM admin privileges.**
@@ -1593,7 +1624,7 @@ workspace information with the UCX installations. Once the workspace information
 ## `sync-workspace-info` command
 
 ```text
-databricks labs ucx sync-workspace-info
+databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
 14:07:07  INFO [d.labs.ucx] Account ID: ...
 14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
@@ -1602,9 +1633,12 @@ databricks labs ucx sync-workspace-info
 ...
 ```
 
-**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces
-in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](#Table-Migration) process and is the prerequisite
+> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
+> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
+> or "https://accounts.azuredatabricks.net").
+
+This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
+necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
@@ -1792,10 +1826,9 @@ from a VPC, or from a specific IP range.
 the Databricks account and workspace. If not, you might need to be
 connected to a VPN or configure an HTTP proxy to access your workspace.
 
-**From local machine to GitHub:** UCX needs internet access to connect
-to [<u>github.com</u>](https://github.com) (to download the tool) from
-the machine running the installation. The installation will fail if
-there is no internet connectivity.
+**From local machine to GitHub:** UCX needs internet access to connect to GitHub (https://api.github.com
+and https://raw.githubusercontent.com) for downloading the tool from the machine running the installation. The
+installation will fail if there is no internet connectivity to these URLs.
 
 **Solution:** Ensure that GitHub is reachable from the local machine. If
 not, make necessary changes to the network/firewall settings.

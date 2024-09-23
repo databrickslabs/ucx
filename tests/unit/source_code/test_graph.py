@@ -1,11 +1,20 @@
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, InheritedContext
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+    InheritedContext,
+    DependencyGraphWalker,
+)
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 
@@ -62,7 +71,6 @@ class _TestDependencyGraph(DependencyGraph):
 
 @pytest.fixture()
 def dependency_graph_factory(mock_path_lookup, simple_dependency_resolver):
-
     def new_test_dependency_graph(dependency: Dependency) -> _TestDependencyGraph:
         return _TestDependencyGraph(
             dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState()
@@ -182,3 +190,27 @@ def test_graph_builds_inherited_context(mock_path_lookup, simple_dependency_reso
     assert inference_context.tree is not None
     assert inference_context.tree.has_global("some_table_name")
     assert not inference_context.tree.has_global("other_table_name")
+
+
+def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resolver):
+    grand_parent = mock_path_lookup.cwd / "functional/grand_parent_that_magic_runs_parent_that_magic_runs_child.py"
+    child = mock_path_lookup.cwd / "functional/_child_that_uses_value_from_parent.py"
+    root_dependency = Dependency(NotebookLoader(), grand_parent)
+    root_graph = DependencyGraph(
+        root_dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState()
+    )
+    container = root_dependency.load(mock_path_lookup)
+    container.build_dependency_graph(root_graph)
+
+    class _TestWalker(DependencyGraphWalker):
+        def _process_dependency(
+            self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+        ) -> Iterable[None]:
+            if dependency.path.as_posix().endswith(grand_parent.as_posix()):
+                assert len(self._lineage) == 1
+            if dependency.path.as_posix().endswith(child.as_posix()):
+                assert len(self._lineage) == 3  # there's a parent between grand_parent and child
+            return []
+
+    walker = _TestWalker(root_graph, set(), mock_path_lookup)
+    _ = list(_ for _ in walker)

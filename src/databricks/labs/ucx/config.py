@@ -70,6 +70,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
 
+    # [INTERNAL ONLY] Whether the assessment should lint only specific dashboards.
+    include_dashboard_ids: list[str] | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

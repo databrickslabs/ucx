@@ -29,7 +29,7 @@ from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.core import with_user_agent_extra
+from databricks.sdk.useragent import with_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -75,7 +75,9 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
+from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -85,7 +87,6 @@ WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 logger = logging.getLogger(__name__)
-with_user_agent_extra("cmd", "install")
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
@@ -117,9 +118,12 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "policies", PolicyInfo),
             functools.partial(table, "migration_status", TableMigrationStatus),
             functools.partial(table, "workflow_problems", JobProblem),
+            functools.partial(table, "query_problems", QueryProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
+            functools.partial(table, "directfs_in_paths", DirectFsAccess),
+            functools.partial(table, "directfs_in_queries", DirectFsAccess),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -128,6 +132,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
+    deployer.deploy_view("directfs", "queries/views/directfs.sql")
 
 
 def extract_major_minor(version_string):
@@ -235,7 +240,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         upload_dependencies = self.prompts.confirm(
-            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+            f"Does given workspace {self.workspace_client.get_workspace_id()} block Internet access?"
         )
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         recon_tolerance_percent = int(
@@ -673,17 +678,7 @@ class WorkspaceInstallation(InstallationMixin):
             logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
-        logger.info("Deleting jobs")
-        if not self._install_state.jobs:
-            logger.error("No jobs present or jobs already deleted")
-            return
-        for step_name, job_id in self._install_state.jobs.items():
-            try:
-                logger.info(f"Deleting {step_name} job_id={job_id}.")
-                self._ws.jobs.delete(job_id)
-            except InvalidParameterValue:
-                logger.error(f"Already deleted: {step_name} job_id={job_id}.")
-                continue
+        self._workflows_installer.remove_jobs()
 
     def _remove_warehouse(self):
         try:
@@ -729,7 +724,6 @@ class AccountInstaller(AccountContext):
 
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
-        logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
         return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
     def install_on_account(self):
@@ -889,6 +883,7 @@ class AccountInstaller(AccountContext):
 
 
 if __name__ == "__main__":
+    with_extra("cmd", "install")
     logger = get_logger(__file__)
     if is_in_debug():
         logging.getLogger('databricks').setLevel(logging.DEBUG)

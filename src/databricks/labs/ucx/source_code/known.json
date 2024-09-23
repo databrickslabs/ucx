@@ -1823,6 +1823,10 @@
   "databricks-labs-pylint": {
     "databricks.labs.pylint": []
   },
+  "databricks-labs-pytester": {
+    "databricks.labs.pytester": [],
+    "tests.resources.hatchling-whl.src.hatchling_whl": []
+  },
   "databricks-labs-ucx": {
     "databricks.labs.ucx": []
   },

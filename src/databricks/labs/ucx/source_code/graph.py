@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import dataclasses
+import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +13,7 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook
+from databricks.labs.ucx.source_code.directfs_access import LineageAtom
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -93,7 +96,8 @@ class DependencyGraph:
         return MaybeGraph(
             child_graph,
             [
-                problem.replace(
+                dataclasses.replace(
+                    problem,
                     source_path=dependency.path if problem.is_path_missing() else problem.source_path,
                 )
                 for problem in problems
@@ -304,7 +308,7 @@ class DependencyGraphContext:
     session_state: CurrentSessionState
 
 
-class Dependency(abc.ABC):
+class Dependency:
 
     def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
@@ -330,6 +334,10 @@ class Dependency(abc.ABC):
 
     def __repr__(self):
         return f"Dependency<{self.path}>"
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        return [LineageAtom(object_type="PATH", object_id=str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -467,7 +475,7 @@ class DependencyResolver:
             out_path = path if problem.is_path_missing() else problem.source_path
             if out_path.is_absolute() and out_path.is_relative_to(self._path_lookup.cwd):
                 out_path = out_path.relative_to(self._path_lookup.cwd)
-            adjusted_problems.append(problem.replace(source_path=out_path))
+            adjusted_problems.append(dataclasses.replace(problem, source_path=out_path))
         return adjusted_problems
 
     def __repr__(self):
@@ -490,26 +498,6 @@ class DependencyProblem:
 
     def is_path_missing(self):
         return self.source_path == Path(MISSING_SOURCE_PATH)
-
-    def replace(
-        self,
-        code: str | None = None,
-        message: str | None = None,
-        source_path: Path | None = None,
-        start_line: int | None = None,
-        start_col: int | None = None,
-        end_line: int | None = None,
-        end_col: int | None = None,
-    ) -> DependencyProblem:
-        return DependencyProblem(
-            code if code is not None else self.code,
-            message if message is not None else self.message,
-            source_path if source_path is not None else self.source_path,
-            start_line if start_line is not None else self.start_line,
-            start_col if start_col is not None else self.start_col,
-            end_line if end_line is not None else self.end_line,
-            end_col if end_col is not None else self.end_col,
-        )
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(
@@ -608,6 +596,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._graph = graph
         self._walked_paths = walked_paths
         self._path_lookup = path_lookup
+        self._lineage: list[Dependency] = []
 
     def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:
@@ -619,6 +608,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
         if dependency.path in self._walked_paths:
             return
+        self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
         if dependency.path.is_file() or is_a_notebook(dependency.path):
@@ -631,6 +621,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
                 child_graph = maybe_graph.graph
                 for child_dependency in child_graph.local_dependencies:
                     yield from self._iter_one(child_dependency, child_graph, root_path)
+        self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency):
         logger.debug(f'Analyzing dependency: {dependency}')
@@ -639,3 +630,8 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
     ) -> Iterable[T]: ...
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        lists: list[list[LineageAtom]] = [dependency.lineage for dependency in self._lineage]
+        return list(itertools.chain(*lists))

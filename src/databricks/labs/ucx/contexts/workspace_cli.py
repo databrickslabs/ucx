@@ -68,18 +68,18 @@ class WorkspaceContext(CliContext):
         return AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
 
     @cached_property
-    def azure_subscription_id(self):
-        subscription_id = self.named_parameters.get("subscription_id")
-        if not subscription_id:
-            raise ValueError("Please enter subscription id to scan storage accounts in.")
-        return subscription_id
+    def azure_subscription_ids(self) -> list[str]:
+        subscription_ids = self.named_parameters.get("subscription_ids", "")
+        if not subscription_ids:
+            raise ValueError("Please enter subscription ids to scan storage accounts in.")
+        return subscription_ids.split(",")
 
     @cached_property
     def azure_resources(self):
         return AzureResources(
             self.azure_management_client,
             self.microsoft_graph_client,
-            [self.azure_subscription_id],
+            self.azure_subscription_ids,
         )
 
     @cached_property
@@ -132,7 +132,7 @@ class WorkspaceContext(CliContext):
         return run_command
 
     @cached_property
-    def aws_profile(self):
+    def aws_profile(self) -> str:
         aws_profile = self.named_parameters.get("aws_profile")
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
@@ -202,6 +202,7 @@ class LocalCheckoutContext(WorkspaceContext):
     def local_code_linter(self):
         session_state = CurrentSessionState()
         return LocalCodeLinter(
+            self.notebook_loader,
             self.file_loader,
             self.folder_loader,
             self.path_lookup,
