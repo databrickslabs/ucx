@@ -1088,7 +1088,10 @@ def test_open_config(ws, mocker, mock_installation):
 
 @pytest.mark.parametrize(
     "prompt_question,prompt_answer,workspace_config_overwrite",
-    [(r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]})],
+    [
+        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
+        ("Catalog to store UCX artifacts in", "ucx-test", {"ucx_catalog": "ucx-test"}),
+    ],
 )
 def test_save_config_should_overwrite_value(
     ws,
