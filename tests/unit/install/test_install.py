@@ -353,7 +353,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
         (r"Max workers for auto-scale.*", "20", {"max_workers": 20}),
     ],
 )
-def test_save_config_should_overwrite_value(
+def test_configure_sets_expected_workspace_configuration_values(
     ws,
     mock_installation,
     prompt_question,
