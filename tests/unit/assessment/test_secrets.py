@@ -8,7 +8,7 @@ from databricks.labs.ucx.assessment.secrets import SecretsMixin
     [
         ("spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL", "url"),
         ("NonExistentKey", ""),
-        ("spark_conf.invalid", ""),
+        ("spark_conf.invalid", "{'should_not': 'be_string'}"),
     ],
 )
 def test_secrets_mixin_gets_value_from_config_key(key, expected) -> None:

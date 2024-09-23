@@ -41,7 +41,9 @@ class SecretsMixin:
         If the value is of format {{secret_scope/secret}}, we extract that as well
         """
         if re.search("spark_conf", key):
-            value = config.get(key, {}).get("value", "")
+            value = config.get(key, {})
+            if isinstance(value, dict):
+                value = value.get("value", "")
         else:
             value = config.get(key, "")
         # retrieve from secret scope if used
