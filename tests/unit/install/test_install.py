@@ -335,8 +335,15 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
 @pytest.mark.parametrize(
     "prompt_question,prompt_answer,workspace_config_overwrite",
     [
-        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
+        ("Inventory Database stored in hive_metastore", "non_default", {"inventory_database": "non_default"}),
         ("Catalog to store UCX artifacts in", "ucx-test", {"ucx_catalog": "ucx-test"}),
+        ("Log level", "DEBUG", {"log_level": "DEBUG"}),
+        (r".*workspace group names.*", "g1, g2, g99", {"include_group_names": ["g1", "g2", "g99"]}),
+        ("Number of threads", "16", {"num_threads": 16}),
+        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
+        (r"Does given workspace .* block Internet access?", "yes", {"upload_dependencies": True}),
+        ("Do you want to trigger assessment job after installation?", "yes", {"trigger_job": True}),
+        ("Reconciliation threshold, in percentage", "10", {"recon_tolerance_percent": 10}),
         (
             r"Parallelism for migrating.*",
             "1000",
@@ -344,7 +351,6 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
         ),
         (r"Min workers for auto-scale.*", "2", {"min_workers": 2}),
         (r"Max workers for auto-scale.*", "20", {"max_workers": 20}),
-        (r".*workspace group names.*", "g1, g2, g99", {"include_group_names": ["g1", "g2", "g99"]}),
     ],
 )
 def test_save_config_should_overwrite_value(
