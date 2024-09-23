@@ -11,6 +11,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
+    ucx_catalog: str | None = "ucx"  # Catalog to store UCX artifact tables (shared across workspaces)
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None
@@ -26,7 +27,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     num_threads: int | None = 10
     database_to_catalog_mapping: dict[str, str] | None = None
     default_catalog: str | None = "ucx_default"  # DEPRECATED: Keeping to avoid errors when loading old configurations
-    ucx_catalog: str | None = "ucx"
     log_level: str | None = "INFO"
 
     # Starting path for notebooks and directories crawler
