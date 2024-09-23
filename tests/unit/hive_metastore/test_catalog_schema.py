@@ -144,7 +144,7 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_ucx_catalog(mock_prompts)
-    assert "Catalog 'ucx' already exists. Skipping" in caplog.text
+    assert "Catalog 'ucx' already exists. Skipping." in caplog.text
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
