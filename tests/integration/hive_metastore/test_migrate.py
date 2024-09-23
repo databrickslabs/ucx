@@ -340,6 +340,44 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
     assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
 
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_view_alias_test(ws, sql_backend, runtime_ctx, make_catalog):
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    src_view1 = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        ctas=f"SELECT A.* FROM {src_managed_table.full_name} AS A",
+        view=True,
+    )
+
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+
+    rules = [
+        Rule.from_src_dst(src_managed_table, dst_schema),
+        Rule.from_src_dst(src_view1, dst_schema),
+    ]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.tables_migrator.index()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.migration_status_refresher.snapshot()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.VIEW)
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 2
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
+    assert (
+        view1_view_text == f"SELECT * FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}`"
+    )
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
