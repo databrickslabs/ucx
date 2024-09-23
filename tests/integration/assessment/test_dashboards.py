@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
+import pytest
+
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.sdk.service.iam import PermissionLevel
@@ -88,9 +90,9 @@ def _populate_directfs_problems(installation_ctx):
     installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas)
 
 
-# @pytest.mark.skip
+@pytest.mark.skip("Development tool")
 def test_dashboard_with_prepopulated_data(installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
-    """the purpose of this test is to prepopulate data used by the dashboard without running an assessment"""
+    """the purpose of this test is to prepopulate data used by the dashboard without running an actual -lengthy- assessment"""
     ucx_group, _ = installation_ctx.make_ucx_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
