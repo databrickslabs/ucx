@@ -12,7 +12,6 @@ from databricks.labs.ucx.install import WorkspaceInstaller
 def test_running_real_assessment_job(
     ws,
     installation_ctx,
-    product_info,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_job,
@@ -30,7 +29,7 @@ def test_running_real_assessment_job(
     installation_ctx.workspace_installation.run()
 
     # keep linting scope to minimum to avoid test timeouts
-    installer = WorkspaceInstaller(ws).replace(product_info=product_info)
+    installer = WorkspaceInstaller(ws)
 
     notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
     job = make_job(notebook_path=notebook_path)
@@ -38,7 +37,6 @@ def test_running_real_assessment_job(
 
     dashboard = make_dashboard()
     installer.replace_config(include_dashboard_ids=[dashboard.id])
-    installation_ctx.config.include_dashboard_ids = [dashboard.id]
 
     installation_ctx.deployed_workflows.run_workflow("assessment")
     assert installation_ctx.deployed_workflows.validate_step("assessment")
