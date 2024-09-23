@@ -435,6 +435,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.directfs_access_crawler_for_queries,
+            self.config.include_dashboard_ids,
         )
 
     @cached_property

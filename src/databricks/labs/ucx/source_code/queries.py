@@ -40,10 +40,12 @@ class QueryLinter:
         ws: WorkspaceClient,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
+        include_dashboard_ids: list[str] | None,
     ):
         self._ws = ws
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
+        self._include_dashboard_ids = include_dashboard_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now(timezone.utc)
@@ -53,16 +55,12 @@ class QueryLinter:
         all_problems: list[QueryProblem] = []
         all_dfsas: list[DirectFsAccess] = []
         # first lint and collect queries from dashboards
-        for dashboard in all_dashboards:
-            if not dashboard.id:
-                continue
-            dashboard = self._ws.dashboards.get(dashboard_id=dashboard.id)
+        for dashboard_id in self._dashboard_ids_in_scope():
+            dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
             problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
             all_problems.extend(problems)
             all_dfsas.extend(dfsas)
-        for query in self._ws.queries_legacy.list():
-            if query.id is None:
-                continue
+        for query in self._queries_in_scope():
             if query.id in linted_queries:
                 continue
             linted_queries.add(query.id)
@@ -87,6 +85,18 @@ class QueryLinter:
             for dfsa in all_dfsas
         ]
         self._directfs_crawler.dump_all(all_dfsas)
+
+    def _dashboard_ids_in_scope(self) -> list[str]:
+        if self._include_dashboard_ids is not None:  # an empty list is accepted
+            return self._include_dashboard_ids
+        all_dashboards = self._ws.dashboards.list()
+        return [dashboard.id for dashboard in all_dashboards if dashboard.id]
+
+    def _queries_in_scope(self):
+        if self._include_dashboard_ids is not None:  # an empty list is accepted
+            return []
+        all_queries = self._ws.queries_legacy.list()
+        return [query for query in all_queries if query.id]
 
     def _lint_and_collect_from_dashboard(
         self, dashboard: Dashboard, linted_queries: set[str]

@@ -1,5 +1,5 @@
 import pytest
-from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Name  # type: ignore
+from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -159,6 +159,16 @@ df.write.format("delta").saveAsTable("old.things")
         Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)]
     )[0]
     assert Tree(save_call).is_from_module("spark")
+
+
+@pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
+def test_is_instance_of(source, name, class_name):
+    tree = Tree.normalize_and_parse(source)
+    assert isinstance(tree.node, Module)
+    module = tree.node
+    var = module.globals.get(name, None)
+    assert isinstance(var, list) and len(var) > 0
+    assert Tree(var[0]).is_instance_of(class_name)
 
 
 def test_supports_recursive_refs_when_checking_module():

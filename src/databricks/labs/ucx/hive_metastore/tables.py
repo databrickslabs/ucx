@@ -499,6 +499,10 @@ class FasterTableScanCrawler(CrawlerBase):
         while iterator.hasNext():
             yield iterator.next()
 
+    @staticmethod
+    def _option_as_python(scala_option: typing.Any):
+        return scala_option.get() if scala_option.isDefined() else None
+
     def _all_databases(self) -> list[str]:
         if not self._include_database:
             return list(self._iterator(self._external_catalog.listDatabases()))
@@ -536,28 +540,35 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog and database.
         """
         full_name = f"{catalog}.{database}.{table}"
-        try:
+        if catalog != "hive_metastore":
+            msg = f"Only tables in the hive_metastore catalog can be described: {full_name}"
+            raise ValueError(msg)
+        logger.debug(f"Fetching metadata for table: {full_name}")
+        try:  # pylint: disable=too-many-try-statements
             raw_table = self._external_catalog.getTable(database, table)
-            table_format = raw_table.provider().getOrElse(None) or "UNKNOWN"
-            location_uri = raw_table.storage().locationUri().getOrElse(None)
+            table_format = self._option_as_python(raw_table.provider()) or "UNKNOWN"
+            location_uri = self._option_as_python(raw_table.storage().locationUri())
             if location_uri:
                 location_uri = location_uri.toString()
-            is_partitioned = len(list(self._iterator(raw_table.partitionColumnNames()))) > 0
-
-            return Table(
-                catalog='hive_metastore',
-                database=database,
-                name=table,
-                object_type=raw_table.tableType().name(),
-                table_format=table_format,
-                location=location_uri,
-                view_text=raw_table.viewText(),
-                storage_properties=self._format_properties_list(list(self._iterator(raw_table.properties()))),
-                is_partitioned=is_partitioned,
-            )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Couldn't fetch information for table {full_name} : {e}")
+            is_partitioned = raw_table.partitionColumnNames().iterator().hasNext()
+            object_type = raw_table.tableType().name()
+            view_text = self._option_as_python(raw_table.viewText())
+            table_properties = list(self._iterator(raw_table.properties()))
+            formatted_table_properties = self._format_properties_list(table_properties)
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Couldn't fetch information for table: {full_name}", exc_info=True)
             return None
+        return Table(
+            catalog=catalog,
+            database=database,
+            name=table,
+            object_type=object_type,
+            table_format=table_format,
+            location=location_uri,
+            view_text=view_text,
+            storage_properties=formatted_table_properties,
+            is_partitioned=is_partitioned,
+        )
 
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database."""

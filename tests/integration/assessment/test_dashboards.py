@@ -64,7 +64,6 @@ def _populate_directfs_problems(installation_ctx):
                 LineageAtom(object_type="TASK", object_id="my_workflow/my_task"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook"),
                 LineageAtom(object_type="FILE", object_id="my file"),
-
             ],
             assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
