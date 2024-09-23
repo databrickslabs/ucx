@@ -374,10 +374,11 @@ class StaticMountCrawler(Mounts):
 
 
 class CommonUtils:
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture):
         self._make_schema = make_schema_fixture
         self._env_or_skip = env_or_skip_fixture
         self._ws = ws_fixture
+        self._make_random = make_random_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -446,8 +447,9 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ) -> None:
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture)
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -668,8 +670,25 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> MockRuntimeContext:
-    ctx = MockRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
+def runtime_ctx(
+    ws,
+    sql_backend,
+    make_table,
+    make_schema,
+    make_udf,
+    make_group,
+    env_or_skip,
+    make_random,
+) -> MockRuntimeContext:
+    ctx = MockRuntimeContext(
+        make_table,
+        make_schema,
+        make_udf,
+        make_group,
+        env_or_skip,
+        ws,
+        make_random,
+    )
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
@@ -679,8 +698,9 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ):
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture)
         WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
@@ -796,8 +816,8 @@ class MockInstallationContext(MockRuntimeContext):
             make_group_fixture,
             env_or_skip_fixture,
             ws_fixture,
+            make_random_fixture,
         )
-        self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
         self._watchdog_purge_suffix = watchdog_purge_suffix
