@@ -20,7 +20,7 @@ class AccountContext(CliContext):
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
-        """Return any workspace client available"""
+        """The first workspace client available"""
         workspace_clients = self.account_workspaces.workspace_clients()
         if len(workspace_clients) == 0:
             return super().workspace_client
