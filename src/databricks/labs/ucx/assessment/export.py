@@ -21,10 +21,10 @@ class AssessmentExporter:
     def export_results(self, prompts: Prompts):
         """Main method to export results to CSV files inside a ZIP archive."""
         project_root = Path(__file__).resolve().parents[3]
-        queries_path_root = project_root / f"labs/ucx/queries/assessment"
-        valid_queries = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
+        queries_path_root = project_root / "labs/ucx/queries/assessment"
+        valid_queries_dirs = {subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()}
 
-        export_path = Path(
+        results_directory  = Path(
             prompts.question(
                 "Choose a path to save the UCX Assessment results",
                 default=Path.cwd().as_posix(),
@@ -35,15 +35,15 @@ class AssessmentExporter:
         query_choice = prompts.question(
             "Choose which assessment results to export",
             default="main",
-            validate=lambda q: q in valid_queries,
+            validate=lambda q: q in valid_queries_dirs,
         )
 
+        export_path = results_directory / f"export_{query_choice}_results.zip"
         queries_path = queries_path_root / query_choice
         display_name = "UCX Assessment Results"
         dashboard_metadata = DashboardMetadata(display_name)
-        assessment_results = (
-            DashboardMetadata.from_path(queries_path)
-                .replace_database(catalog="hive_metastore", database=self._config.inventory_database)
+        assessment_results = dashboard_metadata.from_path(queries_path).replace_database(
+            catalog="hive_metastore", database=self._config.inventory_database
         )
 
         logger.info("Exporting assessment results....")
