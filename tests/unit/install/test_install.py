@@ -1105,7 +1105,6 @@ def test_save_config_should_overwrite_value(
             prompt_question: prompt_answer,
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
-            r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
     )
