@@ -333,7 +333,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
 
 
-def test_save_config(ws, mock_installation):
+def test_save_config(ws, mock_installation) -> None:
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -362,6 +362,7 @@ def test_save_config(ws, mock_installation):
             'version': 2,
             'default_catalog': 'ucx_default',
             'inventory_database': 'ucx',
+            'ucx_catalog': 'ucx',
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
@@ -398,7 +399,7 @@ def test_corrupted_config(ws, mock_installation, caplog):
     assert 'Existing installation at ~/mock is corrupted' in caplog.text
 
 
-def test_save_config_strip_group_names(ws, mock_installation):
+def test_save_config_strip_group_names(ws, mock_installation) -> None:
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -422,6 +423,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_group_names': ['g1', 'g2', 'g99'],
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -438,7 +440,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
     )
 
 
-def test_create_cluster_policy(ws, mock_installation):
+def test_create_cluster_policy(ws, mock_installation) -> None:
     ws.cluster_policies.list.return_value = [
         Policy(
             policy_id="foo1",
@@ -470,6 +472,7 @@ def test_create_cluster_policy(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_group_names': ['g1', 'g2', 'g99'],
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -1083,7 +1086,7 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-def test_save_config_should_include_databases(ws, mock_installation):
+def test_save_config_should_include_databases(ws, mock_installation) -> None:
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1106,6 +1109,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_databases': ['db1', 'db2'],
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -1237,7 +1241,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     wheels.upload_to_wsfs.assert_called()
 
 
-def test_fresh_install(ws, mock_installation):
+def test_fresh_install(ws, mock_installation) -> None:
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1265,6 +1269,7 @@ def test_fresh_install(ws, mock_installation):
             'version': 2,
             'default_catalog': 'ucx_default',
             'inventory_database': 'ucx',
+            'ucx_catalog': 'ucx',
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
@@ -1746,7 +1751,7 @@ def test_user_workspace_installer(mock_ws):
     assert workspace_installer.install_state.install_folder().startswith("/Users/")
 
 
-def test_save_config_ext_hms(ws, mock_installation):
+def test_save_config_ext_hms(ws, mock_installation) -> None:
     ws.get_workspace_id.return_value = 12345678
     cluster_policy = {
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
@@ -1786,6 +1791,7 @@ def test_save_config_ext_hms(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_databases': ['db1', 'db2'],
             'inventory_database': 'ucx_12345678',
             'log_level': 'INFO',
