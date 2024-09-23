@@ -769,8 +769,8 @@ class MockLocalAzureCli(MockWorkspaceContext):
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
+def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_backend):
+    ctx = MockLocalAzureCli(make_catalog, make_schema, env_or_skip, ws, make_random)
     return ctx.replace(sql_backend=sql_backend)
 
 
