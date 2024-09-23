@@ -411,11 +411,13 @@ class TablesCrawler(CrawlerBase[Table]):
         After performing initial scan of all tables, starts making parallel
         DESCRIBE TABLE EXTENDED queries for every table.
 
-        Production tasks would most likely be executed through `tables.scala`
+        Production tasks would most likely be executed through FasterTableScanCrawler
         within `crawl_tables` task due to `spark.sharedState.externalCatalog`
         lower-level APIs not requiring a roundtrip to storage, which is not
         possible for Azure storage with credentials supplied through Spark
         conf (see https://github.com/databrickslabs/ucx/issues/249).
+
+        FasterTableScanCrawler uses the _jsparkSession to utilize faster scanning with Scala APIs.
 
         See also https://github.com/databrickslabs/ucx/issues/247
         """
