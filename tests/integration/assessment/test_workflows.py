@@ -1,14 +1,13 @@
 from datetime import timedelta
 
-from databricks.labs.pytester.fixtures.catalog import make_schema
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from integration.conftest import installation_ctx
 
 
+# pylint: disable=too-many-locals
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions, make_dashboard, sql_backend, inventory_schema, populate_for_linting,
@@ -39,7 +38,6 @@ def test_running_real_assessment_job(
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
 
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
-
 
     tables = set[str]()
     local_crawler = TablesCrawler(sql_backend, inventory_schema, [source_schema.name])
