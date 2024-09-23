@@ -926,3 +926,13 @@ def test_serving_endpoints_not_enabled_raises_warning(caplog):
     with caplog.at_level('WARNING'):
         list(sup.get_crawler_tasks())
     assert "Listing serving-endpoints failed" in caplog.text
+
+
+def test_internal_error_in_serving_endpoints_raises_warning(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ws.serving_endpoints.list.side_effect = InternalError(...)
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
+    with caplog.at_level('WARNING'):
+        list(sup.get_crawler_tasks())
+    assert "Listing serving-endpoints failed" in caplog.text
