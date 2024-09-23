@@ -32,7 +32,7 @@ class SecretsMixin:
 
     def _get_value_from_config_key(
         self,
-        config: dict[str, str | dict[str, str]],
+        config: dict,
         key: str,
         get_secret: bool = True,
     ) -> str | None:
