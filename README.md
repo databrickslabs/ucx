@@ -92,6 +92,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
 * [Table migration commands](#table-migration-commands)
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
@@ -115,7 +116,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
   * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
 * [Cross-workspace installations](#cross-workspace-installations)
-  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
   * [`sync-workspace-info` command](#sync-workspace-info-command)
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
@@ -1173,6 +1173,17 @@ This command assigns a metastore to a workspace with `workspace-id`. If there is
 region, it will be automatically assigned to the workspace. If there are multiple metastores available, you need to specify
 the metastore id of the metastore you want to assign to the workspace.
 
+## `create-ucx-catalog` command
+
+```commandline
+databricks labs ucx create-ucx-catalog
+16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
+Please provide storage location url for catalog: ucx (default: metastore): ...
+16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
+```
+
+Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
+
 # Table migration commands
 
 These commands are vital part of [table migration process](#Table-Migration) process and require
@@ -1602,17 +1613,6 @@ workspace information with the UCX installations. Once the workspace information
 [`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog.
 
 [[back to top](#databricks-labs-ucx)]
-
-## `create-ucx-catalog` command
-
-```commandline
-databricks labs ucx create-ucx-catalog
-16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
-Please provide storage location url for catalog: ucx (default: metastore): ...
-16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
-```
-
-Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
 
 ## `sync-workspace-info` command
 
