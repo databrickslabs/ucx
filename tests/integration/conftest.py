@@ -374,7 +374,15 @@ class StaticMountCrawler(Mounts):
 
 
 class CommonUtils:
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture):
+    def __init__(
+        self,
+        make_catalog_fixture,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+        make_random_fixture,
+    ):
+        self._make_catalog = make_catalog_fixture
         self._make_schema = make_schema_fixture
         self._env_or_skip = env_or_skip_fixture
         self._ws = ws_fixture
@@ -441,15 +449,22 @@ class CommonUtils:
 class MockRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
     ) -> None:
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -673,16 +688,18 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 def runtime_ctx(
     ws,
     sql_backend,
-    make_table,
+    make_catalog,
     make_schema,
+    make_table,
     make_udf,
     make_group,
     env_or_skip,
     make_random,
 ) -> MockRuntimeContext:
     ctx = MockRuntimeContext(
-        make_table,
+        make_catalog,
         make_schema,
+        make_table,
         make_udf,
         make_group,
         env_or_skip,
@@ -695,12 +712,19 @@ def runtime_ctx(
 class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
+        make_catalog_fixture,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
     ):
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture, make_random_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
@@ -798,8 +822,9 @@ class MockInstallationContext(MockRuntimeContext):
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
@@ -810,8 +835,9 @@ class MockInstallationContext(MockRuntimeContext):
         watchdog_purge_suffix,
     ):
         super().__init__(
-            make_table_fixture,
+            make_catalog_fixture,
             make_schema_fixture,
+            make_table_fixture,
             make_udf_fixture,
             make_group_fixture,
             env_or_skip_fixture,
@@ -973,8 +999,9 @@ class MockInstallationContext(MockRuntimeContext):
 def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
-    make_table,
+    make_catalog,
     make_schema,
+    make_table,
     make_udf,
     make_group,
     env_or_skip,
@@ -984,8 +1011,9 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
-        make_table,
+        make_catalog,
         make_schema,
+        make_table,
         make_udf,
         make_group,
         env_or_skip,
