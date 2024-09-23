@@ -11,7 +11,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
-    ucx_catalog: str | None = "ucx"  # Catalog to store UCX artifact tables (shared across workspaces)
+    ucx_catalog: str = "ucx"  # Catalog to store UCX artifact tables (shared across workspaces)
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None
