@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
-    UCX_CATALOG = "ucx"
 
     def __init__(
         self,
@@ -47,10 +46,10 @@ class CatalogSchema:
                 The properties to pass to the catalog. If None, no properties are passed.
         """
         try:
-            self._create_catalog_validate(self.UCX_CATALOG, prompts, properties=properties)
+            self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
         except BadRequest as e:
             if "already exists" in str(e):
-                logger.warning(f"Catalog '{self.UCX_CATALOG}' already exists. Skipping.")
+                logger.warning(f"Catalog '{self._ucx_catalog}' already exists. Skipping.")
                 return
             raise
 

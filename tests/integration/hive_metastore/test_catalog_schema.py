@@ -36,7 +36,7 @@ def test_create_ucx_catalog_creates_catalog(
     catalog_name,
 ) -> None:
     prompts = MockPrompts({f"Please provide storage location url for catalog: {catalog_name}": "metastore"})
-    runtime_ctx.catalog_schema.UCX_CATALOG = catalog_name
+    runtime_ctx.catalog_schema._ucx_catalog = catalog_name
 
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
 
