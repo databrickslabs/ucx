@@ -6,7 +6,7 @@
       "columns": [
         {"fieldName": "code", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "code"},
         {"fieldName": "message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "message"},
-        {"fieldName": "dashboard_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/dashboards/{{ dashboard_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "dashboard_name"},
+        {"fieldName": "dashboard_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/dashboards/{{ dashboard_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "Dashboard"},
         {"fieldName": "query_name", "booleanValues": ["false", "true"], "imageUrlTemplate": "{{ @ }}", "linkUrlTemplate": "/queries/{{ query_id }}/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "query_name"}
       ]},
     "invisibleColumns": [
