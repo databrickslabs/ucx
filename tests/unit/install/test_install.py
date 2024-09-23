@@ -384,7 +384,6 @@ def test_configure_sets_expected_workspace_configuration_values(
             prompt_question: prompt_answer,
         }
     )
-    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
 
     install.configure()
