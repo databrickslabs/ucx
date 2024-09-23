@@ -1,6 +1,5 @@
 import logging
 from datetime import timedelta
-from collections.abc import Iterator
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -17,34 +16,19 @@ logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
 
 
-@pytest.fixture
-def catalog_name(ws, make_random) -> Iterator[str]:
-    name = f"test-catalog-{make_random(5)}"
-    yield name
-    try:
-        ws.catalogs.delete(name, force=True)
-        logger.info(f"Deleted test catalog: {name}")
-    except NotFound:
-        pass
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_create_ucx_catalog_creates_catalog(
-    ws,
-    runtime_ctx,
-    watchdog_remove_after,
-    catalog_name,
-) -> None:
-    prompts = MockPrompts({f"Please provide storage location url for catalog: {catalog_name}": "metastore"})
-    runtime_ctx.catalog_schema._ucx_catalog = catalog_name
+def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_after) -> None:
+    # Delete catalog created for testing to test the creation of a new catalog
+    runtime_ctx.workspace_client.catalogs.delete(runtime_ctx.ucx_catalog, force=True)
+    prompts = MockPrompts({f"Please provide storage location url for catalog: {runtime_ctx.ucx_catalog}": "metastore"})
 
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
 
-    @retried(on=[KeyError], timeout=timedelta(seconds=20))
+    @retried(on=[NotFound], timeout=timedelta(seconds=20))
     def get_catalog(name: str) -> CatalogInfo:
         return ws.catalogs.get(name)
 
-    assert get_catalog(catalog_name)
+    assert get_catalog(runtime_ctx.ucx_catalog)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
