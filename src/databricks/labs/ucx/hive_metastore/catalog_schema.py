@@ -6,7 +6,7 @@ from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import SchemaInfo
@@ -19,13 +19,19 @@ logger = logging.getLogger(__name__)
 
 class CatalogSchema:
     def __init__(
-        self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend
+        self,
+        ws: WorkspaceClient,
+        table_mapping: TableMapping,
+        principal_grants: PrincipalACL,
+        sql_backend: SqlBackend,
+        grants_crawler: GrantsCrawler,
     ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
         self._principal_grants = principal_grants
         self._backend = sql_backend
+        self._hive_grants_crawler = grants_crawler
 
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
@@ -50,10 +56,7 @@ class CatalogSchema:
         self._update_principal_acl()
 
     def _update_grants_acl(self):
-        # todo
-        pass
-    def _update_principal_acl(self):
-        grants = self._get_catalog_schema_grants()
+        grants = self._get_catalog_schema_hive_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
             if acl_migrate_sql is None:
@@ -62,7 +65,34 @@ class CatalogSchema:
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
-    def _get_catalog_schema_grants(self) -> list[Grant]:
+    def _update_principal_acl(self):
+
+        grants = self._get_catalog_schema_principal_acl_grants()
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql()
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
+
+    def _get_catalog_schema_hive_grants(self) -> list[Grant]:
+        src_trg_schema_mapping = self._get_database_source_target_mapping()
+        hive_grants = self._hive_grants_crawler.snapshot()
+        new_grants: list[Grant] = []
+        for grant in hive_grants:
+            if grant.catalog and grant.database and not grant.table and not grant.view and not grant.udf:
+                new_grants.extend(
+                    replace(grant, catalog=schema.catalog_name, database=schema.name)
+                    for schema in src_trg_schema_mapping[grant.database]
+                )
+        catalog_grants: set[Grant] = set()
+        for grant in new_grants:
+            catalog_grants.add(replace(grant, database=None))
+        new_grants.extend(catalog_grants)
+        return new_grants
+
+    def _get_catalog_schema_principal_acl_grants(self) -> list[Grant]:
         src_trg_schema_mapping = self._get_database_source_target_mapping()
         grants = self._principal_grants.get_interactive_cluster_grants()
         # filter on grants to only get database level grants

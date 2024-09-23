@@ -9,7 +9,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 
@@ -83,6 +83,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     )
     table_mapping = TableMapping(installation, ws, backend)
     principal_acl = create_autospec(PrincipalACL)
+    hive_acl = create_autospec(GrantsCrawler)
     grants = [
         Grant('user1', 'SELECT', 'catalog1', 'schema3', 'table'),
         Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
@@ -91,7 +92,9 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
     ]
     principal_acl.get_interactive_cluster_grants.return_value = grants
-    return CatalogSchema(ws, table_mapping, principal_acl, backend)
+    hive_acl.snapshot.return_value = []
+
+    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl)
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
