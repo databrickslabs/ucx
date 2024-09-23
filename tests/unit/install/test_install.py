@@ -1102,10 +1102,10 @@ def test_save_config_should_overwrite_value(
 ) -> None:
     prompts = MockPrompts(
         {
-            prompt_question: prompt_answer,
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*": "",
+            prompt_question: prompt_answer,
         }
     )
     ws.workspace.get_status = not_found
