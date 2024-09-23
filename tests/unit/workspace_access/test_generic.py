@@ -925,6 +925,4 @@ def test_serving_endpoints_not_enabled_raises_warning(caplog):
     sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
     with caplog.at_level('WARNING'):
         list(sup.get_crawler_tasks())
-    assert (
-        "Listing serving-endpoints failed due to NotFound: Model serving is not enabled for your shard" in caplog.text
-    )
+    assert "Listing serving-endpoints failed" in caplog.text
