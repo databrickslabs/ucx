@@ -1,3 +1,4 @@
+import dataclasses
 import io
 from datetime import timedelta
 
@@ -5,7 +6,7 @@ from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.install import WorkspaceInstaller
+from databricks.labs.ucx.config import WorkspaceConfig
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
@@ -29,14 +30,15 @@ def test_running_real_assessment_job(
     installation_ctx.workspace_installation.run()
 
     # keep linting scope to minimum to avoid test timeouts
-    installer = WorkspaceInstaller(ws)
 
     notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
     job = make_job(notebook_path=notebook_path)
-    installer.replace_config(include_job_ids=[job.job_id])
-
     dashboard = make_dashboard()
-    installer.replace_config(include_dashboard_ids=[dashboard.id])
+    config = installation_ctx.installation.load(WorkspaceConfig)
+    new_config = dataclasses.replace(
+        config, include_job_idsinclude_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
+    )
+    installation_ctx.installation.save(new_config)
 
     installation_ctx.deployed_workflows.run_workflow("assessment")
     assert installation_ctx.deployed_workflows.validate_step("assessment")
