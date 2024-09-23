@@ -1,5 +1,5 @@
 /*
---title 'Dashboard migration problems'
+--title 'Dashboard compatibility problems'
 --width 6
 --overrides '{"spec":{
     "encodings":{
