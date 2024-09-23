@@ -1086,12 +1086,22 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-def test_save_config_should_include_databases(ws, mock_installation) -> None:
+@pytest.mark.parametrize(
+    "prompt_question,prompt_answer,workspace_config_overwrite",
+    [(r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]})],
+)
+def test_save_config_should_overwrite_value(
+    ws,
+    mock_installation,
+    prompt_question,
+    prompt_answer,
+    workspace_config_overwrite,
+) -> None:
     prompts = MockPrompts(
         {
+            prompt_question: prompt_answer,
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
-            r"Comma-separated list of databases to migrate.*": "db1,db2",
             r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
@@ -1107,21 +1117,23 @@ def test_save_config_should_include_databases(ws, mock_installation) -> None:
     mock_installation.assert_file_written(
         'config.yml',
         {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'ucx_catalog': 'ucx',
-            'include_databases': ['db1', 'db2'],
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'num_days_submit_runs_history': 30,
-            'recon_tolerance_percent': 5,
+            **{
+                'version': 2,
+                'default_catalog': 'ucx_default',
+                'ucx_catalog': 'ucx',
+                'inventory_database': 'ucx',
+                'log_level': 'INFO',
+                'num_threads': 8,
+                'min_workers': 1,
+                'max_workers': 10,
+                'policy_id': 'foo',
+                'renamed_group_prefix': 'db-temp-',
+                'warehouse_id': 'abc',
+                'workspace_start_path': '/',
+                'num_days_submit_runs_history': 30,
+                'recon_tolerance_percent': 5,
+            },
+            **workspace_config_overwrite,
         },
     )
 
