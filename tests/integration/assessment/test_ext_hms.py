@@ -5,10 +5,13 @@ import io
 from databricks.labs.lsql.backends import CommandExecutionBackend
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.install import WorkspaceInstaller
+
 
 def test_running_real_assessment_job_ext_hms(
     ws,
     installation_ctx,
+    product_info,
     env_or_skip,
     make_cluster_policy,
     make_cluster_policy_permissions,
@@ -41,14 +44,18 @@ def test_running_real_assessment_job_ext_hms(
     ext_hms_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     ext_hms_ctx.workspace_installation.run()
 
-    # Under ideal circumstances this can take 10-16 minutes (depending on whether there are compute instances available
-    # via the integration pool). Allow some margin to reduce spurious failures.
+    # keep linting scope to minimum to avoid test timeouts
+    installer = WorkspaceInstaller(ws).replace(product_info=product_info)
+
     notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
     job = make_job(notebook_path=notebook_path)
-    installation_ctx.config.include_job_ids = [job.job_id]
+    installer.replace_config(include_job_ids=[job.job_id])
 
     dashboard = make_dashboard()
     installation_ctx.config.include_dashboard_ids = [dashboard.id]
+
+    # Under ideal circumstances this can take 10-16 minutes (depending on whether there are compute instances available
+    # via the integration pool). Allow some margin to reduce spurious failures.
     ext_hms_ctx.deployed_workflows.run_workflow("assessment", max_wait=dt.timedelta(minutes=25))
 
     # assert the workflow is successful. the tasks on sql warehouse will fail so skip checking them
