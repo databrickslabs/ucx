@@ -41,7 +41,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
-    ctx, _, schema_name, catalog_name_ = prepared_principal_acl
+    ctx, _, schema_name, catalog_name = prepared_principal_acl
 
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     user = make_user()
@@ -55,7 +55,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
-    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name_)
+    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
     schema_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_SCHEMA])
     catalog_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_CATALOG])
     assert schema_grant in schema_grants.privilege_assignments
@@ -66,7 +66,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
 def test_create_catalog_schema_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
-    ctx, _, schema_name, catalog_name_ = prepared_principal_acl
+    ctx, _, schema_name, catalog_name = prepared_principal_acl
 
     cluster = make_cluster(
         single_node=True,
@@ -84,7 +84,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
-    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name_)
+    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
     schema_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_SCHEMA])
     catalog_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_CATALOG])
     assert schema_grant in schema_grants.privilege_assignments
