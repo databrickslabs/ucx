@@ -102,8 +102,8 @@ class AccountWorkspaces:
             # check if user has access to workspace
             ws = self.client_for(workspace)
             current_user = ws.current_user.me()
-        except (PermissionDenied, NotFound, ValueError) as err:
-            logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
+        except (PermissionDenied, NotFound, ValueError) as e:
+            logger.warning(f"User cannot access workspace: {workspace.deployment_name}", exc_info=e)
             return False
         if current_user.groups is None:
             return False

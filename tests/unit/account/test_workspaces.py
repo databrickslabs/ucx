@@ -1,3 +1,4 @@
+import logging
 import io
 import json
 from unittest.mock import create_autospec
@@ -496,13 +497,16 @@ def test_get_accessible_workspaces():
     assert len(account_workspaces.get_accessible_workspaces()) == 1
 
 
-def test_account_workspaces_can_administer_handles_permission_error_for_current_user() -> None:
+def test_account_workspaces_can_administer_handles_permission_error_for_current_user(caplog) -> None:
     acc, ws = create_autospec(AccountClient), create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
     ws.current_user.me.side_effect = PermissionDenied(
         "This API is disabled for users without the databricks-sql-access or workspace-access entitlements"
     )
-    workspace = Workspace()
+    workspace = Workspace(deployment_name="test")
     account_workspaces = AccountWorkspaces(acc)
 
-    assert not account_workspaces.can_administer(workspace)
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User cannot access workspace: test" in caplog.messages
