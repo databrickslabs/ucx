@@ -518,7 +518,7 @@ class FasterTableScanCrawler(CrawlerBase):
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Failed to list tables in {database}: {err}")
+            logger.warning(f"failed-table-crawl: listing {database} tables: {err}", exc_info=True)
             return []
 
     def _try_fetch(self) -> Iterable[Table]:
@@ -566,8 +566,8 @@ class FasterTableScanCrawler(CrawlerBase):
             view_text = self._option_as_python(raw_table.viewText())
             table_properties = list(self._iterator(raw_table.properties()))
             formatted_table_properties = self._format_properties_list(table_properties)
-        except Exception:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Couldn't fetch information for table: {full_name}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"failed-table-crawl: describing table {full_name}: {e}", exc_info=True)
             return None
         return Table(
             catalog=catalog,
