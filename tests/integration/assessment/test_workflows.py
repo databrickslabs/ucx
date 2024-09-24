@@ -10,7 +10,14 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 # pylint: disable=too-many-locals
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
-    ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions, make_dashboard, sql_backend, inventory_schema, populate_for_linting,
+    ws,
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+    make_dashboard,
+    sql_backend,
+    inventory_schema,
+    populate_for_linting,
 ):
     ws_group, _ = installation_ctx.make_ucx_group()
     cluster_policy = make_cluster_policy()
