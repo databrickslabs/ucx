@@ -1190,7 +1190,7 @@ def populate_for_linting(ws, make_random, make_job, make_notebook, make_query, m
         file_path = WorkspacePath(ws, installation.install_folder()) / file_name
         file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
         path = Path(installation.install_folder()) / f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
-        notebook_text = f"import {file_name}\nspark.read.parquet('dbfs://mnt/foo1/bar1')"
+        notebook_text = f"import ./{file_name}\nspark.read.parquet('dbfs://mnt/foo1/bar1')"
         notebook_path = make_notebook(path=path, content=io.BytesIO(notebook_text.encode("utf-8")))
         job = make_job(notebook_path=notebook_path)
         query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
