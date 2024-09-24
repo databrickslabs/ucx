@@ -499,9 +499,10 @@ def test_get_accessible_workspaces():
 def test_account_workspaces_can_administer_handles_permission_error_for_current_user() -> None:
     acc, ws = create_autospec(AccountClient), create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
-    ws.current_user.me.side_effect = PermissionDenied("This API is disabled for users without the databricks-sql-access or workspace-access entitlements")
+    ws.current_user.me.side_effect = PermissionDenied(
+        "This API is disabled for users without the databricks-sql-access or workspace-access entitlements"
+    )
     workspace = Workspace()
     account_workspaces = AccountWorkspaces(acc)
 
     assert not account_workspaces.can_administer(workspace)
-
