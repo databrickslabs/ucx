@@ -274,7 +274,7 @@ make test
 
 Before every commit, apply the consistent styleguide and formatting of the code, as we want our codebase to look consistent. Consult the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) if you have any doubts. Make sure to run the tests.
 ```shell
-make fmt test
+make fmt lint test
 ```
 
 ## Getting overview of linter message codes
@@ -316,15 +316,17 @@ Here are the example steps to submit your first contribution:
 6. ... do the work
 7. `make fmt`
 8. ... fix if any
-9. `make test`
+9. `make lint`
 10. ... fix if any
-11. `git commit -a`. Make sure to enter a meaningful commit message title.
-12. `git push origin FEATURENAME`
-13. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed).
+11. `make test`
+12. ... fix if any
+13. `git commit -a`. Make sure to enter a meaningful commit message title.
+14. `git push origin FEATURENAME`
+15. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed).
     Use a meaningful pull request title because it'll appear in the release notes. Use `Resolves #NUMBER` in pull
     request description to [automatically link it](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests#linking-a-pull-request-to-an-issue)
     to an existing issue.
-14. Announce PR for the review.
+16. Announce PR for the review.
 
 ## Troubleshooting
 
