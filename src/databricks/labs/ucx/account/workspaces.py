@@ -118,9 +118,7 @@ class AccountWorkspaces:
         if current_user.groups is None:
             return False
         if "admins" not in [g.display for g in current_user.groups]:
-            logger.warning(
-                f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
-            )
+            logger.warning(f"User '{current_user.user_name}' is not a workspace admin: {workspace.deployment_name}")
             return False
         return True
 
