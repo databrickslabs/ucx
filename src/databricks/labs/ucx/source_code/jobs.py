@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
+from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
