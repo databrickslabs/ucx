@@ -116,15 +116,17 @@ class TableMapping:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
 
-    def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None], unskip: bool = False):
+    def skip_table_or_view(
+        self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None], unskip: bool = False
+    ):
         # Marks a table to be skipped in the migration process by applying a table property
-        unskip = "false" if unskip else "true"
+        skip_flag = "false" if unskip else "true"
         try:
             table = load_table(schema_name, table_name)
             if table is None:
                 raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
             self._sql_backend.execute(
-                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {unskip})"
+                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {skip_flag})"
             )
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
@@ -138,10 +140,10 @@ class TableMapping:
 
     def skip_schema(self, schema: str, unskip: bool = False):
         # Marks a schema to be skipped in the migration process by applying a table property
-        unskip = "false" if unskip else "true"
+        skip_flag = "false" if unskip else "true"
         try:
             self._sql_backend.execute(
-                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {unskip})"
+                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {skip_flag})"
             )
         except NotFound as err:
             if "[SCHEMA_NOT_FOUND]" in str(err):
@@ -211,7 +213,7 @@ class TableMapping:
             return None
 
         for value in properties:
-            #TODO : there should be a check to see if this property is equal to true then skip and if false then ignore
+            # TODO : there should be a check to see if this property is equal to true then skip and if false then ignore
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
                 return None

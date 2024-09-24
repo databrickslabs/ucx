@@ -97,6 +97,8 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
+
+@ucx.command
 def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
     """Create a unskip comment on a schema or a table"""
     logger.info("Running unskip command")
