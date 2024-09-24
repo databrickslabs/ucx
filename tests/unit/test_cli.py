@@ -874,7 +874,7 @@ def test_show_all_metastores(acc_client, caplog):
     assert 'Matching metastores are:' in caplog.messages
 
 
-def test_assign_metastore(acc_client, caplog):
+def test_assign_metastore(acc_client) -> None:
     with pytest.raises(ValueError):
         assign_metastore(acc_client, "123")
 
