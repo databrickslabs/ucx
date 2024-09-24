@@ -35,7 +35,7 @@ class AccountMetastores:
             # search for all matching metastores
             metastore_choices = self._get_all_metastores(self._get_region(workspace_id))
             if len(metastore_choices) == 0:
-                raise ValueError(f"No matching metastore found for workspace {workspace_id}")
+                raise ValueError(f"No matching metastore found for workspace: {workspace_id}")
             # if there are multiple matches, prompt users to select one
             if len(metastore_choices) > 1:
                 metastore_id = prompts.choice_from_dict(
