@@ -4,7 +4,7 @@
 --overrides '{"spec":{
     "encodings":{
       "columns": [
-        {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ link }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},
+        {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "/#workspace/{{ link }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},
         {"fieldName": "code", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "code"},
         {"fieldName": "message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "message"},
         {"fieldName": "workflow_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/jobs/{{ workflow_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "workflow_name"},
@@ -21,8 +21,8 @@
   }}'
 */
 SELECT
-  path,
-  if ( contains(path, '.'), concat('/#files/', path), concat('/#notebook/', path) ) as link,
+  substring_index(path, '@databricks.com/', -1) as path,
+  path as link,
   code,
   message,
   job_id AS workflow_id,

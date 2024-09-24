@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.blueprint.paths import DBFSPath
+from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -86,7 +86,7 @@ class WorkflowTask(Dependency):
     @property
     def lineage(self) -> list[LineageAtom]:
         job_name = (None if self._job.settings is None else self._job.settings.name) or "unknown job"
-        job_lineage = LineageAtom("JOB", str(self._job.job_id), {"name": job_name})
+        job_lineage = LineageAtom("WORKFLOW", str(self._job.job_id), {"name": job_name})
         task_lineage = LineageAtom("TASK", f"{self._job.job_id}/{self._task.task_key}")
         return [job_lineage, task_lineage]
 
@@ -406,16 +406,12 @@ class WorkflowLinter:
             if not advices:
                 advices = self._lint_task(task, graph, session_state, linted_paths)
             for advice in advices:
-                relative_path = advice.path.as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
-                domain = "@databricks.com/"
-                idx = relative_path.index(domain)
-                if idx >= 0:
-                    relative_path = relative_path[idx + len(domain):]
+                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,
                     task_key=task.task_key,
-                    path=relative_path,
+                    path=absolute_path,
                     code=advice.advice.code,
                     message=advice.advice.message,
                     start_line=advice.advice.start_line,
