@@ -501,11 +501,25 @@ def test_account_workspaces_can_administer_when_user_in_admins_group() -> None:
     acc = create_autospec(AccountClient)
     ws = create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
-    ws.current_user.me.return_value = User(groups=[ComplexValue(display="admins")])
+    ws.current_user.me.return_value = User(user_name="test", groups=[ComplexValue(display="admins")])
     account_workspaces = AccountWorkspaces(acc)
     workspace = Workspace(deployment_name="test")
 
     assert account_workspaces.can_administer(workspace)
+
+
+def test_account_workspaces_cannot_administer_when_user_not_in_admins_group(caplog) -> None:
+    acc = create_autospec(AccountClient)
+    ws = create_autospec(WorkspaceClient)
+    acc.get_workspace_client.return_value = ws
+    ws.current_user.me.return_value = User(user_name="test", groups=[ComplexValue(display="not-admins")])
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User 'test' is not a workspace admin: test" in caplog.messages
 
 
 def test_account_workspaces_can_administer_handles_permission_denied_error_for_current_user(caplog) -> None:
