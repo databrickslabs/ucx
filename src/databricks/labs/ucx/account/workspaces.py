@@ -98,8 +98,18 @@ class AccountWorkspaces:
         return accessible_workspaces
 
     def can_administer(self, workspace: Workspace) -> bool:
+        """Evaluate if the user can administer a workspace.
+
+        A user can administer a workspace if the user can access the workspace and is a member of the workspace "admin"
+        group.
+
+        Args:
+            workspace (Workspace): The workspace to check if the user can administer.
+
+        Returns:
+            bool: True if the user can administer the workspace, False otherwise.
+        """
         try:
-            # check if user has access to workspace
             ws = self.client_for(workspace)
             current_user = ws.current_user.me()
         except (PermissionDenied, NotFound, ValueError) as e:
@@ -107,7 +117,6 @@ class AccountWorkspaces:
             return False
         if current_user.groups is None:
             return False
-        # check if user is a workspace admin
         if "admins" not in [g.display for g in current_user.groups]:
             logger.warning(
                 f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
