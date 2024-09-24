@@ -55,14 +55,13 @@ def test_assign_metastore(acc_client):
         etag="123", namespace=StringMessage("hive_metastore")
     )
     account_metastores = AccountMetastores(acc_client)
-    prompts = MockPrompts({"Multiple metastores found, please select one*": "0", "Please select a workspace:*": "0"})
+    prompts = MockPrompts({"Multiple metastores found, please select one*": "0"})
 
-    # need to select a workspace - since it is alphabetically sorted, needs to pick workspace bar
-    account_metastores.assign_metastore(prompts, "", "", "")
+    account_metastores.assign_metastore(prompts, 123457, "", "")
     acc_client.metastore_assignments.create.assert_called_with(123457, "123")
 
     # multiple metastores & default catalog name, need to choose one
-    account_metastores.assign_metastore(prompts, "123456", "", "main")
+    account_metastores.assign_metastore(prompts, 123456, "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
@@ -72,7 +71,7 @@ def test_assign_metastore(acc_client):
 
     # default catalog not found, still get etag
     ws.settings.default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
-    account_metastores.assign_metastore(prompts, "123456", "", "main")
+    account_metastores.assign_metastore(prompts, 123456, "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
@@ -82,10 +81,10 @@ def test_assign_metastore(acc_client):
 
     # only one metastore, should assign directly
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-east-2")
-    account_metastores.assign_metastore(MockPrompts({}), "123456")
+    account_metastores.assign_metastore(MockPrompts({}), 123456)
     acc_client.metastore_assignments.create.assert_called_with(123456, "126")
 
     # no metastore found, error
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-central-2")
     with pytest.raises(ValueError):
-        account_metastores.assign_metastore(MockPrompts({}), "123456")
+        account_metastores.assign_metastore(MockPrompts({}), 123456)
