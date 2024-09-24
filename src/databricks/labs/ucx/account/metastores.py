@@ -43,8 +43,7 @@ class AccountMetastores:
                 )
             else:
                 metastore_id = list(metastore_choices.values())[0]
-        if metastore_id is not None:
-            self._ac.metastore_assignments.create(workspace_id, metastore_id)
+        self._ac.metastore_assignments.create(workspace_id, metastore_id)
         # set the default catalog using the default_namespace setting API
         if default_catalog is not None:
             self._set_default_catalog(workspace_id, default_catalog)
