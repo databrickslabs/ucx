@@ -31,7 +31,7 @@ class AccountMetastores:
         metastore_id: str | None = None,
         default_catalog: str | None = None,
     ):
-        if not metastore_id:
+        if metastore_id is None:
             # search for all matching metastores
             metastore_choices = self._get_all_metastores(self._get_region(workspace_id))
             if len(metastore_choices) == 0:

@@ -23,8 +23,10 @@ class AccountContext(CliContext):
         """The first workspace client available"""
         workspace_id = self.named_parameters.get("workspace_id")
         if workspace_id is not None:
-            workspace_id = int(workspace_id)
-        workspace = Workspace(workspace_id=workspace_id)
+            workspace_id_casted = int(workspace_id)
+        else:
+            workspace_id_casted = None
+        workspace = Workspace(workspace_id=workspace_id_casted)
         workspace_client = self.account_workspaces.client_for(workspace)
         return workspace_client
 
