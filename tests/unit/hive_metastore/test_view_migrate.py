@@ -36,8 +36,9 @@ def test_view_to_migrate_sql_migrate_view_sql():
 
     assert sql == expected_query
 
+
 def test_view_with_alias_to_migrate_sql_migrate_view_sql():
-    expected_query = "CREATE OR REPLACE VIEW IF NOT EXISTS `cat1`.`schema1`.`dest_view1` AS SELECT `A`.* FROM `cat1`.`schema1`.`dest_table1` as `A`"
+    expected_query = "CREATE OR REPLACE VIEW IF NOT EXISTS `cat1`.`schema1`.`dest_view1` AS SELECT `A`.* FROM `cat1`.`schema1`.`dest_table1` AS `A`"
     view = Table(
         object_type="VIEW",
         table_format="VIEW",
@@ -59,6 +60,7 @@ def test_view_with_alias_to_migrate_sql_migrate_view_sql():
     sql = view_to_migrate.sql_migrate_view(migration_index)
 
     assert sql == expected_query
+
 
 @pytest.fixture(scope="session")
 def samples() -> dict[str, dict[str, str]]:

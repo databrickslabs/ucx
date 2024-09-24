@@ -340,6 +340,7 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
     assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
 
+
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_view_alias_test(ws, sql_backend, runtime_ctx, make_catalog):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
