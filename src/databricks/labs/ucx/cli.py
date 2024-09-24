@@ -594,12 +594,12 @@ def assign_metastore(
 ):
     """Assign metastore to a workspace"""
     if not workspace_id:
-        logger.error("--workspace_id is a required parameter.")
+        logger.error("--workspace-id is a required parameter.")
         return
     try:
         workspace_id_casted = int(workspace_id)
     except ValueError as e:
-        logger.error("--workspace_id should be an integer.", exc_info=e)
+        logger.error("--workspace-id should be an integer.", exc_info=e)
         return
     ctx = ctx or AccountContext(a, named_parameters={"workspace_id": workspace_id})
     logger.info(f"Account ID: {ctx.account_client.config.account_id}")
