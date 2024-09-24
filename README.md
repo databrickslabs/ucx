@@ -125,6 +125,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`upload` command](#upload-command)
   * [`download` command](#download-command)
   * [`join-collection` command](#join-collection command)
+  * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
