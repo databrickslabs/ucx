@@ -27,15 +27,10 @@ class AccountMetastores:
     def assign_metastore(
         self,
         prompts: Prompts,
-        str_workspace_id: str | None = None,
+        workspace_id: int,
         metastore_id: str | None = None,
         default_catalog: str | None = None,
     ):
-        if not str_workspace_id:
-            workspace_choices = self._get_all_workspaces()
-            workspace_id = prompts.choice_from_dict("Please select a workspace:", workspace_choices)
-        else:
-            workspace_id = int(str_workspace_id)
         if not metastore_id:
             # search for all matching metastores
             metastore_choices = self._get_all_metastores(self._get_region(workspace_id))
