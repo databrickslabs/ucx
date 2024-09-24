@@ -508,11 +508,12 @@ def test_account_workspaces_can_administer_when_user_in_admins_group() -> None:
     assert account_workspaces.can_administer(workspace)
 
 
-def test_account_workspaces_cannot_administer_when_user_not_in_admins_group(caplog) -> None:
+@pytest.mark.parametrize("groups", [[ComplexValue(display="not-admins")], None])
+def test_account_workspaces_cannot_administer_when_user_not_in_admins_group(caplog, groups) -> None:
     acc = create_autospec(AccountClient)
     ws = create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
-    ws.current_user.me.return_value = User(user_name="test", groups=[ComplexValue(display="not-admins")])
+    ws.current_user.me.return_value = User(user_name="test", groups=groups)
     account_workspaces = AccountWorkspaces(acc)
     workspace = Workspace(deployment_name="test")
 
