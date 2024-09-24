@@ -6,7 +6,7 @@ import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceConflict
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
@@ -494,3 +494,14 @@ def test_get_accessible_workspaces():
     acc.config.auth_type = "databricks-cli"
     account_workspaces = AccountWorkspaces(acc)
     assert len(account_workspaces.get_accessible_workspaces()) == 1
+
+
+def test_account_workspaces_can_administer_handles_permission_error_for_current_user() -> None:
+    acc, ws = create_autospec(AccountClient), create_autospec(WorkspaceClient)
+    acc.get_workspace_client.return_value = ws
+    ws.current_user.me.side_effect = PermissionDenied("This API is disabled for users without the databricks-sql-access or workspace-access entitlements")
+    workspace = Workspace()
+    account_workspaces = AccountWorkspaces(acc)
+
+    assert not account_workspaces.can_administer(workspace)
+
