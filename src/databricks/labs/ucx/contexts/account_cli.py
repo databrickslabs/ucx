@@ -22,11 +22,9 @@ class AccountContext(CliContext):
     def workspace_client(self) -> WorkspaceClient:
         """The workspace client when workspace_id is provided."""
         workspace_id = self.named_parameters.get("workspace_id")
-        if workspace_id is not None:
-            workspace_id_casted = int(workspace_id)
-        else:
-            workspace_id_casted = None
-        workspace = Workspace(workspace_id=workspace_id_casted)
+        if workspace_id is None:
+            raise ValueError(f"Missing workspace id to create workspace client: {self.named_parameters}")
+        workspace = self._ac.workspaces.get(int(workspace_id))
         workspace_client = self.account_workspaces.client_for(workspace)
         return workspace_client
 
