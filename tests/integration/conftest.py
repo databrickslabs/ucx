@@ -1,4 +1,3 @@
-import dataclasses
 import io
 import json
 from collections.abc import Callable, Generator
@@ -11,11 +10,15 @@ from datetime import timedelta
 from functools import cached_property
 import shutil
 import subprocess
+from pathlib import Path
+
 import pytest  # pylint: disable=wrong-import-order
+import yaml
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
@@ -1180,16 +1183,21 @@ def pytest_ignore_collect(path):
 
 
 @pytest.fixture
-def populator_for_linting(make_job, make_notebook, make_dashboard):
+def populate_for_linting(ws, make_random, make_job, make_notebook, make_dashboard, watchdog_purge_suffix):
     def populate_workspace(installation):
         # keep linting scope to minimum to avoid test timeouts
-        notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
+        path = Path(installation.install_folder()) / f"dummy-{make_random(4)}-{watchdog_purge_suffix}"
+        notebook_path = make_notebook(path=path, content=io.BytesIO(b"import xyz"))
         job = make_job(notebook_path=notebook_path)
         dashboard = make_dashboard()
-        config = installation.load(WorkspaceConfig)
-        new_config = dataclasses.replace(
-            config, include_job_ids=[job.job_id], include_dashboard_ids=[dashboard.id]
-        )
-        installation.save(new_config)
+        # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
+        config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
+        text = config_path.read_text()
+        config = yaml.safe_load(text)
+        config["include_job_ids"] = [job.job_id]
+        config["include_dashboard_ids"] = [dashboard.id]
+        text = yaml.dump(config)
+        config_path.unlink()
+        config_path.write_text(text)
 
     return populate_workspace

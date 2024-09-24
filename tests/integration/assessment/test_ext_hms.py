@@ -12,7 +12,7 @@ def test_running_real_assessment_job_ext_hms(
     env_or_skip,
     make_cluster_policy,
     make_cluster_policy_permissions,
-    populator_for_linting,
+    populate_for_linting,
 ):
     cluster_id = env_or_skip('TEST_EXT_HMS_CLUSTER_ID')
     ext_hms_ctx = installation_ctx.replace(
@@ -39,7 +39,7 @@ def test_running_real_assessment_job_ext_hms(
     ext_hms_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     ext_hms_ctx.workspace_installation.run()
 
-    populator_for_linting(installation_ctx.installation)
+    populate_for_linting(installation_ctx.installation)
 
     # Under ideal circumstances this can take 10-16 minutes (depending on whether there are compute instances available
     # via the integration pool). Allow some margin to reduce spurious failures.

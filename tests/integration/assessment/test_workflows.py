@@ -11,7 +11,7 @@ def test_running_real_assessment_job(
     installation_ctx,
     make_cluster_policy,
     make_cluster_policy_permissions,
-    populator_for_linting,
+    populate_for_linting,
 ):
     ws_group, _ = installation_ctx.make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -23,7 +23,7 @@ def test_running_real_assessment_job(
     installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     installation_ctx.workspace_installation.run()
 
-    populator_for_linting(installation_ctx.installation)
+    populate_for_linting(installation_ctx.installation)
 
     installation_ctx.deployed_workflows.run_workflow("assessment")
     assert installation_ctx.deployed_workflows.validate_step("assessment")
