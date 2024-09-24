@@ -498,7 +498,8 @@ def test_get_accessible_workspaces():
 
 
 def test_account_workspaces_can_administer_handles_permission_denied_error_for_current_user(caplog) -> None:
-    acc, ws = create_autospec(AccountClient), create_autospec(WorkspaceClient)
+    acc = create_autospec(AccountClient)
+    ws = create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
     ws.current_user.me.side_effect = PermissionDenied(
         "This API is disabled for users without the databricks-sql-access or workspace-access entitlements"
