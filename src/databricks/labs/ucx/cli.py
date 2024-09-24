@@ -596,6 +596,11 @@ def assign_metastore(
     if not workspace_id:
         logger.error("--workspace_id is a required parameter.")
         return None
+    try:
+        workspace_id = int(workspace_id)
+    except ValueError as e:
+        logger.error("--workspace_id should be an integer.", exc_info=e)
+        return None
     ctx = ctx or AccountContext(a)
     logger.info(f"Account ID: {ctx.account_client.config.account_id}")
     ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
