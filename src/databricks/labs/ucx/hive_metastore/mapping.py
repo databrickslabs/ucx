@@ -242,7 +242,6 @@ class TableMapping:
             return None
 
         for value in properties:
-            # TODO : there should be a check to see if this property is equal to true then skip and if false then ignore
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
                 return None
