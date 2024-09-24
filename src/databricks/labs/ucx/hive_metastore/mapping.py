@@ -116,17 +116,14 @@ class TableMapping:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None
 
-    def skip_table_or_view(
-        self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None], unskip: bool = False
-    ):
+    def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
         # Marks a table to be skipped in the migration process by applying a table property
-        skip_flag = "false" if unskip else "true"
         try:
             table = load_table(schema_name, table_name)
             if table is None:
                 raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
             self._sql_backend.execute(
-                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {skip_flag})"
+                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
@@ -138,16 +135,48 @@ class TableMapping:
         except BadRequest as err:
             logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True)
 
-    def skip_schema(self, schema: str, unskip: bool = False):
+    def unskip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
+        # Removes skip mark from the table property
+        try:
+            table = load_table(schema_name, table_name)
+            if table is None:
+                raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+            self._sql_backend.execute(
+                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}' );"
+            )
+        except NotFound as err:
+            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
+                logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}. Table not found.")
+            else:
+                logger.error(
+                    f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True
+                )
+        except BadRequest as err:
+            logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True)
+
+    def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
-        skip_flag = "false" if unskip else "true"
         try:
             self._sql_backend.execute(
-                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = {skip_flag})"
+                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as err:
             if "[SCHEMA_NOT_FOUND]" in str(err):
                 logger.error(f"Failed to apply skip marker for Schema {schema}. Schema not found.")
+            else:
+                logger.error(err)
+        except BadRequest as err:
+            logger.error(err)
+
+    def unskip_schema(self, schema: str):
+        # Removes skip mark from the schema property
+        try:
+            self._sql_backend.execute(
+                f"ALTER SCHEMA {escape_sql_identifier(schema)} UNSET DBPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
+            )
+        except NotFound as err:
+            if "[SCHEMA_NOT_FOUND]" in str(err):
+                logger.error(f"Failed to remove skip marker for Schema {schema}. Schema not found.")
             else:
                 logger.error(err)
         except BadRequest as err:
