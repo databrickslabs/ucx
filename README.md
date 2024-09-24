@@ -1796,15 +1796,15 @@ $ databricks labs ucx join-collection --workspace-ids <comma seperate list of wo
 
 `join-collection` command joins 2 or more workspaces into a collection. This helps in running supported cli commands as a collection
 `join-collection` command updates config.yml file on each workspace ucx installation with installed_workspace_ids attribute.
-In order to run `join-collectioon` command a user should be:
- - Account admin on the Databricks account
- - Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
- - should have installed UCX on the workspace
+In order to run `join-collectioon` command a user should:
+ - be an Account admin on the Databricks account
+ - be a Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
+ - have installed UCX on the workspace
 The `join-collection` command will fail and throw an error msg if the above conditions are not met.
 
 ## collection eligible command
 
-Once `join-collection` command run, it allows user to run multiple cli commands as a collection. The following cli commands
+Once `join-collection` command is run, it allows user to run multiple cli commands as a collection. The following cli commands
 are eligible to be run as a collection. User can run the below commands as collection by passing an additional flag `--run-as-collection=True`
 - `ensure-assessment-run`
 - `create-table-mapping`
