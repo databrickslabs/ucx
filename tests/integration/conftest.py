@@ -1,3 +1,4 @@
+import io
 import json
 from collections.abc import Callable, Generator
 import functools
@@ -9,11 +10,15 @@ from datetime import timedelta
 from functools import cached_property
 import shutil
 import subprocess
+from pathlib import Path
+
 import pytest  # pylint: disable=wrong-import-order
+import yaml
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
@@ -1175,3 +1180,25 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
+
+
+@pytest.fixture
+def populate_for_linting(ws, make_random, make_job, make_notebook, make_query, make_dashboard, watchdog_purge_suffix):
+    def populate_workspace(installation):
+        # keep linting scope to minimum to avoid test timeouts
+        path = Path(installation.install_folder()) / f"dummy-{make_random(4)}-{watchdog_purge_suffix}"
+        notebook_path = make_notebook(path=path, content=io.BytesIO(b"spark.read.parquet('dbfs://mnt/foo/bar')"))
+        job = make_job(notebook_path=notebook_path)
+        query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo/bar`')
+        dashboard = make_dashboard(query=query)
+        # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
+        config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
+        text = config_path.read_text()
+        config = yaml.safe_load(text)
+        config["include_job_ids"] = [job.job_id]
+        config["include_dashboard_ids"] = [dashboard.id]
+        text = yaml.dump(config)
+        config_path.unlink()
+        config_path.write_text(text)
+
+    return populate_workspace
