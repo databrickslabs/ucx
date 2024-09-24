@@ -52,10 +52,10 @@ class CatalogSchema:
                             f"Schema {candidate_schema} in catalog {candidate_catalog} " f"already exists. Skipping."
                         )
                         continue
-        self._update_grants_acl()
+        self._apply_from_legacy_table_acls()
         self._update_principal_acl()
 
-    def _update_grants_acl(self):
+    def _apply_from_legacy_table_acls(self):
         grants = self._get_catalog_schema_hive_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
@@ -77,15 +77,13 @@ class CatalogSchema:
             self._backend.execute(acl_migrate_sql)
 
     def _get_catalog_schema_hive_grants(self) -> list[Grant]:
-        src_trg_schema_mapping = self._get_database_source_target_mapping()
+        src_dst_schema_mapping = self._get_database_source_target_mapping()
         hive_grants = self._hive_grants_crawler.snapshot()
         new_grants: list[Grant] = []
         for grant in hive_grants:
-            if grant.catalog and grant.database and not grant.table and not grant.view and not grant.udf:
-                new_grants.extend(
-                    replace(grant, catalog=schema.catalog_name, database=schema.name)
-                    for schema in src_trg_schema_mapping[grant.database]
-                )
+            if grant.this_type_and_key()[0] == "DATABASE" and grant.database:
+                for schema in src_dst_schema_mapping[grant.database]:
+                    new_grants.append(replace(grant, catalog=schema.catalog_name, database=schema.name))
         catalog_grants: set[Grant] = set()
         for grant in new_grants:
             catalog_grants.add(replace(grant, database=None))
