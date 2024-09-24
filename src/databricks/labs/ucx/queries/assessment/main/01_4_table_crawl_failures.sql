@@ -1,6 +1,8 @@
+/*
 --title 'Table Crawl Failures'
 --height 4
---width 5
+--width 4
+*/
 WITH table_crawl_failures AS (
 SELECT
     timestamp,
