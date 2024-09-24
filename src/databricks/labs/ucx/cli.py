@@ -600,7 +600,10 @@ def assign_metastore(
 
 @ucx.command
 def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
-    """Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces."""
+    """Create and setup UCX artifact catalog
+
+    Amongst other things, the artifacts are used for tracking the migration progress across workspaces.
+    """
     workspace_context = ctx or WorkspaceContext(w)
     workspace_context.catalog_schema.create_ucx_catalog(prompts)
 

@@ -1170,10 +1170,10 @@ databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-
 ```
 
 This command assigns a metastore to a workspace with `workspace-id`. If there is only a single metastore in the
-workspace region, the command automatically assigns to the workspace. If there are multiple metastores available, the
-command prompts for specification of the metastore (id) you want to assign to the workspace.
+workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
+available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
 
-Finally, the command setups up the metastore with a UCX artifact catalog. The command prompts for the catalog name.
+Finally, the command sets up the metastore with a UCX artifact catalog. The command prompts for the catalog name.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1186,7 +1186,8 @@ Please provide storage location url for catalog: ucx (default: metastore): ...
 16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
 ```
 
-Create UCX catalog for tracking the migration progress (possibly) across multiple workspaces.
+Create and setup UCX artifact catalog. Amongst other things, the artifacts are used for tracking the migration progress
+across workspaces.
 
 # Table migration commands
 
