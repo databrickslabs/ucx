@@ -28,6 +28,7 @@ class AccountMetastores:
         self,
         prompts: Prompts,
         workspace_id: int,
+        *,
         metastore_id: str | None = None,
         default_catalog: str | None = None,
     ):

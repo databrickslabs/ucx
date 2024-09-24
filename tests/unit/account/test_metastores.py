@@ -57,11 +57,11 @@ def test_assign_metastore(acc_client):
     account_metastores = AccountMetastores(acc_client)
     prompts = MockPrompts({"Multiple metastores found, please select one*": "0"})
 
-    account_metastores.assign_metastore(prompts, 123457, "", "")
+    account_metastores.assign_metastore(prompts, 123457)
     acc_client.metastore_assignments.create.assert_called_with(123457, "123")
 
     # multiple metastores & default catalog name, need to choose one
-    account_metastores.assign_metastore(prompts, 123456, "", "main")
+    account_metastores.assign_metastore(prompts, 123456, default_catalog="main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
@@ -71,7 +71,7 @@ def test_assign_metastore(acc_client):
 
     # default catalog not found, still get etag
     ws.settings.default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
-    account_metastores.assign_metastore(prompts, 123456, "", "main")
+    account_metastores.assign_metastore(prompts, 123456, default_catalog="main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
