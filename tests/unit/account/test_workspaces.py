@@ -497,7 +497,7 @@ def test_get_accessible_workspaces():
     assert len(account_workspaces.get_accessible_workspaces()) == 1
 
 
-def test_account_workspaces_can_administer_handles_permission_error_for_current_user(caplog) -> None:
+def test_account_workspaces_can_administer_handles_permission_denied_error_for_current_user(caplog) -> None:
     acc, ws = create_autospec(AccountClient), create_autospec(WorkspaceClient)
     acc.get_workspace_client.return_value = ws
     ws.current_user.me.side_effect = PermissionDenied(
