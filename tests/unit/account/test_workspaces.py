@@ -523,6 +523,18 @@ def test_account_workspaces_cannot_administer_when_user_not_in_admins_group(capl
     assert "User 'test' is not a workspace admin: test" in caplog.messages
 
 
+def test_account_workspaces_can_administer_handles_not_found_error_for_get_workspace_client(caplog) -> None:
+    acc = create_autospec(AccountClient)
+    acc.get_workspace_client.side_effect = NotFound
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User cannot access workspace: test" in caplog.messages
+
+
 def test_account_workspaces_can_administer_handles_permission_denied_error_for_current_user(caplog) -> None:
     acc = create_autospec(AccountClient)
     ws = create_autospec(WorkspaceClient)
