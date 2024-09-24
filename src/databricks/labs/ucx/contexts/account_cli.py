@@ -1,7 +1,7 @@
 from functools import cached_property
 from os import environ
 
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import AccountClient, Workspace, WorkspaceClient
 
 from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.metastores import AccountMetastores
@@ -21,10 +21,12 @@ class AccountContext(CliContext):
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
         """The first workspace client available"""
-        workspace_clients = self.account_workspaces.workspace_clients()
-        if len(workspace_clients) == 0:
-            return super().workspace_client
-        return workspace_clients[0]
+        workspace_id = self.named_parameters.get("workspace_id")
+        if workspace_id is not None:
+            workspace_id = int(workspace_id)
+        workspace = Workspace(workspace_id=workspace_id)
+        workspace_client = self.account_workspaces.client_for(workspace)
+        return workspace_client
 
     @cached_property
     def workspace_ids(self):
