@@ -124,6 +124,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
   * [`upload` command](#upload-command)
   * [`download` command](#download-command)
+  * [`join-collection` command](#join-collection command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
@@ -1785,6 +1786,38 @@ $ databricks labs ucx download --file <file_path> --run-as-collection True
 
 Download a csv file from a single workspace (`--run-as-collection False`) or a collection of workspaces
 (`--run-as-collection True`). This command is especially useful when downloading the same file from multiple workspaces.
+
+## `join-collection` command
+
+```text
+$ databricks labs ucx join-collection --workspace-ids <comma seperate list of workspace ids> --profile <account-profile>
+```
+
+`join-collection` command joins 2 or more workspaces into a collection. This helps in running supported cli commands as a collection
+`join-collection` command updates config.yml file on each workspace ucx installation with installed_workspace_ids attribute.
+In order to run `join-collectioon` command a user should be:
+ - Account admin on the Databricks account
+ - Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
+ - should have installed UCX on the workspace
+The `join-collection` command will fail and throw an error msg if the above conditions are not met.
+
+## collection eligible command
+
+Once `join-collection` command run, it allows user to run multiple cli commands as a collection. The following cli commands
+are eligible to be run as a collection. User can run the below commands as collection by passing an additional flag `--run-as-collection=True`
+- `ensure-assessment-run`
+- `create-table-mapping`
+- `principal-prefix-access`
+- `migrate-credentials`
+- `create-uber-principal`
+- `create-missing-principals`
+- `validate-external-location`
+- `migrate-locations`
+- `create-catalog-schemas`
+- `migrate-tables`
+- `migrate-acls`
+- `migrate-dbsql-dashboards`
+- `validate-group-membership`
 
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
