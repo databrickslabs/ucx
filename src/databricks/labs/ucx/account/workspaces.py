@@ -100,7 +100,7 @@ class AccountWorkspaces:
     def can_administer(self, workspace: Workspace) -> bool:
         """Evaluate if the user can administer a workspace.
 
-        A user can administer a workspace if the user can access the workspace and is a member of the workspace "admin"
+        A user can administer a workspace if the user can access the workspace and is a member of the workspace "admins"
         group.
 
         Args:
