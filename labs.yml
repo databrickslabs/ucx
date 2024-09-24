@@ -261,9 +261,7 @@ commands:
 
   - name: assign-metastore
     is_account_level: true
-    description: |
-      Enable Unity Catalog features on a workspace by assigning a metastore to it. Also, a UCX artifact catalog is
-      setup.
+    description: Enable Unity Catalog features on a workspace by assigning a metastore to it.
     flags:
       - name: workspace-id
         description: Workspace ID to assign a metastore to

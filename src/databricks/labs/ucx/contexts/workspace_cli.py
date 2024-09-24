@@ -17,7 +17,6 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
-from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -179,13 +178,6 @@ class WorkspaceContext(CliContext):
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return NotebookLoader()
-
-    @cached_property
-    def catalog_schema(self) -> CatalogSchema:
-        # TODO: Split `CatalogSchema` into `Catalogs` and `Schemas` https://github.com/databrickslabs/ucx/issues/2735
-        return CatalogSchema(
-            self.workspace_client, self.config.ucx_catalog, self.principal_acl, self.table_mapping, self.sql_backend
-        )
 
 
 class LocalCheckoutContext(WorkspaceContext):

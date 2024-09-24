@@ -593,20 +593,14 @@ def assign_metastore(
     ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
-    if not workspace_id:
-        logger.error("--workspace-id is a required parameter.")
-        return
-    try:
-        workspace_id_casted = int(workspace_id)
-    except ValueError as e:
-        logger.error("--workspace-id should be an integer.", exc_info=e)
-        return
-    ctx = ctx or AccountContext(a, named_parameters={"workspace_id": workspace_id})
-    logger.info(f"Account ID: {ctx.account_client.config.account_id}")
+    logger.info(f"Account ID: {a.config.account_id}")
+    ctx = ctx or AccountContext(a)
     ctx.account_metastores.assign_metastore(
-        ctx.prompts, workspace_id_casted, metastore_id=metastore_id, default_catalog=default_catalog
+        ctx.prompts,
+        workspace_id,
+        metastore_id=metastore_id,
+        default_catalog=default_catalog,
     )
-    ctx.catalog_schema.create_ucx_catalog(ctx.prompts)
 
 
 @ucx.command

@@ -874,9 +874,8 @@ def test_show_all_metastores(acc_client, caplog):
     assert 'Matching metastores are:' in caplog.messages
 
 
-def test_assign_metastore_assigns_metastore_and_creates_catalog(caplog, acc_client, ws, mock_backend) -> None:
-    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
-    ctx = AccountContext(acc_client).replace(workspace_client=ws, sql_backend=mock_backend, prompts=prompts)
+def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_client) -> None:
+    ctx = AccountContext(acc_client)
     acc_client.metastores.list.return_value = [MetastoreInfo(name="test", metastore_id="123")]
 
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.cli"):
@@ -884,7 +883,6 @@ def test_assign_metastore_assigns_metastore_and_creates_catalog(caplog, acc_clie
 
     assert "Account ID: 123" in caplog.messages
     acc_client.metastore_assignments.create.assert_called_once()
-    ws.catalogs.create.assert_called_once()
 
 
 def test_create_ucx_catalog_calls_create_catalog(ws) -> None:

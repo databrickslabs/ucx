@@ -1173,8 +1173,6 @@ This command assigns a metastore to a workspace with `--workspace-id`. If there 
 workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
 available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
 
-Finally, the command sets up the metastore with a UCX artifact catalog. The command prompts for the catalog name.
-
 [[back to top](#databricks-labs-ucx)]
 
 ## `create-ucx-catalog` command
