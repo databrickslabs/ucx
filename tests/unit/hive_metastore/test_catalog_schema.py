@@ -9,7 +9,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 
@@ -83,6 +83,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     )
     table_mapping = TableMapping(installation, ws, backend)
     principal_acl = create_autospec(PrincipalACL)
+    hive_acl = create_autospec(GrantsCrawler)
     grants = [
         Grant('user1', 'SELECT', 'catalog1', 'schema3', 'table'),
         Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
@@ -90,8 +91,27 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         Grant('user1', 'USAGE', 'hive_metastore', 'schema3'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
     ]
+    hive_grants = [
+        Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
+        Grant(principal="princ2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
+        Grant(
+            principal="princ33",
+            catalog="hive_metastore",
+            database="database_one",
+            view="table_one",
+            action_type="SELECT",
+        ),
+        Grant(
+            principal="princ5",
+            catalog="hive_metastore",
+            database="schema2",
+            action_type="USAGE",
+        ),
+    ]
     principal_acl.get_interactive_cluster_grants.return_value = grants
-    return CatalogSchema(ws, table_mapping, principal_acl, backend)
+    hive_acl.snapshot.return_value = hive_grants
+
+    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl)
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
@@ -171,6 +191,11 @@ def test_catalog_schema_acl():
         'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user1`',
         'GRANT USE CATALOG ON CATALOG `catalog1` TO `user1`',
         'GRANT USE CATALOG ON CATALOG `catalog2` TO `user1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `princ5`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `princ5`',
+        'GRANT USE CATALOG ON CATALOG `catalog2` TO `princ5`',
     ]
     assert len(backend.queries) == len(queries)
     for query in queries:
