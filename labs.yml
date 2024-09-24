@@ -266,7 +266,7 @@ commands:
       setup.
     flags:
       - name: workspace-id
-        description: (Optional) Workspace ID to assign a metastore to
+        description: Workspace ID to assign a metastore to
       - name: metastore-id
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
       - name: default-catalog

@@ -1169,7 +1169,7 @@ a region, and you want to see which ones are available for assignment.
 databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-id <metastore-id>]
 ```
 
-This command assigns a metastore to a workspace with `workspace-id`. If there is only a single metastore in the
+This command assigns a metastore to a workspace with `--workspace-id`. If there is only a single metastore in the
 workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
 available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
 
