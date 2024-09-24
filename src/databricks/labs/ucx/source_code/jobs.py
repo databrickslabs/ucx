@@ -469,8 +469,8 @@ class WorkflowLinter:
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
         for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
             atoms = [
-                LineageAtom(object_type="JOB", object_id=job_id, other={"name": job_name}),
-                LineageAtom(object_type="TASK", object_id=task.task_key),
+                LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
             ]
             yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 
