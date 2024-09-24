@@ -211,6 +211,29 @@ def test_skip_happy_path(caplog):
     assert len(caplog.records) == 0
 
 
+def test_unskip(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, sbe)
+    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
+    mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
+    sbe.execute.assert_called_with(
+        f"ALTER TABLE `schema`.`table` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+    )
+    view = Table(
+        catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
+    )
+    mapping.unskip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
+    sbe.execute.assert_called_with(
+        f"ALTER VIEW `schema`.`view` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+    )
+    assert len(caplog.records) == 0
+    mapping.unskip_schema(schema="schema")
+    sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` UNSET DBPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');")
+    assert len(caplog.records) == 0
+
+
 def test_skip_missing_schema(caplog):
     ws = create_autospec(WorkspaceClient)
     sbe = create_autospec(SqlBackend)
