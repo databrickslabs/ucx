@@ -20,7 +20,7 @@ class AccountContext(CliContext):
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
-        """The first workspace client available"""
+        """The workspace client when workspace_id is provided."""
         workspace_id = self.named_parameters.get("workspace_id")
         if workspace_id is not None:
             workspace_id_casted = int(workspace_id)
