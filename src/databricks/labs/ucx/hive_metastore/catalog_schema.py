@@ -218,7 +218,7 @@ class CatalogSchema:
                 return True
         return False
 
-    def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None = None) -> None:
+    def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
         if catalog_storage == "metastore":
             self._ws.catalogs.create(catalog, comment="Created by UCX", properties=properties)
