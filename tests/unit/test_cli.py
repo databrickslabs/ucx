@@ -13,7 +13,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import jobs, sql
-from databricks.sdk.service.catalog import ExternalLocationInfo
+from databricks.sdk.service.catalog import ExternalLocationInfo, MetastoreInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
@@ -874,9 +874,15 @@ def test_show_all_metastores(acc_client, caplog):
     assert 'Matching metastores are:' in caplog.messages
 
 
-def test_assign_metastore(acc_client) -> None:
-    with pytest.raises(ValueError):
-        assign_metastore(acc_client, "123")
+def test_assign_metastore_assigns_metastore_and_creates_catalog(acc_client, ws, mock_backend) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ctx = AccountContext(acc_client).replace(workspace_client=ws, sql_backend=mock_backend, prompts=prompts)
+    acc_client.metastores.list.return_value = [MetastoreInfo(name="test", metastore_id="123")]
+
+    assign_metastore(acc_client, "123", ctx=ctx)
+
+    acc_client.metastore_assignments.create.assert_called_once()
+    ws.catalogs.create.assert_called_once()
 
 
 def test_create_ucx_catalog_calls_create_catalog(ws) -> None:

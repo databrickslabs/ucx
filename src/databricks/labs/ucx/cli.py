@@ -590,10 +590,11 @@ def assign_metastore(
     workspace_id: str | None = None,
     metastore_id: str | None = None,
     default_catalog: str | None = None,
+    ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
-    logger.info(f"Account ID: {a.config.account_id}")
-    ctx = AccountContext(a)
+    ctx = ctx or AccountContext(a)
+    logger.info(f"Account ID: {ctx.account_client.config.account_id}")
     ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
     ctx.catalog_schema.create_ucx_catalog(ctx.prompts)
 
