@@ -882,7 +882,7 @@ def test_assign_metastore_assigns_metastore_and_creates_catalog(caplog, acc_clie
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.cli"):
         assign_metastore(acc_client, "456", ctx=ctx)
 
-    assert "Account ID: 123"
+    assert "Account ID: 123" in caplog.messages
     acc_client.metastore_assignments.create.assert_called_once()
     ws.catalogs.create.assert_called_once()
 
