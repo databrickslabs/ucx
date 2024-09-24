@@ -4,7 +4,7 @@
 --overrides '{"spec":{
     "encodings":{
       "columns": [
-        {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "/#workspace/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},
+        {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ link }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},
         {"fieldName": "code", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "code"},
         {"fieldName": "message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "message"},
         {"fieldName": "workflow_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/jobs/{{ workflow_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "workflow_name"},
@@ -15,12 +15,14 @@
         {"fieldName": "end_col", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "end_col"}
       ]},
     "invisibleColumns": [
-      {"name": "workflow_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "/jobs/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "workflow_id"}
+      {"name": "link", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "link"},
+      {"name": "workflow_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "workflow_id"}
     ]
   }}'
 */
 SELECT
   path,
+  if ( contains(path, '.'), concat('/#files/', path), concat('/#notebook/', path) ) as link,
   code,
   message,
   job_id AS workflow_id,

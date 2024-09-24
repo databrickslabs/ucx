@@ -406,12 +406,16 @@ class WorkflowLinter:
             if not advices:
                 advices = self._lint_task(task, graph, session_state, linted_paths)
             for advice in advices:
-                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
+                relative_path = advice.path.as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
+                domain = "@databricks.com/"
+                idx = relative_path.index(domain)
+                if idx >= 0:
+                    relative_path = relative_path[idx + len(domain):]
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,
                     task_key=task.task_key,
-                    path=absolute_path,
+                    path=relative_path,
                     code=advice.advice.code,
                     message=advice.advice.message,
                     start_line=advice.advice.start_line,

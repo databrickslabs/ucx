@@ -1,4 +1,8 @@
-## Direct filesystem access problems
+---
+height: 4
+---
+
+# Direct filesystem access problems
 
 The table below assists with verifying if workflows and dashboards require direct filesystem access.
 As a reminder, `dbfs:/` is not supported in Unity Catalog, and more generally direct filesystem access is discouraged.
