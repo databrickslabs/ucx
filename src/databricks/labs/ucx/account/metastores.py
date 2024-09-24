@@ -54,11 +54,11 @@ class AccountMetastores:
         if default_catalog is not None:
             self._set_default_catalog(workspace_id, default_catalog)
 
-    def _get_region(self, workspace_id: int) -> str:
+    def _get_region(self, workspace_id: int) -> str | None:
         workspace = self._ac.workspaces.get(workspace_id)
         if self._ac.config.is_aws:
-            return str(workspace.aws_region)
-        return str(workspace.location)
+            return workspace.aws_region
+        return workspace.location
 
     def _get_all_workspaces(self) -> dict[str, int]:
         output = dict[str, int]()
