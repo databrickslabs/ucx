@@ -1819,6 +1819,8 @@ are eligible to be run as a collection. User can run the below commands as colle
 - `migrate-acls`
 - `migrate-dbsql-dashboards`
 - `validate-group-membership`
+Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
+
 
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
