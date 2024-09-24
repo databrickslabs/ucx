@@ -104,6 +104,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-locations` command](#migrate-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
   * [`skip` command](#skip-command)
+  * [`unskip` command](#unskip-command)
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
   * [`migrate-tables` command](#migrate-tables-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
@@ -1417,6 +1418,15 @@ is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration of a particular schema or table.
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `unskip` command
+
+```text
+databricks labs ucx unskip --schema X [--table Y]
+```
+This command is useful to re-enable migration of a particular schema or table that has been already marked by [`skip` command](#skip-command).
 
 [[back to top](#databricks-labs-ucx)]
 
