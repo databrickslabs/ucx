@@ -37,7 +37,7 @@ def test_show_all_metastores(acc_client, caplog):
     assert "metastore_use - 124" in caplog.messages
 
 
-def test_assign_metastore(acc_client):
+def test_assign_metastore(acc_client) -> None:
     acc_client.metastores.list.return_value = [
         MetastoreInfo(name="metastore_usw_1", metastore_id="123", region="us-west-2"),
         MetastoreInfo(name="metastore_usw_2", metastore_id="124", region="us-west-2"),
@@ -59,6 +59,12 @@ def test_assign_metastore(acc_client):
 
     account_metastores.assign_metastore(prompts, 123457)
     acc_client.metastore_assignments.create.assert_called_with(123457, "123")
+    ws.settings.default_namespaces.update.assert_not_called()
+
+    # Empty default catalog should not call default name spaces
+    account_metastores.assign_metastore(prompts, 123457, default_catalog="")
+    acc_client.metastore_assignments.create.assert_called_with(123457, "123")
+    ws.settings.default_namespaces.update.assert_not_called()
 
     # multiple metastores & default catalog name, need to choose one
     account_metastores.assign_metastore(prompts, 123456, default_catalog="main")
