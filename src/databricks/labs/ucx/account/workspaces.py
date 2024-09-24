@@ -101,10 +101,10 @@ class AccountWorkspaces:
         try:
             # check if user has access to workspace
             ws = self.client_for(workspace)
+            current_user = ws.current_user.me()
         except (PermissionDenied, NotFound, ValueError) as err:
             logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
             return False
-        current_user = ws.current_user.me()
         if current_user.groups is None:
             return False
         # check if user is a workspace admin
