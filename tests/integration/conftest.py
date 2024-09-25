@@ -28,8 +28,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.iam import Group
+from databricks.sdk.service.jobs import Task, SparkPythonTask
 from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
@@ -1183,23 +1185,65 @@ def pytest_ignore_collect(path):
 
 
 @pytest.fixture
-def populate_for_linting(ws, make_random, make_job, make_notebook, make_query, make_dashboard, watchdog_purge_suffix):
-    def populate_workspace(installation):
-        # keep linting scope to minimum to avoid test timeouts
+def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffix, log_workspace_link):
+
+    def create(installation, **kwargs):
+        # create args
+        data = {"name": f"dummy-{make_random(4)}"}
+        # create file to run
         file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
         file_path = WorkspacePath(ws, installation.install_folder()) / file_name
         file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
+        task = Task(
+            task_key=make_random(4),
+            description=make_random(4),
+            new_cluster=ClusterSpec(
+                num_workers=1,
+                node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                spark_version=ws.clusters.select_spark_version(latest=True)
+            ),
+            spark_python_task=SparkPythonTask(python_file=str(file_path)),
+            timeout_seconds=0,
+        )
+        data["tasks"] = [task]
+        # add RemoveAfter tag for job cleanup
+        data["tags"] = [{"key": "RemoveAfter", "value": watchdog_remove_after}]
+        job = ws.jobs.create(**data)
+        log_workspace_link(data["name"], f'job/{job.job_id}', anchor=False)
+        return job
+
+    yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
+
+
+@pytest.fixture
+def populate_for_linting(
+    ws,
+    make_random,
+    make_job,
+    make_notebook,
+    make_query,
+    make_dashboard,
+    create_file_job,
+    watchdog_purge_suffix,
+):
+
+    def create_notebook_job(installation):
         path = Path(installation.install_folder()) / f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
-        notebook_text = f"import ./{file_name}\nspark.read.parquet('dbfs://mnt/foo1/bar1')"
+        notebook_text = "spark.read.parquet('dbfs://mnt/foo1/bar1')"
         notebook_path = make_notebook(path=path, content=io.BytesIO(notebook_text.encode("utf-8")))
-        job = make_job(notebook_path=notebook_path)
+        return make_job(notebook_path=notebook_path)
+
+    def populate_workspace(installation):
+        # keep linting scope to minimum to avoid test timeouts
+        file_job = create_file_job(installation=installation)
+        notebook_job = create_notebook_job(installation=installation)
         query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
         dashboard = make_dashboard(query=query)
         # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
         config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
         text = config_path.read_text()
         config = yaml.safe_load(text)
-        config["include_job_ids"] = [job.job_id]
+        config["include_job_ids"] = [file_job.job_id, notebook_job.job_id]
         config["include_dashboard_ids"] = [dashboard.id]
         text = yaml.dump(config)
         config_path.unlink()
