@@ -23,8 +23,7 @@ integration:
 	hatch run integration
 
 coverage:
-	hatch run coverage
-	[ -e "htmlcov/index.html" ] && open htmlcov/index.html
+	hatch run coverage; status=$$?; [ -e "htmlcov/index.html" ] && open htmlcov/index.html; exit $$status
 
 known:
 	hatch run python src/databricks/labs/ucx/source_code/known.py
