@@ -253,6 +253,7 @@ def test_unskip_on_schema():
         in mock_backend.queries
     )
 
+
 def test_unskip_missing_table(caplog):
     ws = create_autospec(WorkspaceClient)
     sbe = create_autospec(SqlBackend)
