@@ -22,7 +22,6 @@ Table Utilization:
 | pipelines                | RW                  | RW                        |                |                         |              |                |                             |                 |
 | groups                   | RW                  |                           | RO             |                         |              |                |                             |                 |
 | table_size               | RW                  |                           |                |                         |              |                |                             |                 |
-| table_failures           | RW                  |                           |                |                         |              |                |                             |                 |
 | submit_runs              | RW                  |                           |                |                         |              |                |                             |                 |
 | policies                 | RW                  | RW                        |                |                         |              |                |                             |                 |
 | migration_status         |                     | RW                        |                | RW                      |              | RW             |                             |                 |
@@ -50,19 +49,6 @@ Holds Inventory of all tables in all databases and their relevant metadata.
 | location     | string          | Location of the data for table                                              |
 | view_text    | nullable string | If the table is the view, then this column holds the definition of the view |
 | upgraded_to  | string          | Upgrade Target (3 level namespace)                                          |
-
-<br/>
-
-#### _$inventory_.table_failures
-
-Holds failures that occurred during crawling HMS tables
-
-| Column   | Datatype | Description                                              | Comments |
-|----------|----------|----------------------------------------------------------|----------|
-| catalog  | string   | Original catalog of the table. hive_metastore by default |
-| database | string   | Original schema of the table                             |
-| name     | string   | Name of the table                                        |
-| failures | string   | Exception message context                                |
 
 <br/>
 
