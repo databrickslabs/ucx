@@ -17,6 +17,9 @@ class HistoricalRecord:
     run_id: int
     """An identifier of the workflow run that generated this record."""
 
+    run_as: str
+    """The identity of the account that ran the workflow that generated this record."""
+
     snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
 
