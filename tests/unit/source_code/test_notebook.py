@@ -249,7 +249,7 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     container.build_dependency_graph(graph)
-    expected_paths = [path, "leaf1.py", "leaf3.py"]
+    expected_paths = [path, "leaf1.py",  "leaf2.py", "leaf3.py"]
     all_paths = set(d.path for d in graph.all_dependencies)
     assert all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
 
@@ -279,7 +279,7 @@ stuff2 = notebook.run("where is notebook 1?")
     assert len(nodes) == 0
 
 
-def test_raises_advice_when_dbutils_notebook_run_is_too_complex() -> None:
+def test_lints_complex_dbutils_notebook_run() -> None:
     source = """
 name1 = "John"
 name2 = f"{name1}"
@@ -287,5 +287,4 @@ dbutils.notebook.run(f"Hey {name2}")
     """
     linter = DbutilsPyLinter(CurrentSessionState())
     advices = list(linter.lint(source))
-    assert len(advices) == 1
-    assert advices[0].code == "notebook-run-cannot-compute-value"
+    assert not advices
