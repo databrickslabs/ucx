@@ -565,6 +565,11 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
     @cached_property
     def tables_crawler(self) -> TablesCrawler:
+        """
+        Returns a TablesCrawler instance with the tables that were created in the context.
+        Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
+        :return: TablesCrawler
+        """
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     def save_tables(self, is_hiveserde: bool = False):

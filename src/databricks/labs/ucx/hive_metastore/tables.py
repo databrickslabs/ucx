@@ -599,6 +599,11 @@ class FasterTableScanCrawler(CrawlerBase):
         return catalog_tables
 
     def _get_table_names(self, database: str) -> list[str]:
+        """
+        Lists tables names in the specified database.
+        :param database:
+        :return: list of table names
+        """
         table_names = []
         table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
         for table_batch in table_names_batches:
@@ -606,6 +611,13 @@ class FasterTableScanCrawler(CrawlerBase):
         return table_names
 
     def _create_describe_tasks(self, catalog: str, database: str, table_names: list[str]) -> list[partial]:
+        """
+        Creates a list of partial functions for describing tables.
+        :param catalog:
+        :param database:
+        :param table_names:
+        :return: list of partial functions
+        """
         tasks = []
         for table in table_names:
             tasks.append(partial(self._describe, catalog, database, table))
