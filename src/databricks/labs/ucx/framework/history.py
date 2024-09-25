@@ -51,8 +51,7 @@ class HistoricalRecord:
 
 class DataclassInstance(Protocol):
     __dataclass_fields__: ClassVar[dict]
-    # TODO: Enable this once all record types provide this property.
-    # key_fields: ClassVar[Sequence[str]]
+    # TODO: Once all record types provide the property: key_fields: ClassVar[Sequence[str]]
 
 
 Record = TypeVar("Record", bound=DataclassInstance)
