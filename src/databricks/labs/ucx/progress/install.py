@@ -41,7 +41,7 @@ class HistoryInstallation:
     def run(self) -> None:
         self._create_schema()
         self._create_table("records", Record)
-        logger.info(f"Installation completed successfully!")
+        logger.info("Installation completed successfully!")
 
     @retried(on=[InternalError], timeout=dt.timedelta(minutes=1))
     def _create_schema(self) -> None:
