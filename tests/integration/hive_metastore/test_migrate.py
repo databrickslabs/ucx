@@ -376,7 +376,7 @@ def test_migrate_view_alias_test(ws, sql_backend, runtime_ctx, make_catalog):
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
     assert (
-        view1_view_text == f"SELECT `A`.* FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}` AS A"
+        view1_view_text == f"SELECT `A`.* FROM `{dst_schema.catalog_name}`.`{dst_schema.name}`.`{src_managed_table.name}` AS `A`"
     )
 
 
