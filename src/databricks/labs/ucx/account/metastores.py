@@ -27,20 +27,16 @@ class AccountMetastores:
     def assign_metastore(
         self,
         prompts: Prompts,
-        str_workspace_id: str | None = None,
+        workspace_id: int,
+        *,
         metastore_id: str | None = None,
         default_catalog: str | None = None,
     ):
-        if not str_workspace_id:
-            workspace_choices = self._get_all_workspaces()
-            workspace_id = prompts.choice_from_dict("Please select a workspace:", workspace_choices)
-        else:
-            workspace_id = int(str_workspace_id)
-        if not metastore_id:
+        if metastore_id is None:
             # search for all matching metastores
             metastore_choices = self._get_all_metastores(self._get_region(workspace_id))
             if len(metastore_choices) == 0:
-                raise ValueError(f"No matching metastore found for workspace {workspace_id}")
+                raise ValueError(f"No matching metastore found for workspace: {workspace_id}")
             # if there are multiple matches, prompt users to select one
             if len(metastore_choices) > 1:
                 metastore_id = prompts.choice_from_dict(
@@ -48,17 +44,16 @@ class AccountMetastores:
                 )
             else:
                 metastore_id = list(metastore_choices.values())[0]
-        if metastore_id is not None:
-            self._ac.metastore_assignments.create(workspace_id, metastore_id)
+        self._ac.metastore_assignments.create(workspace_id, metastore_id)
         # set the default catalog using the default_namespace setting API
         if default_catalog is not None:
             self._set_default_catalog(workspace_id, default_catalog)
 
-    def _get_region(self, workspace_id: int) -> str:
+    def _get_region(self, workspace_id: int) -> str | None:
         workspace = self._ac.workspaces.get(workspace_id)
         if self._ac.config.is_aws:
-            return str(workspace.aws_region)
-        return str(workspace.location)
+            return workspace.aws_region
+        return workspace.location
 
     def _get_all_workspaces(self) -> dict[str, int]:
         output = dict[str, int]()

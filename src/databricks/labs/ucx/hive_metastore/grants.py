@@ -579,7 +579,7 @@ class PrincipalACL:
         installation: Installation,
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
-        cluster_locations: list[ComputeLocations],
+        cluster_locations: Callable[[], list[ComputeLocations]],
     ):
         self._backend = backend
         self._ws = ws
@@ -593,7 +593,7 @@ class PrincipalACL:
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
-        for compute_location in self._compute_locations:
+        for compute_location in self._compute_locations():
             principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
@@ -697,7 +697,7 @@ class PrincipalACL:
             "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
         )
         # get the eligible location mapped for each interactive cluster
-        for compute_location in self._compute_locations:
+        for compute_location in self._compute_locations():
             # get interactive cluster users
             principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:

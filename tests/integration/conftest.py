@@ -374,10 +374,19 @@ class StaticMountCrawler(Mounts):
 
 
 class CommonUtils:
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+    def __init__(
+        self,
+        make_catalog_fixture,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+        make_random_fixture,
+    ):
+        self._make_catalog = make_catalog_fixture
         self._make_schema = make_schema_fixture
         self._env_or_skip = env_or_skip_fixture
         self._ws = ws_fixture
+        self._make_random = make_random_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -433,6 +442,10 @@ class CommonUtils:
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
+    def ucx_catalog(self) -> str:
+        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+
+    @cached_property
     def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
@@ -440,14 +453,22 @@ class CommonUtils:
 class MockRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ) -> None:
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -533,6 +554,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
@@ -668,19 +690,46 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> MockRuntimeContext:
-    ctx = MockRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
+def runtime_ctx(
+    ws,
+    sql_backend,
+    make_catalog,
+    make_schema,
+    make_table,
+    make_udf,
+    make_group,
+    env_or_skip,
+    make_random,
+) -> MockRuntimeContext:
+    ctx = MockRuntimeContext(
+        make_catalog,
+        make_schema,
+        make_table,
+        make_udf,
+        make_group,
+        env_or_skip,
+        ws,
+        make_random,
+    )
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
 class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
+        make_catalog_fixture,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ):
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
@@ -720,8 +769,8 @@ class MockLocalAzureCli(MockWorkspaceContext):
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
+def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_backend):
+    ctx = MockLocalAzureCli(make_catalog, make_schema, env_or_skip, ws, make_random)
     return ctx.replace(sql_backend=sql_backend)
 
 
@@ -778,8 +827,9 @@ class MockInstallationContext(MockRuntimeContext):
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
@@ -790,14 +840,15 @@ class MockInstallationContext(MockRuntimeContext):
         watchdog_purge_suffix,
     ):
         super().__init__(
-            make_table_fixture,
+            make_catalog_fixture,
             make_schema_fixture,
+            make_table_fixture,
             make_udf_fixture,
             make_group_fixture,
             env_or_skip_fixture,
             ws_fixture,
+            make_random_fixture,
         )
-        self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
         self._watchdog_purge_suffix = watchdog_purge_suffix
@@ -953,8 +1004,9 @@ class MockInstallationContext(MockRuntimeContext):
 def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
-    make_table,
+    make_catalog,
     make_schema,
+    make_table,
     make_udf,
     make_group,
     env_or_skip,
@@ -964,8 +1016,9 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
-        make_table,
+        make_catalog,
         make_schema,
+        make_table,
         make_udf,
         make_group,
         env_or_skip,

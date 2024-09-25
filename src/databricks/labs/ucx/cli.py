@@ -590,11 +590,27 @@ def assign_metastore(
     workspace_id: str | None = None,
     metastore_id: str | None = None,
     default_catalog: str | None = None,
+    ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
     logger.info(f"Account ID: {a.config.account_id}")
-    ctx = AccountContext(a)
-    ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
+    ctx = ctx or AccountContext(a)
+    ctx.account_metastores.assign_metastore(
+        ctx.prompts,
+        workspace_id,
+        metastore_id=metastore_id,
+        default_catalog=default_catalog,
+    )
+
+
+@ucx.command
+def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
+    """Create and setup UCX artifact catalog
+
+    Amongst other things, the artifacts are used for tracking the migration progress across workspaces.
+    """
+    workspace_context = ctx or WorkspaceContext(w)
+    workspace_context.catalog_schema.create_ucx_catalog(prompts)
 
 
 @ucx.command
