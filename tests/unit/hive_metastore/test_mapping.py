@@ -259,7 +259,7 @@ def test_unskip_missing_table(caplog):
     installation = MockInstallation()
     sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
     mapping = TableMapping(installation, ws, sbe)
-    mapping.skip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
+    mapping.unskip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
     ws.tables.get.assert_not_called()
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 
