@@ -39,8 +39,8 @@ class HistoricalRecord:
     object_id: str
     """The type-specific identifier for this inventory record."""
 
-    object_data: str
-    """Type-specific JSON-encoded data of the inventory record."""
+    object_data: dict[str,str]
+    """Type-specific data of the inventory record. Keys are top-level attributes, values are their JSON-encoded values."""
 
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
@@ -133,7 +133,7 @@ class HistoryLog:
         ) -> HistoricalRecord:
             object_id = self._key_from(record)
             object_as_dict = dataclasses.asdict(record)
-            object_as_json = json.dumps(object_as_dict)
+            flattened_object_data = {k: json.dumps(v) for k, v in object_as_dict.items()}
             # TODO: Get failures.
             failures: list[str] = []
             return HistoricalRecord(
