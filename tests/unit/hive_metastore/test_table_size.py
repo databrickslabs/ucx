@@ -137,7 +137,7 @@ def test_table_size_when_table_corrupted(mocker, caplog):
         results = tsc.snapshot()
 
     assert len(results) == 0
-    assert "Delta table hive_metastore.db1.table1 is corrupted: missing transaction log" in caplog.text
+    assert "Delta table hive_metastore.db1.table1 is corrupt: missing transaction log" in caplog.text
 
 
 def test_table_size_when_delta_invalid_format_error(mocker, caplog):
