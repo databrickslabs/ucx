@@ -261,14 +261,17 @@ commands:
 
   - name: assign-metastore
     is_account_level: true
-    description: Enable Unity Catalog features on a workspace by assign a metastore to it
+    description: Enable Unity Catalog features on a workspace by assigning a metastore to it.
     flags:
       - name: workspace-id
-        description: (Optional) Workspace ID to assign a metastore to
+        description: Workspace ID to assign a metastore to
       - name: metastore-id
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
       - name: default-catalog
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
+
+  - name: create-ucx-catalog
+    description: Create UCX artifact catalog
 
   - name: migrate-tables
     description: |
