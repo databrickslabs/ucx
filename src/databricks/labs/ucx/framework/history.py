@@ -39,7 +39,7 @@ class HistoricalRecord:
     object_id: list[str]
     """The type-specific identifier for this inventory record."""
 
-    object_data: dict[str,str]
+    object_data: dict[str, str]
     """Type-specific data of the inventory record. Keys are top-level attributes, values are their JSON-encoded values."""
 
     failures: list[str]
