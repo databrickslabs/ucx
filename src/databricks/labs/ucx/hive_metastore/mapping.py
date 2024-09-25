@@ -144,10 +144,10 @@ class TableMapping:
             table_name (String): The table name of the table to be unskipped.
             load_table (Callable): A function that loads a table from the metastore.
         """
-        table = load_table(schema_name, table_name)
-        if table is None:
-            raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
         try:
+            table = load_table(schema_name, table_name)
+            if table is None:
+                raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
             self._sql_backend.execute(
                 f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
             )

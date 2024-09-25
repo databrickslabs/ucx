@@ -253,6 +253,16 @@ def test_unskip_on_schema():
         in mock_backend.queries
     )
 
+def test_unskip_missing_table(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    installation = MockInstallation()
+    sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+    mapping = TableMapping(installation, ws, sbe)
+    mapping.skip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
+    ws.tables.get.assert_not_called()
+    assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
+
 
 def test_skip_missing_schema(caplog):
     ws = create_autospec(WorkspaceClient)
