@@ -18,7 +18,7 @@ from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.errors import ResourceDoesNotExist
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -319,7 +319,7 @@ class GlobalContext(abc.ABC):
                 eligible_locations = self.aws_acl.get_eligible_locations_principals()
             if self.is_gcp:
                 raise NotImplementedError("Not implemented for GCP.")
-        except ResourceDoesNotExist:
+        except NotFound:
             pass
         return eligible_locations
 
@@ -359,6 +359,7 @@ class GlobalContext(abc.ABC):
             self.principal_acl,
             self.sql_backend,
             self.grants_crawler,
+            self.config.ucx_catalog,
         )
 
     @cached_property
