@@ -138,18 +138,19 @@ class TableMapping:
     def unskip_table_or_view(
         self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]
     ) -> None:
-        """Removes skip mark from the table property..
+        """Removes skip mark from the table property.
+
         Args:
-            schema_name (String): The schema name of the table to be unskipped.
-            table_name (String): The table name of the table to be unskipped.
-            load_table (Callable): A function that loads a table from the metastore.
+            schema_name (str): The schema name of the table to be unskipped.
+            table_name (str): The table name of the table to be unskipped.
+            load_table (Callable[[str, str], Table | None]): A function that loads a table from the metastore.
         """
         try:
             table = load_table(schema_name, table_name)
             if table is None:
                 raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
             self._sql_backend.execute(
-                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
+                f"ALTER {table.kind} {escape_sql_identifier(table.full_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
             )
         except NotFound as e:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e) or "[DELTA_TABLE_NOT_FOUND]" in str(e):
@@ -177,8 +178,9 @@ class TableMapping:
 
     def unskip_schema(self, schema: str) -> None:
         """Removes skip mark from the schema property.
+
         Args:
-            schema (String): The schema name of the table to be unskipped.
+            schema (str): The schema name of the table to be unskipped.
         """
         try:
             self._sql_backend.execute(
