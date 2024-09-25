@@ -49,13 +49,13 @@ class QueryLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now(timezone.utc)
+        dashboard_ids = self._dashboard_ids_in_scope()
+        logger.info(f"Running {len(dashboard_ids)} linting tasks...")
         linted_queries: set[str] = set()
-        all_dashboards = list(self._ws.dashboards.list())
-        logger.info(f"Running {len(all_dashboards)} linting tasks...")
         all_problems: list[QueryProblem] = []
         all_dfsas: list[DirectFsAccess] = []
         # first lint and collect queries from dashboards
-        for dashboard_id in self._dashboard_ids_in_scope():
+        for dashboard_id in dashboard_ids:
             dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
             problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
             all_problems.extend(problems)
