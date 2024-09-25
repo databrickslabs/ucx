@@ -99,7 +99,7 @@ class FromTableSqlLinter(SqlLinter, Fixer):
                 dst = self._index.get(src_schema, old_table.name)
                 if not dst:
                     continue
-                new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
+                new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table, alias=old_table.alias)
                 old_table.replace(new_table)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
