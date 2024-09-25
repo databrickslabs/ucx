@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import requests
@@ -54,7 +55,7 @@ def collect_missing_imports(advices: list[LocatedAdvice]):
     return missing_imports
 
 
-def collect_not_computed(advices: list[LocatedAdvice]):
+def collect_uninferrable_count(advices: list[LocatedAdvice]):
     not_computed = 0
     for located_advice in advices:
         if "computed" in located_advice.advice.message:
@@ -68,93 +69,121 @@ def print_advices(advices: list[LocatedAdvice], file: Path):
         sys.stdout.write(f"{message}\n")
 
 
-def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int, int]:
+@dataclass
+class SolaccContext:
+    unparsed_path: Path | None = None
+    files_to_skip: set[str] | None = None
+    total_count = 0
+    parseable_count = 0
+    uninferrable_count = 0
+    missing_imports: dict[str, dict[str, int]] = field(default_factory=dict)
+
+    @classmethod
+    def create(cls, lint_all: bool):
+        unparsed_path: Path | None = None
+        # if lint_all, recreate "solacc-unparsed.txt"
+        if lint_all is None:
+            unparsed_path = Path(Path(__file__).parent, "solacc-unparsed.txt")
+            if unparsed_path.exists():
+                os.remove(unparsed_path)
+        files_to_skip: set[str] | None = None
+        malformed = Path(__file__).parent / "solacc-malformed.txt"
+        if lint_all and malformed.exists():
+            lines = malformed.read_text(encoding="utf-8").split("\n")
+            files_to_skip = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
+        return SolaccContext(unparsed_path=unparsed_path, files_to_skip=files_to_skip)
+
+    def register_missing_import(self, missing_import: str):
+        prefix = missing_import.split(".")[0]
+        details = self.missing_imports.get(prefix, None)
+        if details is None:
+            details = {}
+            self.missing_imports[prefix] = details
+        count = details.get(missing_import, 0)
+        details[missing_import] = count + 1
+
+    def log_missing_imports(self):
+        missing_imports = dict(sorted(self.missing_imports.items(), key=lambda item: sum(item[1].values()), reverse=True))
+        for prefix, details in missing_imports.items():
+            logger.info(f"Missing import '{prefix}'")
+            for item, count in details.items():
+                logger.info(f"  {item}: {count} occurrences")
+
+
+
+def lint_one(solacc: SolaccContext, file: Path, ctx: LocalCheckoutContext) -> None:
     try:
         advices = list(ctx.local_code_linter.lint_path(file, set()))
+        solacc.parseable_count += 1
         missing_imports = collect_missing_imports(advices)
-        not_computed = collect_not_computed(advices)
+        for missing_import in missing_imports:
+            solacc.register_missing_import(missing_import)
+        uninferrable_count = collect_uninferrable_count(advices)
+        solacc.uninferrable_count += uninferrable_count
         print_advices(advices, file)
-        return missing_imports, 1, not_computed
     except Exception as e:  # pylint: disable=broad-except
         # here we're most likely catching astroid & sqlglot errors
-        if unparsed is None:  # linting single file, log exception details
-            logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
-        else:
+        # when linting single file, log exception details
+        logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e if solacc.unparsed_path is None else None)
+        if solacc.unparsed_path:
             logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
             # populate solacc-unparsed.txt
-            with unparsed.open(mode="a", encoding="utf-8") as f:
+            with solacc.unparsed_path.open(mode="a", encoding="utf-8") as f:
                 f.write(file.relative_to(dist).as_posix())
                 f.write("\n")
-        return set(), 0, 0
 
 
-def lint_all(file_to_lint: str | None):
+def lint_dir(solacc: SolaccContext, dir: Path, file_to_lint: str | None = None):
     ws = WorkspaceClient(host='...', token='...')
     ctx = LocalCheckoutContext(ws).replace(
         linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state)
     )
-    parseable = 0
-    not_computed = 0
-    missing_imports: dict[str, dict[str, int]] = {}
-    all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
-    unparsed: Path | None = None
-    if file_to_lint is None:
-        unparsed = Path(Path(__file__).parent, "solacc-unparsed.txt")
-        if unparsed.exists():
-            os.remove(unparsed)
-    skipped: set[str] | None = None
-    malformed = Path(__file__).parent / "solacc-malformed.txt"
-    if file_to_lint is None and malformed.exists():
-        lines = malformed.read_text(encoding="utf-8").split("\n")
-        skipped = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
+    all_files = list(dir.glob('**/*.py')) if file_to_lint is None else [Path(dir, file_to_lint)]
     for file in all_files:
-        if skipped and file.relative_to(dist).as_posix() in skipped:
+        solacc.total_count += 1
+        if solacc.files_to_skip and file.relative_to(dist).as_posix() in solacc.files_to_skip:
             continue
-        _missing_imports, _parseable, _not_computed = lint_one(file, ctx, unparsed)
-        for _import in _missing_imports:
-            register_missing_import(missing_imports, _import)
-        parseable += _parseable
-        not_computed += _not_computed
-    all_files_len = len(all_files) - (len(skipped) if skipped else 0)
-    parseable_pct = int(parseable / all_files_len * 100)
-    missing_imports_count = sum(sum(details.values()) for details in missing_imports.values())
+        lint_one(solacc, file, ctx)
+
+
+def lint_file(file_to_lint: str):
+    solacc = SolaccContext.create(False)
+    file_path = Path(file_to_lint)
+    lint_dir(solacc, file_path.parent, file_path.name)
+
+
+def lint_all():
+    solacc = SolaccContext.create(True)
+    for dir in os.listdir(dist):
+        lint_dir(solacc, dist / dir)
+    all_files_len = solacc.total_count - (len(solacc.files_to_skip) if solacc.files_to_skip else 0)
+    parseable_pct = int(solacc.parseable_count / all_files_len * 100)
+    missing_imports_count = sum(sum(details.values()) for details in solacc.missing_imports.values())
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {missing_imports_count}, not computed: {not_computed}"
+        f"Skipped: {len(solacc.files_to_skip or [])}, "
+        f"parseable: {parseable_pct}% ({solacc.parseable_count}/{all_files_len}), "
+        f"missing imports: {missing_imports_count}, "
+        f"not computed: {solacc.uninferrable_count}"
     )
-    log_missing_imports(missing_imports)
+    solacc.log_missing_imports()
     # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
-
-
-def register_missing_import(missing_imports: dict[str, dict[str, int]], missing_import: str):
-    prefix = missing_import.split(".")[0]
-    details = missing_imports.get(prefix, None)
-    if details is None:
-        details = {}
-        missing_imports[prefix] = details
-    count = details.get(missing_import, 0)
-    details[missing_import] = count + 1
-
-
-def log_missing_imports(missing_imports: dict[str, dict[str, int]]):
-    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: sum(item[1].values()), reverse=True))
-    for prefix, details in missing_imports.items():
-        logger.info(f"Missing import '{prefix}'")
-        for item, count in details.items():
-            logger.info(f"  {item}: {count} occurrences")
 
 
 def main(args: list[str]):
     install_logger()
     logging.root.setLevel(logging.INFO)
     file_to_lint = args[1] if len(args) > 1 else None
-    if not file_to_lint:
+    if file_to_lint:
         # don't clone if linting just one file, assumption is we're troubleshooting
-        logger.info("Cloning...")
-        clone_all()
+        logger.info("Linting...")
+        lint_file(file_to_lint)
+        return
+    logger.info("Cloning...")
+    clone_all()
     logger.info("Linting...")
-    lint_all(file_to_lint)
+    lint_all()
 
 
 if __name__ == "__main__":
