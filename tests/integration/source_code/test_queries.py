@@ -13,7 +13,8 @@ def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, sql_backend
     assert len(problems) == 1
     crawler = DirectFsAccessCrawler.for_queries(sql_backend, simple_ctx.inventory_database)
     all_dfsas = crawler.snapshot()
-    dfsas = [dfsa for dfsa in all_dfsas if dfsa.source_id == query.id]
+    source_id = f"{_dashboard.id}/{query.id}"
+    dfsas = [dfsa for dfsa in all_dfsas if dfsa.source_id == source_id]
     assert len(dfsas) == 1
     dfsa = dfsas[0]
     assert len(dfsa.source_lineage) == 2
@@ -25,6 +26,6 @@ def test_query_linter_lints_queries_and_stores_dfsas(simple_ctx, ws, sql_backend
     assert lineage.other.get("name", None) == _dashboard.name
     lineage = dfsa.source_lineage[1]
     assert lineage.object_type == "QUERY"
-    assert lineage.object_id == query.id
+    assert lineage.object_id == source_id
     assert lineage.other
     assert lineage.other.get("name", None) == query.name

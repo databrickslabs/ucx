@@ -163,7 +163,7 @@ display(spark.read.parquet("/mnt/something"))
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
     assert len(dfsas) == 2
-    task_keys = set(task.task_key for task in j.settings.tasks)
+    task_keys = set(f"{j.job_id}/{task.task_key}" for task in j.settings.tasks)
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     for dfsa in dfsas:
         assert dfsa.source_id != DirectFsAccess.UNKNOWN
@@ -172,7 +172,7 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.assessment_start_timestamp > yesterday
         assert dfsa.assessment_end_timestamp > yesterday
         assert dfsa.source_lineage[0] == LineageAtom(
-            object_type="JOB", object_id=str(j.job_id), other={"name": j.settings.name}
+            object_type="WORKFLOW", object_id=str(j.job_id), other={"name": j.settings.name}
         )
         assert dfsa.source_lineage[1].object_type == "TASK"
         assert dfsa.source_lineage[1].object_id in task_keys
