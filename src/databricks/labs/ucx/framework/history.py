@@ -116,8 +116,7 @@ class HistoryLog:
             return owner
 
         def append_snapshot(self, records: Sequence[Record], *, run_start_time: dt.datetime) -> None:
-            # Equivalent entropy to a type-4 UUID.
-            snapshot_id = int.from_bytes(os.urandom(16), byteorder="big")
+            snapshot_id = int.from_bytes(os.urandom(7), byteorder="big")
             historical_records = [
                 self._inventory_record_to_historical(record, snapshot_id=snapshot_id, run_start_time=run_start_time)
                 for record in records
