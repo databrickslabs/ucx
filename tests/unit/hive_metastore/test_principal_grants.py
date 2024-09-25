@@ -157,11 +157,15 @@ def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
 
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    locations = []
-    if w.config.is_azure:
-        locations = azure_acl(w, install, cluster_spn, warehouse_spn).get_eligible_locations_principals()
-    if w.config.is_aws:
-        locations = aws_acl(w, install).get_eligible_locations_principals()
+
+    def inner():
+        if w.config.is_azure:
+            return azure_acl(w, install, cluster_spn, warehouse_spn).get_eligible_locations_principals()
+        if w.config.is_aws:
+            return aws_acl(w, install).get_eligible_locations_principals()
+        return None
+
+    locations = inner
     return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, locations)
 
 

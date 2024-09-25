@@ -18,7 +18,6 @@ from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -305,18 +304,15 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def principal_locations(self):
-        eligible_locations = {}
-        try:
+    def principal_locations_retriever(self):
+        def inner():
             if self.is_azure:
-                eligible_locations = self.azure_acl.get_eligible_locations_principals()
+                return self.azure_acl.get_eligible_locations_principals()
             if self.is_aws:
-                eligible_locations = self.aws_acl.get_eligible_locations_principals()
-            if self.is_gcp:
-                raise NotImplementedError("Not implemented for GCP.")
-        except ResourceDoesNotExist:
-            pass
-        return eligible_locations
+                return self.aws_acl.get_eligible_locations_principals()
+            raise NotImplementedError("Not implemented for GCP.")
+
+        return inner
 
     @cached_property
     def principal_acl(self):
@@ -326,7 +322,7 @@ class GlobalContext(abc.ABC):
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            self.principal_locations,
+            self.principal_locations_retriever,
         )
 
     @cached_property
