@@ -72,10 +72,10 @@ def test_run(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
         location_crawler,
         azure_resource_permissions,
         azurerm,
-        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
+        az_cli_ctx.principal_acl.apply_location_acl()
         assert "All UC external location are created." in caplog.text
         assert ws.external_locations.get("uctest_ziyuanqintest_one").credential_name == "oneenv-adls"
         assert ws.external_locations.get("uctest_ziyuanqintest_two").credential_name == "oneenv-adls"
@@ -119,10 +119,10 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema, az_cli_ct
         location_crawler,
         azure_resource_permissions,
         azurerm,
-        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
+        az_cli_ctx.principal_acl.apply_location_acl()
         assert ws.external_locations.get("ucx1_ziyuanqintest").credential_name == "ziyuanqin-uc-test-ac"
         assert ws.external_locations.get("ucx1_ziyuanqintest").read_only
     finally:
@@ -164,9 +164,9 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema, az_cli_ct
         location_crawler,
         azure_resource_permissions,
         azurerm,
-        az_cli_ctx.principal_acl,
     )
     leftover_loc = location_migration.run()
+    az_cli_ctx.principal_acl.apply_location_acl()
 
     assert "External locations below are not created in UC" in caplog.text
     assert len(leftover_loc) == 2
@@ -212,10 +212,10 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_
         location_crawler,
         azure_resource_permissions,
         azurerm,
-        az_cli_ctx.principal_acl,
     )
     try:
         leftover_loc_urls = location_migration.run()
+        az_cli_ctx.principal_acl.apply_location_acl()
         assert "abfss://uctest@ziyuanqintest.dfs.core.windows.net/" in leftover_loc_urls
         assert "overlaps with an existing external location" in caplog.text
     finally:

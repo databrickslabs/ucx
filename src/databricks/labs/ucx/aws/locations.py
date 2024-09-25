@@ -5,7 +5,6 @@ from pathlib import PurePath, Path
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 from databricks.sdk import WorkspaceClient
@@ -20,12 +19,10 @@ class AWSExternalLocationsMigration:
         ws: WorkspaceClient,
         external_locations: ExternalLocations,
         aws_resource_permissions: AWSResourcePermissions,
-        principal_acl: PrincipalACL,
     ):
         self._ws = ws
         self._external_locations = external_locations
         self._aws_resource_permissions = aws_resource_permissions
-        self._principal_acl = principal_acl
 
     def run(self) -> None:
         """
@@ -53,7 +50,6 @@ class AWSExternalLocationsMigration:
                 credential_dict[role_arn],
                 skip_validation=True,
             )
-        self._principal_acl.apply_location_acl()
 
     @staticmethod
     def _generate_external_location_name(path: str) -> str:

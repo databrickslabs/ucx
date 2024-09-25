@@ -6,7 +6,6 @@ from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDeni
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 
 
 logger = logging.getLogger(__name__)
@@ -19,13 +18,11 @@ class ExternalLocationsMigration:
         hms_locations: ExternalLocations,
         resource_permissions: AzureResourcePermissions,
         azurerm: AzureResources,
-        principal_acl: PrincipalACL,
     ):
         self._ws = ws
         self._hms_locations = hms_locations
         self._resource_permissions = resource_permissions
         self._azurerm = azurerm
-        self._principal_acl = principal_acl
 
     def _app_id_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
         # list all storage credentials.
@@ -201,7 +198,6 @@ class ExternalLocationsMigration:
                 migrated_loc_urls.append(migrated_loc_url)
 
         leftover_loc_urls = [url for url in missing_loc_urls if url not in migrated_loc_urls]
-        self._principal_acl.apply_location_acl()
         if leftover_loc_urls:
             logger.info(
                 "External locations below are not created in UC. You may check following cases and rerun this command:"

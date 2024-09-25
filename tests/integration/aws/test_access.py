@@ -53,9 +53,9 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         ws,
         external_location,
         aws_permissions,
-        aws_cli_ctx.principal_acl,
     )
     external_location_migration.run()
+    aws_cli_ctx.principal_acl.apply_location_acl()
     external_location = [
         external_location
         for external_location in list(ws.external_locations.list())
@@ -150,10 +150,10 @@ def test_create_external_location_validate_acl(
         ws,
         external_location,
         aws_permissions,
-        aws_cli_ctx.principal_acl,
     )
     try:
         external_location_migration.run()
+        aws_cli_ctx.principal_acl.apply_location_acl()
         permissions = ws.grants.get(
             SecurableType.EXTERNAL_LOCATION, external_location_name, principal=cluster_user.user_name
         )

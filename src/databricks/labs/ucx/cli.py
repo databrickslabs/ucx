@@ -506,6 +506,7 @@ def migrate_locations(
     for workspace_context in workspace_contexts:
         if workspace_context.is_azure or workspace_context.is_aws:
             workspace_context.external_locations_migration.run()
+            workspace_context.principal_acl.apply_location_acl()
         else:
             raise ValueError("Unsupported cloud provider")
 

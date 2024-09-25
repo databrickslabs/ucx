@@ -112,7 +112,6 @@ class WorkspaceContext(CliContext):
                 self.workspace_client,
                 self.external_locations,
                 self.aws_resource_permissions,
-                self.principal_acl,
             )
         if self.is_azure:
             return ExternalLocationsMigration(
@@ -120,7 +119,6 @@ class WorkspaceContext(CliContext):
                 self.external_locations,
                 self.azure_resource_permissions,
                 self.azure_resources,
-                self.principal_acl,
             )
         raise NotImplementedError
 

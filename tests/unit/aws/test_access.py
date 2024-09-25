@@ -133,7 +133,6 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
         mock_ws,
         locations,
         aws_resource_permissions,
-        principal_acl,
     )
     external_locations_migration.run()
     calls = [
@@ -141,6 +140,7 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
         call('bucket2_folder2', 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True),
         call('bucketx_folderx', 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True),
     ]
+    principal_acl.apply_location_acl()
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
     aws.get_role_policy.assert_not_called()
     principal_acl.apply_location_acl.assert_called()
@@ -187,9 +187,9 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
         mock_ws,
         locations,
         aws_resource_permissions,
-        principal_acl,
     )
     external_locations_migration.run()
+    principal_acl.apply_location_acl()
     calls = [
         call("bucket1_folder1", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
     ]
