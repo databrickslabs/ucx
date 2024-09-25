@@ -6,7 +6,7 @@ from databricks.labs.blueprint.installation import Installation, MockInstallatio
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.errors.platform import ResourceConflict
 from databricks.sdk.service.catalog import TableInfo
 
@@ -254,15 +254,27 @@ def test_unskip_on_schema():
     )
 
 
-def test_unskip_missing_table(caplog):
+def test_unskip_missing_table():
     ws = create_autospec(WorkspaceClient)
     sbe = create_autospec(SqlBackend)
-    installation = MockInstallation()
     sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+    installation = MockInstallation()
     mapping = TableMapping(installation, ws, sbe)
-    mapping.unskip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
     ws.tables.get.assert_not_called()
-    assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
+    with pytest.raises(NotFound, match="[TABLE_OR_VIEW_NOT_FOUND]"):
+        mapping.unskip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
+
+
+def test_unskip_badrequest(caplog):
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    sbe.execute.side_effect = BadRequest("[Bad command]")
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, sbe)
+    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
+    ws.tables.get.assert_not_called()
+    mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
+    assert [rec.message for rec in caplog.records if "bad command" in rec.message.lower()]
 
 
 def test_skip_missing_schema(caplog):
