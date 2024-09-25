@@ -33,3 +33,15 @@ def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_re
     assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
     assert all(dfsa.is_read == is_read for dfsa in dfsas)
     assert all(dfsa.is_write == is_write for dfsa in dfsas)
+
+
+def test_query_liner_refresh_report_writes_query_problems(migration_index, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    crawlers = create_autospec(DirectFsAccessCrawler)
+    linter = QueryLinter(ws, migration_index, crawlers, None)
+
+    linter.refresh_report(mock_backend, inventory_database="test")
+
+    assert mock_backend.has_rows_written_for("`test`.query_problems")
+    ws.dashboards.list.assert_called_once()
+    crawlers.assert_not_called()
