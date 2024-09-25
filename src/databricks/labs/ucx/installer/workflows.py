@@ -12,6 +12,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from databricks.bundles.resource import resource_generator
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
@@ -95,7 +96,7 @@ ctx = RuntimeContext(named_parameters)
 print(__version__)
 """
 
-TEST_RUNNER_NOTEBOOK = """# Databricks notebook source
+RUNNER_NOTEBOOK = """# Databricks notebook source
 # MAGIC %pip install {remote_wheel}
 dbutils.library.restartPython()
 
@@ -443,6 +444,7 @@ from databricks.bundles.jobs.models.email_notifications import EmailNotification
 from databricks.bundles.jobs.models.task import Task as BundleTask
 from databricks.bundles.jobs.models.task_dependency import TaskDependency
 from databricks.bundles.jobs.models.job_cluster import JobCluster, ClusterSpec
+from databricks.bundles.jobs.models.job import Job as BundleJob
 
 
 class WorkflowsDeployment(InstallationMixin):
@@ -467,12 +469,20 @@ class WorkflowsDeployment(InstallationMixin):
         super().__init__(config, installation, ws)
 
     def create_jobs(self) -> None:
+        managed_jobs = self._resource_generator()
+        # ...
+
+
+        self.remove_jobs(keep=desired_workflows)
+        self._install_state.save()
+        self._create_debug(remote_wheels)
+        self._create_readme()
+
+    @resource_generator
+    def _resource_generator(self) -> Iterator[BundleJob]:
         remote_wheels = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
-
-        wheel_runner = ""
-        if self._config.override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheels)
+        wheel_runner = self._upload_wheel_runner(remote_wheels)
         for workflow_name in desired_workflows:
             settings = self._job_settings(workflow_name, remote_wheels)
             if self._config.override_clusters:
@@ -482,12 +492,14 @@ class WorkflowsDeployment(InstallationMixin):
                     self._config.override_clusters,
                     wheel_runner,
                 )
-            self._deploy_workflow(workflow_name, settings)
-
-        self.remove_jobs(keep=desired_workflows)
-        self._install_state.save()
-        self._create_debug(remote_wheels)
-        self._create_readme()
+            yield BundleJob(
+                resource_name=workflow_name,
+                name=settings["name"],
+                tags=settings["tags"],
+                job_clusters=settings["job_clusters"],
+                email_notifications=settings.get("email_notifications"),
+                tasks=settings["tasks"],
+            )
 
     def remove_jobs(self, *, keep: set[str] | None = None) -> None:
         for workflow_name, job_id in self._install_state.jobs.items():
@@ -613,6 +625,7 @@ class WorkflowsDeployment(InstallationMixin):
         return conf_from_installation
 
     # Workflow creation might fail on an InternalError with no message
+    # TODO: remove as we're doing bundle
     @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._install_state.jobs:
@@ -655,8 +668,8 @@ class WorkflowsDeployment(InstallationMixin):
     def _upload_wheel_runner(self, remote_wheels: list[str]) -> str:
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         remote_wheels_str = " ".join(remote_wheels)
-        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
+        code = RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
+        return self._installation.upload(f"wheels/runner.py", code)
 
     @staticmethod
     def _apply_cluster_overrides(
