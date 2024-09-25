@@ -1423,10 +1423,10 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 
 ## `unskip` command
 
-```text
+```commandline
 databricks labs ucx unskip --schema X [--table Y]
 ```
-This command is useful to re-enable migration of a particular schema or table that has been already marked by [`skip` command](#skip-command).
+This command removes the mark set by the [`skip` command](#skip-command) on the given schema or table.
 
 [[back to top](#databricks-labs-ucx)]
 
