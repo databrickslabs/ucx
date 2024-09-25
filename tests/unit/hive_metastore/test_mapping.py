@@ -175,15 +175,15 @@ def test_load_mapping():
     ws.tables.get.assert_not_called()
 
     assert [
-               Rule(
-                   workspace_name="foo-bar",
-                   catalog_name="foo_bar",
-                   src_schema="foo",
-                   dst_schema="foo",
-                   src_table="bar",
-                   dst_table="bar",
-               )
-           ] == rules
+        Rule(
+            workspace_name="foo-bar",
+            catalog_name="foo_bar",
+            src_schema="foo",
+            dst_schema="foo",
+            src_table="bar",
+            dst_table="bar",
+        )
+    ] == rules
 
 
 def test_skip_happy_path(caplog):

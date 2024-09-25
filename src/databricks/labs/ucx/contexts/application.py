@@ -18,7 +18,6 @@ from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.errors import NotFound
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -323,7 +322,7 @@ class GlobalContext(abc.ABC):
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            self.principal_locations,
+            self.principal_locations_retriever,
         )
 
     @cached_property
