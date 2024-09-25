@@ -24,11 +24,11 @@ def test_export(tmp_path):
 
     # Mock backend and prompts
     mock_backend = MockBackend(rows=query)
-    query_choice = "main"  # Mocking the choice here
+    query_choice = {"assessment_name": "main", "option": 3}
     mock_prompts = MockPrompts(
         {
             "Choose a path to save the UCX Assessment results": export_path.as_posix(),
-            "Choose which assessment results to export": query_choice,
+            "Choose which assessment results to export": query_choice["option"],
         }
     )
 
@@ -37,5 +37,5 @@ def test_export(tmp_path):
     exported = export.export_results(mock_prompts)
 
     # Assertion based on the query_choice
-    expected_file_name = f"export_{query_choice}_results.zip"  # Adjusted filename
+    expected_file_name = f"export_{query_choice['assessment_name']}_results.zip"  # Adjusted filename
     assert exported == export_path / expected_file_name
