@@ -22,111 +22,112 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 <!-- TOC -->
 * [Databricks Labs UCX](#databricks-labs-ucx)
 * [Installation](#installation)
-    * [Authenticate Databricks CLI](#authenticate-databricks-cli)
-    * [Install UCX](#install-ucx)
-    * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
-    * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
-    * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
-    * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
-    * [Uninstall UCX](#uninstall-ucx)
+  * [Authenticate Databricks CLI](#authenticate-databricks-cli)
+  * [Install UCX](#install-ucx)
+  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
+  * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
+  * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
+  * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
 * [Workflows](#workflows)
-    * [Readme notebook](#readme-notebook)
-    * [Assessment workflow](#assessment-workflow)
-    * [Group migration workflow](#group-migration-workflow)
-    * [Debug notebook](#debug-notebook)
-    * [Debug logs](#debug-logs)
-    * [Table Migration](#table-migration)
-        * [Prerequisites](#prerequisites)
-        * [Upgrade Process](#upgrade-process)
-            * [Step 1: Mapping Metastore Tables (UCX Only)](#step-1-mapping-metastore-tables-ucx-only)
-                * [Step 1.1: Create the mapping file](#step-11-create-the-mapping-file)
-                * [Step 1.2: Update the mapping file](#step-12-update-the-mapping-file)
-            * [Step 2: Create the necessary cloud principals for the upgrade](#step-2-create-the-necessary-cloud-principals-for-the-upgrade)
-                * [Step 2.1: Map the cloud principals to the cloud "prefixes"](#step-21-map-the-cloud-principals-to-the-cloud-prefixes)
-                * [Step 2.2: Create/Modify Cloud Principals and Credentials](#step-22-createmodify-cloud-principals-and-credentials)
-                * [Step 2.3: Create External Locations](#step-23-create-external-locations)
-                * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
-                * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
-            * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
-            * [Table migration workflows](#table-migration-workflows)
-            * [Step 4: Odds and Ends](#step-4-odds-and-ends)
-                * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
-                * [Step 4.2: Moving objects](#step-42-moving-objects)
-                * [Step 4.2: Aliasing objects](#step-42-aliasing-objects)
-                * [Step 4.3: Reverting objects](#step-43-reverting-objects)
-        * [Post Migration Data Reconciliation Task](#post-migration-data-reconciliation-task)
-        * [Other considerations](#other-considerations)
-        * [[EXPERIMENTAL] Scan tables in mounts Workflow](#experimental-scan-tables-in-mounts-workflow)
-            * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
-        * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
-    * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
-        * [Linter message codes](#linter-message-codes)
-            * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
-            * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
-            * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-            * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-            * [`direct-filesystem-access`](#direct-filesystem-access)
-            * [`dependency-not-found`](#dependency-not-found)
-        * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
-            * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
-            * [`not-supported`](#not-supported)
-            * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
-            * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
-            * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
-            * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
-            * [`sql-parse-error`](#sql-parse-error)
-            * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
-            * [`table-migrated-to-uc`](#table-migrated-to-uc)
-            * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
-            * [`unsupported-magic-line`](#unsupported-magic-line)
+  * [Readme notebook](#readme-notebook)
+  * [Assessment workflow](#assessment-workflow)
+  * [Group migration workflow](#group-migration-workflow)
+  * [Debug notebook](#debug-notebook)
+  * [Debug logs](#debug-logs)
+  * [Table Migration](#table-migration)
+    * [Prerequisites](#prerequisites)
+    * [Upgrade Process](#upgrade-process)
+      * [Step 1: Mapping Metastore Tables (UCX Only)](#step-1-mapping-metastore-tables-ucx-only)
+        * [Step 1.1: Create the mapping file](#step-11-create-the-mapping-file)
+        * [Step 1.2: Update the mapping file](#step-12-update-the-mapping-file)
+      * [Step 2: Create the necessary cloud principals for the upgrade](#step-2-create-the-necessary-cloud-principals-for-the-upgrade)
+        * [Step 2.1: Map the cloud principals to the cloud "prefixes"](#step-21-map-the-cloud-principals-to-the-cloud-prefixes)
+        * [Step 2.2: Create/Modify Cloud Principals and Credentials](#step-22-createmodify-cloud-principals-and-credentials)
+        * [Step 2.3: Create External Locations](#step-23-create-external-locations)
+        * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
+        * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
+      * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
+      * [Table migration workflows](#table-migration-workflows)
+      * [Step 4: Odds and Ends](#step-4-odds-and-ends)
+        * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
+        * [Step 4.2: Moving objects](#step-42-moving-objects)
+        * [Step 4.2: Aliasing objects](#step-42-aliasing-objects)
+        * [Step 4.3: Reverting objects](#step-43-reverting-objects)
+    * [Post Migration Data Reconciliation Task](#post-migration-data-reconciliation-task)
+    * [Other considerations](#other-considerations)
+    * [[EXPERIMENTAL] Scan tables in mounts Workflow](#experimental-scan-tables-in-mounts-workflow)
+      * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
+    * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
+  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
+    * [Linter message codes](#linter-message-codes)
+      * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
+      * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
+      * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
+      * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
+      * [`dependency-not-found`](#dependency-not-found)
+    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+      * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
+      * [`not-supported`](#not-supported)
+      * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+      * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
+      * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
+      * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
+      * [`sql-parse-error`](#sql-parse-error)
+      * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
+      * [`table-migrated-to-uc`](#table-migrated-to-uc)
+      * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
+      * [`unsupported-magic-line`](#unsupported-magic-line)
 * [Utility commands](#utility-commands)
-    * [`logs` command](#logs-command)
-    * [`ensure-assessment-run` command](#ensure-assessment-run-command)
-    * [`update-migration-progress` command](#update-migration-progress-command)
-    * [`repair-run` command](#repair-run-command)
-    * [`workflows` command](#workflows-command)
-    * [`open-remote-config` command](#open-remote-config-command)
-    * [`installations` command](#installations-command)
-    * [`report-account-compatibility` command](#report-account-compatibility-command)
+  * [`logs` command](#logs-command)
+  * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`update-migration-progress` command](#update-migration-progress-command)
+  * [`repair-run` command](#repair-run-command)
+  * [`workflows` command](#workflows-command)
+  * [`open-remote-config` command](#open-remote-config-command)
+  * [`installations` command](#installations-command)
+  * [`report-account-compatibility` command](#report-account-compatibility-command)
 * [Metastore related commands](#metastore-related-commands)
-    * [`show-all-metastores` command](#show-all-metastores-command)
-    * [`assign-metastore` command](#assign-metastore-command)
-    * [`create-ucx-catalog` command](#create-ucx-catalog-command)
+  * [`show-all-metastores` command](#show-all-metastores-command)
+  * [`assign-metastore` command](#assign-metastore-command)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
 * [Table migration commands](#table-migration-commands)
-    * [`principal-prefix-access` command](#principal-prefix-access-command)
-        * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
-        * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
-    * [`create-missing-principals` command (AWS Only)](#create-missing-principals-command-aws-only)
-    * [`delete-missing-principals` command (AWS Only)](#delete-missing-principals-command-aws-only)
-    * [`create-uber-principal` command](#create-uber-principal-command)
-    * [`migrate-credentials` command](#migrate-credentials-command)
-    * [`validate-external-locations` command](#validate-external-locations-command)
-    * [`migrate-locations` command](#migrate-locations-command)
-    * [`create-table-mapping` command](#create-table-mapping-command)
-    * [`skip` command](#skip-command)
-    * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
-    * [`migrate-tables` command](#migrate-tables-command)
-    * [`revert-migrated-tables` command](#revert-migrated-tables-command)
-    * [`move` command](#move-command)
-    * [`alias` command](#alias-command)
+  * [`principal-prefix-access` command](#principal-prefix-access-command)
+    * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
+    * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
+  * [`create-missing-principals` command (AWS Only)](#create-missing-principals-command-aws-only)
+  * [`delete-missing-principals` command (AWS Only)](#delete-missing-principals-command-aws-only)
+  * [`create-uber-principal` command](#create-uber-principal-command)
+  * [`migrate-credentials` command](#migrate-credentials-command)
+  * [`validate-external-locations` command](#validate-external-locations-command)
+  * [`migrate-locations` command](#migrate-locations-command)
+  * [`create-table-mapping` command](#create-table-mapping-command)
+  * [`skip` command](#skip-command)
+  * [`unskip` command](#unskip-command)
+  * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
+  * [`migrate-tables` command](#migrate-tables-command)
+  * [`revert-migrated-tables` command](#revert-migrated-tables-command)
+  * [`move` command](#move-command)
+  * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
-    * [`lint-local-code` command](#lint-local-code-command)
-    * [`migrate-local-code` command](#migrate-local-code-command)
-    * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
-    * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
+  * [`lint-local-code` command](#lint-local-code-command)
+  * [`migrate-local-code` command](#migrate-local-code-command)
+  * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
+  * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
 * [Cross-workspace installations](#cross-workspace-installations)
-    * [`sync-workspace-info` command](#sync-workspace-info-command)
-    * [`manual-workspace-info` command](#manual-workspace-info-command)
-    * [`create-account-groups` command](#create-account-groups-command)
-    * [`validate-groups-membership` command](#validate-groups-membership-command)
-    * [`validate-table-locations` command](#validate-table-locations-command)
-    * [`cluster-remap` command](#cluster-remap-command)
-    * [`revert-cluster-remap` command](#revert-cluster-remap-command)
-    * [`upload` command](#upload-command)
-    * [`download` command](#download-command)
-    * [`join-collection` command](#join-collection command)
-    * [collection eligible command](#collection-eligible-command)
+  * [`sync-workspace-info` command](#sync-workspace-info-command)
+  * [`manual-workspace-info` command](#manual-workspace-info-command)
+  * [`create-account-groups` command](#create-account-groups-command)
+  * [`validate-groups-membership` command](#validate-groups-membership-command)
+  * [`validate-table-locations` command](#validate-table-locations-command)
+  * [`cluster-remap` command](#cluster-remap-command)
+  * [`revert-cluster-remap` command](#revert-cluster-remap-command)
+  * [`upload` command](#upload-command)
+  * [`download` command](#download-command)
+  * [`join-collection` command](#join-collection command)
+  * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
@@ -461,8 +462,8 @@ To effectively upgrade the metastores, four principal operations are required:
 1. Assess - In this step, you evaluate the existing HMS tables identified for upgrade to determine the right approach for upgrade. This step is a prerequisite and is performed by the assessment workflow.
 2. Create - In this step, you create the required UC assets such as, Metastore, Catalog, Schema, Storage Credentials, External Locations. This step is part of the upgrade process.
 3. Upgrade/Grant these are two steps that UCX combine.
-    4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC
-    4. Grant - The table upgrade the newly created object the same permission as the original object.
+   4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC
+   4. Grant - The table upgrade the newly created object the same permission as the original object.
 
 ### Prerequisites
 For UCX to be able to upgrade the metastore. The following prerequisites must be met:
@@ -662,12 +663,12 @@ This command will remove the upgraded table and reset the `upgraded_from` proper
 ### Post Migration Data Reconciliation Task
 UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
 - Compare the schema of the source and target tables. The result is `schema_matches`, and column by column comparison
-  is stored as `column_comparison` struct.
+is stored as `column_comparison` struct.
 - Compare the row counts of the source and target tables. If the row count is within the reconciliation threshold
-  (defaults to 5%), `data_matches` is True.
+(defaults to 5%), `data_matches` is True.
 - Compare the content of individual row between source and target tables to identify any discrepancies (when `compare_rows`
-  flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
-  and `target_missing_count`
+flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
+and `target_missing_count`
 
 Once the workflow completes, the output will be stored in `$inventory_database.reconciliation_results` view, and displayed
 in the Migration dashboard.
@@ -677,8 +678,8 @@ in the Migration dashboard.
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
 - If your Delta tables in DBFS root have a large number of files, consider:
-    - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
-    - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
+  - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
+  - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
 - Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
@@ -689,20 +690,20 @@ in the Migration dashboard.
 - It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
 - This command is incremental, meaning that each time you run it, it will overwrite the previous tables in mounts found.
 - Current format are supported:
-    - DELTA - PARQUET - CSV - JSON
-    - Also detects partitioned DELTA and PARQUET
+  - DELTA - PARQUET - CSV - JSON
+  - Also detects partitioned DELTA and PARQUET
 - You can configure these workflows with the following options available on conf.yml:
-    - include_mounts : A list of mount points to scans, by default the workflow scans for all mount points
-    - exclude_paths_in_mount : A list of paths to exclude in all mount points
-    - include_paths_in_mount : A list of paths to include in all mount points
+  - include_mounts : A list of mount points to scans, by default the workflow scans for all mount points
+  - exclude_paths_in_mount : A list of paths to exclude in all mount points
+  - include_paths_in_mount : A list of paths to include in all mount points
 
 ### [EXPERIMENTAL] Migrate tables in mounts Workflow
 - An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter.
 - You must do the following in order to make this work:
-    - run the Assessment [workflow](#assessment-workflow)
-    - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
-    - run the [`create-table-mapping` command](#create-table-mapping-command)
-        - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
+  - run the Assessment [workflow](#assessment-workflow)
+  - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
+  - run the [`create-table-mapping` command](#create-table-mapping-command)
+    - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
 
 
 [[back to top](#databricks-labs-ucx)]
@@ -1074,26 +1075,26 @@ and opens it using the `webbrowser.open()` method. This command is useful for de
 edit the remote configuration file without having to manually navigate to it in the workspace. It can also be used to quickly
 access the configuration file from the command line. Here's the description of configuration properties:
 
-* `inventory_database`: A string representing the name of the inventory database.
-* `workspace_group_regex`: An optional string representing the regular expression to match workspace group names.
-* `workspace_group_replace`: An optional string to replace the matched group names with.
-* `account_group_regex`: An optional string representing the regular expression to match account group names.
-* `group_match_by_external_id`: A boolean value indicating whether to match groups by their external IDs.
-* `include_group_names`: An optional list of strings representing the names of groups to include for migration.
-* `renamed_group_prefix`: An optional string representing the prefix to add to renamed group names.
-* `instance_pool_id`: An optional string representing the ID of the instance pool.
-* `warehouse_id`: An optional string representing the ID of the warehouse.
-* `connect`: An optional `Config` object representing the configuration for connecting to the warehouse.
-* `num_threads`: An optional integer representing the number of threads to use for migration.
-* `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
-* `default_catalog`: An optional string representing the default catalog name.
-* `log_level`: An optional string representing the log level.
-* `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.
-* `instance_profile`: An optional string representing the name of the instance profile.
-* `spark_conf`: An optional dictionary of Spark configuration properties.
-* `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
-* `policy_id`: An optional string representing the ID of the cluster policy.
-* `include_databases`: An optional list of strings representing the names of databases to include for migration.
+  * `inventory_database`: A string representing the name of the inventory database.
+  * `workspace_group_regex`: An optional string representing the regular expression to match workspace group names.
+  * `workspace_group_replace`: An optional string to replace the matched group names with.
+  * `account_group_regex`: An optional string representing the regular expression to match account group names.
+  * `group_match_by_external_id`: A boolean value indicating whether to match groups by their external IDs.
+  * `include_group_names`: An optional list of strings representing the names of groups to include for migration.
+  * `renamed_group_prefix`: An optional string representing the prefix to add to renamed group names.
+  * `instance_pool_id`: An optional string representing the ID of the instance pool.
+  * `warehouse_id`: An optional string representing the ID of the warehouse.
+  * `connect`: An optional `Config` object representing the configuration for connecting to the warehouse.
+  * `num_threads`: An optional integer representing the number of threads to use for migration.
+  * `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
+  * `default_catalog`: An optional string representing the default catalog name.
+  * `log_level`: An optional string representing the log level.
+  * `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.
+  * `instance_profile`: An optional string representing the name of the instance profile.
+  * `spark_conf`: An optional dictionary of Spark configuration properties.
+  * `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
+  * `policy_id`: An optional string representing the ID of the cluster policy.
+  * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1326,7 +1327,7 @@ databricks labs ucx migrate-credentials
 For Azure, this command prompts to confirm performing the following credential migration steps:
 1. [RECOMMENDED] For each storage account, create access connectors with managed identities that have the
    `Storage Blob Data Contributor` role on the respective storage account. A storage credential is created for each
-   access connector.
+    access connector.
 2. Migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
    `Storage Blob Data Reader`, `Storage Blob Data Owner`, or custom roles on ADLS Gen2 locations that are being used in
    Databricks, to UC storage credentials. The Azure Service Principals to location mapping are listed
@@ -1335,8 +1336,8 @@ For Azure, this command prompts to confirm performing the following credential m
    Principals you do not want to be migrated. The command will only migrate the Service Principals that have client
    secret stored in Databricks Secret.
 
-**Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
-recommend to use access connectors instead.
+  **Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
+  recommend to use access connectors instead.
 
 For AWS, this command migrates AWS Instance Profiles that are being used in Databricks, to UC storage credentials.
 The AWS Instance Profiles to location mapping are listed in
@@ -1437,6 +1438,15 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 
 [[back to top](#databricks-labs-ucx)]
 
+## `unskip` command
+
+```commandline
+databricks labs ucx unskip --schema X [--table Y]
+```
+This command removes the mark set by the [`skip` command](#skip-command) on the given schema or table.
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `create-catalogs-schemas` command
 
 ```text
@@ -1507,7 +1517,7 @@ Users will be prompted whether tables/view are dropped after moving to new schem
 This command moves different table types differently:
 - `MANAGED` tables are deep-cloned to the new schema.
 - `EXTERNAL` tables are dropped from the original schema, then created in the target schema using the same location.
-  This is due to Unity Catalog not supporting multiple tables with overlapping paths
+This is due to Unity Catalog not supporting multiple tables with overlapping paths
 - `VIEW` are recreated using the same view definition.
 
 This command supports moving multiple tables at once, by specifying `*` as the table name.
@@ -1729,14 +1739,14 @@ Options to resolve tables with overlapping locations are:
 
 Considerations when resolving tables with overlapping locations are:
 - Migrate the tables one workspace at a time:
-    - Let later migrated workspaces read tables from the earlier migrated workspace catalogs.
-    - [Move](#move-command) tables between schemas and catalogs when it fits the data management model.
+  - Let later migrated workspaces read tables from the earlier migrated workspace catalogs.
+  - [Move](#move-command) tables between schemas and catalogs when it fits the data management model.
 - The tables might have different:
-    - Metadata, like:
-        - Column schema (names, types, order)
-        - Description
-        - Tags
-    - ACLs
+  - Metadata, like:
+    - Column schema (names, types, order)
+    - Description
+    - Tags
+  - ACLs
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1812,10 +1822,10 @@ $ databricks labs ucx join-collection --workspace-ids <comma seperate list of wo
 `join-collection` command joins 2 or more workspaces into a collection. This helps in running supported cli commands as a collection
 `join-collection` command updates config.yml file on each workspace ucx installation with installed_workspace_ids attribute.
 In order to run `join-collectioon` command a user should:
-- be an Account admin on the Databricks account
-- be a Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
-- have installed UCX on the workspace
-  The `join-collection` command will fail and throw an error msg if the above conditions are not met.
+ - be an Account admin on the Databricks account
+ - be a Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
+ - have installed UCX on the workspace
+The `join-collection` command will fail and throw an error msg if the above conditions are not met.
 
 ## collection eligible command
 
@@ -1834,7 +1844,7 @@ are eligible to be run as a collection. User can run the below commands as colle
 - `migrate-acls`
 - `migrate-dbsql-dashboards`
 - `validate-group-membership`
-  Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
+Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
 
 
 # Common Challenges and the Solutions
