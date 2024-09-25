@@ -25,8 +25,8 @@ def test_running_real_assessment_job(
 
     populate_for_linting(installation_ctx.installation)
 
-    installation_ctx.deployed_workflows.run_workflow("assessment")
-    assert installation_ctx.deployed_workflows.validate_step("assessment", max_wait=timedelta(minutes=25))
+    installation_ctx.deployed_workflows.run_workflow("assessment", max_wait=timedelta(minutes=25))
+    assert installation_ctx.deployed_workflows.validate_step("assessment")
 
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
