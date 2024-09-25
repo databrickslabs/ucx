@@ -13,7 +13,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import jobs, sql
-from databricks.sdk.service.catalog import ExternalLocationInfo
+from databricks.sdk.service.catalog import ExternalLocationInfo, MetastoreInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
@@ -802,8 +802,8 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
-    assert "Catalog test already exists. Skipping." in caplog.messages
-    assert "Schema test in catalog test already exists. Skipping." in caplog.messages
+    assert "Catalog 'test' already exists. Skipping." in caplog.messages
+    assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
 
 
 def test_cluster_remap(ws, caplog):
@@ -874,9 +874,23 @@ def test_show_all_metastores(acc_client, caplog):
     assert 'Matching metastores are:' in caplog.messages
 
 
-def test_assign_metastore(acc_client, caplog):
-    with pytest.raises(ValueError):
-        assign_metastore(acc_client, "123")
+def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_client) -> None:
+    ctx = AccountContext(acc_client)
+    acc_client.metastores.list.return_value = [MetastoreInfo(name="test", metastore_id="123")]
+
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.cli"):
+        assign_metastore(acc_client, "456", ctx=ctx)
+
+    assert "Account ID: 123" in caplog.messages
+    acc_client.metastore_assignments.create.assert_called_once()
+
+
+def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
+
+    ws.catalogs.create.assert_called_once()
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])

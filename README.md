@@ -92,6 +92,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
 * [Table migration commands](#table-migration-commands)
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
@@ -1168,9 +1169,23 @@ a region, and you want to see which ones are available for assignment.
 databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-id <metastore-id>]
 ```
 
-This command assigns a metastore to a workspace with `workspace-id`. If there is only a single metastore in the workspace
-region, it will be automatically assigned to the workspace. If there are multiple metastores available, you need to specify
-the metastore id of the metastore you want to assign to the workspace.
+This command assigns a metastore to a workspace with `--workspace-id`. If there is only a single metastore in the
+workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
+available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-ucx-catalog` command
+
+```commandline
+databricks labs ucx create-ucx-catalog
+16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
+Please provide storage location url for catalog: ucx (default: metastore): ...
+16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
+```
+
+Create and setup UCX artifact catalog. Amongst other things, the artifacts are used for tracking the migration progress
+across workspaces.
 
 # Table migration commands
 
