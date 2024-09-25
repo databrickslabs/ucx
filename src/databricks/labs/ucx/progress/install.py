@@ -23,7 +23,7 @@ class Record:
     object_type: str  # The object type, e.g. TABLE, VIEW. Forms a composite key together with object_id
     object_id: str  # The object id, e.g. hive_metastore.database.table. Forms a composite key together with object_id
     object_data: str  # The object data; the attributes of the corresponding ucx data class, e.g. table name, table ...
-    failures: list  # The failures indicating the object is not UC compatible
+    failures: list[str]  # The failures indicating the object is not UC compatible
     owner: str  # The object owner
     ucx_version: str  # The ucx semantic version
     snapshot_id: int  # An identifier for the snapshot
