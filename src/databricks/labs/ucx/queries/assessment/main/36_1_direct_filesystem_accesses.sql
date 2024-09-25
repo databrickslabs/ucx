@@ -18,8 +18,7 @@
     {"fieldName": "source_link", "title": "source_link", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]},
     {"fieldName": "lineage_type", "title": "lineage_type", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]},
     {"fieldName": "lineage_id", "title": "lineage_id", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]},
-    {"fieldName": "lineage_link", "title": "lineage_link", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]},
-    {"fieldName": "lineage_data", "title": "lineage_data", "type": "complex", "displayAs": "json", "booleanValues": ["false", "true"]}
+    {"fieldName": "lineage_link", "title": "lineage_link", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]}
     ]
   }}'
 */
