@@ -36,7 +36,7 @@ class HistoricalRecord:
     object_type_version: int
     """Versioning of inventory table, for forward compatibility."""
 
-    object_id: str
+    object_id: list[str]
     """The type-specific identifier for this inventory record."""
 
     object_data: dict[str,str]
@@ -51,6 +51,8 @@ class HistoricalRecord:
 
 class DataclassInstance(Protocol):
     __dataclass_fields__: ClassVar[dict]
+    # TODO: Enable this once all record types provide this property.
+    # key_fields: ClassVar[Sequence[str]]
 
 
 Record = TypeVar("Record", bound=DataclassInstance)
@@ -93,7 +95,7 @@ class HistoryLog:
             ws: WorkspaceClient,
             run_id: int,
             klass: type[Record],
-            key_from: Callable[[Record], str],
+            key_from: Callable[[Record], list[str]],
             persist: Callable[[str, list[HistoricalRecord]], None],
         ) -> None:
             self._ws = ws
@@ -143,12 +145,15 @@ class HistoryLog:
                 object_type=self._object_type,
                 object_type_version=self._object_type_version,
                 object_id=object_id,
-                object_data=object_as_json,
+                object_data=flattened_object_data,
                 failures=failures,
                 owner=self._owner,
             )
 
     def appender(self, klass: type[Record]) -> Appender:
-        # TODO: Make a part of the protocol so the type-checker can enforce this.
-        key_from = getattr(klass, "key_fields")
+        key_fields = getattr(klass, "key_fields", ())
+
+        def key_from(record: Record) -> list[str]:
+            return [getattr(record, field) for field in key_fields]
+
         return self.Appender(self._ws, self._run_id, klass, key_from, self._append_history_snapshot)
