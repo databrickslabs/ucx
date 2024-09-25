@@ -84,7 +84,7 @@ class QueryLinter:
             )
             for dfsa in all_dfsas
         ]
-        self._directfs_crawler.dump_all(all_dfsas)
+        self._directfs_crawler.dump_all(all_dfsas, crawl_start_time=assessment_start)
 
     def _dashboard_ids_in_scope(self) -> list[str]:
         if self._include_dashboard_ids is not None:  # an empty list is accepted

@@ -1,3 +1,5 @@
+from __future__ import annotations
+import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
@@ -6,6 +8,7 @@ from typing import ClassVar, Generic, Literal, Protocol, TypeVar
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
+from databricks.labs.ucx.framework.history import HistoryLog
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -21,13 +24,22 @@ ResultFn = Callable[[], Iterable[Result]]
 
 
 class CrawlerBase(ABC, Generic[Result]):
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]):
+    def __init__(
+        self,
+        backend: SqlBackend,
+        catalog: str,
+        schema: str,
+        table: str,
+        klass: type[Result],
+        history_log: HistoryLog | None = None,
+    ):
         """
         Initializes a CrawlerBase instance.
 
         Args:
             backend (SqlBackend): The backend that executes SQL queries:
                 Statement Execution API or Databricks Runtime.
+            history_log: The (optional) history log where (new) snapshots should be saved.
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
             table: The table name for the inventory persistence.
@@ -36,6 +48,7 @@ class CrawlerBase(ABC, Generic[Result]):
         self._schema = self._valid(schema)
         self._table = self._valid(table)
         self._backend = backend
+        self._history_log = history_log
         self._fetch = backend.fetch
         self._exec = backend.execute
         self._klass = klass
@@ -155,10 +168,16 @@ class CrawlerBase(ABC, Generic[Result]):
             except NotFound as e:
                 logger.debug("Inventory table not found", exc_info=e)
         logger.debug(f"[{self.full_name}] crawling new set of snapshot data for {self._table}")
+        crawl_start_time = dt.datetime.now(tz=dt.timezone.utc)
         loaded_records = list(loader())
-        self._update_snapshot(loaded_records, mode="overwrite")
+        self._update_snapshot(loaded_records, crawl_start_time=crawl_start_time, mode="overwrite")
         return loaded_records
 
-    def _update_snapshot(self, items: Sequence[Result], mode: Literal["append", "overwrite"] = "append") -> None:
+    def _update_snapshot(
+        self, items: Sequence[Result], *, crawl_start_time: dt.datetime, mode: Literal["append", "overwrite"]
+    ) -> None:
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self.full_name, items, self._klass, mode=mode)
+        if self._history_log:
+            appender = self._history_log.appender(self._klass)
+            appender.append_snapshot(items, run_start_time=crawl_start_time)

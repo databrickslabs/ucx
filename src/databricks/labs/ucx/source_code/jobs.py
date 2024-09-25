@@ -352,6 +352,7 @@ class WorkflowLinter:
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
+        crawl_start_time = datetime.now(tz=timezone.utc)
         tasks = []
         all_jobs = list(self._ws.jobs.list())
         logger.info(f"Preparing {len(all_jobs)} linting tasks...")
@@ -374,7 +375,7 @@ class WorkflowLinter:
             JobProblem,
             mode='overwrite',
         )
-        self._directfs_crawler.dump_all(job_dfsas)
+        self._directfs_crawler.dump_all(job_dfsas, crawl_start_time=crawl_start_time)
         if len(errors) > 0:
             raise ManyError(errors)
 
