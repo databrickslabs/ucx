@@ -220,7 +220,7 @@ def test_unskip_on_table():
     mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
     ws.tables.get.assert_not_called()
     assert (
-        f"ALTER TABLE `schema`.`table` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        f"ALTER TABLE `catalog`.`schema`.`table` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
         in mock_backend.queries
     )
 
@@ -231,12 +231,12 @@ def test_unskip_on_view():
     installation = MockInstallation()
     mapping = TableMapping(installation, ws, mock_backend)
     view = Table(
-        catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
+        catalog="catalog", database="schema", name="view", object_type="table", table_format="csv", view_text="stuff"
     )
     mapping.unskip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
     ws.tables.get.assert_not_called()
     assert (
-        f"ALTER VIEW `schema`.`view` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        f"ALTER VIEW `catalog`.`schema`.`view` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
         in mock_backend.queries
     )
 
