@@ -26,6 +26,9 @@ class HistoricalRecord:
     snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
 
+    ucx_version: str
+    "The UCX semantic version"
+
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
 
