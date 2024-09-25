@@ -42,7 +42,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
+from databricks.sdk.service.jobs import Run, RunLifeCycleState, RunResultState
 from databricks.sdk.service.workspace import ObjectType
 
 import databricks
@@ -114,43 +114,85 @@ main(f'--config=/Workspace{config_file}',
 
 
 class DeployedWorkflows:
-    def __init__(self, ws: WorkspaceClient, install_state: InstallState, verify_timeout: timedelta):
+    def __init__(self, ws: WorkspaceClient, install_state: InstallState):
         self._ws = ws
         self._install_state = install_state
-        self._verify_timeout = verify_timeout
 
-    def run_workflow(self, step: str, skip_job_wait: bool = False):
+    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
-        if job_initial_run.run_id and not skip_job_wait:
-            try:
-                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
-            except OperationFailed as err:
-                logger.info('---------- REMOTE LOGS --------------')
-                self._relay_logs(step, job_initial_run.run_id)
-                logger.info('---------- END REMOTE LOGS ----------')
-                job_run = self._ws.jobs.get_run(job_initial_run.run_id)
-                raise self._infer_error_from_job_run(job_run) from err
-            return
-        raise NotFound(f"job run not found for {step}")
-
-    def repair_run(self, workflow):
+        run_id = job_initial_run.run_id
+        if not run_id:
+            raise NotFound(f"job run not found for {step}")
+        run_url = f"{self._ws.config.host}#job/{job_id}/runs/{run_id}"
+        logger.info(f"Started {step} job: {run_url}")
+        if skip_job_wait:
+            return run_id
         try:
-            job_id, run_id = self._repair_workflow(workflow)
+            logger.debug(f"Waiting for completion of {step} job: {run_url}")
+            job_run = self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run_id, timeout=max_wait)
+            self._log_completed_job(step, run_id, job_run)
+            return run_id
+        except TimeoutError:
+            logger.warning(f"Timeout while waiting for {step} job to complete: {run_url}")
+            logger.info('---------- REMOTE LOGS --------------')
+            self._relay_logs(step, run_id)
+            logger.info('------ END REMOTE LOGS (SO FAR) -----')
+            raise
+        except OperationFailed as err:
+            logger.info('---------- REMOTE LOGS --------------')
+            self._relay_logs(step, run_id)
+            logger.info('---------- END REMOTE LOGS ----------')
+            job_run = self._ws.jobs.get_run(run_id)
+            raise self._infer_error_from_job_run(job_run) from err
+
+    @staticmethod
+    def _log_completed_job(step: str, run_id: int, job_run: Run) -> None:
+        if job_run.state:
+            result_state = job_run.state.result_state or "N/A"
+            state_message = job_run.state.state_message
+            state_description = f"{result_state} ({state_message})" if state_message else f"{result_state}"
+            logger.info(f"Completed {step} job run {run_id} with state: {state_description}")
+        else:
+            logger.warning(f"Completed {step} job run {run_id} but end state is unknown.")
+        if job_run.start_time or job_run.end_time:
+            start_time = (
+                datetime.fromtimestamp(job_run.start_time / 1000, tz=timezone.utc) if job_run.start_time else None
+            )
+            end_time = datetime.fromtimestamp(job_run.end_time / 1000, tz=timezone.utc) if job_run.end_time else None
+            if job_run.run_duration:
+                duration = timedelta(milliseconds=job_run.run_duration)
+            elif start_time and end_time:
+                duration = end_time - start_time
+            else:
+                duration = None
+            logger.info(
+                f"Completed {step} job run {run_id} duration: {duration or 'N/A'} ({start_time or 'N/A'} thru {end_time or 'N/A'})"
+            )
+
+    def repair_run(self, workflow, verify_timeout: timedelta = timedelta(minutes=2)):
+        try:
+            job_id, run_id = self._repair_workflow(workflow, verify_timeout)
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
+            self._handle_repair_run(run_details, job_id, run_id, workflow)
+        except InvalidParameterValue as e:
+            logger.warning(f"Skipping {workflow}: {e}")
+        except TimeoutError:
+            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+
+    def _handle_repair_run(self, run_details, job_id, run_id, workflow):
+        if run_details.repair_history:
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
             logger.debug(f"Repairing {workflow} job: {job_url}")
             self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
             webbrowser.open(job_url)
-        except InvalidParameterValue as e:
-            logger.warning(f"Skipping {workflow}: {e}")
-        except TimeoutError:
-            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+        else:
+            logger.warning(f"No repair history found for run_id={run_id}")
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
@@ -255,9 +297,10 @@ class DeployedWorkflows:
         """
         log_path = f"{self._install_state.install_folder()}/logs/{workflow}"
         try:
-            log_path_objects = self._ws.workspace.list(log_path)
+            # Ensure any exception is triggered early.
+            log_path_objects = list(self._ws.workspace.list(log_path))
         except ResourceDoesNotExist:
-            logger.warning(f"Can not fetch logs as folder {log_path} does not exist")
+            logger.warning(f"Cannot fetch logs as folder {log_path} does not exist")
             return []
         run_folders = []
         for run_folder in log_path_objects:
@@ -285,9 +328,9 @@ class DeployedWorkflows:
             return " ".join(time_parts)
         return "less than 1 second ago"
 
-    def _repair_workflow(self, workflow):
+    def _repair_workflow(self, workflow, verify_timeout):
         job_id, latest_job_run = self._latest_job_run(workflow)
-        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=verify_timeout)
         retried_check = retry_on_attribute_error(self._get_result_state)
         state_value = retried_check(job_id)
         logger.info(f"The status for the latest run is {state_value}")
@@ -405,7 +448,6 @@ class WorkflowsDeployment(InstallationMixin):
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
-        verify_timeout: timedelta,
         tasks: list[Task],
     ):
         self._config = config
@@ -414,7 +456,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
@@ -437,18 +478,45 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             self._deploy_workflow(workflow_name, settings)
 
-        for workflow_name, job_id in self._install_state.jobs.items():
-            if workflow_name not in desired_workflows:
-                try:
-                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                    self._ws.jobs.delete(job_id)
-                except InvalidParameterValue:
-                    logger.warning(f"step={workflow_name} does not exist anymore for some reason")
-                    continue
-
+        self.remove_jobs(keep=desired_workflows)
         self._install_state.save()
         self._create_debug(remote_wheels)
         self._create_readme()
+
+    def remove_jobs(self, *, keep: set[str] | None = None) -> None:
+        for workflow_name, job_id in self._install_state.jobs.items():
+            if keep and workflow_name in keep:
+                continue
+            try:
+                if not self._is_managed_job_failsafe(int(job_id)):
+                    logger.warning(f"Corrupt installation state. Skipping job_id={job_id} as it is not managed by UCX")
+                    continue
+                logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                self._ws.jobs.delete(job_id)
+            except InvalidParameterValue:
+                logger.warning(f"step={workflow_name} does not exist anymore for some reason")
+                continue
+
+    # see https://github.com/databrickslabs/ucx/issues/2667
+    def _is_managed_job_failsafe(self, job_id: int) -> bool:
+        install_folder = self._installation.install_folder()
+        try:
+            return self._is_managed_job(job_id, install_folder)
+        except ResourceDoesNotExist:
+            return False
+        except InvalidParameterValue:
+            return False
+
+    def _is_managed_job(self, job_id: int, install_folder: str) -> bool:
+        job = self._ws.jobs.get(job_id)
+        if not job.settings or not job.settings.tasks:
+            return False
+        for task in job.settings.tasks:
+            if task.notebook_task and task.notebook_task.notebook_path.startswith(install_folder):
+                return True
+            if task.python_wheel_task and task.python_wheel_task.package_name == "databricks_labs_ucx":
+                return True
+        return False
 
     @property
     def _config_file(self):
@@ -538,6 +606,8 @@ class WorkflowsDeployment(InstallationMixin):
             return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
         return conf_from_installation
 
+    # Workflow creation might fail on an InternalError with no message
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._install_state.jobs:
             try:
@@ -689,7 +759,7 @@ class WorkflowsDeployment(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="main",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD,
                         spark_conf=self._job_cluster_spark_conf("main"),
                         custom_tags={"ResourceClass": "SingleNode"},
                         num_workers=0,
@@ -743,8 +813,9 @@ class WorkflowsDeployment(InstallationMixin):
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._install_state.jobs.items()
         )
+        remote_wheels_str = " ".join(remote_wheels)
         content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            remote_wheel=remote_wheels_str, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 

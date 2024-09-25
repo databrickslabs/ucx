@@ -7,7 +7,6 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
 
 
 @pytest.fixture
@@ -32,8 +31,9 @@ def test_create_account_level_groups(
     ws,
     make_random,
     clean_account_level_groups,
+    watchdog_purge_suffix,
 ):
-    suffix = get_purge_suffix()
+    suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"

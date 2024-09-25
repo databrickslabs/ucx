@@ -1,25 +1,36 @@
+import pytest
+
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 
-def test_escaped_path():
-    # test with optional escaping
-    assert escape_sql_identifier("a") == "a"
-    assert escape_sql_identifier("a.b") == "a.b"
-    assert escape_sql_identifier("a.b.c") == "a.b.c"
-    assert escape_sql_identifier("a") == "a"
-    assert escape_sql_identifier("a.b") == "a.b"
-    assert escape_sql_identifier("`a`.`b`.`c`") == "`a`.`b`.`c`"
-    assert escape_sql_identifier("`a.b`.`c`") == "`a.b`.`c`"
-    assert escape_sql_identifier("a-b.c.d") == "`a-b`.c.d"
-    assert escape_sql_identifier("a.b-c.d") == "a.`b-c`.d"
-    assert escape_sql_identifier("a.b.c-d") == "a.b.`c-d`"
-    assert escape_sql_identifier("✨.🍰.✨") == "`✨`.`🍰`.`✨`"
-    assert escape_sql_identifier("a.b.c.d") == "a.b.`c.d`"
-    # test with escaping enforced
-    assert escape_sql_identifier("a", False) == "`a`"
-    assert escape_sql_identifier("a.b", False) == "`a`.`b`"
-    assert escape_sql_identifier("a.b.c", False) == "`a`.`b`.`c`"
-    assert escape_sql_identifier("a-b.c.d", False) == "`a-b`.`c`.`d`"
-    assert escape_sql_identifier("a.b-c.d", False) == "`a`.`b-c`.`d`"
-    assert escape_sql_identifier("a.b.c-d", False) == "`a`.`b`.`c-d`"
-    assert escape_sql_identifier("a.b.c.d", False) == "`a`.`b`.`c.d`"
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("a", "`a`"),
+        ("a.b", "`a`.`b`"),
+        ("a.b.c", "`a`.`b`.`c`"),
+        ("`a`.b.c", "`a`.`b`.`c`"),
+        ("a.`b`.c", "`a`.`b`.`c`"),
+        ("a.b.`c`", "`a`.`b`.`c`"),
+        ("`a.b`.c", "`a`.`b`.`c`"),
+        ("a.`b.c`", "`a`.`b`.`c`"),
+        ("`a.b`.`c`", "`a`.`b`.`c`"),
+        ("`a`.`b.c`", "`a`.`b`.`c`"),
+        ("`a`.`b`.`c`", "`a`.`b`.`c`"),
+        ("a.b.c.d", "`a`.`b`.`c.d`"),
+        ("a-b.c.d", "`a-b`.`c`.`d`"),
+        ("a.b-c.d", "`a`.`b-c`.`d`"),
+        ("a.b.c-d", "`a`.`b`.`c-d`"),
+        ("a.b.c`d", "`a`.`b`.`c``d`"),
+        ("✨.🍰.✨", "`✨`.`🍰`.`✨`"),
+        ("", ""),
+    ],
+)
+def test_escaped_path(path: str, expected: str) -> None:
+    assert escape_sql_identifier(path) == expected
+
+
+def test_escaped_when_column_contains_period() -> None:
+    expected = "`column.with.periods`"
+    path = "column.with.periods"
+    assert escape_sql_identifier(path, maxsplit=0) == expected

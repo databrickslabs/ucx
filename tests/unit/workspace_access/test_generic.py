@@ -918,11 +918,21 @@ def test_models_page_listing():
         assert item.object_type == "registered-models"
 
 
-def test_serving_endpoints_not_enabled_raises_warning(caplog):
+def test_serving_endpoints_not_enabled_raises_warning(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.serving_endpoints.list.side_effect = NotFound("Model serving is not enabled for your shard")
 
     sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
-    with caplog.at_level('WARNING'):
+    with caplog.at_level('WARNING', logger="databricks.labs.ucx.workspace_access.generic"):
         list(sup.get_crawler_tasks())
-    assert "Listing serving-endpoints failed: Model serving is not enabled for your shard" in caplog.text
+    assert "Listing serving-endpoints failed" in caplog.text
+
+
+def test_internal_error_in_serving_endpoints_raises_warning(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.serving_endpoints.list.side_effect = InternalError
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
+    with caplog.at_level('WARNING', logger="databricks.labs.ucx.workspace_access.generic"):
+        list(sup.get_crawler_tasks())
+    assert "Listing serving-endpoints failed" in caplog.text

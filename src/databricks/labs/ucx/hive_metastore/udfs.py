@@ -50,16 +50,7 @@ class UdfsCrawler(CrawlerBase):
             return [row[0] for row in self._fetch("SHOW DATABASES")]
         return self._include_database
 
-    def snapshot(self) -> list[Udf]:
-        """
-        Takes a snapshot of tables in the specified catalog and database.
-
-        Returns:
-            list[Udf]: A list of Udf objects representing the snapshot of tables.
-        """
-        return self._snapshot(self._try_load, self._crawl)
-
-    def _try_load(self) -> Iterable[Udf]:
+    def _try_fetch(self) -> Iterable[Udf]:
         """Tries to load udf information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Udf(*row)

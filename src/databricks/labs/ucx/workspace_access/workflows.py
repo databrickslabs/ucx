@@ -13,7 +13,10 @@ class GroupMigration(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_metastore_attached(self, ctx: RuntimeContext):
-        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail."""
+        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail.
+
+        Account level groups are only available when a metastore is attached to the workspace.
+        """
         ctx.verify_has_metastore.verify_metastore()
 
     @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
@@ -56,7 +59,10 @@ class PermissionsMigrationAPI(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_metastore_attached(self, ctx: RuntimeContext):
-        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail."""
+        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail.
+
+        Account level groups are only available when a metastore is attached to the workspace.
+        """
         ctx.verify_has_metastore.verify_metastore()
 
     @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])

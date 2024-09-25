@@ -8,8 +8,9 @@ from databricks.sdk.errors import DatabricksError
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.recon.base import (
     DataComparator,
     SchemaComparator,
@@ -39,7 +40,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         self,
         sbe: SqlBackend,
         schema: str,
-        migration_status_refresher: MigrationStatusRefresher,
+        migration_status_refresher: TableMigrationStatusRefresher,
         table_mapping: TableMapping,
         schema_comparator: SchemaComparator,
         data_comparator: DataComparator,
@@ -51,9 +52,6 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         self._schema_comparator = schema_comparator
         self._data_comparator = data_comparator
         self._default_threshold = default_threshold
-
-    def snapshot(self) -> Iterable[ReconResult]:
-        return self._snapshot(self._try_fetch, self._crawl)
 
     def _crawl(self) -> Iterable[ReconResult]:
         self._migration_status_refresher.reset()
@@ -145,5 +143,5 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         return round(abs(source_row_count - target_row_count) / source_row_count * 100)
 
     def _try_fetch(self) -> Iterable[ReconResult]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ReconResult(*row)

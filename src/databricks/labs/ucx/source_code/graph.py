@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import abc
+import dataclasses
+import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
+from typing import TypeVar, Generic
 
 from astroid import (  # type: ignore
     NodeNG,
 )
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.directfs_access import LineageAtom
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.Logger(__name__)
@@ -42,8 +46,8 @@ class DependencyGraph:
         return self._dependency
 
     @property
-    def path(self):
-        return self._dependency.path
+    def dependencies(self):
+        return self._dependencies
 
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
         return self._resolver.register_library(self.path_lookup, *libraries)
@@ -59,6 +63,13 @@ class DependencyGraph:
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
         maybe = self._resolver.resolve_import(self.path_lookup, name)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
+
+    def register_file(self, path: Path) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_file(self.path_lookup, path)
         if not maybe.dependency:
             return maybe.problems
         maybe_graph = self.register_dependency(maybe.dependency)
@@ -85,7 +96,8 @@ class DependencyGraph:
         return MaybeGraph(
             child_graph,
             [
-                problem.replace(
+                dataclasses.replace(
+                    problem,
                     source_path=dependency.path if problem.is_path_missing() else problem.source_path,
                 )
                 for problem in problems
@@ -97,7 +109,7 @@ class DependencyGraph:
         found: list[DependencyGraph] = []
 
         def check_registered_dependency(graph):
-            if graph.path == path:
+            if graph.dependency.path == path:
                 found.append(graph)
                 return True
             return False
@@ -166,13 +178,6 @@ class DependencyGraph:
     def local_dependencies(self) -> set[Dependency]:
         return {child.dependency for child in self._dependencies.values()}
 
-    @property
-    def all_paths(self) -> set[Path]:
-        # TODO: remove this public method, as it'll throw false positives
-        # for package imports, like certifi. a WorkflowTask is also a dependency,
-        # but it does not exist on a filesystem
-        return {d.path for d in self.all_dependencies}
-
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
         return self._relative_names(self.all_dependencies)
@@ -197,19 +202,13 @@ class DependencyGraph:
         """This method is intended to simplify testing"""
         return self._relative_names(self.root_dependencies)
 
-    # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None) -> bool:
-        """provide visited set if you want to ensure nodes are only visited once"""
-        if visited is not None:
-            if self.path in visited:
-                return False
-            visited.add(self.path)
-        if visit_node(self):
-            return True
-        for dependency in self._dependencies.values():
-            if dependency.visit(visit_node, visited):
-                return True
-        return False
+        """ "
+        when visit_node returns True it interrupts the visit
+        provide visited set if you want to ensure nodes are only visited once
+        """
+        visitor = DependencyGraphVisitor(visit_node, visited)
+        return visitor.visit(self)
 
     def new_dependency_graph_context(self):
         return DependencyGraphContext(
@@ -273,7 +272,32 @@ class DependencyGraph:
         return InheritedContext.from_route(self, self.path_lookup, route)
 
     def __repr__(self):
-        return f"<DependencyGraph {self.path}>"
+        return f"<DependencyGraph {self.dependency.path}>"
+
+
+class DependencyGraphVisitor:
+
+    def __init__(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path] | None):
+        self._visit_node = visit_node
+        self._visited = visited
+        self._visited_pairs: set[tuple[Path, Path]] = set()
+
+    def visit(self, graph: DependencyGraph) -> bool:
+        path = graph.dependency.path
+        if self._visited is not None:
+            if path in self._visited:
+                return False
+            self._visited.add(path)
+        if self._visit_node(graph):
+            return True
+        for dependency_graph in graph.dependencies.values():
+            pair = (path, dependency_graph.dependency.path)
+            if pair in self._visited_pairs:
+                continue
+            self._visited_pairs.add(pair)
+            if self.visit(dependency_graph):
+                return True
+        return False
 
 
 @dataclass
@@ -284,7 +308,7 @@ class DependencyGraphContext:
     session_state: CurrentSessionState
 
 
-class Dependency(abc.ABC):
+class Dependency:
 
     def __init__(self, loader: DependencyLoader, path: Path, inherits_context=True):
         self._loader = loader
@@ -310,6 +334,11 @@ class Dependency(abc.ABC):
 
     def __repr__(self):
         return f"Dependency<{self.path}>"
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        object_type = "NOTEBOOK" if is_a_notebook(self.path) else "FILE"
+        return [LineageAtom(object_type=object_type, object_id=str(self.path))]
 
 
 class SourceContainer(abc.ABC):
@@ -364,7 +393,7 @@ class BaseImportResolver(abc.ABC):
 class BaseFileResolver(abc.ABC):
 
     @abc.abstractmethod
-    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+    def resolve_file(self, path_lookup, path: Path) -> MaybeDependency:
         """locates a file"""
 
 
@@ -387,11 +416,13 @@ class DependencyResolver:
         library_resolver: LibraryResolver,
         notebook_resolver: BaseNotebookResolver,
         import_resolver: BaseImportResolver,
+        file_resolver: BaseFileResolver,
         path_lookup: PathLookup,
     ):
         self._library_resolver = library_resolver
         self._notebook_resolver = notebook_resolver
         self._import_resolver = import_resolver
+        self._file_resolver = file_resolver
         self._path_lookup = path_lookup
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path, inherit_context: bool) -> MaybeDependency:
@@ -400,17 +431,16 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
+    def resolve_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._file_resolver.resolve_file(path_lookup, path)
+
     def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         return self._library_resolver.register_library(path_lookup, *libraries)
 
     def build_local_file_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        resolver = self._local_file_resolver
-        if not resolver:
-            problem = DependencyProblem("missing-file-resolver", "Missing resolver for local files")
-            return MaybeGraph(None, [problem])
-        maybe = resolver.resolve_local_file(self._path_lookup, path)
+        maybe = self._file_resolver.resolve_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)
@@ -422,12 +452,6 @@ class DependencyResolver:
         if problems:
             problems = self._make_relative_paths(problems, path)
         return MaybeGraph(graph, problems)
-
-    @property
-    def _local_file_resolver(self) -> BaseFileResolver | None:
-        if isinstance(self._import_resolver, BaseFileResolver):
-            return self._import_resolver
-        return None
 
     def build_notebook_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
@@ -452,11 +476,11 @@ class DependencyResolver:
             out_path = path if problem.is_path_missing() else problem.source_path
             if out_path.is_absolute() and out_path.is_relative_to(self._path_lookup.cwd):
                 out_path = out_path.relative_to(self._path_lookup.cwd)
-            adjusted_problems.append(problem.replace(source_path=out_path))
+            adjusted_problems.append(dataclasses.replace(problem, source_path=out_path))
         return adjusted_problems
 
     def __repr__(self):
-        return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._path_lookup}>"
+        return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._file_resolver}, {self._path_lookup}>"
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
@@ -475,26 +499,6 @@ class DependencyProblem:
 
     def is_path_missing(self):
         return self.source_path == Path(MISSING_SOURCE_PATH)
-
-    def replace(
-        self,
-        code: str | None = None,
-        message: str | None = None,
-        source_path: Path | None = None,
-        start_line: int | None = None,
-        start_col: int | None = None,
-        end_line: int | None = None,
-        end_col: int | None = None,
-    ) -> DependencyProblem:
-        return DependencyProblem(
-            code if code is not None else self.code,
-            message if message is not None else self.message,
-            source_path if source_path is not None else self.source_path,
-            start_line if start_line is not None else self.start_line,
-            start_col if start_col is not None else self.start_col,
-            end_line if end_line is not None else self.end_line,
-            end_col if end_col is not None else self.end_col,
-        )
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(
@@ -582,3 +586,53 @@ class InheritedContext:
             return self
         tree = self._tree.renumber(-1)
         return InheritedContext(tree, self.found)
+
+
+T = TypeVar("T")
+
+
+class DependencyGraphWalker(abc.ABC, Generic[T]):
+
+    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
+        self._graph = graph
+        self._walked_paths = walked_paths
+        self._path_lookup = path_lookup
+        self._lineage: list[Dependency] = []
+
+    def __iter__(self) -> Iterator[T]:
+        for dependency in self._graph.root_dependencies:
+            # the dependency is a root, so its path is the one to use
+            # for computing lineage and building python global context
+            root_path = dependency.path
+            yield from self._iter_one(dependency, self._graph, root_path)
+
+    def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
+        if dependency.path in self._walked_paths:
+            return
+        self._lineage.append(dependency)
+        self._walked_paths.add(dependency.path)
+        self._log_walk_one(dependency)
+        if dependency.path.is_file() or is_a_notebook(dependency.path):
+            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
+            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+            yield from self._process_dependency(dependency, path_lookup, inherited_tree)
+            maybe_graph = graph.locate_dependency(dependency.path)
+            # missing graph problems have already been reported while building the graph
+            if maybe_graph.graph:
+                child_graph = maybe_graph.graph
+                for child_dependency in child_graph.local_dependencies:
+                    yield from self._iter_one(child_dependency, child_graph, root_path)
+        self._lineage.pop()
+
+    def _log_walk_one(self, dependency: Dependency):
+        logger.debug(f'Analyzing dependency: {dependency}')
+
+    @abc.abstractmethod
+    def _process_dependency(
+        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+    ) -> Iterable[T]: ...
+
+    @property
+    def lineage(self) -> list[LineageAtom]:
+        lists: list[list[LineageAtom]] = [dependency.lineage for dependency in self._lineage]
+        return list(itertools.chain(*lists))

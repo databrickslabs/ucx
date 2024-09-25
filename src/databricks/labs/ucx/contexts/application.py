@@ -15,9 +15,9 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -31,11 +31,13 @@ from databricks.labs.ucx.hive_metastore.grants import (
     GrantsCrawler,
     PrincipalACL,
     AwsACL,
+    MigrateGrants,
+    ACLMigrator,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher,
+    TableMigrationStatusRefresher,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
@@ -51,6 +53,7 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoad
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -115,8 +118,6 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def is_azure(self) -> bool:
-        if self.is_aws:
-            return False
         return self.connect_config.is_azure
 
     @cached_property
@@ -241,13 +242,32 @@ class GlobalContext(abc.ABC):
     def tables_migrator(self):
         return TablesMigrator(
             self.tables_crawler,
-            self.grants_crawler,
             self.workspace_client,
             self.sql_backend,
             self.table_mapping,
-            self.group_manager,
             self.migration_status_refresher,
-            self.principal_acl,
+            self.migrate_grants,
+        )
+
+    @cached_property
+    def acl_migrator(self):
+        return ACLMigrator(
+            self.tables_crawler,
+            self.workspace_info,
+            self.migration_status_refresher,
+            self.migrate_grants,
+        )
+
+    @cached_property
+    def migrate_grants(self):
+        grant_loaders = [
+            self.grants_crawler.snapshot,
+            self.principal_acl.get_interactive_cluster_grants,
+        ]
+        return MigrateGrants(
+            self.sql_backend,
+            self.group_manager,
+            grant_loaders,
         )
 
     @cached_property
@@ -284,18 +304,15 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def principal_locations(self):
-        eligible_locations = {}
-        try:
+    def principal_locations_retriever(self):
+        def inner():
             if self.is_azure:
-                eligible_locations = self.azure_acl.get_eligible_locations_principals()
+                return self.azure_acl.get_eligible_locations_principals()
             if self.is_aws:
-                eligible_locations = self.aws_acl.get_eligible_locations_principals()
-            if self.is_gcp:
-                raise NotImplementedError("Not implemented for GCP.")
-        except ResourceDoesNotExist:
-            pass
-        return eligible_locations
+                return self.aws_acl.get_eligible_locations_principals()
+            raise NotImplementedError("Not implemented for GCP.")
+
+        return inner
 
     @cached_property
     def principal_acl(self):
@@ -305,12 +322,12 @@ class GlobalContext(abc.ABC):
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            self.principal_locations,
+            self.principal_locations_retriever,
         )
 
     @cached_property
     def migration_status_refresher(self):
-        return MigrationStatusRefresher(
+        return TableMigrationStatusRefresher(
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,
@@ -327,7 +344,14 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def catalog_schema(self):
-        return CatalogSchema(self.workspace_client, self.table_mapping, self.principal_acl, self.sql_backend)
+        return CatalogSchema(
+            self.workspace_client,
+            self.table_mapping,
+            self.principal_acl,
+            self.sql_backend,
+            self.grants_crawler,
+            self.config.ucx_catalog,
+        )
 
     @cached_property
     def verify_timeout(self):
@@ -343,7 +367,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def deployed_workflows(self):
-        return DeployedWorkflows(self.workspace_client, self.install_state, self.verify_timeout)
+        return DeployedWorkflows(self.workspace_client, self.install_state)
 
     @cached_property
     def workspace_info(self):
@@ -393,7 +417,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        return DependencyResolver(self.pip_resolver, self.notebook_resolver, self.file_resolver, self.path_lookup)
+        return DependencyResolver(
+            self.pip_resolver, self.notebook_resolver, self.file_resolver, self.file_resolver, self.path_lookup
+        )
 
     @cached_property
     def workflow_linter(self):
@@ -401,9 +427,27 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.dependency_resolver,
             self.path_lookup,
-            MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.directfs_access_crawler_for_paths,
             self.config.include_job_ids,
         )
+
+    @cached_property
+    def query_linter(self):
+        return QueryLinter(
+            self.workspace_client,
+            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.directfs_access_crawler_for_queries,
+            self.config.include_dashboard_ids,
+        )
+
+    @cached_property
+    def directfs_access_crawler_for_paths(self):
+        return DirectFsAccessCrawler.for_paths(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def directfs_access_crawler_for_queries(self):
+        return DirectFsAccessCrawler.for_queries(self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self):

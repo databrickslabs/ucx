@@ -10,6 +10,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineRespons
 
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
@@ -17,7 +18,11 @@ from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+)
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 
@@ -36,10 +41,12 @@ def test_job_problem_as_message():
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     allow_list = KnownList()
+    import_file_resolver = ImportFileResolver(file_loader, allow_list)
     resolver = DependencyResolver(
         PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
+        import_file_resolver,
+        import_file_resolver,
         mock_path_lookup,
     )
     return resolver
@@ -222,7 +229,7 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
     expected_path_instance = expected_cls(ws, expected_path)
 
     registered_notebooks = []
-    for call in dep_graph.register_notebook.call_args_list:
+    for call in dep_graph.register_file.call_args_list:
         registered_notebooks.append(call.args[0])
     assert registered_notebooks == [expected_path_instance]
 
@@ -231,7 +238,8 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index)
+    crawler = create_autospec(DirectFsAccessCrawler)
+    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, crawler)
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test-task", libraries=libraries)
@@ -239,10 +247,10 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     job = jobs.Job(job_id=1234, settings=settings)
 
     ws.jobs.get.return_value = job
-
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         linter.lint_job(1234)
 
+    crawler.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 

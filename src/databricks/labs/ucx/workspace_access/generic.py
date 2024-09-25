@@ -24,6 +24,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
@@ -58,8 +59,8 @@ class Listing:
         try:
             for item in self._func():
                 yield GenericPermissionsInfo(getattr(item, self._id_attribute), self._object_type)
-        except NotFound as e:
-            logger.warning(f"Listing {self._object_type} failed: {e}")
+        except (NotFound, InternalError) as e:
+            logger.warning(f"Listing {self._object_type} failed", exc_info=e)
         since = datetime.datetime.now() - started
         logger.info(f"Listed {self._object_type} in {since}")
 
@@ -359,11 +360,8 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
                 language=raw.get("language", None),
             )
 
-    def snapshot(self) -> Iterable[WorkspaceObjectInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[WorkspaceObjectInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield WorkspaceObjectInfo(
                 path=row["path"], object_type=row["object_type"], object_id=row["object_id"], language=row["language"]
             )

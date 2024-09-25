@@ -8,7 +8,6 @@ from databricks.labs.ucx.workspace_access.groups import MigrationState
 logger = Logger(__name__)
 
 
-# TODO: fix order to standard https://github.com/databrickslabs/ucx/issues/411
 @dataclass
 class Permissions:
     object_id: str

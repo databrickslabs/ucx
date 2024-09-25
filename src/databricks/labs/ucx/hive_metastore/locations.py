@@ -1,9 +1,12 @@
+import dataclasses
 import logging
 import os
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar
+from functools import cached_property
+from typing import ClassVar, Optional
+from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -19,6 +22,9 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 logger = logging.getLogger(__name__)
 
 
+_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss")
+
+
 @dataclass
 class ExternalLocation:
     location: str
@@ -29,6 +35,82 @@ class ExternalLocation:
 class Mount:
     name: str
     source: str
+
+
+# Union with string is invalid syntax: "LocationTrie" | None
+OptionalLocationTrie = Optional["LocationTrie"]  # pylint: disable=consider-alternative-union-syntax
+
+
+@dataclass
+class LocationTrie:
+    """A trie datastructure to search locations.
+
+    Used to find overlapping locations.
+    """
+
+    key: str = ""
+    parent: OptionalLocationTrie = None
+    children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
+    tables: list[Table] = dataclasses.field(default_factory=list)
+
+    @cached_property
+    def _path(self):
+        """The path to traverse to get to the current node."""
+        parts = []
+        current = self
+        while current:
+            parts.append(current.key)
+            current = current.parent
+        return list(reversed(parts))[1:]
+
+    @property
+    def location(self):
+        scheme, netloc, *path = self._path
+        return f"{scheme}://{netloc}/{'/'.join(path)}"
+
+    @staticmethod
+    def _parse_location(location: str | None) -> list[str]:
+        if not location:
+            return []
+        parse_result = urlparse(location)
+        parts = [parse_result.scheme, parse_result.netloc]
+        parts.extend(parse_result.path.strip("/").split("/"))
+        return parts
+
+    def insert(self, table: Table) -> None:
+        current = self
+        for part in self._parse_location(table.location):
+            if part not in current.children:
+                parent = current
+                current = LocationTrie(part, parent)
+                parent.children[part] = current
+                continue
+            current = current.children[part]
+        current.tables.append(table)
+
+    def find(self, table: Table) -> OptionalLocationTrie:
+        current = self
+        for part in self._parse_location(table.location):
+            if part not in current.children:
+                return None
+            current = current.children[part]
+        return current
+
+    def is_valid(self) -> bool:
+        """A valid location has a scheme and netloc; the path is optional."""
+        if len(self._path) < 3:
+            return False
+        scheme, netloc, *_ = self._path
+        return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
+
+    def has_children(self):
+        return len(self.children) > 0
+
+    def __iter__(self):
+        if self.is_valid():
+            yield self
+        for child in self.children.values():
+            yield from child
 
 
 class ExternalLocations(CrawlerBase[ExternalLocation]):
@@ -119,22 +201,18 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not dupe:
             external_locations.append(ExternalLocation(jdbc_location, 1))
 
-    def _external_location_list(self) -> Iterable[ExternalLocation]:
+    def _crawl(self) -> Iterable[ExternalLocation]:
+        tables_identifier = escape_sql_identifier(f"{self._catalog}.{self._schema}.tables")
         tables = list(
             self._backend.fetch(
-                f"SELECT location, storage_properties FROM {escape_sql_identifier(self._schema)}.tables WHERE location IS NOT NULL"
+                f"SELECT location, storage_properties FROM {tables_identifier} WHERE location IS NOT NULL"
             )
         )
         mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
         return self._external_locations(list(tables), list(mounts))
 
-    def snapshot(self) -> Iterable[ExternalLocation]:
-        return self._snapshot(self._try_fetch, self._external_location_list)
-
     def _try_fetch(self) -> Iterable[ExternalLocation]:
-        for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
-        ):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ExternalLocation(*row)
 
     @staticmethod
@@ -142,9 +220,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         tf_script = []
         cnt = 1
         res_name = ""
-        supported_prefixes = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
         for loc in missing_locations:
-            for prefix in supported_prefixes:
+            for scheme in _EXTERNAL_FILE_LOCATION_SCHEMES:
+                prefix = f"{scheme}://"
                 prefix_len = len(prefix)
                 if not loc.location.startswith(prefix):
                     continue
@@ -226,7 +304,8 @@ class Mounts(CrawlerBase[Mount]):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
 
-    def _deduplicate_mounts(self, mounts: list) -> list:
+    @staticmethod
+    def _deduplicate_mounts(mounts: list) -> list:
         seen = set()
         deduplicated_mounts = []
         for obj in mounts:
@@ -239,22 +318,14 @@ class Mounts(CrawlerBase[Mount]):
                 deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
-    def inventorize_mounts(self):
-        self._append_records(self._list_mounts())
-
-    def _list_mounts(self) -> Iterable[Mount]:
+    def _crawl(self) -> Iterable[Mount]:
         mounts = []
         for mount_point, source, _ in self._dbutils.fs.mounts():
             mounts.append(Mount(mount_point, source))
         return self._deduplicate_mounts(mounts)
 
-    def snapshot(self) -> Iterable[Mount]:
-        return self._snapshot(self._try_fetch, self._list_mounts)
-
     def _try_fetch(self) -> Iterable[Mount]:
-        for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
-        ):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Mount(*row)
 
 
@@ -265,6 +336,14 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
+    """Experimental scanner for tables that can be found on mounts.
+
+    This crawler was developed with a specific use-case in mind and isn't currently in use. It does not conform to the
+    design of other crawlers. In particular:
+     - It depends on the `tables` inventory, but without verifying the tables crawler has run.
+     - Rather than have its own table it will blindly overwrite the existing content of the tables inventory.
+    """
+
     TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
@@ -289,29 +368,36 @@ class TablesInMounts(CrawlerBase[Table]):
             irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
-    def snapshot(self) -> list[Table]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
+        if not force_refresh:
+            msg = "This crawler only supports forced refresh; refer to source implementation for details."
+            raise NotImplementedError(msg)
+        return list(super().snapshot(force_refresh=force_refresh))
+
+    def _crawl(self) -> list[Table]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
-        cached_results = []
         try:
-            cached_results = list(self._try_load())
+            cached_results = list(self._try_fetch())
         except NotFound:
-            pass
+            # This happens when the table crawler hasn't run yet, and is arguably incorrect:
+            # rather than pretending there are no tables it should instead trigger a crawl.
+            cached_results = []
         table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
-        loaded_records = list(self._crawl(table_paths))
-        if len(cached_results) > 0:
-            loaded_records = loaded_records + cached_results
-        self._overwrite_records(loaded_records)
+        loaded_records = list(self._crawl_tables(table_paths))
+        if cached_results:
+            loaded_records = [*loaded_records, *cached_results]
         return loaded_records
 
-    def _try_load(self) -> Iterable[Table]:
+    def _try_fetch(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
             f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
         ):
             yield Table(*row)
 
-    def _get_tables_paths_from_assessment(self, loaded_records: Iterable[Table]) -> dict[str, str]:
+    @staticmethod
+    def _get_tables_paths_from_assessment(loaded_records: Iterable[Table]) -> dict[str, str]:
         seen = {}
         for rec in loaded_records:
             if not rec.location:
@@ -319,19 +405,15 @@ class TablesInMounts(CrawlerBase[Table]):
             seen[rec.location] = rec.key
         return seen
 
-    def _overwrite_records(self, items: Sequence[Table]):
-        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
-
-    def _crawl(self, table_paths_from_assessment: dict[str, str]):
+    def _crawl_tables(self, table_paths_from_assessment: dict[str, str]) -> list[Table]:
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
             if self._include_mounts and mount.name not in self._include_mounts:
                 logger.info(f"Filtering mount {mount.name}")
                 continue
-            table_paths = {}
             if self._include_paths_in_mount:
+                table_paths = {}
                 for path in self._include_paths_in_mount:
                     table_paths.update(self._find_delta_log_folders(path))
             else:
@@ -366,7 +448,8 @@ class TablesInMounts(CrawlerBase[Table]):
         logger.info(f"Found a total of {len(all_tables)} tables in mount points")
         return all_tables
 
-    def _get_table_location(self, mount: Mount, path: str):
+    @staticmethod
+    def _get_table_location(mount: Mount, path: str) -> str:
         """
         There can be different cases for mounts:
             - Mount(name='/mnt/things/a', source='abfss://things@labsazurethings.dfs.core.windows.net/a')
@@ -377,7 +460,11 @@ class TablesInMounts(CrawlerBase[Table]):
             return path.replace(f"dbfs:{mount.name}/", mount.source)
         return path.replace(f"dbfs:{mount.name}", mount.source)
 
-    def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(
+        self,
+        root_dir: str,
+        delta_log_folders: dict[str, TableInMount] | None = None,
+    ) -> dict[str, TableInMount]:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
@@ -439,18 +526,22 @@ class TablesInMounts(CrawlerBase[Table]):
             return TableInMount(format="PARQUET", is_partitioned=False)
         return None
 
-    def _is_partitioned(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_partitioned(file_name: str) -> bool:
         return '=' in file_name
 
-    def _is_parquet(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_parquet(file_name: str) -> bool:
         parquet_patterns = {'.parquet'}
         return any(pattern in file_name for pattern in parquet_patterns)
 
-    def _is_csv(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_csv(file_name: str) -> bool:
         csv_patterns = {'.csv'}
         return any(pattern in file_name for pattern in csv_patterns)
 
-    def _is_json(self, file_name: str) -> bool:
+    @staticmethod
+    def _is_json(file_name: str) -> bool:
         json_patterns = {'.json'}
         return any(pattern in file_name for pattern in json_patterns)
 

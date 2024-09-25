@@ -26,14 +26,14 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.compute import Policy, State
+from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.sql import EndpointInfo, EndpointInfoWarehouseType
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.install import AccountInstaller, WorkspaceInstallation, WorkspaceInstaller, extract_major_minor
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
@@ -86,7 +86,7 @@ def mock_installation_extra_jobs():
         {
             'state.json': {
                 'resources': {
-                    'jobs': {"assessment": "123", "extra_job": "123"},
+                    'jobs': {"assessment": "123", "extra_job": "124", "other_job": "125"},
                     'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'},
                 }
             }
@@ -112,7 +112,6 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
 
@@ -135,7 +134,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
             raise e.errs[0]
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_install_cluster_override_jobs(ws, mock_installation):
@@ -147,7 +146,6 @@ def test_install_cluster_override_jobs(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 
@@ -170,7 +168,6 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 
@@ -211,7 +208,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    installer = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    installer = DeployedWorkflows(ws, install_state)
     logger = logging.getLogger("databricks.labs.ucx.installer.workflows")
     logger.setLevel(logging.DEBUG)
     with pytest.raises(Unknown) as failure:
@@ -246,7 +243,7 @@ def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(NotFound):
         deployed.run_workflow("assessment")
 
@@ -279,7 +276,7 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(PermissionDenied) as failure:
         deployed.run_workflow("assessment")
 
@@ -324,7 +321,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     with pytest.raises(ManyError) as failure:
         deployed.run_workflow("assessment")
 
@@ -335,47 +332,64 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
 
 
-def test_save_config(ws, mock_installation):
-    ws.workspace.get_status = not_found
-    ws.warehouses.list = lambda **_: [
-        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
-    ]
-    ws.workspace.download = not_found
-
+@pytest.mark.parametrize(
+    "prompt_question,prompt_answer,workspace_config_overwrite",
+    [
+        ("Inventory Database stored in hive_metastore", "non_default", {"inventory_database": "non_default"}),
+        ("Catalog to store UCX artifacts in", "ucx-test", {"ucx_catalog": "ucx-test"}),
+        ("Log level", "DEBUG", {"log_level": "DEBUG"}),
+        (r".*workspace group names.*", "g1, g2, g99", {"include_group_names": ["g1", "g2", "g99"]}),
+        ("Number of threads", "16", {"num_threads": 16}),
+        (r"Comma-separated list of databases to migrate.*", "db1,db2", {"include_databases": ["db1", "db2"]}),
+        (r"Does given workspace .* block Internet access?", "yes", {"upload_dependencies": True}),
+        ("Do you want to trigger assessment job after installation?", "yes", {"trigger_job": True}),
+        ("Reconciliation threshold, in percentage", "10", {"recon_tolerance_percent": 10}),
+        (
+            r"Parallelism for migrating.*",
+            "1000",
+            {"spark_conf": {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"}},
+        ),
+        (r"Min workers for auto-scale.*", "2", {"min_workers": 2}),
+        (r"Max workers for auto-scale.*", "20", {"max_workers": 20}),
+    ],
+)
+def test_configure_sets_expected_workspace_configuration_values(
+    ws,
+    mock_installation,
+    prompt_question,
+    prompt_answer,
+    workspace_config_overwrite,
+) -> None:
+    workspace_config_default = {
+        "version": 2,
+        "default_catalog": "ucx_default",
+        "ucx_catalog": "ucx",
+        "inventory_database": "ucx",
+        "log_level": "INFO",
+        "num_threads": 8,
+        "min_workers": 1,
+        "max_workers": 10,
+        "policy_id": "foo",
+        "renamed_group_prefix": "db-temp-",
+        "warehouse_id": "abc",
+        "workspace_start_path": "/",
+        "num_days_submit_runs_history": 30,
+        "recon_tolerance_percent": 5,
+    }
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*": "",
-            r".*days to analyze submitted runs.*": "1",
-            r"Reconciliation threshold, in percentage.*": "5",
+            prompt_question: prompt_answer,
         }
     )
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
+    install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
+
     install.configure()
 
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'recon_tolerance_percent': 5,
-        },
-    )
+    workspace_config_expected = {**workspace_config_default, **workspace_config_overwrite}
+    mock_installation.assert_file_written("config.yml", workspace_config_expected)
 
 
 def test_corrupted_config(ws, mock_installation, caplog):
@@ -400,47 +414,7 @@ def test_corrupted_config(ws, mock_installation, caplog):
     assert 'Existing installation at ~/mock is corrupted' in caplog.text
 
 
-def test_save_config_strip_group_names(ws, mock_installation):
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",  # specify names
-            r".*workspace group names.*": "g1, g2, g99",
-            r".*": "",
-            r"Reconciliation threshold, in percentage.*": "5",
-        }
-    )
-    ws.workspace.get_status = not_found
-
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'include_group_names': ['g1', 'g2', 'g99'],
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'recon_tolerance_percent': 5,
-        },
-    )
-
-
-def test_create_cluster_policy(ws, mock_installation):
+def test_create_cluster_policy(ws, mock_installation) -> None:
     ws.cluster_policies.list.return_value = [
         Policy(
             policy_id="foo1",
@@ -472,6 +446,7 @@ def test_create_cluster_policy(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_group_names': ['g1', 'g2', 'g99'],
             'inventory_database': 'ucx',
             'log_level': 'INFO',
@@ -507,7 +482,6 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
@@ -523,7 +497,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     workspace_installation.run()
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README')
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     wheels.upload_to_dbfs.assert_not_called()
 
 
@@ -579,7 +553,6 @@ def test_remove_jobs_no_state(ws):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
@@ -614,16 +587,16 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
-    with caplog.at_level('ERROR'):
+    with caplog.at_level('WARNING'):
         workspace_installation.uninstall()
-        assert 'Already deleted: assessment job_id=123.' in caplog.messages
+        failure = 'Corrupt installation state. Skipping job_id=123 as it is not managed by UCX'
+        assert failure in caplog.messages
 
     mock_installation_with_jobs.assert_removed()
     wheels.upload_to_wsfs.assert_not_called()
@@ -826,9 +799,9 @@ def test_repair_run(ws, mocker, mock_installation_with_jobs):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
 
 
 def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
@@ -847,9 +820,9 @@ def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
     ws.jobs.list_runs.repair_run = None
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
 
     assert "job is not in FAILED state" in caplog.text
 
@@ -871,10 +844,10 @@ def test_repair_run_no_job_id(ws, mock_installation, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert 'Skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
@@ -884,10 +857,10 @@ def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert "Skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
@@ -896,10 +869,10 @@ def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
     with caplog.at_level('WARNING'):
-        deployed.repair_run("assessment")
+        deployed.repair_run("assessment", timeout)
         assert "Skipping assessment: Workflow does not exists" in caplog.messages
 
 
@@ -920,9 +893,9 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
 
     timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
 
-    deployed.repair_run("assessment")
+    deployed.repair_run("assessment", timeout)
     assert "Please try after sometime" in caplog.text
 
 
@@ -968,9 +941,8 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, state, expect
             start_time=1704114000000,
         )
     ]
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = base
     status = deployed.latest_job_status()
     assert len(status) == 1
@@ -999,9 +971,8 @@ def test_latest_job_status_success_with_time(mock_datetime, ws, mock_installatio
             start_time=start_time,
         )
     ]
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = base
     faked_now = datetime(2024, 1, 1, 14, 0, 0)
     mock_datetime.now.return_value = faked_now
@@ -1035,10 +1006,9 @@ def test_latest_job_status_list(ws):
         ],
         [],  # the last job has no runs
     ]
-    timeout = timedelta(seconds=1)
     installation = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
     install_state = InstallState.from_installation(installation)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = deployed.latest_job_status()
     assert len(status) == 3
@@ -1051,9 +1021,8 @@ def test_latest_job_status_list(ws):
 
 
 def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = ""
     status = deployed.latest_job_status()
     assert len(status) == 1
@@ -1061,9 +1030,8 @@ def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
 
 
 def test_latest_job_status_exception(ws, mock_installation_with_jobs):
-    timeout = timedelta(seconds=1)
     install_state = InstallState.from_installation(mock_installation_with_jobs)
-    deployed = DeployedWorkflows(ws, install_state, timeout)
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     status = deployed.latest_job_status()
     assert len(status) == 0
@@ -1092,45 +1060,6 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-def test_save_config_should_include_databases(ws, mock_installation):
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",  # specify names
-            r"Comma-separated list of databases to migrate.*": "db1,db2",
-            r"Reconciliation threshold, in percentage.*": "5",
-            r".*": "",
-        }
-    )
-    ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'include_databases': ['db1', 'db2'],
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_threads': 8,
-            'min_workers': 1,
-            'max_workers': 10,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'num_days_submit_runs_history': 30,
-            'recon_tolerance_percent': 5,
-        },
-    )
-
-
 def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
@@ -1153,14 +1082,13 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     ws.jobs.run_now.assert_not_called()
 
 
@@ -1186,14 +1114,13 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
     ws.jobs.run_now.assert_called_once()
 
 
@@ -1216,11 +1143,9 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
         wheels=wheels,
     )
 
-    install.run(
-        verify_timeout=timedelta(seconds=60),
-    )
+    install.run()
 
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
@@ -1244,61 +1169,20 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
         wheels=wheels,
     )
 
-    install.run(
-        verify_timeout=timedelta(seconds=10),
-    )
+    install.run()
 
     existing_installation.assert_file_uploaded('logs/README.md')
-    wheels.upload_to_wsfs.assert_called_once()
-
-
-def test_fresh_install(ws, mock_installation):
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r"Open config file in.*": "no",
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r"Reconciliation threshold, in percentage.*": "5",
-            r".*": "",
-        }
-    )
-    ws.workspace.get_status = not_found
-
-    install = WorkspaceInstaller(ws).replace(
-        prompts=prompts,
-        installation=mock_installation,
-        product_info=PRODUCT_INFO,
-    )
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'policy_id': 'foo',
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
-            'min_workers': 2,
-            'max_workers': 20,
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-            'recon_tolerance_percent': 5,
-        },
-    )
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
+
+    def dummy_task(*_):
+        pass
+
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation_extra_jobs,
@@ -1306,8 +1190,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
-        [],
+        [Task('assessment', 'some', '...', dummy_task)],
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -1321,9 +1204,28 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         PRODUCT_INFO,
     )
 
-    workspace_installation.run()
-    ws.jobs.delete.assert_called_with("123")
-    wheels.upload_to_wsfs.assert_called_once()
+    def job_side_effect(job_id):
+        tasks = {
+            123: [jobs.Task('x', notebook_task=jobs.NotebookTask(notebook_path='~/mock/assessment'))],
+            124: [jobs.Task('y', python_wheel_task=jobs.PythonWheelTask('databricks_labs_ucx', 'runtime'))],
+            125: [jobs.Task('z', notebook_task=jobs.NotebookTask(notebook_path='outside-of-ucx'))],
+        }
+        return jobs.Job(
+            settings=jobs.JobSettings(
+                tasks=tasks[job_id],
+            ),
+        )
+
+    ws.jobs.get.side_effect = job_side_effect
+
+    with caplog.at_level('WARNING'):
+        workspace_installation.run()
+
+    job_deletes = {_.args[0] for _ in ws.jobs.delete.mock_calls}
+    assert len(job_deletes) == 1
+    assert '124' in job_deletes
+    wheels.upload_to_wsfs.assert_called()
+    assert 'Corrupt installation state. Skipping job_id=125 as it is not managed by UCX' in caplog.messages
 
 
 def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
@@ -1338,7 +1240,6 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         [],
     )
 
@@ -1354,7 +1255,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
     )
 
     workspace_installation.run()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 def test_get_existing_installation_global(ws, mock_installation):
@@ -1551,11 +1452,10 @@ def test_user_not_admin(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        timedelta(seconds=1),
         Workflows.all().tasks(),
     )
 
-    with pytest.raises(PermissionError) as failure:
+    with pytest.raises(PermissionDenied) as failure:
         workspace_installation.create_jobs()
     assert "Current user is not a workspace admin" in str(failure.value)
 
@@ -1580,7 +1480,7 @@ def test_validate_step(ws, result_state, expected):
         }
     )
     install_state = InstallState.from_installation(installation)
-    deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    deployed = DeployedWorkflows(ws, install_state)
     ws.jobs.list_runs.return_value = [
         BaseRun(
             job_id=123,
@@ -1741,7 +1641,7 @@ def test_user_workspace_installer(mock_ws):
     assert workspace_installer.install_state.install_folder().startswith("/Users/")
 
 
-def test_save_config_ext_hms(ws, mock_installation):
+def test_save_config_ext_hms(ws, mock_installation) -> None:
     ws.get_workspace_id.return_value = 12345678
     cluster_policy = {
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
@@ -1781,6 +1681,7 @@ def test_save_config_ext_hms(ws, mock_installation):
         {
             'version': 2,
             'default_catalog': 'ucx_default',
+            'ucx_catalog': 'ucx',
             'include_databases': ['db1', 'db2'],
             'inventory_database': 'ucx_12345678',
             'log_level': 'INFO',
@@ -1823,7 +1724,7 @@ def test_upload_dependencies(ws, mock_installation):
     )
     workspace_installation.run()
     wheels.upload_wheel_dependencies.assert_called_once()
-    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called()
 
 
 @pytest.fixture

@@ -1,28 +1,42 @@
+import io
+import json
 from collections.abc import Callable, Generator
 import functools
 import collections
 import os
 import logging
 from dataclasses import replace
-from functools import partial, cached_property
 from datetime import timedelta
+from functools import cached_property
 import shutil
 import subprocess
-import databricks.sdk.core
+from pathlib import Path
+
 import pytest  # pylint: disable=wrong-import-order
+import yaml
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
+from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.compute import ClusterSpec
+from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.iam import Group
+from databricks.sdk.service.jobs import Task, SparkPythonTask
+from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command, AWSResources
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
@@ -34,14 +48,12 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
-# pylint: disable-next=unused-wildcard-import,wildcard-import
-from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
@@ -51,9 +63,202 @@ logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture  # type: ignore[no-redef]
-def debug_env_name():  # pylint: disable=function-redefined
+@pytest.fixture
+def debug_env_name():
     return "ucws"
+
+
+@pytest.fixture
+def product_info():
+    return "ucx", __version__
+
+
+@pytest.fixture
+def inventory_schema(make_schema):
+    return make_schema(catalog_name="hive_metastore").name
+
+
+@pytest.fixture
+def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix):
+    """Create a lakeview dashboard."""
+    warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
+    serialized_dashboard = {
+        "datasets": [{"name": "fourtytwo", "displayName": "count", "query": "SELECT 42 AS count"}],
+        "pages": [
+            {
+                "name": "count",
+                "displayName": "Counter",
+                "layout": [
+                    {
+                        "widget": {
+                            "name": "counter",
+                            "queries": [
+                                {
+                                    "name": "main_query",
+                                    "query": {
+                                        "datasetName": "fourtytwo",
+                                        "fields": [{"name": "count", "expression": "`count`"}],
+                                        "disaggregated": True,
+                                    },
+                                }
+                            ],
+                            "spec": {
+                                "version": 2,
+                                "widgetType": "counter",
+                                "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
+                            },
+                        },
+                        "position": {"x": 0, "y": 0, "width": 1, "height": 3},
+                    }
+                ],
+            }
+        ],
+    }
+
+    def create(display_name: str = "") -> SDKDashboard:
+        if display_name:
+            display_name = f"{display_name} ({make_random()})"
+        else:
+            display_name = f"created_by_ucx_{make_random()}_{watchdog_purge_suffix}"
+        dashboard = ws.lakeview.create(
+            display_name,
+            serialized_dashboard=json.dumps(serialized_dashboard),
+            warehouse_id=warehouse_id,
+        )
+        ws.lakeview.publish(dashboard.dashboard_id)
+        return dashboard
+
+    def delete(dashboard: SDKDashboard) -> None:
+        ws.lakeview.trash(dashboard.dashboard_id)
+
+    yield from factory("dashboard", create, delete)
+
+
+@pytest.fixture
+def make_dashboard(
+    ws: WorkspaceClient,
+    make_random: Callable[[int], str],
+    make_query,
+    watchdog_purge_suffix,
+):
+    """Create a legacy dashboard.
+    This fixture is used to test migrating legacy dashboards to Lakeview.
+    """
+
+    def create(query: LegacyQuery | None = None) -> Dashboard:
+        if not query:
+            query = make_query()
+        assert query
+        assert query.id
+        viz = ws.query_visualizations_legacy.create(
+            type="table",
+            query_id=query.id,
+            options={
+                "itemsPerPage": 1,
+                "condensed": True,
+                "withRowNumber": False,
+                "version": 2,
+                "columns": [
+                    {"name": "id", "title": "id", "allowSearch": True},
+                ],
+            },
+        )
+
+        dashboard_name = f"ucx_D{make_random(4)}_{watchdog_purge_suffix}"
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
+        assert dashboard.id is not None
+        ws.dashboard_widgets.create(
+            dashboard_id=dashboard.id,
+            visualization_id=viz.id,
+            width=1,
+            options=WidgetOptions(
+                title="",
+                position=WidgetPosition(
+                    col=0,
+                    row=0,
+                    size_x=3,
+                    size_y=3,
+                ),
+            ),
+        )
+        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
+        return dashboard
+
+    def remove(dashboard: Dashboard) -> None:
+        try:
+            assert dashboard.id is not None
+            ws.dashboards.delete(dashboard_id=dashboard.id)
+        except RuntimeError as e:
+            logger.info(f"Can't delete dashboard {e}")
+
+    yield from factory("dashboard", create, remove)
+
+
+@pytest.fixture
+def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    _ = make_cluster  # Need cluster to copy data
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, src_path: str, dst_path: str, wait_for_provisioning=True):
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning(path) -> None:
+            if not ws.dbfs.exists(path):
+                raise NotFound(f"Location not found: {path}")
+
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.copy(src_path, dst_path, recursive=True)
+            if wait_for_provisioning:
+                _wait_for_provisioning(dst_path)
+        return dst_path
+
+    def remove(dst_path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.delete(dst_path, recursive=True)
+
+    yield from factory("make_dbfs_data_copy", create, remove)
+
+
+@pytest.fixture
+def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip, watchdog_purge_suffix):
+    """Make a copy of source data to a new location
+
+    Use the fixture to avoid overlapping UC table path that will fail other external table migration tests.
+
+    Note:
+        This fixture is different to the other `make_` fixtures as it does not return a `Callable` to make the mounted
+        location; the mounted location is made with fixture setup already.
+    """
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    # DBFS locations are not purged; no suffix necessary.
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}-{watchdog_purge_suffix}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    return new_mounted_location
+
+
+@pytest.fixture
+def make_storage_dir(ws, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.mkdirs('{path}')")
+        else:
+            ws.dbfs.mkdirs(path)
+        return path
+
+    def remove(path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{path}', recurse=True)")
+        else:
+            ws.dbfs.delete(path, recursive=True)
+
+    yield from factory("make_storage_dir", create, remove)
 
 
 def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup"):
@@ -70,39 +275,20 @@ def get_workspace_membership(workspace_client, res_type: str = "WorkspaceGroup")
     return membership
 
 
-def account_host(self: databricks.sdk.core.Config) -> str:
-    if self.is_azure:
-        return "https://accounts.azuredatabricks.net"
-    if self.is_gcp:
-        return "https://accounts.gcp.databricks.com/"
-    return "https://accounts.cloud.databricks.com"
-
-
-@pytest.fixture(scope="session")  # type: ignore[no-redef]
-def product_info():  # pylint: disable=function-redefined
-    return "ucx", __version__
-
-
-@pytest.fixture  # type: ignore[no-redef]
-def acc(ws) -> AccountClient:  # pylint: disable=function-redefined
-    return AccountClient(host=ws.config.environment.deployment_url('accounts'))
+@pytest.fixture
+def migrated_group(acc, ws, make_group, make_acc_group):
+    """Create a pair of groups in workspace and account. Assign account group to workspace."""
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, permissions=[iam.WorkspacePermission.USER])
+    return MigratedGroup.partial_info(ws_group, acc_group)
 
 
 @pytest.fixture
-def sql_exec(sql_backend):
-    return partial(sql_backend.execute)
-
-
-@pytest.fixture
-def sql_fetch_all(sql_backend):
-    return partial(sql_backend.fetch)
-
-
-@pytest.fixture
-def make_ucx_group(make_random, make_group, make_acc_group, make_user):
+def make_ucx_group(make_random, make_group, make_acc_group, make_user, watchdog_purge_suffix):
     def inner(workspace_group_name=None, account_group_name=None, **kwargs):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_G{make_random(4)}-{get_purge_suffix()}"  # noqa: F405
+            workspace_group_name = f"ucx_G{make_random(4)}-{watchdog_purge_suffix}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
@@ -161,7 +347,7 @@ class StaticTablesCrawler(TablesCrawler):
             for _ in tables
         ]
 
-    def snapshot(self) -> list[Table]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
         return self._tables
 
 
@@ -170,7 +356,7 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
         super().__init__(*args)
         self._spn_infos = spn_infos
 
-    def snapshot(self) -> list[AzureServicePrincipalInfo]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[AzureServicePrincipalInfo]:
         return self._spn_infos
 
 
@@ -185,15 +371,24 @@ class StaticMountCrawler(Mounts):
         super().__init__(sb, workspace_client, inventory_database)
         self._mounts = mounts
 
-    def snapshot(self) -> list[Mount]:
+    def snapshot(self, *, force_refresh: bool = False) -> list[Mount]:
         return self._mounts
 
 
 class CommonUtils:
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+    def __init__(
+        self,
+        make_catalog_fixture,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+        make_random_fixture,
+    ):
+        self._make_catalog = make_catalog_fixture
         self._make_schema = make_schema_fixture
         self._env_or_skip = env_or_skip_fixture
         self._ws = ws_fixture
+        self._make_random = make_random_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -221,7 +416,7 @@ class CommonUtils:
             ]
             uc_roles_mapping = [
                 AWSRoleAction(
-                    self._env_or_skip("TEST_STORAGE_CREDENTIAL"),
+                    self._env_or_skip("TEST_AWS_STORAGE_ROLE"),
                     's3',
                     'WRITE_FILES',
                     f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
@@ -249,21 +444,33 @@ class CommonUtils:
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
-    def workspace_client(self):
+    def ucx_catalog(self) -> str:
+        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+
+    @cached_property
+    def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
 
 class MockRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ) -> None:
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -349,6 +556,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
@@ -484,19 +692,46 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> MockRuntimeContext:
-    ctx = MockRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
+def runtime_ctx(
+    ws,
+    sql_backend,
+    make_catalog,
+    make_schema,
+    make_table,
+    make_udf,
+    make_group,
+    env_or_skip,
+    make_random,
+) -> MockRuntimeContext:
+    ctx = MockRuntimeContext(
+        make_catalog,
+        make_schema,
+        make_table,
+        make_udf,
+        make_group,
+        env_or_skip,
+        ws,
+        make_random,
+    )
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
 class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
+        make_catalog_fixture,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ):
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
@@ -531,13 +766,13 @@ class MockLocalAzureCli(MockWorkspaceContext):
         return True
 
     @cached_property
-    def azure_subscription_id(self):
+    def azure_subscription_id(self) -> str:
         return self._env_or_skip("TEST_SUBSCRIPTION_ID")
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
+def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_backend):
+    ctx = MockLocalAzureCli(make_catalog, make_schema, env_or_skip, ws, make_random)
     return ctx.replace(sql_backend=sql_backend)
 
 
@@ -556,9 +791,37 @@ class MockLocalAwsCli(MockWorkspaceContext):
 
 
 @pytest.fixture
-def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAwsCli(make_schema, env_or_skip, ws)
-    return ctx.replace(sql_backend=sql_backend)
+def aws_cli_ctx(installation_ctx, env_or_skip):
+    def aws_cli_run_command():
+        if not installation_ctx.is_aws:
+            pytest.skip("Aws only")
+        if not shutil.which("aws"):
+            pytest.skip("Local test only")
+        return run_command
+
+    def aws_profile():
+        return env_or_skip("AWS_PROFILE")
+
+    @property
+    def aws():
+        return AWSResources(aws_profile())
+
+    def aws_resource_permissions():
+        return AWSResourcePermissions(
+            installation_ctx.installation,
+            installation_ctx.workspace_client,
+            AWSResources(aws_profile()),
+            ExternalLocations(
+                installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database
+            ),
+        )
+
+    return installation_ctx.replace(
+        aws_profile=aws_profile,
+        aws_cli_run_command=aws_cli_run_command,
+        aws_resource_permissions=aws_resource_permissions,
+        connect_config=installation_ctx.workspace_client.config,
+    )
 
 
 class MockInstallationContext(MockRuntimeContext):
@@ -566,8 +829,9 @@ class MockInstallationContext(MockRuntimeContext):
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
@@ -575,22 +839,25 @@ class MockInstallationContext(MockRuntimeContext):
         make_acc_group_fixture,
         make_user_fixture,
         ws_fixture,
+        watchdog_purge_suffix,
     ):
         super().__init__(
-            make_table_fixture,
+            make_catalog_fixture,
             make_schema_fixture,
+            make_table_fixture,
             make_udf_fixture,
             make_group_fixture,
             env_or_skip_fixture,
             ws_fixture,
+            make_random_fixture,
         )
-        self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
+        self._watchdog_purge_suffix = watchdog_purge_suffix
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
         if not workspace_group_name:
-            workspace_group_name = f"ucx-{self._make_random(4)}-{get_purge_suffix()}"  # noqa: F405
+            workspace_group_name = f"ucx-{self._make_random(4)}-{self._watchdog_purge_suffix}"  # noqa: F405
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
@@ -671,6 +938,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
             include_object_permissions=self.include_object_permissions,
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
         )
         workspace_config = self.config_transform(workspace_config)
         self.installation.save(workspace_config)
@@ -693,7 +961,6 @@ class MockInstallationContext(MockRuntimeContext):
             self.workspace_client,
             self.product_info.wheels(self.workspace_client),
             self.product_info,
-            timedelta(minutes=3),
             self.tasks,
         )
 
@@ -739,18 +1006,21 @@ class MockInstallationContext(MockRuntimeContext):
 def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
-    make_table,
+    make_catalog,
     make_schema,
+    make_table,
     make_udf,
     make_group,
     env_or_skip,
     make_random,
     make_acc_group,
     make_user,
+    watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
-        make_table,
+        make_catalog,
         make_schema,
+        make_table,
         make_udf,
         make_group,
         env_or_skip,
@@ -758,6 +1028,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_acc_group,
         make_user,
         ws,
+        watchdog_purge_suffix,
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
@@ -964,3 +1235,71 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
+
+
+@pytest.fixture
+def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffix, log_workspace_link):
+
+    def create(installation, **_kwargs):
+        # create args
+        data = {"name": f"dummy-{make_random(4)}"}
+        # create file to run
+        file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
+        file_path = WorkspacePath(ws, installation.install_folder()) / file_name
+        file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
+        task = Task(
+            task_key=make_random(4),
+            description=make_random(4),
+            new_cluster=ClusterSpec(
+                num_workers=1,
+                node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                spark_version=ws.clusters.select_spark_version(latest=True),
+            ),
+            spark_python_task=SparkPythonTask(python_file=str(file_path)),
+            timeout_seconds=0,
+        )
+        data["tasks"] = [task]
+        # add RemoveAfter tag for job cleanup
+        data["tags"] = [{"key": "RemoveAfter", "value": watchdog_remove_after}]
+        job = ws.jobs.create(**data)
+        log_workspace_link(data["name"], f'job/{job.job_id}', anchor=False)
+        return job
+
+    yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
+
+
+@pytest.fixture
+def populate_for_linting(
+    ws,
+    make_random,
+    make_job,
+    make_notebook,
+    make_query,
+    make_dashboard,
+    create_file_job,
+    watchdog_purge_suffix,
+):
+
+    def create_notebook_job(installation):
+        path = Path(installation.install_folder()) / f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
+        notebook_text = "spark.read.parquet('dbfs://mnt/foo1/bar1')"
+        notebook_path = make_notebook(path=path, content=io.BytesIO(notebook_text.encode("utf-8")))
+        return make_job(notebook_path=notebook_path)
+
+    def populate_workspace(installation):
+        # keep linting scope to minimum to avoid test timeouts
+        file_job = create_file_job(installation=installation)
+        notebook_job = create_notebook_job(installation=installation)
+        query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
+        dashboard = make_dashboard(query=query)
+        # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
+        config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
+        text = config_path.read_text()
+        config = yaml.safe_load(text)
+        config["include_job_ids"] = [file_job.job_id, notebook_job.job_id]
+        config["include_dashboard_ids"] = [dashboard.id]
+        text = yaml.dump(config)
+        config_path.unlink()
+        config_path.write_text(text)
+
+    return populate_workspace

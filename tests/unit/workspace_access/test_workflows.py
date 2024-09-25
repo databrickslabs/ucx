@@ -6,7 +6,7 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
-from databricks.sdk.service.iam import PermissionMigrationResponse
+from databricks.sdk.service.iam import MigratePermissionsResponse
 
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.workflows import (
@@ -19,36 +19,38 @@ from tests.unit import GROUPS, PERMISSIONS
 
 def test_runtime_delete_backup_groups(run_workflow) -> None:
     ctx = run_workflow(RemoveWorkspaceLocalGroups.delete_backup_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_runtime_apply_permissions_to_account_groups(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.apply_permissions_to_account_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_rename_workspace_local_group(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.rename_workspace_local_groups)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_reflect_account_groups_on_workspace(run_workflow) -> None:
     ctx = run_workflow(PermissionsMigrationAPI.reflect_account_groups_on_workspace)
-    assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
 
 
 def test_migrate_permissions_experimental(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[
+            ("123", "QUERIES", "temp")
+        ],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
-    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(0)
+    ws.permission_migration.migrate_permissions.return_value = MigratePermissionsResponse(0)
     sql_backend = MockBackend(rows=rows)
 
     run_workflow(PermissionsMigrationAPI.apply_permissions, sql_backend=sql_backend, workspace_client=ws)
@@ -63,17 +65,19 @@ def test_migrate_permissions_experimental(run_workflow) -> None:
 
 def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+        'SELECT COUNT\\(\\*\\) as cnt FROM `hive_metastore`.`ucx`.`permissions`': PERMISSIONS[
+            ("123", "QUERIES", "temp")
+        ],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
     ws.permission_migration.migrate_permissions.side_effect = [
-        PermissionMigrationResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
+        MigratePermissionsResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
     ]
     sql_backend = MockBackend(rows=rows)
 
@@ -89,7 +93,7 @@ def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
 
 def test_migrate_permissions_not_enabled_error(run_workflow) -> None:
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
@@ -106,7 +110,7 @@ def test_migrate_permissions_not_enabled_error(run_workflow) -> None:
 def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
     """Check that permission migration continues for other groups even if it fails for a single group."""
     rows = {
-        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+        'SELECT \\* FROM `hive_metastore`.`ucx`.`groups`': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),  # Will fail immediately.
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),  # Will fail midway.
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),  # Will succeed.
@@ -119,11 +123,11 @@ def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
         # First group: fails immediately.
         DatabricksError("simulate group failure: immediately"),
         # Second group; fails mid-migration.
-        PermissionMigrationResponse(permissions_migrated=10),
+        MigratePermissionsResponse(permissions_migrated=10),
         DatabricksError("simulate group failure: midway"),
         # Third group.
-        PermissionMigrationResponse(permissions_migrated=50),
-        PermissionMigrationResponse(permissions_migrated=0),
+        MigratePermissionsResponse(permissions_migrated=50),
+        MigratePermissionsResponse(permissions_migrated=0),
     ]
 
     with pytest.raises(ManyError) as exc_info, caplog.at_level(logging.INFO):

@@ -1,3 +1,4 @@
+from io import BytesIO
 import json
 import webbrowser
 from pathlib import Path
@@ -8,6 +9,7 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -24,6 +26,17 @@ CANT_FIND_UCX_MSG = (
     "Couldn't find UCX configuration in the user's home folder. "
     "Make sure the current user has configured and installed UCX."
 )
+
+
+def _get_workspace_contexts(
+    w: WorkspaceClient, a: AccountClient | None = None, run_as_collection: bool = False, **named_parameters
+) -> list[WorkspaceContext]:
+    """Get workspace contexts to the workspaces for which the user has access"""
+    if not a:
+        a = AccountClient(product='ucx', product_version=__version__)
+    account_installer = AccountInstaller(a)
+    workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
+    return workspace_contexts
 
 
 @ucx.command
@@ -81,8 +94,21 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return None
     ctx = WorkspaceContext(w)
     if table:
-        return ctx.table_mapping.skip_table(schema, table)
+        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
+
+
+@ucx.command
+def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
+    """Create a unskip comment on a schema or a table"""
+    logger.info("Running unskip command")
+    if not schema:
+        logger.error("--schema is a required parameter.")
+        return None
+    ctx = WorkspaceContext(w)
+    if table:
+        return ctx.table_mapping.unskip_table_or_view(schema, table, ctx.tables_crawler.load_one)
+    return ctx.table_mapping.unskip_schema(schema)
 
 
 @ucx.command(is_account=True)
@@ -99,6 +125,14 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
     if not ctx:
         ctx = AccountContext(a, named_parameters)
     ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
+def validate_table_locations(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """Validate if the table locations are overlapping in a workspace and across workspaces"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.validate_table_locations()
 
 
 @ucx.command(is_account=True)
@@ -132,40 +166,75 @@ def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def create_table_mapping(w: WorkspaceClient):
+def create_table_mapping(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
     """create initial table mapping for review"""
-    ctx = WorkspaceContext(w)
-    path = ctx.table_mapping.save(ctx.tables_crawler, ctx.workspace_info)
-    webbrowser.open(f"{w.config.host}/#workspace{path}")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    if ctx:
+        workspace_contexts = [ctx]
+    for workspace_ctx in workspace_contexts:
+        logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+        path = workspace_ctx.table_mapping.save(workspace_ctx.tables_crawler, workspace_ctx.workspace_info)
+        if len(workspace_contexts) == 1:
+            webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
 @ucx.command
-def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
+def validate_external_locations(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    ctx = WorkspaceContext(w)
-    path = ctx.external_locations.save_as_terraform_definitions_on_workspace(ctx.installation)
-    if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
-        webbrowser.open(f"{w.config.host}/#workspace{path}")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        path = workspace_context.external_locations.save_as_terraform_definitions_on_workspace(
+            workspace_context.installation
+        )
+        if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
+            webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
 @ucx.command
 def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
     """ensure the assessment job was run on a workspace"""
-    if run_as_collection:
-        if not a:
-            a = AccountClient(product='ucx', product_version=__version__)
-        account_installer = AccountInstaller(a)
-        workspaces_context = account_installer.get_workspace_contexts(w.get_workspace_id())
-        # if running the cmd as a collection, dont wait for each assessment job to finish as that will take long time
-        skip_job_status = True
-    else:
-        skip_job_status = False
-        workspaces_context = [WorkspaceContext(w)]
-    for ctx in workspaces_context:
-        logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Checking assessment workflow in workspace: {workspace_id}")
         deployed_workflows = ctx.deployed_workflows
-        if not deployed_workflows.validate_step("assessment"):
-            deployed_workflows.run_workflow("assessment", skip_job_status)
+        # Note: will block if the workflow is already underway but not completed.
+        if deployed_workflows.validate_step("assessment"):
+            logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
+        else:
+            logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
+            # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
+            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
+
+
+@ucx.command
+def update_migration_progress(
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
+    """Manually trigger the migration-progress-experimental job."""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        logger.info(f"Starting 'migration-progress-experimental' workflow in workspace: {workspace_id}")
+        deployed_workflows = ctx.deployed_workflows
+        # If running for a collection, don't wait for each migration-progress job to finish as that will take long time.
+        deployed_workflows.run_workflow("migration-progress-experimental", skip_job_wait=run_as_collection)
 
 
 @ucx.command
@@ -179,19 +248,28 @@ def repair_run(w: WorkspaceClient, step):
 
 
 @ucx.command
-def validate_groups_membership(w: WorkspaceClient):
+def validate_groups_membership(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
-    ctx = WorkspaceContext(w)
-    mismatch_groups = ctx.group_manager.validate_group_membership()
-    print(json.dumps(mismatch_groups))
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        mismatch_groups = workspace_context.group_manager.validate_group_membership()
+        print(json.dumps(mismatch_groups))
 
 
 @ucx.command
 def revert_migrated_tables(
     w: WorkspaceClient,
     prompts: Prompts,
-    schema: str,
-    table: str,
+    schema: str | None = None,
+    table: str | None = None,
     *,
     delete_managed: bool = False,
     ctx: WorkspaceContext | None = None,
@@ -203,9 +281,9 @@ def revert_migrated_tables(
             return
     if not ctx:
         ctx = WorkspaceContext(w)
-    revert = ctx.tables_migrator.print_revert_report(delete_managed=delete_managed)
+    revert = ctx.tables_migrator.print_revert_report(schema=schema, table=table, delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        ctx.tables_migrator.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        ctx.tables_migrator.revert_migrated_tables(schema=schema, table=table, delete_managed=delete_managed)
 
 
 @ucx.command
@@ -268,37 +346,56 @@ def create_uber_principal(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     **named_parameters,
 ):
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
     it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
-    Pass subscription_id for azure and aws_profile for aws."""
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_resource_permissions.create_uber_principal(prompts)
-    if ctx.is_aws:
-        return ctx.aws_resource_permissions.create_uber_principal(prompts)
-    raise ValueError("Unsupported cloud provider")
+    Pass subscription ids for Azure and aws_profile for AWS."""
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure:
+            workspace_context.azure_resource_permissions.create_uber_principal(prompts)
+        elif workspace_context.is_aws:
+            workspace_context.aws_resource_permissions.create_uber_principal(prompts)
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
-def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
+def principal_prefix_access(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
-    Pass subscription_id for azure and aws_profile for aws."""
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_resource_permissions.save_spn_permissions()
-    if ctx.is_aws:
-        instance_role_path = ctx.aws_resource_permissions.save_instance_profile_permissions()
-        logger.info(f"Instance profile and bucket info saved {instance_role_path}")
-        logger.info("Generating UC roles and bucket permission info")
-        return ctx.aws_resource_permissions.save_uc_compatible_roles()
+    Pass subscription ids for Azure and aws_profile for AWS."""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_azure:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.azure_resource_permissions.save_spn_permissions()
+        return
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            instance_role_path = workspace_ctx.aws_resource_permissions.save_instance_profile_permissions()
+            logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+            logger.info("Generating UC roles and bucket permission info")
+            workspace_ctx.aws_resource_permissions.save_uc_compatible_roles()
+        return
     raise ValueError("Unsupported cloud provider")
 
 
@@ -307,6 +404,8 @@ def create_missing_principals(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
     single_role: bool = False,
     role_name="UC_ROLE",
     policy_name="UC_POLICY",
@@ -316,15 +415,47 @@ def create_missing_principals(
     For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
     By default, it will create a  role per S3 location. Set the optional single_role parameter to True to create a single role for all S3 locations.
     """
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_creation.run(
+                prompts, single_role=single_role, role_name=role_name, policy_name=policy_name
+            )
+    else:
+        raise ValueError("Unsupported cloud provider")
+
+
+@ucx.command
+def delete_missing_principals(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    **named_parameters,
+):
+    """Not supported for Azure.
+    For AWS, this command identifies all the UC roles that are created through the create-missing-principals cmd.
+    It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected roles
+    are used by any storage credential and prompts to confirm if roles should still be deleted.
+    """
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
     if ctx.is_aws:
-        return ctx.iam_role_creation.run(prompts, single_role=single_role, role_name=role_name, policy_name=policy_name)
+        return ctx.iam_role_creation.delete_uc_roles(prompts)
     raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_credentials(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """For Azure, this command prompts to i) create UC storage credentials for the access connectors with a
     managed identity created for each storage account present in the ADLS Gen2 locations, the access connectors are
     granted Storage Blob Data Contributor permissions on their corresponding storage account, to prepare for adopting to
@@ -340,34 +471,60 @@ def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceCont
     Please review the file and delete the Roles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.service_principal_migration.run(prompts)
-    if ctx.is_aws:
-        return ctx.iam_role_migration.run(prompts)
-    raise ValueError("Unsupported cloud provider")
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_azure:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.service_principal_migration.run(prompts)
+    elif w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_migration.run(prompts)
+    else:
+        raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
-def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
+def migrate_locations(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
     """This command creates UC external locations. The candidate locations to be created are extracted from
     guess_external_locations task in the assessment job. You can run validate_external_locations command to check
     the candidate locations. Please make sure the credentials haven migrated before running this command. The command
     will only create the locations that have corresponded UC Storage Credentials.
     """
-    if not ctx:
-        ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure or ctx.is_aws:
-        return ctx.external_locations_migration.run()
-    raise ValueError("Unsupported cloud provider")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    for workspace_context in workspace_contexts:
+        if workspace_context.is_azure or workspace_context.is_aws:
+            workspace_context.external_locations_migration.run()
+        else:
+            raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
-def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
+def create_catalogs_schemas(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    ctx = WorkspaceContext(w)
-    ctx.catalog_schema.create_all_catalogs_schemas(prompts)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command
@@ -433,49 +590,108 @@ def assign_metastore(
     workspace_id: str | None = None,
     metastore_id: str | None = None,
     default_catalog: str | None = None,
+    ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
     logger.info(f"Account ID: {a.config.account_id}")
-    ctx = AccountContext(a)
-    ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
+    ctx = ctx or AccountContext(a)
+    ctx.account_metastores.assign_metastore(
+        ctx.prompts,
+        workspace_id,
+        metastore_id=metastore_id,
+        default_catalog=default_catalog,
+    )
 
 
 @ucx.command
-def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
+def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None) -> None:
+    """Create and setup UCX artifact catalog
+
+    Amongst other things, the artifacts are used for tracking the migration progress across workspaces.
+    """
+    workspace_context = ctx or WorkspaceContext(w)
+    workspace_context.catalog_schema.create_ucx_catalog(prompts)
+
+
+@ucx.command
+def migrate_tables(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
     workflow and migrate-external-tables-ctas.
     """
-    if ctx is None:
-        ctx = WorkspaceContext(w)
-    deployed_workflows = ctx.deployed_workflows
-    deployed_workflows.run_workflow("migrate-tables")
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        deployed_workflows = workspace_context.deployed_workflows
+        deployed_workflows.run_workflow("migrate-tables")
 
-    tables = ctx.tables_crawler.snapshot()
-    hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
-    if len(hiveserde_tables) > 0:
-        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
-            f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+        tables = workspace_context.tables_crawler.snapshot()
+        hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
+        if len(hiveserde_tables) > 0:
+            percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables in "
+                f"{workspace_context.workspace_client.config.host}, do you want to run "
+                f"the `migrate-external-hiveserde-tables-in-place-experimental` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
-    external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
-    if len(external_ctas_tables) > 0:
-        percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
-        if prompts.confirm(
-            f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which cannot be migrated using sync"
-            f", do you want to run the migrate-external-tables-ctas workflow?"
-        ):
-            deployed_workflows.run_workflow("migrate-external-tables-ctas")
+        external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
+        if len(external_ctas_tables) > 0:
+            percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
+            if prompts.confirm(
+                f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which "
+                f"cannot be migrated using sync in {workspace_context.workspace_client.config.host}, do you want to "
+                "run the `migrate-external-tables-ctas` workflow?"
+            ):
+                deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
 
 @ucx.command
-def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
+def migrate_acls(
+    w: WorkspaceClient,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
+    """
+    Migrate the ACLs for migrated tables and view. Can work with hms federation or other table migration scenarios.
+    """
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    target_catalog, hms_fed = named_parameters.get("target_catalog"), named_parameters.get("hms_fed", False)
+    for workspace_context in workspace_contexts:
+        workspace_context.acl_migrator.migrate_acls(target_catalog=target_catalog, hms_fed=hms_fed)
+
+
+@ucx.command
+def migrate_dbsql_dashboards(
+    w: WorkspaceClient,
+    dashboard_id: str | None = None,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
     """Migrate table references in DBSQL Dashboard queries"""
-    ctx = WorkspaceContext(w)
-    ctx.redash.migrate_dashboards(dashboard_id)
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for workspace_context in workspace_contexts:
+        workspace_context.redash.migrate_dashboards(dashboard_id)
 
 
 @ucx.command
@@ -491,6 +707,65 @@ def join_collection(a: AccountClient, workspace_ids: str):
     account_installer = AccountInstaller(a)
     w_ids = [int(_.strip()) for _ in workspace_ids.split(",") if _]
     account_installer.join_collection(w_ids)
+
+
+@ucx.command
+def upload(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,  # Only used while testing
+):
+    """Upload a file to the (collection of) workspace(s)"""
+    file = Path(file)
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
+    logger.warning("The schema of CSV files is NOT validated, ensure it is correct")
+    for ctx in contexts:
+        ctx.installation.upload(file.name, file.read_bytes())
+    if len(contexts) > 0:
+        logger.info(f"Finished uploading {file}")
+
+
+@ucx.command
+def download(
+    file: Path | str,
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,  # Only used while testing
+):
+    """Download and merge a CSV file from the ucx installation in a (collection of) workspace(s)"""
+    file = Path(file)
+    if file.suffix != ".csv":
+        raise ValueError("Command only supported for CSV files")
+    contexts = _get_workspace_contexts(w, run_as_collection=run_as_collection, a=a)
+    csv_header = None
+    with file.open("wb") as output:
+        for ctx in contexts:
+            remote_file_name = f"{ctx.installation.install_folder()}/{file.name}"
+            try:
+                # Installation does not have a download method
+                data = ctx.workspace_client.workspace.download(remote_file_name, format=ExportFormat.AUTO).read()
+            except NotFound:
+                logger.warning(f"File not found for {ctx.workspace_client.config.host}: {remote_file_name}")
+                continue
+            input_ = BytesIO()  # BytesIO supports .readline() to read the header, where StreamingResponse does not
+            input_.write(data.rstrip(b"\n"))
+            input_.seek(0)  # Go back to the beginning of the file
+            csv_header_next = input_.readline()
+            if csv_header is None:
+                csv_header = csv_header_next
+                output.write(csv_header)
+            elif csv_header == csv_header_next:
+                output.write(b"\n")
+            else:
+                raise ValueError("CSV files have different headers")
+            output.write(input_.read())
+    if csv_header is None:
+        logger.warning("No file(s) to download found")
+    if file.is_file() and file.stat().st_size == 0:
+        file.unlink()
+    else:
+        logger.info(f"Finished downloading {file}")
 
 
 @ucx.command

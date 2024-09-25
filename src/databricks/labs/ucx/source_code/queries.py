@@ -1,140 +1,183 @@
-from collections.abc import Iterable
-
+import dataclasses
 import logging
-from sqlglot import parse as parse_sql, ParseError as SqlParseError
-from sqlglot.expressions import Table, Expression, Use, Create
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState, Failure
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import Dashboard, LegacyQuery
+from databricks.sdk.service.workspace import Language
+
+from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessSqlLinter
+from databricks.labs.ucx.source_code.redash import Redash
 
 logger = logging.getLogger(__name__)
 
 
-class FromTable(Linter, Fixer):
-    """Linter and Fixer for table migrations in SQL queries.
+@dataclass
+class QueryProblem:
+    dashboard_id: str
+    dashboard_parent: str
+    dashboard_name: str
+    query_id: str
+    query_parent: str
+    query_name: str
+    code: str
+    message: str
 
-    This class is responsible for identifying and fixing table migrations in
-    SQL queries.
-    """
 
-    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
-        """
-        Initializes the FromTable class.
+class QueryLinter:
 
-        Args:
-            index: The migration index, which is a mapping of source tables to destination tables.
-            session_state: The current session state, which will be used to track the current schema.
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        migration_index: TableMigrationIndex,
+        directfs_crawler: DirectFsAccessCrawler,
+        include_dashboard_ids: list[str] | None,
+    ):
+        self._ws = ws
+        self._migration_index = migration_index
+        self._directfs_crawler = directfs_crawler
+        self._include_dashboard_ids = include_dashboard_ids
 
-        We need to be careful with the nomenclature here. For instance when parsing a table reference,
-        sqlglot uses `db` instead of `schema` to refer to the schema. The following table references
-        show how sqlglot represents them:::
-
-                catalog.schema.table    -> Table(catalog='catalog', db='schema', this='table')
-                schema.table                 -> Table(catalog='', db='schema', this='table')
-                table                               -> Table(catalog='', db='', this='table')
-        """
-        self._index: MigrationIndex = index
-        self._session_state: CurrentSessionState = session_state
-
-    def name(self) -> str:
-        return 'table-migrate'
-
-    @property
-    def schema(self):
-        return self._session_state.schema
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            statements = parse_sql(code, read='databricks')
-            for statement in statements:
-                if not statement:
-                    continue
-                yield from self._lint_statement(statement)
-        except SqlParseError as e:
-            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield self.sql_parse_failure(code)
-
-    @staticmethod
-    def sql_parse_failure(code: str):
-        return Failure(
-            code='sql-parse-error',
-            message=f"SQL query is not supported yet: {code}",
-            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
+    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
+        assessment_start = datetime.now(timezone.utc)
+        dashboard_ids = self._dashboard_ids_in_scope()
+        logger.info(f"Running {len(dashboard_ids)} linting tasks...")
+        linted_queries: set[str] = set()
+        all_problems: list[QueryProblem] = []
+        all_dfsas: list[DirectFsAccess] = []
+        # first lint and collect queries from dashboards
+        for dashboard_id in dashboard_ids:
+            dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
+            problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
+            all_problems.extend(problems)
+            all_dfsas.extend(dfsas)
+        for query in self._queries_in_scope():
+            if query.id in linted_queries:
+                continue
+            linted_queries.add(query.id)
+            problems = self.lint_query(query)
+            all_problems.extend(problems)
+            dfsas = self.collect_dfsas_from_query("no-dashboard-id", query)
+            all_dfsas.extend(dfsas)
+        # dump problems
+        logger.info(f"Saving {len(all_problems)} linting problems...")
+        sql_backend.save_table(
+            f'{escape_sql_identifier(inventory_database)}.query_problems',
+            all_problems,
+            QueryProblem,
+            mode='overwrite',
         )
+        # dump dfsas
+        assessment_end = datetime.now(timezone.utc)
+        all_dfsas = [
+            dataclasses.replace(
+                dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
+            )
+            for dfsa in all_dfsas
+        ]
+        self._directfs_crawler.dump_all(all_dfsas)
 
-    def _lint_statement(self, statement: Expression):
-        for table in statement.find_all(Table):
-            if isinstance(statement, Use):
-                # Sqlglot captures the database name in the Use statement as a Table, with
-                # the schema  as the table name.
-                self._session_state.schema = table.name
-                continue
-            if isinstance(statement, Create) and getattr(statement, "kind", None) == "SCHEMA":
-                # Sqlglot captures the schema name in the Create statement as a Table, with
-                # the schema  as the db name.
-                self._session_state.schema = table.db
-                continue
+    def _dashboard_ids_in_scope(self) -> list[str]:
+        if self._include_dashboard_ids is not None:  # an empty list is accepted
+            return self._include_dashboard_ids
+        all_dashboards = self._ws.dashboards.list()
+        return [dashboard.id for dashboard in all_dashboards if dashboard.id]
 
-            # we only migrate tables in the hive_metastore catalog
-            if self._catalog(table) != 'hive_metastore':
+    def _queries_in_scope(self):
+        if self._include_dashboard_ids is not None:  # an empty list is accepted
+            return []
+        all_queries = self._ws.queries_legacy.list()
+        return [query for query in all_queries if query.id]
+
+    def _lint_and_collect_from_dashboard(
+        self, dashboard: Dashboard, linted_queries: set[str]
+    ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess]]:
+        dashboard_queries = Redash.get_queries_from_dashboard(dashboard)
+        query_problems: list[QueryProblem] = []
+        query_dfsas: list[DirectFsAccess] = []
+        dashboard_id = dashboard.id or "<no-id>"
+        dashboard_parent = dashboard.parent or "<orphan>"
+        dashboard_name = dashboard.name or "<anonymous>"
+        for query in dashboard_queries:
+            if query.id is None:
                 continue
-            # Sqlglot uses db instead of schema, watch out for that
-            src_schema = table.db if table.db else self._session_state.schema
-            if not src_schema:
-                logger.error(f"Could not determine schema for table {table.name}")
+            if query.id in linted_queries:
                 continue
-            dst = self._index.get(src_schema, table.name)
-            if not dst:
-                continue
-            yield Deprecation(
-                code='table-migrated-to-uc',
-                message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
-                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                start_line=0,
-                start_col=0,
-                end_line=0,
-                end_col=1024,
+            linted_queries.add(query.id)
+            problems = self.lint_query(query)
+            for problem in problems:
+                query_problems.append(
+                    dataclasses.replace(
+                        problem,
+                        dashboard_id=dashboard_id,
+                        dashboard_parent=dashboard_parent,
+                        dashboard_name=dashboard_name,
+                    )
+                )
+            dfsas = self.collect_dfsas_from_query(dashboard_id, query)
+            for dfsa in dfsas:
+                atom = LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard_id,
+                    other={"parent": dashboard_parent, "name": dashboard_name},
+                )
+                source_lineage = [atom] + dfsa.source_lineage
+                query_dfsas.append(dataclasses.replace(dfsa, source_lineage=source_lineage))
+        return query_problems, query_dfsas
+
+    def lint_query(self, query: LegacyQuery) -> Iterable[QueryProblem]:
+        if not query.query:
+            return
+        ctx = LinterContext(self._migration_index, CurrentSessionState())
+        linter = ctx.linter(Language.SQL)
+        query_id = query.id or "<no-id>"
+        query_parent = query.parent or "<orphan>"
+        query_name = query.name or "<anonymous>"
+        for advice in linter.lint(query.query):
+            yield QueryProblem(
+                dashboard_id="",
+                dashboard_parent="",
+                dashboard_name="",
+                query_id=query_id,
+                query_parent=query_parent,
+                query_name=query_name,
+                code=advice.code,
+                message=advice.message,
             )
 
-    @staticmethod
-    def _catalog(table):
-        if table.catalog:
-            return table.catalog
-        return 'hive_metastore'
-
-    def apply(self, code: str) -> str:
-        new_statements = []
-        for statement in parse_sql(code, read='databricks'):
-            if not statement:
-                continue
-            if isinstance(statement, Use):
-                table = statement.this
-                self._session_state.schema = table.name
-                new_statements.append(statement.sql('databricks'))
-                continue
-            for old_table in self._dependent_tables(statement):
-                src_schema = old_table.db if old_table.db else self._session_state.schema
-                if not src_schema:
-                    logger.error(f"Could not determine schema for table {old_table.name}")
-                    continue
-                dst = self._index.get(src_schema, old_table.name)
-                if not dst:
-                    continue
-                new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
-                old_table.replace(new_table)
-            new_sql = statement.sql('databricks')
-            new_statements.append(new_sql)
-        return '; '.join(new_statements)
+    @classmethod
+    def collect_dfsas_from_query(cls, dashboard_id: str, query: LegacyQuery) -> Iterable[DirectFsAccess]:
+        if query.query is None:
+            return
+        linter = DirectFsAccessSqlLinter()
+        source_id = f"{dashboard_id}/{query.id}"
+        source_name = query.name or "<anonymous>"
+        source_timestamp = cls._read_timestamp(query.updated_at)
+        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
+        for dfsa in linter.collect_dfsas(query.query):
+            yield DirectFsAccess(**asdict(dfsa)).replace_source(
+                source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
+            )
 
     @classmethod
-    def _dependent_tables(cls, statement: Expression):
-        dependencies = []
-        for old_table in statement.find_all(Table):
-            catalog = cls._catalog(old_table)
-            if catalog != 'hive_metastore':
-                continue
-            dependencies.append(old_table)
-        return dependencies
+    def _read_timestamp(cls, timestamp: str | None) -> datetime:
+        if timestamp is not None:
+            methods = [
+                datetime.fromisoformat,
+                lambda s: datetime.fromisoformat(s[:-1]),  # ipython breaks on final 'Z'
+            ]
+            for method in methods:
+                try:
+                    return method(timestamp)
+                except ValueError:
+                    pass
+        return datetime.now()

@@ -143,7 +143,7 @@ def test_get_workspaces_context_not_collection_admin(caplog):
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
-    workspaces_ctx = account_installer.get_workspace_contexts(123)
+    workspaces_ctx = account_installer.get_workspace_contexts(ws, True)
     assert len(workspaces_ctx) == 0
     assert 'User is not workspace admin of collection workspace 123' in caplog.text
 
@@ -167,7 +167,7 @@ def test_get_workspaces_context_empty_collection(caplog):
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
-    workspaces_ctx = account_installer.get_workspace_contexts(123)
+    workspaces_ctx = account_installer.get_workspace_contexts(ws, True)
     assert len(workspaces_ctx) == 0
     assert 'No collection info found in the workspace 123' in caplog.text
 
@@ -183,7 +183,7 @@ def test_get_workspaces_context_not_workspace_admin(caplog):
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
-    workspaces_ctx = account_installer.get_workspace_contexts(123)
+    workspaces_ctx = account_installer.get_workspace_contexts(ws, True)
     assert len(workspaces_ctx) == 0
     assert 'User is not workspace admin of workspace 456' in caplog.text
 
@@ -193,5 +193,5 @@ def test_get_workspaces_context():
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
-    workspaces_ctx = account_installer.get_workspace_contexts(123)
+    workspaces_ctx = account_installer.get_workspace_contexts(ws, True)
     assert len(workspaces_ctx) == 2

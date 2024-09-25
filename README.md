@@ -26,6 +26,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Install UCX](#install-ucx)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
+  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -48,6 +49,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
         * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
         * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
       * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
+      * [Table migration workflows](#table-migration-workflows)
       * [Step 4: Odds and Ends](#step-4-odds-and-ends)
         * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
         * [Step 4.2: Moving objects](#step-42-moving-objects)
@@ -59,9 +61,29 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
     * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
   * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
+    * [Linter message codes](#linter-message-codes)
+      * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
+      * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
+      * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
+      * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
+      * [`direct-filesystem-access`](#direct-filesystem-access)
+      * [`dependency-not-found`](#dependency-not-found)
+    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+      * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
+      * [`not-supported`](#not-supported)
+      * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+      * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
+      * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
+      * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
+      * [`sql-parse-error`](#sql-parse-error)
+      * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
+      * [`table-migrated-to-uc`](#table-migrated-to-uc)
+      * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
+      * [`unsupported-magic-line`](#unsupported-magic-line)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
+  * [`update-migration-progress` command](#update-migration-progress-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
@@ -70,11 +92,13 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
 * [Table migration commands](#table-migration-commands)
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
     * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
-  * [`create-missing-pricipals` command (AWS Only)](#create-missing-pricipals-command-aws-only)
+  * [`create-missing-principals` command (AWS Only)](#create-missing-principals-command-aws-only)
+  * [`delete-missing-principals` command (AWS Only)](#delete-missing-principals-command-aws-only)
   * [`create-uber-principal` command](#create-uber-principal-command)
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
@@ -96,14 +120,19 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
   * [`validate-groups-membership` command](#validate-groups-membership-command)
+  * [`validate-table-locations` command](#validate-table-locations-command)
   * [`cluster-remap` command](#cluster-remap-command)
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
+  * [`upload` command](#upload-command)
+  * [`download` command](#download-command)
+  * [`join-collection` command](#join-collection command)
+  * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
     * [Version Issues](#version-issues)
-    * [Multiple Profiles in Databricks CLI](#multiple-profiles-in-databricks-cli)
     * [Authentication Issues](#authentication-issues)
+    * [Multiple Profiles in Databricks CLI](#multiple-profiles-in-databricks-cli)
     * [Workspace has an external Hive Metastore (HMS)](#workspace-has-an-external-hive-metastore-hms)
     * [Verify the Installation](#verify-the-installation)
 * [Star History](#star-history)
@@ -227,6 +256,21 @@ This installation mode will automatically select the following options:
 
 [[back to top](#databricks-labs-ucx)]
 
+## [ADVANCED] Installing UCX with company hosted PYPI mirror
+
+Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
+company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
+"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+hosted PYPI mirror URL while installing UCX:
+
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx
+```
+
+During installation reply *yes* to the question "Does the given workspace block Internet access"?
+
+[[back to top](#databricks-labs-ucx)]
+
 ## Upgrading UCX for newer versions
 
 Verify that UCX is installed
@@ -282,6 +326,8 @@ flowchart TD
         create-table-mapping --> table-migration
         create-table-mapping --> code-migration
         validate-external-locations --> table-migration
+        assessment --> validate-table-locations
+        validate-table-locations --> table-migration
         table-migration --> revert-migrated-tables
         revert-migrated-tables --> table-migration
     end
@@ -338,23 +384,27 @@ It identifies incompatible entities and provides information necessary for plann
 the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators.
 The output of each task is stored in Delta tables in the `$inventory_database` schema, that you specify during [installation](#install-ucx),
 which can be used for further analysis and decision-making through the [assessment report](docs/assessment.md).
-The assessment workflow can be executed multiple times to ensure that all incompatible entities are identified and accounted
-for before starting the migration process.
 
-1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a Delta table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
-2. `crawl_grants`: This task scans the Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS` statement for every object to retrieve the permissions assigned to it. The permissions include information such as the principal, action type, and the table it applies to. This task persists the permissions in the Delta table `$inventory_database.grants`.
-3. `estimate_table_size_for_migration`: This task scans the Delta table named `$inventory_database.tables` and locates tables that cannot be synced. These tables will have to be cloned in the migration process. The task assesses the size of these tables and creates the `$inventory_database.table_size` table to list these sizes. The table size is a factor in deciding whether to clone these tables.
-4. `crawl_mounts`: This task scans the workspace to compile a list of all existing mount points and stores this information in the `$inventory.mounts` table. This is crucial for planning the migration.
-5. `guess_external_locations`: This task determines the shared path prefixes of all the tables that utilize mount points. The goal is to identify the external locations necessary for a successful migration and store this information in the `$inventory.external_locations` table.
-6. `assess_jobs`: This task scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is stored in the `$inventory.jobs` table.
-7. `assess_clusters`: This task scans through all the clusters and identifies those that are not compatible with UC. The list of all the clusters is stored in the `$inventory.clusters` table.
-8. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
-9. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
-10. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
+2. `crawl_udfs`: This task scans all UDFs in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.udfs`. This task assesses whether the UDFs can be easily migrated to Unity Catalog.
+3. `crawl_grants`: This task scans all securable objects (including tables/views and UDFs) to determine the directly assigned permissions. The scanned permissions metadata includes information such as the principal, action type, and the securable object to which it applies. This task persists the permissions in the `$inventory_database.grants` inventory table.
+4. `estimate_table_size_for_migration`: This task scans the Delta table named `$inventory_database.tables` and locates tables that cannot be synced. These tables will have to be cloned in the migration process. The task assesses the size of these tables and creates the `$inventory_database.table_size` table to list these sizes. The table size is a factor in deciding whether to clone these tables.
+5. `crawl_mounts`: This task scans the workspace to compile a list of all existing mount points and stores this information in the `$inventory.mounts` table. This is crucial for planning the migration.
+6. `guess_external_locations`: This task determines the shared path prefixes of all the tables that utilize mount points. The goal is to identify the external locations necessary for a successful migration and store this information in the `$inventory.external_locations` table.
+7. `assess_jobs`: This task scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is stored in the `$inventory.jobs` table.
+8. `assess_clusters`: This task scans through all the clusters and identifies those that are not compatible with UC. The list of all the clusters is stored in the `$inventory.clusters` table.
+9. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
+10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
+11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration problems. It also collects direct filesystem access patterns that require attention.
+13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration problems. It also collects direct filesystem access patterns that require attention.
+
 
 ![report](docs/assessment-report.png)
 
 After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
+
+The UCX assessment workflow is intended to only run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx) and [installing](#install-ucx) it again.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -487,7 +537,7 @@ The manual process is documented in the following links:
 [AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
 [Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
-For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-pricipals-command-aws-only)
+For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-principals-command-aws-only)
 
 For both AWS and Azure we can use the `migrate-credentials` [UCX command](#migrate-credentials-command) to upgrade the necessary cloud principals:
 
@@ -664,13 +714,282 @@ in the Migration dashboard.
 
 > Please note that this is an experimental workflow.
 
-The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
-workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+The `experimental-workflow-linter` workflow lints accessible code from 2 sources:
+ - all workflows/jobs present in the workspace
+ - all dashboards/queries present in the workspace
+The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+The linting also locates direct filesystem access that need to be migrated.
 
-Once the workflow completes, the output will be stored in `$inventory_database.workflow_problems` table, and displayed
-in the Migration dashboard.
+Once the workflow completes:
+ - problems are stored in the `$inventory_database.workflow_problems`/`$inventory_database.query_problems` table
+ - direct filesystem access are stored in the `$inventory_database.directfs_in_paths`/`$inventory_database.directfs_in_queries` table
+ - all the above are displayed in the Migration dashboard.
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
+
+[[back to top](#databricks-labs-ucx)]
+
+### Linter message codes
+
+Here's the detailed explanation of the linter message codes:
+
+#### `cannot-autofix-table-reference`
+
+This indicates that the linter has found a table reference that cannot be automatically fixed. The user must manually
+update the table reference to point to the correct table in Unity Catalog. This mostly occurs, when table name is
+computed dynamically, and it's too complex for our static code analysis to detect it. We detect this problem anywhere
+where table name could be used: `spark.sql`, `spark.catalog.*`, `spark.table`, `df.write.*` and many more. Code examples
+that trigger this problem:
+
+```python
+spark.table(f"foo_{some_table_name}")
+# ..
+df = spark.range(10)
+df.write.saveAsTable(f"foo_{some_table_name}")
+# .. or even
+df.write.insertInto(f"foo_{some_table_name}")
+```
+
+Here the `some_table_name` variable is not defined anywhere in the visible scope. Though, the analyser would
+successfully detect table name if it is defined:
+
+```python
+some_table_name = 'bar'
+spark.table(f"foo_{some_table_name}")
+```
+
+We even detect string constants when coming either from `dbutils.widgets.get` (via job named parameters) or through
+loop variables. If `old.things` table is migrated to `brand.new.stuff` in Unity Catalog, the following code will
+trigger two messages: [`table-migrated-to-uc`](#table-migrated-to-uc) for the first query, as the contents are clearly
+analysable, and `cannot-autofix-table-reference` for the second query.
+
+```python
+# ucx[table-migrated-to-uc:+4:4:+4:20] Table old.things is migrated to brand.new.stuff in Unity Catalog
+# ucx[cannot-autofix-table-reference:+3:4:+3:20] Can't migrate table_name argument in 'spark.sql(query)' because its value cannot be computed
+table_name = f"table_{index}"
+for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
+    spark.sql(query).collect()
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `catalog-api-in-shared-clusters`
+
+`spark.catalog.*` functions require Databricks Runtime 14.3 LTS or above on Unity Catalog clusters in Shared access
+mode, so of your code has `spark.catalog.tableExists("table")` or `spark.catalog.listDatabases()`, you need to ensure
+that your cluster is running the correct runtime version and data security mode.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `changed-result-format-in-uc`
+
+Calls to these functions would return a list of `<catalog>.<database>.<table>` instead of `<database>.<table>`. So if
+you have code like this:
+
+```python
+for table in spark.catalog.listTables():
+    do_stuff_with_table(table)
+```
+
+you need to make sure that `do_stuff_with_table` can handle the new format.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `direct-filesystem-access-in-sql-query`
+
+Direct filesystem access is deprecated in Unity Catalog.
+DBFS is no longer supported, so if you have code like this:
+
+```python
+df = spark.sql("SELECT * FROM parquet.`/mnt/foo/path/to/parquet.file`")
+```
+
+you need to change it to use UC tables.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `direct-filesystem-access`
+
+Direct filesystem access is deprecated in Unity Catalog.
+DBFS is no longer supported, so if you have code like this:
+
+```python
+display(spark.read.csv('/mnt/things/data.csv'))
+```
+
+or this:
+
+```python
+display(spark.read.csv('s3://bucket/folder/data.csv'))
+```
+
+You need to change it to use UC tables or UC volumes.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `dependency-not-found`
+
+This message indicates that the linter has found a dependency, like Python source file or a notebook, that is not
+available in the workspace. The user must ensure that the dependency is available in the workspace. This usually
+means an error in the user code.
+
+[[back to top](#databricks-labs-ucx)]
+
+### `jvm-access-in-shared-clusters`
+
+You cannot access Spark Driver JVM on Unity Catalog clusters in Shared Access mode. If you have code like this:
+
+```python
+spark._jspark._jvm.com.my.custom.Name()
+```
+
+or like this:
+
+```python
+log4jLogger = sc._jvm.org.apache.log4j
+LOGGER = log4jLogger.LogManager.getLogger(__name__)
+```
+
+you need to change it to use Python equivalents.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `legacy-context-in-shared-clusters`
+
+SparkContext (`sc`) is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using SparkSession
+(`spark`). Example code that triggers this message:
+
+```python
+df = spark.createDataFrame(sc.emptyRDD(), schema)
+```
+
+or this:
+
+```python
+sc.parallelize([1, 2, 3])
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `not-supported`
+
+Installing eggs is no longer supported on Databricks 14.0 or higher.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `notebook-run-cannot-compute-value`
+
+Path for `dbutils.notebook.run` cannot be computed and requires adjusting the notebook path.
+It is not clear for automated code analysis where the notebook is located, so you need to simplify the code like:
+
+```python
+b = some_function()
+dbutils.notebook.run(b)
+```
+
+to something like this:
+
+```python
+a = "./leaf1.py"
+dbutils.notebook.run(a)
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `python-udf-in-shared-clusters`
+
+`applyInPandas` requires DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode. Example:
+
+```python
+df.groupby("id").applyInPandas(subtract_mean, schema="id long, v double").show()
+```
+
+Arrow UDFs require DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode.
+
+```python
+@udf(returnType='int', useArrow=True)
+def arrow_slen(s):
+    return len(s)
+```
+
+It is not possible to register Java UDF from Python code on Unity Catalog clusters in Shared access mode. Use a
+`%scala` cell to register the Scala UDF using `spark.udf.register`. Example code that triggers this message:
+
+```python
+spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `rdd-in-shared-clusters`
+
+RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use mapInArrow() or Pandas UDFs instead.
+
+```python
+df.rdd.mapPartitions(myUdf)
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `spark-logging-in-shared-clusters`
+
+Cannot set Spark log level directly from code on Unity Catalog clusters in Shared access mode. Remove the call and set
+the cluster spark conf `spark.log.level` instead:
+
+```python
+sc.setLogLevel("INFO")
+setLogLevel("WARN")
+```
+
+Another example could be:
+
+```python
+log4jLogger = sc._jvm.org.apache.log4j
+LOGGER = log4jLogger.LogManager.getLogger(__name__)
+```
+
+or
+
+```python
+sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `sql-parse-error`
+
+This is a generic message indicating that the SQL query could not be parsed. The user must manually check the SQL query.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `sys-path-cannot-compute-value`
+
+Path for `sys.path.append` cannot be computed and requires adjusting the path. It is not clear for automated code
+analysis where the path is located.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `table-migrated-to-uc`
+
+This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
+that the table is available in Unity Catalog.
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `to-json-in-shared-clusters`
+
+`toJson()` is not available on Unity Catalog clusters in Shared access mode. Use `toSafeJson()` on DBR 13.3 LTS or
+above to get a subset of command context information. Example code that triggers this message:
+
+```python
+dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+#### `unsupported-magic-line`
+
+This message indicates the code that could not be analysed by UCX. User must check the code manually.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -700,6 +1019,20 @@ This command ensures that the [assessment workflow](#assessment-workflow) was ru
 This command will block until job finishes.
 Failed workflows can be fixed with the [`repair-run` command](#repair-run-command). Workflows and their status can be
 listed with the [`workflows` command](#workflows-command).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `update-migration-progress` command
+
+```commandline
+databricks labs ucx update-migration-progress
+```
+
+This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+
+_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
+
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -844,9 +1177,23 @@ a region, and you want to see which ones are available for assignment.
 databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-id <metastore-id>]
 ```
 
-This command assigns a metastore to a workspace with `workspace-id`. If there is only a single metastore in the workspace
-region, it will be automatically assigned to the workspace. If there are multiple metastores available, you need to specify
-the metastore id of the metastore you want to assign to the workspace.
+This command assigns a metastore to a workspace with `--workspace-id`. If there is only a single metastore in the
+workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
+available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-ucx-catalog` command
+
+```commandline
+databricks labs ucx create-ucx-catalog
+16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
+Please provide storage location url for catalog: ucx (default: metastore): ...
+16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
+```
+
+Create and setup UCX artifact catalog. Amongst other things, the artifacts are used for tracking the migration progress
+across workspaces.
 
 # Table migration commands
 
@@ -882,7 +1229,7 @@ Once you're done with the table migration, proceed to the [code migration](#code
 ## `principal-prefix-access` command
 
 ```text
-databricks labs ucx principal-prefix-access [--subscription-id <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
+databricks labs ucx principal-prefix-access [--subscription-ids <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
 ```
 
 This command depends on results from the [assessment workflow](#assessment-workflow) and requires [AWS CLI](#access-for-aws-s3-buckets)
@@ -918,7 +1265,7 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 ### Access for Azure Storage Accounts
 
 ```commandline
-databricks labs ucx principal-prefix-access --subscription-id test-subscription-id
+databricks labs ucx principal-prefix-access --subscription-ids test-subscription-id
 ```
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions
@@ -933,7 +1280,7 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 
 [[back to top](#databricks-labs-ucx)]
 
-## `create-missing-pricipals` command (AWS Only)
+## `create-missing-principals` command (AWS Only)
 ```bash
 databricks labs ucx create-missing-principals --aws-profile <aws_profile> --single-role <single_role>
 ```
@@ -948,10 +1295,20 @@ Two optional parameter are available for this command:
 
 [[back to top](#databricks-labs-ucx)]
 
+## `delete-missing-principals` command (AWS Only)
+```bash
+databricks labs ucx delete-missing-principals --aws-profile <aws_profile>
+```
+This command helps to delete the IAM role created by UCX. It lists all the IAM Roles generated by the principal-prefix-access
+command and allows user to select multiple roles to delete. It also checks if selected roles are mapped to any storage credentials
+and asks for confirmation from user. Once confirmed, it deletes the role and its associated inline policy.
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `create-uber-principal` command
 
 ```text
-databricks labs ucx create-uber-principal [--subscription-id X]
+databricks labs ucx create-uber-principal [--subscription-ids X]
 ```
 
 **Requires Cloud IAM admin privileges.**
@@ -1023,6 +1380,15 @@ Once the [`assessment` workflow](#assessment-workflow) finished successfully, an
 run this command to have Unity Catalog external locations created. The candidate locations to be created are extracted from guess_external_locations
 task in the assessment job. You can run [`validate-external-locations` command](#validate-external-locations-command) to check the candidate locations.
 
+**Location ACLs:**
+`migrate-locations` command applies any location ACL from existing cluster.
+For Azure, it checks if there are any interactive cluster or SQL warehouse
+which has service principals configured to access storage. It maps the storage account to the external location created and grants `CREATE_EXTERNAL_TABLE`,
+`CREATE_EXTERNAL_VOLUME` and `READ_FILES` permission on the location to all the user who have access to the interactive cluster or SQL warehouse
+For AWS, it checks any instance profiles mapped to the interactive cluster or SQL warehouse. It checks the mapping of instance profiles to the bucket. It then
+maps the bucket to the external locations created and grants `CREATE_EXTERNAL_TABLE`, `CREATE_EXTERNAL_VOLUME` and `READ_FILES` permission on the location to all the user who have access to the interactive cluster
+or SQL warehouse
+
 Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
 
 [[back to top](#databricks-labs-ucx)]
@@ -1086,7 +1452,14 @@ databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
 This command is supposed to be run before migrating tables to UC using [table migration process](#Table-Migration).
-
+Catalog & Schema ACL:
+`create-catalogs-schemas` command also applies any catalog and schema ACL from existing clusters.
+For Azure it checks if there are any interactive cluster or sql warehouse which has service principals configured to access storage.
+It maps the storage account to the tables which has external location on those storage account created and grants `USAGE` access to
+the schema and catalog if at least one such table is migrated to it.
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
+to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
+the schema and catalog if at least one such table is migrated to it.
 [[back to top](#databricks-labs-ucx)]
 
 ## `migrate-tables` command
@@ -1099,6 +1472,15 @@ Anytime after [`create-table-mapping` command](#create-table-mapping-command) is
 
 This command kicks off the [table migration](#Table-Migration) process. It triggers the `migrate-tables` workflow,
 and if there are HiveSerDe tables detected, prompt whether to trigger the `migrate-external-hiveserde-tables-in-place-experimental` workflow.
+
+Table and View ACL:
+`migrate-tables` command also applies any table and view ACL from existing clusters.
+For Azure it checks if there are any interactive cluster or sql warehouse which has service principals configured to access storage.
+It maps the storage account to the tables which has external location on those storage account created and grants either `SELECT` permission if
+the service principal only has read access on the storage account and `ALL_PRIVILEGES` if the service principal has write access on the storage account
+For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
+to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants either `SELECT` permission if
+the instance profile only has read access on the bucket and `ALL_PRIVILEGES` if the instance profile has write access on the bucket.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1246,7 +1628,7 @@ workspace information with the UCX installations. Once the workspace information
 ## `sync-workspace-info` command
 
 ```text
-databricks labs ucx sync-workspace-info
+databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
 14:07:07  INFO [d.labs.ucx] Account ID: ...
 14:07:10  INFO [d.l.blueprint.parallel][finding_ucx_installations_16] finding ucx installations 10/88, rps: 16.415/sec
@@ -1255,9 +1637,12 @@ databricks labs ucx sync-workspace-info
 ...
 ```
 
-**Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces
-in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](#Table-Migration) process and is the prerequisite
+> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
+> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
+> or "https://accounts.azuredatabricks.net").
+
+This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
+necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
@@ -1332,6 +1717,37 @@ Valid group membership is important to ensure users has correct access after leg
 
 [[back to top](#databricks-labs-ucx)]
 
+## `validate-table-locations` command
+
+```text
+$ databricks labs ucx validate-table-locations [--workspace-ids 123,456,789]
+...
+11:39:36  WARN [d.l.u.account.aggregate] Workspace 99999999 does not have UCX installed
+11:39:37  WARN [d.l.u.account.aggregate] Overlapping table locations: 123456789:hive_metastore.database.table and 987654321:hive_metastore.database.table
+11:39:37  WARN [d.l.u.account.aggregate] Overlapping table locations: 123456789:hive_metastore.database.table and 123456789:hive_metastore.another_database.table
+```
+
+This command validates the table locations by checking for overlapping table locations in the workspace and across
+workspaces. Unity catalog does not allow overlapping table locations, also not between tables in different catalogs.
+Overlapping table locations need to be resolved by the user before running the table migration.
+
+Options to resolve tables with overlapping locations are:
+- Move one table and [skip](#skip-command) the other(s).
+- Duplicate the tables by copying the data into a managed table and [skip](#skip-command) the original tables.
+
+Considerations when resolving tables with overlapping locations are:
+- Migrate the tables one workspace at a time:
+  - Let later migrated workspaces read tables from the earlier migrated workspace catalogs.
+  - [Move](#move-command) tables between schemas and catalogs when it fits the data management model.
+- The tables might have different:
+  - Metadata, like:
+    - Column schema (names, types, order)
+    - Description
+    - Tags
+  - ACLs
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `cluster-remap` command
 
 ```text
@@ -1374,6 +1790,61 @@ By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
 
+## `upload` command
+
+```text
+$ databricks labs ucx upload --file <file_path> --run-as-collection True
+21:31:29 WARNING [d.labs.ucx] The schema of CSV files is NOT validated, ensure it is correct
+21:31:29 INFO [d.labs.ucx] Finished uploading: <file_path>
+```
+
+Upload a file to a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when uploading the same file to multiple workspaces.
+
+## `download` command
+
+```text
+$ databricks labs ucx download --file <file_path> --run-as-collection True
+21:31:29 INFO [d.labs.ucx] Finished downloading: <file_path>
+```
+
+Download a csv file from a single workspace (`--run-as-collection False`) or a collection of workspaces
+(`--run-as-collection True`). This command is especially useful when downloading the same file from multiple workspaces.
+
+## `join-collection` command
+
+```text
+$ databricks labs ucx join-collection --workspace-ids <comma seperate list of workspace ids> --profile <account-profile>
+```
+
+`join-collection` command joins 2 or more workspaces into a collection. This helps in running supported cli commands as a collection
+`join-collection` command updates config.yml file on each workspace ucx installation with installed_workspace_ids attribute.
+In order to run `join-collectioon` command a user should:
+ - be an Account admin on the Databricks account
+ - be a Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
+ - have installed UCX on the workspace
+The `join-collection` command will fail and throw an error msg if the above conditions are not met.
+
+## collection eligible command
+
+Once `join-collection` command is run, it allows user to run multiple cli commands as a collection. The following cli commands
+are eligible to be run as a collection. User can run the below commands as collection by passing an additional flag `--run-as-collection=True`
+- `ensure-assessment-run`
+- `create-table-mapping`
+- `principal-prefix-access`
+- `migrate-credentials`
+- `create-uber-principal`
+- `create-missing-principals`
+- `validate-external-location`
+- `migrate-locations`
+- `create-catalog-schemas`
+- `migrate-tables`
+- `migrate-acls`
+- `migrate-dbsql-dashboards`
+- `validate-group-membership`
+Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
+
+
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
 
@@ -1393,10 +1864,9 @@ from a VPC, or from a specific IP range.
 the Databricks account and workspace. If not, you might need to be
 connected to a VPN or configure an HTTP proxy to access your workspace.
 
-**From local machine to GitHub:** UCX needs internet access to connect
-to [<u>github.com</u>](https://github.com) (to download the tool) from
-the machine running the installation. The installation will fail if
-there is no internet connectivity.
+**From local machine to GitHub:** UCX needs internet access to connect to GitHub (https://api.github.com
+and https://raw.githubusercontent.com) for downloading the tool from the machine running the installation. The
+installation will fail if there is no internet connectivity to these URLs.
 
 **Solution:** Ensure that GitHub is reachable from the local machine. If
 not, make necessary changes to the network/firewall settings.
@@ -1472,20 +1942,21 @@ run the commands that need cloud administrator rights.
 
 Admin privileges required for commands:
 
-| **CLI command** | **Admin privileges** |
-|----|----|
-| [<u>install</u>](#install-ucx) | Workspace Admin |
+| **CLI command**                                                                                  | **Admin privileges** |
+|--------------------------------------------------------------------------------------------------|----|
+| [<u>install</u>](#install-ucx)                                                                   | Workspace Admin |
 | [<u>account install</u>](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account) | Account Admin |
-| [<u>create-account-groups</u>](#create-account-groups-command) | Account Admin |
-| [<u>validate-groups-membership</u>](#validate-groups-membership-command) | Account Admin |
-| [<u>create-uber-principal</u>](#create-uber-principal-command) | Cloud Admin |
-| [<u>principal-prefix-access</u>](#principal-prefix-access-command) | Cloud Admin |
-| [<u>create-missing-principals</u>](#create-missing-pricipals-command-aws-only) | Cloud Admin |
-| [<u>migrate-credentials</u>](#migrate-credentials-command) | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
-| [<u>migrate-location</u>](#migrate-locations-command) | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
-| [<u>create-catalogs-schemas</u>](#create-catalogs-schemas-command) | Metastore Admin / CREATE CATALOG privilege |
-| [<u>sync-workspace-info</u>](#sync-workspace-info-command) | Account Admin |
-| [<u>manual-workspace-info</u>](#manual-workspace-info-command) | Workspace Admin |
+| [<u>create-account-groups</u>](#create-account-groups-command)                                   | Account Admin |
+| [<u>validate-groups-membership</u>](#validate-groups-membership-command)                         | Account Admin |
+| [<u>create-uber-principal</u>](#create-uber-principal-command)                                   | Cloud Admin |
+| [<u>principal-prefix-access</u>](#principal-prefix-access-command)                               | Cloud Admin |
+| [<u>create-missing-principals</u>](#create-missing-principals-command-aws-only)                  | Cloud Admin |
+| [<u>delete-missing-principals</u>](#delete-missing-principals-command-aws-only)                  | Cloud Admin |
+| [<u>migrate-credentials</u>](#migrate-credentials-command)                                       | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
+| [<u>migrate-location</u>](#migrate-locations-command)                                            | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
+| [<u>create-catalogs-schemas</u>](#create-catalogs-schemas-command)                               | Metastore Admin / CREATE CATALOG privilege |
+| [<u>sync-workspace-info</u>](#sync-workspace-info-command)                                       | Account Admin |
+| [<u>manual-workspace-info</u>](#manual-workspace-info-command)                                   | Workspace Admin |
 
 [[back to top](#databricks-labs-ucx)]
 

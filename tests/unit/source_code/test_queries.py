@@ -1,96 +1,47 @@
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, Failure
-from databricks.labs.ucx.source_code.queries import FromTable
+from unittest.mock import create_autospec
+
+import pytest
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import LegacyQuery
+
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
-def test_not_migrated_tables_trigger_nothing(empty_index):
-    ftf = FromTable(empty_index, CurrentSessionState())
-
-    old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    actual = list(ftf.lint(old_query))
-    assert not actual
-
-
-def test_migrated_tables_trigger_messages(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
-
-    old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-
-    assert [
-        Deprecation(
-            code='table-migrated-to-uc',
-            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
+@pytest.mark.parametrize(
+    "name, query, dfsa_paths, is_read, is_write",
+    [
+        ("simple", "SELECT * from dual", [], False, False),
+        (
+            "location",
+            "CREATE TABLE hive_metastore.indices_historical_data.sp_500 LOCATION 's3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/'",
+            ["s3a://db-gtm-industry-solutions/data/fsi/capm/sp_500/"],
+            False,
+            True,
         ),
-        Deprecation(
-            code='table-migrated-to-uc',
-            message='Table other.matters is migrated to some.certain.issues in Unity Catalog',
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
-        ),
-    ] == list(ftf.lint(old_query))
+    ],
+)
+def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_read, is_write, migration_index):
+    ws = create_autospec(WorkspaceClient)
+    crawlers = create_autospec(DirectFsAccessCrawler)
+    query = LegacyQuery.from_dict({"parent": "workspace", "name": name, "query": query})
+    linter = QueryLinter(ws, migration_index, crawlers, None)
+    dfsas = linter.collect_dfsas_from_query("no-dashboard-id", query)
+    ws.assert_not_called()
+    crawlers.assert_not_called()
+    assert set(dfsa.path for dfsa in dfsas) == set(dfsa_paths)
+    assert all(dfsa.is_read == is_read for dfsa in dfsas)
+    assert all(dfsa.is_write == is_write for dfsa in dfsas)
 
 
-def test_fully_migrated_queries_match(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
+def test_query_liner_refresh_report_writes_query_problems(migration_index, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    crawlers = create_autospec(DirectFsAccessCrawler)
+    linter = QueryLinter(ws, migration_index, crawlers, None)
 
-    old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    new_query = "SELECT * FROM brand.new.stuff LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10"
+    linter.refresh_report(mock_backend, inventory_database="test")
 
-    assert ftf.apply(old_query) == new_query
-
-
-def test_fully_migrated_queries_match_no_db(migration_index):
-    session_state = CurrentSessionState(schema="old")
-    ftf = FromTable(migration_index, session_state=session_state)
-
-    old_query = "SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    new_query = "SELECT * FROM brand.new.stuff LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10"
-
-    assert ftf.apply(old_query) == new_query
-
-
-def test_use_database_change(migration_index):
-    session_state = CurrentSessionState(schema="old")
-    ftf = FromTable(migration_index, session_state=session_state)
-    query = """
-    USE newcatalog;
-    SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1
-    LIMIT 10"""
-    _ = list(ftf.lint(query))
-    assert ftf.schema == "newcatalog"
-
-
-def test_use_database_stops_migration(migration_index):
-    session_state = CurrentSessionState(schema="old")
-    ftf = FromTable(migration_index, session_state=session_state)
-    query = "SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    old_query = f"{query}; USE newcatalog; {query}"
-    new_query = (
-        "SELECT * FROM brand.new.stuff LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10; "
-        "USE newcatalog; "
-        "SELECT * FROM things LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10"
-    )
-    transformed_query = ftf.apply(old_query)
-    assert transformed_query == new_query
-
-
-def test_parses_create_schema(migration_index):
-    query = "CREATE SCHEMA xyz"
-    session_state = CurrentSessionState(schema="old")
-    ftf = FromTable(migration_index, session_state=session_state)
-    advices = ftf.lint(query)
-    assert not list(advices)
-
-
-def test_raises_advice_when_parsing_unsupported_sql(migration_index):
-    query = "XDESCRIBE DETAILS xyz"  # not a valid query
-    session_state = CurrentSessionState(schema="old")
-    ftf = FromTable(migration_index, session_state=session_state)
-    advices = list(ftf.lint(query))
-    assert isinstance(advices[0], Failure)
-    assert 'not supported' in advices[0].message
+    assert mock_backend.has_rows_written_for("`test`.query_problems")
+    ws.dashboards.list.assert_called_once()
+    crawlers.assert_not_called()

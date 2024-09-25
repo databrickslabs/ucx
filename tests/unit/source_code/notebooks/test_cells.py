@@ -8,7 +8,8 @@ import yaml
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     PipCell,
@@ -16,7 +17,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     PipCommand,
     PythonCodeAnalyzer,
 )
-from databricks.labs.ucx.source_code.notebooks.cells import MagicLine
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
@@ -127,8 +127,10 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(KnownList())
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
+    allow_list = KnownList()
+    pip_resolver = PythonLibraryResolver(allow_list)
+    file_resolver = ImportFileResolver(FileLoader(), allow_list)
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], file_resolver, mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
     code = "%pip install unknown-library-name"
@@ -149,7 +151,9 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     file_loader = FileLoader()
     pip_resolver = PythonLibraryResolver(allow_list)
     import_resolver = ImportFileResolver(file_loader, allow_list)
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
+    )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
     whl = Path(__file__).parent / '../samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl'

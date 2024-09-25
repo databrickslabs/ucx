@@ -25,6 +25,7 @@ from databricks.sdk.service.jobs import (
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +128,8 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             )
         return job_assessment, job_details
 
-    def snapshot(self) -> Iterable[JobInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     def _try_fetch(self) -> Iterable[JobInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield JobInfo(*row)
 
     def _check_jar_task(self, all_task: list[RunTask]) -> list[str]:
@@ -165,9 +163,6 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         self._ws = ws
         self._num_days_history = num_days_history
 
-    def snapshot(self) -> Iterable[SubmitRunInfo]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
     @staticmethod
     def _dt_to_ms(date_time: datetime):
         return int(date_time.timestamp() * 1000)
@@ -190,7 +185,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         return self._assess_job_runs(submit_runs, all_clusters)
 
     def _try_fetch(self) -> Iterable[SubmitRunInfo]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield SubmitRunInfo(*row)
 
     def _check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:

@@ -93,7 +93,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     ws = mock_workspace_client(cluster_ids=['simplest-autoscale'])
     mockbackend = MockBackend()
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
-    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
+    result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "overwrite")
     assert result == [
         Row(
             cluster_id="simplest-autoscale",
@@ -149,6 +149,19 @@ def test_no_isolation_clusters():
     assert result_set[0].failures == '["No isolation shared clusters not supported in UC"]'
 
 
+def test_mlr_no_isolation_clusters():
+    ws = mock_workspace_client(cluster_ids=['no-isolation-mlr'])
+    sql_backend = MockBackend()
+    crawler = ClustersCrawler(ws, sql_backend, "ucx")
+    result_set = list(crawler.snapshot())
+    assert len(result_set) == 1
+    expected_failures = (
+        '["No isolation shared clusters not supported in UC",'
+        + ' "Shared Machine Learning Runtime clusters are not supported in UC"]'
+    )
+    assert result_set[0].failures == expected_failures
+
+
 def test_unsupported_clusters():
     ws = mock_workspace_client(cluster_ids=['legacy-passthrough'])
     sql_backend = MockBackend()
@@ -175,7 +188,7 @@ def test_policy_try_fetch():
     ws = mock_workspace_client(policy_ids=['single-user-with-spn-policyid'])
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM ucx.policies": [
+            r"SELECT \* FROM hive_metastore.ucx.policies": [
                 (
                     "single-user-with-spn-policyid",
                     "test_policy",

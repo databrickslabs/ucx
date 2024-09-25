@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 import codecs
+import dataclasses
 import locale
 import logging
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
-from databricks.labs.blueprint.paths import WorkspacePath
+from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.blueprint.paths import WorkspacePath
+
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -38,25 +41,6 @@ class Advice:
     start_col: int
     end_line: int
     end_col: int
-
-    def replace(
-        self,
-        *,
-        code: str | None = None,
-        message: str | None = None,
-        start_line: int | None = None,
-        start_col: int | None = None,
-        end_line: int | None = None,
-        end_col: int | None = None,
-    ) -> Advice:
-        return type(self)(
-            code=code if code is not None else self.code,
-            message=message if message is not None else self.message,
-            start_line=start_line if start_line is not None else self.start_line,
-            start_col=start_col if start_col is not None else self.start_col,
-            end_line=end_line if end_line is not None else self.end_line,
-            end_col=end_col if end_col is not None else self.end_col,
-        )
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(**self.__dict__)
@@ -87,7 +71,8 @@ class Advice:
 
     def replace_from_node(self, node: NodeNG) -> Advice:
         # Astroid lines are 1-based.
-        return self.replace(
+        return dataclasses.replace(
+            self,
             start_line=(node.lineno or 1) - 1,
             start_col=node.col_offset,
             end_line=(node.end_lineno or 1) - 1,
@@ -112,7 +97,7 @@ class LocatedAdvice:
         if default is not None:
             path = default
         path = path.relative_to(base)
-        return f"{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
+        return f"./{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
 
 
 class Advisory(Advice):
@@ -136,6 +121,35 @@ class Linter:
     def lint(self, code: str) -> Iterable[Advice]: ...
 
 
+class SqlLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        try:
+            expressions = parse_sql(code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self.lint_expression(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
+            yield self.sql_parse_failure(code)
+
+    @staticmethod
+    def sql_parse_failure(code: str):
+        return Failure(
+            code='sql-parse-error',
+            message=f"SQL expression is not supported yet: {code}",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=0,
+            start_col=0,
+            end_line=0,
+            end_col=1024,
+        )
+
+    @abstractmethod
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]: ...
+
+
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
@@ -146,7 +160,9 @@ class PythonLinter(Linter):
     def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
-class Fixer:
+class Fixer(ABC):
+
+    @property
     @abstractmethod
     def name(self) -> str: ...
 
@@ -201,13 +217,14 @@ class CurrentSessionState:
             return None
 
 
-class SequentialLinter(Linter):
-    def __init__(self, linters: list[Linter]):
+class SqlSequentialLinter(SqlLinter):
+
+    def __init__(self, linters: list[SqlLinter]):
         self._linters = linters
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_expression(self, expression: Expression) -> Iterable[Advice]:
         for linter in self._linters:
-            yield from linter.lint(code)
+            yield from linter.lint_expression(expression)
 
 
 class PythonSequentialLinter(Linter):
@@ -293,11 +310,13 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     language = file_language(path)
     if not language:
         return False
-    if content is None:
-        try:
-            content = path.read_text(guess_encoding(path))
-        except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-            logger.warning(f"Could not read file {path}")
-            return False
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
-    return content.startswith(magic_header)
+    if content is not None:
+        return content.startswith(magic_header)
+    try:
+        with path.open('rt', encoding=guess_encoding(path)) as f:
+            file_header = f.read(len(magic_header))
+    except (FileNotFoundError, UnicodeDecodeError, PermissionError):
+        logger.warning(f"Could not read file {path}")
+        return False
+    return file_header == magic_header

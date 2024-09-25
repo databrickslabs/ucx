@@ -31,7 +31,6 @@ jobs:
       - name: Draft release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
           files: |
             dist/databricks_*.whl
             dist/databricks_*.tar.gz

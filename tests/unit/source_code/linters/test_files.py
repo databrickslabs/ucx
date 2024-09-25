@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.known import KnownList
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.files import (
     LocalFileMigrator,
     FileLoader,
@@ -28,21 +28,21 @@ from tests.unit import locate_site_packages, _samples_path
 
 
 def test_notebook_migrator_ignores_unsupported_extensions():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
 def test_file_migrator_fix_ignores_unsupported_extensions():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
 def test_file_migrator_fix_ignores_unsupported_language():
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
@@ -66,7 +66,7 @@ def test_file_migrator_supported_language_no_diagnostics():
 
 
 def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup):
-    languages = LinterContext(MigrationIndex([]))
+    languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = mock_path_lookup.resolve(Path("root1.run.py"))
     assert not migrator.apply(path)
@@ -112,18 +112,26 @@ def local_code_linter(mock_path_lookup, migration_index):
     allow_list = KnownList()
     pip_resolver = PythonLibraryResolver(allow_list)
     session_state = CurrentSessionState()
+    import_file_resolver = ImportFileResolver(file_loader, allow_list)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, allow_list),
+        import_file_resolver,
+        import_file_resolver,
         mock_path_lookup,
     )
     return LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
+        notebook_loader,
+        file_loader,
+        folder_loader,
+        mock_path_lookup,
+        session_state,
+        resolver,
+        lambda: LinterContext(migration_index),
     )
 
 
-def test_linter_walks_directory(mock_path_lookup, local_code_linter):
+def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
@@ -132,7 +140,7 @@ def test_linter_walks_directory(mock_path_lookup, local_code_linter):
     assert not advices
 
 
-def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter):
+def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
     paths: set[Path] = set()
@@ -192,6 +200,7 @@ site_packages = locate_site_packages()
     "path", [Path("/Users/eric.vergnaud/development/ucx/.venv/lib/python3.10/site-packages/spacy/pipe_analysis.py")]
 )
 def test_known_issues(path: Path, migration_index):
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
@@ -201,8 +210,9 @@ def test_known_issues(path: Path, migration_index):
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, allow_list)
     pip_resolver = PythonLibraryResolver(allow_list)
-    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
+        notebook_loader,
         file_loader,
         folder_loader,
         path_lookup,

@@ -11,6 +11,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
+    ucx_catalog: str = "ucx"  # Catalog to store UCX artifact tables (shared across workspaces)
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None
@@ -25,7 +26,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     connect: Config | None = None
     num_threads: int | None = 10
     database_to_catalog_mapping: dict[str, str] | None = None
-    default_catalog: str | None = "ucx_default"
+    default_catalog: str | None = "ucx_default"  # DEPRECATED: Keeping to avoid errors when loading old configurations
     log_level: str | None = "INFO"
 
     # Starting path for notebooks and directories crawler
@@ -69,6 +70,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
+
+    # [INTERNAL ONLY] Whether the assessment should lint only specific dashboards.
+    include_dashboard_ids: list[str] | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

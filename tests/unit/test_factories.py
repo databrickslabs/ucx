@@ -58,11 +58,11 @@ def test_replace_installation():
     )
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
-        azure_subscription_id='foo',
+        azure_subscription_ids=["test"],
         installation=mock_installation,
         sql_backend=MockBackend(
             rows={
-                r'some.azure_service_principals': spn_info_rows[
+                r'`some`.`azure_service_principals`': spn_info_rows[
                     ('first-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
                     ('second-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
                 ]

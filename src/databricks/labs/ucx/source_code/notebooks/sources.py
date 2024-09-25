@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import locale
 import logging
 from collections.abc import Iterable
@@ -11,7 +12,7 @@ from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
@@ -35,7 +36,8 @@ from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     UnresolvedPath,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -43,7 +45,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     NOTEBOOK_HEADER,
     RunCell,
     PythonCell,
-    MagicLine,
     RunCommand,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -131,7 +132,7 @@ class NotebookLinter:
     @classmethod
     def from_source(
         cls,
-        index: MigrationIndex,
+        index: TableMigrationIndex,
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         source: str,
@@ -173,7 +174,8 @@ class NotebookLinter:
                 linter = self._linter(cell.language.language)
                 advices = linter.lint(cell.original_code)
             for advice in advices:
-                yield advice.replace(
+                yield dataclasses.replace(
+                    advice,
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )

@@ -259,7 +259,7 @@ make dev
 
 To use different python version, specify it in `HATCH_PYTHON` variable:
 ```shell
-HATCH_PYTHON=python3.10 make clean dev test
+HATCH_PYTHON="$(which python3.10)" make clean dev test
 ```
 
 Configure your IDE to use `.venv/bin/python` from the virtual environment when developing the project:
@@ -275,6 +275,33 @@ make test
 Before every commit, apply the consistent styleguide and formatting of the code, as we want our codebase to look consistent. Consult the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) if you have any doubts. Make sure to run the tests.
 ```shell
 make fmt test
+```
+
+## Getting overview of linter message codes
+
+To get an overview of the linter message codes, run the following command:
+
+```shell
+$ python tests/integration/source_code/message_codes.py
+cannot-autofix-table-reference
+catalog-api-in-shared-clusters
+changed-result-format-in-uc
+direct-filesystem-access
+direct-filesystem-access-in-sql-query
+default-format-changed-in-dbr8
+dependency-not-found
+jvm-access-in-shared-clusters
+legacy-context-in-shared-clusters
+not-supported
+notebook-run-cannot-compute-value
+python-udf-in-shared-clusters
+rdd-in-shared-clusters
+spark-logging-in-shared-clusters
+sql-parse-error
+sys-path-cannot-compute-value
+table-migrated-to-uc
+to-json-in-shared-clusters
+unsupported-magic-line
 ```
 
 ## First contribution

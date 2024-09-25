@@ -6,7 +6,7 @@ from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import SchemaInfo
@@ -18,23 +18,49 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
+
     def __init__(
-        self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend
+        self,
+        ws: WorkspaceClient,
+        table_mapping: TableMapping,
+        principal_grants: PrincipalACL,
+        sql_backend: SqlBackend,
+        grants_crawler: GrantsCrawler,
+        ucx_catalog: str,
     ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
         self._principal_grants = principal_grants
         self._backend = sql_backend
+        self._hive_grants_crawler = grants_crawler
+        self._ucx_catalog = ucx_catalog
 
-    def create_all_catalogs_schemas(self, prompts: Prompts):
+    def create_ucx_catalog(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
+        """Create the UCX catalog.
+
+        Args:
+            prompts : Prompts
+                The prompts object to use for interactive input.
+            properties : (dict[str, str] | None), default None
+                The properties to pass to the catalog. If None, no properties are passed.
+        """
+        try:
+            self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
+        except BadRequest as e:
+            if "already exists" in str(e):
+                logger.warning(f"Catalog '{self._ucx_catalog}' already exists. Skipping.")
+                return
+            raise
+
+    def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             try:
-                self._create_catalog_validate(candidate_catalog, prompts)
+                self._create_catalog_validate(candidate_catalog, prompts, properties=None)
             except BadRequest as e:
                 if "already exists" in str(e):
-                    logger.warning(f"Catalog {candidate_catalog} already exists. Skipping.")
+                    logger.warning(f"Catalog '{candidate_catalog}' already exists. Skipping.")
                     continue
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
@@ -43,13 +69,14 @@ class CatalogSchema:
                 except BadRequest as e:
                     if "already exists" in str(e):
                         logger.warning(
-                            f"Schema {candidate_schema} in catalog {candidate_catalog} " f"already exists. Skipping."
+                            f"Schema '{candidate_schema}' in catalog '{candidate_catalog}' already exists. Skipping."
                         )
                         continue
+        self._apply_from_legacy_table_acls()
         self._update_principal_acl()
 
-    def _update_principal_acl(self):
-        grants = self._get_catalog_schema_grants()
+    def _apply_from_legacy_table_acls(self):
+        grants = self._get_catalog_schema_hive_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
             if acl_migrate_sql is None:
@@ -58,7 +85,32 @@ class CatalogSchema:
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
-    def _get_catalog_schema_grants(self) -> list[Grant]:
+    def _update_principal_acl(self):
+
+        grants = self._get_catalog_schema_principal_acl_grants()
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql()
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
+
+    def _get_catalog_schema_hive_grants(self) -> list[Grant]:
+        src_dst_schema_mapping = self._get_database_source_target_mapping()
+        hive_grants = self._hive_grants_crawler.snapshot()
+        new_grants: list[Grant] = []
+        for grant in hive_grants:
+            if grant.this_type_and_key()[0] == "DATABASE" and grant.database:
+                for schema in src_dst_schema_mapping[grant.database]:
+                    new_grants.append(replace(grant, catalog=schema.catalog_name, database=schema.name))
+        catalog_grants: set[Grant] = set()
+        for grant in new_grants:
+            catalog_grants.add(replace(grant, database=None))
+        new_grants.extend(catalog_grants)
+        return new_grants
+
+    def _get_catalog_schema_principal_acl_grants(self) -> list[Grant]:
         src_trg_schema_mapping = self._get_database_source_target_mapping()
         grants = self._principal_grants.get_interactive_cluster_grants()
         # filter on grants to only get database level grants
@@ -89,20 +141,19 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog, prompts: Prompts):
-        logger.info(f"Creating UC catalog: {catalog}")
-        # create catalogs
+    def _create_catalog_validate(self, catalog: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
+        logger.info(f"Validating UC catalog: {catalog}")
         attempts = 3
         while True:
             catalog_storage = prompts.question(
-                f"Please provide storage location url for catalog:{catalog}.", default="metastore"
+                f"Please provide storage location url for catalog: {catalog}", default="metastore"
             )
             if self._validate_location(catalog_storage):
                 break
             attempts -= 1
             if attempts == 0:
                 raise NotFound(f"Failed to validate location for {catalog} catalog")
-        self._create_catalog(catalog, catalog_storage)
+        self._create_catalog(catalog, catalog_storage, properties=properties)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
         """generate a list of existing UC catalogs and schema."""
@@ -167,12 +218,17 @@ class CatalogSchema:
                 return True
         return False
 
-    def _create_catalog(self, catalog, catalog_storage):
+    def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
         if catalog_storage == "metastore":
-            self._ws.catalogs.create(catalog, comment="Created by UCX")
+            self._ws.catalogs.create(catalog, comment="Created by UCX", properties=properties)
         else:
-            self._ws.catalogs.create(catalog, storage_root=catalog_storage, comment="Created by UCX")
+            self._ws.catalogs.create(
+                catalog,
+                storage_root=catalog_storage,
+                comment="Created by UCX",
+                properties=properties,
+            )
 
     def _create_schema(self, catalog, schema):
         logger.info(f"Creating UC schema: {schema} in catalog: {catalog}")

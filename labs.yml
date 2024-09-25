@@ -51,20 +51,45 @@ commands:
       - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
+  - name: validate-table-locations
+    is_account_level: true
+    description: Validate if the table locations are overlapping in a workspace and across workspaces.
+    flags:
+      - name: workspace-ids
+        description: |
+          List of workspace IDs to include.
+          If --workspace-ids is not provided, it will use all workspaces present in the account.
+
   - name: manual-workspace-info
     description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
 
   - name: create-table-mapping
     description: create initial table mapping for review
+    flags:
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
     flags:
       - name: run-as-collection
-        description: boolean flag to indicate to run the cmd as a collection. Default is False.
+        description: (Optional) Whether to check (and run if necessary) the assessment for the collection of workspaces
+          with ucx installed. Default is false.
+
+  - name: update-migration-progress
+    description: trigger the `migration-progress-experimental` job to refresh the inventory that tracks the workspace
+      resources and their migration status.
+    flags:
+      - name: run-as-collection
+        description: (Optional) Whether to update the migration progress for the collection of workspaces with ucx
+          installed. Default is False.
 
   - name: validate-external-locations
-    description: validates and provides mapping to external table to external location and shared generation tf scripts
+    description: |
+      Validates external locations and provides Terraform script that maps external locations to external table.
+    flags:
+     - name: run-as-collection
+       description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: repair-run
     description: Repair Run the Failed Job
@@ -119,10 +144,12 @@ commands:
       its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
       The output is stored in the workspace install folder.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: create-missing-principals
     description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and
@@ -139,16 +166,29 @@ commands:
         description: (Optional) IAM policy Name to be specified for the UC roles. (default:UC_POLICY)
       - name: single-role
         description: (Optional) Create a single role for all S3 locations. (default:False)
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
-  - name: create-uber-principal
-    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
-      used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
-      it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+  - name: delete-missing-principals
+    description: For AWS, this command identifies all the UC roles that are created through the create-missing-principals
+      cmd. It lists all the UC roles in aws and lets users select the roles to delete. It also validates if the selected
+      roles are used by any storage credential and prompts to confirm if roles should still be deleted.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
       - name: aws-profile
         description: AWS Profile to use for authentication
+
+  - name: create-uber-principal
+    description: |
+      For azure cloud, creates a service principal and gives `STORAGE_BLOB_READER` access on all the storage account
+      used by tables in the workspace and stores the service principal information in the UCX cluster policy.
+      For aws, indentify all s3 buckets used by the Instance Profiles configured in the workspace.
+    flags:
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: validate-groups-membership
     description: Validate groups to check if the groups at account level and workspace level have different memberships
@@ -156,14 +196,19 @@ commands:
       Workspace Group Name\tMembers Count\tAccount Group Name\tMembers Count\tDifference
       {{range .}}{{.wf_group_name}}\t{{.wf_group_members_count}}\t{{.acc_group_name}}\t{{.acc_group_members_count}}\t{{.group_members_difference}}
       {{end}}
+    flags:
+    - name: run-as-collection
+      description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
   - name: create-account-groups
     is_account_level: true
@@ -177,14 +222,20 @@ commands:
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
     flags:
-      - name: subscription-id
-        description: Subscription to scan storage account in
+      - name: subscription-ids
+        description: Comma separated list of subscriptions to scan storage account in.
       - name: aws-profile
         description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: create-catalogs-schemas
-    description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
-      This command is supposed to be run before migrating tables to UC.
+    description: |
+      Create UC external catalogs and schemas based on the destinations created from `create_table_mapping` command.
+      This command should be executed before migrating tables to Unity Catalog.
+    flags:
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: cluster-remap
     description: Re-mapping the cluster to UC
@@ -210,25 +261,44 @@ commands:
 
   - name: assign-metastore
     is_account_level: true
-    description: Enable Unity Catalog features on a workspace by assign a metastore to it
+    description: Enable Unity Catalog features on a workspace by assigning a metastore to it.
     flags:
       - name: workspace-id
-        description: (Optional) Workspace ID to assign a metastore to
+        description: Workspace ID to assign a metastore to
       - name: metastore-id
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
       - name: default-catalog
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
 
+  - name: create-ucx-catalog
+    description: Create UCX artifact catalog
+
   - name: migrate-tables
     description: |
-      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental
-      workflow and migrate-external-tables-ctas workflow.
+      Trigger the `migrate-tables` workflow and, optionally, `migrate-external-hiveserde-tables-in-place-experimental`
+      workflow and `migrate-external-tables-ctas workflow`.
+    flags:
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
+
+  - name: migrate-acls
+    description: |
+      Migrate access control lists from legacy metastore to UC metastore.
+    flags:
+      - name: target-catalog
+        description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
+      - name: hms-fed
+        description: (Optional) Migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
+      - name: run-as-collection
+        description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: migrate-dbsql-dashboards
     description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
     flags:
       - name: dashboard-id
         description: (Optional) DBSQL dashboard ID to migrate. If no dashboard ID is provided, all DBSQL dashboards in the workspace will be migrated.
+      - name: run-as-collection
+        description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
   - name: revert-dbsql-dashboards
     description: Revert DBSQL dashboards that have been migrated to their original state before the migration.
@@ -244,3 +314,19 @@ commands:
         description: workspace_ids which should join a collection. provide a comma separated list of workspace ids.
       - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
+
+  - name: upload
+    description: upload file to all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to upload
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.
+
+  - name: download
+    description: download file from all workspaces in the account where ucx is installed
+    flags:
+      - name: file
+        description: The file to download
+      - name: run-as-collection
+        description: Run the command for the collection of workspaces with ucx installed. Default is False.

@@ -1,5 +1,6 @@
 from unittest.mock import Mock, call, create_autospec
 
+import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
@@ -10,13 +11,71 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
+    LocationTrie,
     Mounts,
     TablesInMounts,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
-def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://databricks-e2demofieldengwest/b169/b50"
+        "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
+        "s3n://bucket-name/path-to-file-in-bucket",
+        "gcs://test_location2/test2/table2",
+        "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
+    ],
+)
+def test_location_trie_valid_and_full_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+    trie = LocationTrie()
+    trie.insert(table)
+    node = trie.find(table)
+    assert node is not None
+    assert node.is_valid()
+    assert node.location == location
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["s3:/missing-slash", "//missing-scheme", "gcs:/missing-netloc/path", "unsupported-file-scheme://bucket"],
+)
+def test_location_trie_invalid_location(location):
+    table = Table("catalog", "database", "table", "TABLE", "DELTA", location)
+    trie = LocationTrie()
+    trie.insert(table)
+    node = trie.find(table)
+    assert not node.is_valid()
+
+
+def test_location_trie_has_children():
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/d", "s3://bucket/a/b/d/g"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
+    trie = LocationTrie()
+    for table in tables:
+        trie.insert(table)
+
+    c_node = trie.find(tables[0])
+    assert not c_node.has_children()
+
+    d_node = trie.find(tables[1])
+    assert d_node.has_children()
+
+
+def test_location_trie_tables():
+    locations = ["s3://bucket/a/b/c", "s3://bucket/a/b/c"]
+    tables = [Table("catalog", "database", "table", "TABLE", "DELTA", location) for location in locations]
+    trie = LocationTrie()
+    for table in tables:
+        trie.insert(table)
+
+    c_node = trie.find(tables[0])
+    assert c_node.tables == tables
+
+
+def test_mounts_inventory_should_contain_mounts_without_encryption_type():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
@@ -27,16 +86,16 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     assert [
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
         Row(name="mp_3", source="path_3"),
-    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
-def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_type():
+def test_mounts_inventory_should_contain_deduped_mounts_without_encryption_type():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
@@ -47,15 +106,15 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     assert [
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
-    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
-def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
+def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_names():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("/Volume", "DbfsReserved", "info_1"),
@@ -70,21 +129,21 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volu
     backend = MockBackend()
     instance = Mounts(backend, client, "test")
 
-    instance.inventorize_mounts()
+    instance.snapshot()
 
     expected = [
         Row(name="/Volume", source="DbfsReserved"),
         Row(name="mp_1", source="path_1"),
         Row(name="mp_2", source="path_2"),
     ]
-    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
 def test_external_locations():
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
     sql_backend = MockBackend(
         rows={
-            'SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL': [
+            'SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL': [
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
                 row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
@@ -131,7 +190,7 @@ def test_external_locations():
                     ]
                 ),
             ],
-            r"SELECT \* FROM test.mounts": [
+            r"SELECT \* FROM `hive_metastore`.`test`.`mounts`": [
                 ("/mnt/ucx", "s3://us-east-1-ucx-container"),
             ],
         }
@@ -160,7 +219,7 @@ def test_save_external_location_mapping_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
                 ("gcs://test_location2/test2/table2", ""),
                 ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
@@ -211,7 +270,7 @@ def test_save_external_location_mapping_no_missing_location():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/test1/table1", ""),
             ],
         }
@@ -226,7 +285,7 @@ def test_match_table_external_locations():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
                 ("s3://test_location/a/b/c/table1", ""),
                 ("s3://test_location/a/b/table1", ""),
                 ("gcs://test_location2/a/b/table2", ""),
@@ -265,12 +324,12 @@ def test_mount_listing_multiple_folders():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
         Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
@@ -304,12 +363,12 @@ def test_mount_listing_sub_folders():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -345,12 +404,12 @@ def test_partitioned_parquet_layout():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -402,12 +461,12 @@ def test_partitioned_delta():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 2
     assert results[0].table_format == "DELTA"
     assert results[0].is_partitioned
@@ -435,12 +494,13 @@ def test_filtering_irrelevant_paths():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"]).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"])
+    results = crawler.snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
     ]
@@ -468,12 +528,13 @@ def test_filter_irrelevant_mounts():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"]).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"])
+    results = crawler.snapshot(force_refresh=True)
 
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
@@ -503,14 +564,14 @@ def test_historical_data_should_be_overwritten():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': TABLE_STORAGE[
+            '`hive_metastore`.`test`.`tables`': TABLE_STORAGE[
                 ("catalog", "database", "name", "object_type", "table_format", "location")
             ],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    TablesInMounts(backend, client, "test", mounts).snapshot()
+    TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert backend.rows_written_for("hive_metastore.test.tables", "overwrite") == [
         Row(
             catalog='hive_metastore',
@@ -560,14 +621,13 @@ def test_mount_include_paths():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(
-        backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"]
-    ).snapshot()
+    crawler = TablesInMounts(backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"])
+    results = crawler.snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
     ]
@@ -599,12 +659,12 @@ def test_mount_listing_csv_json():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`hive_metastore`.`test`.`tables`': [],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -645,16 +705,16 @@ def test_mount_listing_seen_tables():
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': TABLE_STORAGE[
+            '`hive_metastore`.`test`.`tables`': TABLE_STORAGE[
                 ("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
                 ("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
                 ("hive_metastore", "database", "name_3", "MANAGED", "DELTA", None),
             ],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+            '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 3
     assert results[0].location == "adls://bucket/table1"
     assert results[1].location == "dbfs:/mnt/test_mount/table2"

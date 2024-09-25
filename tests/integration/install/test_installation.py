@@ -160,7 +160,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
     spark_version = ws.clusters.select_spark_version(latest=True)
     assert policy_definition["spark_version"]["value"] == spark_version
-    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
+    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
     if ws.config.is_azure:
         assert (
             policy_definition["azure_attributes.availability"]["value"]
@@ -183,16 +183,18 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
+    assert installation_ctx.deployed_workflows.validate_step("remove-workspace-local-backup-groups")
+
     # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
-    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
-    @retried(on=[KeyError], timeout=timedelta(seconds=90))
+    # Note: If you are adjusting this, also look at: test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only
+    @retried(on=[KeyError], timeout=timedelta(minutes=3))
     def get_group(group_id: str) -> NoReturn:
-        _ = ws.groups.get(group_id)
+        ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
-    with pytest.raises(NotFound, match=f"Group with id {ws_group_a.id} not found."):
+    with pytest.raises(NotFound):
         get_group(ws_group_a.id)
 
 

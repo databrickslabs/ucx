@@ -29,10 +29,11 @@ from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.core import with_user_agent_extra
+from databricks.sdk.useragent import with_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
+    DeadlineExceeded,
     InternalError,
     InvalidParameterValue,
     NotFound,
@@ -40,6 +41,7 @@ from databricks.sdk.errors import (
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
+    OperationFailed,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
@@ -62,7 +64,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -73,7 +75,9 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
+from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -83,7 +87,6 @@ WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 logger = logging.getLogger(__name__)
-with_user_agent_extra("cmd", "install")
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
@@ -113,11 +116,14 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
             functools.partial(table, "policies", PolicyInfo),
-            functools.partial(table, "migration_status", MigrationStatus),
+            functools.partial(table, "migration_status", TableMigrationStatus),
             functools.partial(table, "workflow_problems", JobProblem),
+            functools.partial(table, "query_problems", QueryProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
             functools.partial(table, "recon_results", ReconResult),
+            functools.partial(table, "directfs_in_paths", DirectFsAccess),
+            functools.partial(table, "directfs_in_queries", DirectFsAccess),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -126,6 +132,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
+    deployer.deploy_view("directfs", "queries/views/directfs.sql")
 
 
 def extract_major_minor(version_string):
@@ -173,7 +180,6 @@ class WorkspaceInstaller(WorkspaceContext):
     def run(
         self,
         default_config: WorkspaceConfig | None = None,
-        verify_timeout=timedelta(minutes=2),
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
@@ -189,7 +195,6 @@ class WorkspaceInstaller(WorkspaceContext):
                 self.workspace_client,
                 self.wheels,
                 self.product_info,
-                verify_timeout,
                 self._tasks,
             )
             workspace_installation = WorkspaceInstallation(
@@ -229,13 +234,14 @@ class WorkspaceInstaller(WorkspaceContext):
         inventory_database = self.prompts.question(
             "Inventory Database stored in hive_metastore", default=default_database, valid_regex=r"^\w+$"
         )
+        ucx_catalog = self.prompts.question("Catalog to store UCX artifacts in", default="ucx", valid_regex=r"^\w+$")
         log_level = self.prompts.question("Log level", default="INFO").upper()
         num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         include_databases = self._select_databases()
         upload_dependencies = self.prompts.confirm(
-            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+            f"Does given workspace {self.workspace_client.get_workspace_id()} block Internet access?"
         )
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         recon_tolerance_percent = int(
@@ -243,6 +249,7 @@ class WorkspaceInstaller(WorkspaceContext):
         )
         return WorkspaceConfig(
             inventory_database=inventory_database,
+            ucx_catalog=ucx_catalog,
             workspace_group_regex=configure_groups.workspace_group_regex,
             workspace_group_replace=configure_groups.workspace_group_replace,
             account_group_regex=configure_groups.account_group_regex,
@@ -466,11 +473,8 @@ class WorkspaceInstallation(InstallationMixin):
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
-        timeout = timedelta(minutes=2)
         tasks = Workflows.all().tasks()
-        workflows_installer = WorkflowsDeployment(
-            config, installation, install_state, ws, wheels, product_info, timeout, tasks
-        )
+        workflows_installer = WorkflowsDeployment(config, installation, install_state, ws, wheels, product_info, tasks)
 
         return cls(
             config,
@@ -515,6 +519,8 @@ class WorkspaceInstallation(InstallationMixin):
         self._create_database()  # Need the database before creating the dashboards
         Threads.strict("installing dashboards", list(self._get_create_dashboard_tasks()))
 
+    # InternalError are retried for resilience on sporadic Databricks issues
+    @retried(on=[InternalError], timeout=timedelta(minutes=2))
     def _create_database(self):
         try:
             deploy_schema(self._sql_backend, self._config.inventory_database)
@@ -528,6 +534,16 @@ class WorkspaceInstallation(InstallationMixin):
                     "UCX Install: databricks labs install ucx"
                 )
                 raise BadRequest(msg) from err
+            if "Unable to load AWS credentials from any provider in the chain" in str(err):
+                msg = (
+                    "The UCX installation is configured to use external metastore. There is issue with the external metastore connectivity.\n"
+                    "Please check the UCX installation instruction https://github.com/databrickslabs/ucx?tab=readme-ov-file#prerequisites"
+                    "and re-run installation.\n"
+                    "Please Follow the Below Command to uninstall and Install UCX\n"
+                    "UCX Uninstall: databricks labs uninstall ucx.\n"
+                    "UCX Install: databricks labs install ucx"
+                )
+                raise OperationFailed(msg) from err
             raise err
 
     def _get_create_dashboard_tasks(self) -> Iterable[Callable[[], None]]:
@@ -591,10 +607,10 @@ class WorkspaceInstallation(InstallationMixin):
             return None  # Recreate the dashboard if it's reference is corrupted (manually)
         return dashboard_id  # Update the existing dashboard
 
-    # TODO: @JCZuurmond: wait for dashboard team to fix the error below,
-    # then update the retry decorator and document why this is needed
-    # databricks.sdk.errors.platform.InternalError: A database error occurred during import-dashboard-new
-    @retried(on=[InternalError], timeout=timedelta(minutes=4))
+    # InternalError and DeadlineExceeded are retried because of Lakeview internal issues
+    # These issues have been reported to and are resolved by the Lakeview team
+    # Keeping the retry for resilience
+    @retried(on=[InternalError, DeadlineExceeded], timeout=timedelta(minutes=4))
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
@@ -664,17 +680,7 @@ class WorkspaceInstallation(InstallationMixin):
             logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
-        logger.info("Deleting jobs")
-        if not self._install_state.jobs:
-            logger.error("No jobs present or jobs already deleted")
-            return
-        for step_name, job_id in self._install_state.jobs.items():
-            try:
-                logger.info(f"Deleting {step_name} job_id={job_id}.")
-                self._ws.jobs.delete(job_id)
-            except InvalidParameterValue:
-                logger.error(f"Already deleted: {step_name} job_id={job_id}.")
-                continue
+        self._workflows_installer.remove_jobs()
 
     def _remove_warehouse(self):
         try:
@@ -720,7 +726,6 @@ class AccountInstaller(AccountContext):
 
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
-        logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
         return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
     def install_on_account(self):
@@ -760,11 +765,17 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
-    def get_workspace_contexts(self, other_workspace_id: int) -> list[WorkspaceContext]:
+    def get_workspace_contexts(
+        self, ws: WorkspaceClient, run_as_collection: bool, **named_parameters
+    ) -> list[WorkspaceContext]:
+
+        if not run_as_collection:
+            return [WorkspaceContext(ws, named_parameters)]
+        other_workspace_id = ws.get_workspace_id()
         workspace_contexts = []
         account_client = self._get_safe_account_client()
         acct_ctx = AccountContext(account_client)
-        collection_workspace = account_client.workspaces.get(other_workspace_id)
+        collection_workspace = account_client.workspaces.get(workspace_id=other_workspace_id)
         if not acct_ctx.account_workspaces.can_administer(collection_workspace):
             logger.error(f"User is not workspace admin of collection workspace {other_workspace_id}")
             return []
@@ -778,7 +789,7 @@ class AccountInstaller(AccountContext):
                 logger.error(f"User is not workspace admin of workspace {workspace_id}")
                 return []
             workspace_client = account_client.get_workspace_client(workspace)
-            ctx = WorkspaceContext(workspace_client)
+            ctx = WorkspaceContext(workspace_client, named_parameters)
             workspace_contexts.append(ctx)
         return workspace_contexts
 
@@ -874,6 +885,7 @@ class AccountInstaller(AccountContext):
 
 
 if __name__ == "__main__":
+    with_extra("cmd", "install")
     logger = get_logger(__file__)
     if is_in_debug():
         logging.getLogger('databricks').setLevel(logging.DEBUG)

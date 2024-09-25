@@ -1,7 +1,7 @@
 from databricks.labs.ucx.assessment.workflows import Assessment
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
+from databricks.labs.ucx.hive_metastore.tables import What
 
 
 class TableMigration(Workflow):
@@ -13,39 +13,21 @@ class TableMigration(Workflow):
         """This workflow task migrates the external tables that are supported by SYNC command from the Hive Metastore
         to the Unity Catalog.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.EXTERNAL_SYNC,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_dbfs_root_delta_tables(self, ctx: RuntimeContext):
         """This workflow task migrates delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using deep clone.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.DBFS_ROOT_DELTA,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_dbfs_root_non_delta_tables(self, ctx: RuntimeContext):
         """This workflow task migrates non delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using CTAS.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.DBFS_ROOT_NON_DELTA,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
     @job_task(
         job_cluster="table_migration",
@@ -60,18 +42,12 @@ class TableMigration(Workflow):
         """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql
         statement. It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateHiveSerdeTablesInPlace(Workflow):
@@ -84,10 +60,6 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         the Hive Metastore to the Unity Catalog."""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
             mounts_crawler=ctx.mounts_crawler,
             hiveserde_in_place_migrate=True,
         )
@@ -100,18 +72,12 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
         It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateExternalTablesCTAS(Workflow):
@@ -123,10 +89,6 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates non-SYNC supported and non HiveSerde external tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_NO_SYNC,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -135,10 +97,6 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates HiveSerde tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -150,18 +108,12 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql
         statement. It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(
-            what=What.VIEW,
-            acl_strategy=[
-                AclMigrationWhat.LEGACY_TACL,
-                AclMigrationWhat.PRINCIPAL,
-            ],
-        )
+        ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class ScanTablesInMounts(Workflow):
@@ -171,14 +123,14 @@ class ScanTablesInMounts(Workflow):
     @job_task
     def scan_tables_in_mounts_experimental(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] This workflow scans for Delta tables inside all mount points
-        captured during the assessment. It will store the results under the `tables` table
-        located under the assessment."""
-        ctx.tables_in_mounts.snapshot()
+        captured during the assessment. It will store the results in the `tables` table,
+        replacing any existing content that might be present."""
+        ctx.tables_in_mounts.snapshot(force_refresh=True)
 
     @job_task(job_cluster="table_migration", depends_on=[scan_tables_in_mounts_experimental])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()
 
 
 class MigrateTablesInMounts(Workflow):
@@ -191,6 +143,6 @@ class MigrateTablesInMounts(Workflow):
         ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_tables_in_mounts_experimental])
-    def refresh_migration_status(self, ctx: RuntimeContext):
+    def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index_full_refresh()
+        ctx.tables_migrator.get_remaining_tables()

@@ -37,7 +37,7 @@ def test_show_all_metastores(acc_client, caplog):
     assert "metastore_use - 124" in caplog.messages
 
 
-def test_assign_metastore(acc_client):
+def test_assign_metastore(acc_client) -> None:
     acc_client.metastores.list.return_value = [
         MetastoreInfo(name="metastore_usw_1", metastore_id="123", region="us-west-2"),
         MetastoreInfo(name="metastore_usw_2", metastore_id="124", region="us-west-2"),
@@ -55,14 +55,19 @@ def test_assign_metastore(acc_client):
         etag="123", namespace=StringMessage("hive_metastore")
     )
     account_metastores = AccountMetastores(acc_client)
-    prompts = MockPrompts({"Multiple metastores found, please select one*": "0", "Please select a workspace:*": "0"})
+    prompts = MockPrompts({"Multiple metastores found, please select one*": "0"})
 
-    # need to select a workspace - since it is alphabetically sorted, needs to pick workspace bar
-    account_metastores.assign_metastore(prompts, "", "", "")
+    account_metastores.assign_metastore(prompts, 123457)
     acc_client.metastore_assignments.create.assert_called_with(123457, "123")
+    ws.settings.default_namespaces.update.assert_not_called()
+
+    # Empty default catalog should not call default name spaces
+    account_metastores.assign_metastore(prompts, 123457, default_catalog="")
+    acc_client.metastore_assignments.create.assert_called_with(123457, "123")
+    ws.settings.default_namespaces.update.assert_not_called()
 
     # multiple metastores & default catalog name, need to choose one
-    account_metastores.assign_metastore(prompts, "123456", "", "main")
+    account_metastores.assign_metastore(prompts, 123456, default_catalog="main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
@@ -72,7 +77,7 @@ def test_assign_metastore(acc_client):
 
     # default catalog not found, still get etag
     ws.settings.default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
-    account_metastores.assign_metastore(prompts, "123456", "", "main")
+    account_metastores.assign_metastore(prompts, 123456, default_catalog="main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
@@ -82,10 +87,10 @@ def test_assign_metastore(acc_client):
 
     # only one metastore, should assign directly
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-east-2")
-    account_metastores.assign_metastore(MockPrompts({}), "123456")
+    account_metastores.assign_metastore(MockPrompts({}), 123456)
     acc_client.metastore_assignments.create.assert_called_with(123456, "126")
 
     # no metastore found, error
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-central-2")
     with pytest.raises(ValueError):
-        account_metastores.assign_metastore(MockPrompts({}), "123456")
+        account_metastores.assign_metastore(MockPrompts({}), 123456)
