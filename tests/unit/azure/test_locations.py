@@ -44,7 +44,7 @@ def test_run_service_principal():
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM `hive_metastore`.`location_test`.`external_locations`": EXTERNAL_LOCATIONS[
+            r"SELECT  \* FROM `hive_metastore`.`location_test`.`external_locations`": EXTERNAL_LOCATIONS[
                 ("abfss://container1@test.dfs.core.windows.net/one/", 1),
                 ("abfss://container2@test.dfs.core.windows.net/", 2),
             ]
