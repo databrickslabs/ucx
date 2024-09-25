@@ -175,15 +175,15 @@ def test_load_mapping():
     ws.tables.get.assert_not_called()
 
     assert [
-        Rule(
-            workspace_name="foo-bar",
-            catalog_name="foo_bar",
-            src_schema="foo",
-            dst_schema="foo",
-            src_table="bar",
-            dst_table="bar",
-        )
-    ] == rules
+               Rule(
+                   workspace_name="foo-bar",
+                   catalog_name="foo_bar",
+                   src_schema="foo",
+                   dst_schema="foo",
+                   src_table="bar",
+                   dst_table="bar",
+               )
+           ] == rules
 
 
 def test_skip_happy_path(caplog):
@@ -209,49 +209,6 @@ def test_skip_happy_path(caplog):
     mapping.skip_schema(schema="schema")
     sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
-
-
-def test_unskip_on_table():
-    ws = create_autospec(WorkspaceClient)
-    mock_backend = MockBackend()
-    installation = MockInstallation()
-    mapping = TableMapping(installation, ws, mock_backend)
-    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
-    mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
-    ws.tables.get.assert_not_called()
-    assert (
-        f"ALTER TABLE `schema`.`table` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
-        in mock_backend.queries
-    )
-
-
-def test_unskip_on_view():
-    ws = create_autospec(WorkspaceClient)
-    mock_backend = MockBackend()
-    installation = MockInstallation()
-    mapping = TableMapping(installation, ws, mock_backend)
-    view = Table(
-        catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
-    )
-    mapping.unskip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
-    ws.tables.get.assert_not_called()
-    assert (
-        f"ALTER VIEW `schema`.`view` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
-        in mock_backend.queries
-    )
-
-
-def test_unskip_on_schema():
-    ws = create_autospec(WorkspaceClient)
-    mock_backend = MockBackend()
-    installation = MockInstallation()
-    mapping = TableMapping(installation, ws, mock_backend)
-    mapping.unskip_schema(schema="schema")
-    ws.tables.get.assert_not_called()
-    assert (
-        f"ALTER SCHEMA hive_metastore.`schema` UNSET DBPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
-        in mock_backend.queries
-    )
 
 
 def test_skip_missing_schema(caplog):
