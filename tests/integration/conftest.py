@@ -748,6 +748,7 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
         )
