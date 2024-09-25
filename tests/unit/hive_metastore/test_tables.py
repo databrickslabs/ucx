@@ -1,3 +1,4 @@
+import logging
 import sys
 
 import pytest
@@ -580,3 +581,25 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_moc
     assert results[0].storage_properties == (
         "[delta.appendOnly=true, " "delta.autoOptimize=false, " "personalAccessToken=*******, " "password=*******]"
     )
+
+
+def test_fast_table_scan_crawler_crawl_test_warnings(caplog, mocker):
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    # pylint: disable=protected-access
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.side_effect = Exception("Test warning")
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.side_effect = Exception("Test warning")
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.side_effect = Exception("Test warning")
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+
+    assert "Test warning" in caplog.text

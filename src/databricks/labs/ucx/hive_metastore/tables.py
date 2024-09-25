@@ -510,15 +510,19 @@ class FasterTableScanCrawler(CrawlerBase):
         return scala_option.get() if scala_option.isDefined() else None
 
     def _all_databases(self) -> list[str]:
-        if not self._include_database:
-            return list(self._iterator(self._external_catalog.listDatabases()))
-        return self._include_database
+        try:
+            if not self._include_database:
+                return list(self._iterator(self._external_catalog.listDatabases()))
+            return self._include_database
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logger.error(f"failed-table-crawl: listing databases -> catalog : {err}", exc_info=True)
+            return []
 
     def _list_tables(self, database: str) -> list[str]:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:  # pylint: disable=broad-exception-caught
-            logger.warning(f"failed-table-crawl: listing database -> {database} : {err}", exc_info=True)
+            logger.warning(f"failed-table-crawl: listing tables from database -> {database} : {err}", exc_info=True)
             return []
 
     def _try_fetch(self) -> Iterable[Table]:
