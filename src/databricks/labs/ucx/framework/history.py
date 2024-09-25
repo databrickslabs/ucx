@@ -3,7 +3,7 @@ import dataclasses
 import datetime as dt
 import json
 import logging
-import uuid
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import cached_property
@@ -21,10 +21,10 @@ class HistoricalRecord:
     workspace_id: int
     """The identifier of the workspace where this record was generated."""
 
-    run_id: str
-    """An identifier of the workflow run that generated this record."""
+    run_id: int
+    """The identifier of the workflow run that generated this record."""
 
-    snapshot_id: str
+    snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
 
     run_start_time: dt.datetime
@@ -63,7 +63,7 @@ class HistoryLog:
         self,
         ws: WorkspaceClient,
         backend: SqlBackend,
-        run_id: str,
+        run_id: int,
         catalog: str,
         schema: str,
         table: str,
@@ -91,7 +91,7 @@ class HistoryLog:
         def __init__(
             self,
             ws: WorkspaceClient,
-            run_id: str,
+            run_id: int,
             klass: type[Record],
             key_from: Callable[[Record], str],
             persist: Callable[[str, list[HistoricalRecord]], None],
@@ -116,7 +116,8 @@ class HistoryLog:
             return owner
 
         def append_snapshot(self, records: Sequence[Record], *, run_start_time: dt.datetime) -> None:
-            snapshot_id = uuid.uuid4()
+            # Equivalent entropy to a type-4 UUID.
+            snapshot_id = int.from_bytes(os.urandom(16), byteorder="big")
             historical_records = [
                 self._inventory_record_to_historical(record, snapshot_id=snapshot_id, run_start_time=run_start_time)
                 for record in records
@@ -124,7 +125,11 @@ class HistoryLog:
             self._persist(self._object_type, historical_records)
 
         def _inventory_record_to_historical(
-            self, record: Record, *, snapshot_id: uuid.UUID, run_start_time: dt.datetime
+            self,
+            record: Record,
+            *,
+            snapshot_id: int,
+            run_start_time: dt.datetime,
         ) -> HistoricalRecord:
             object_id = self._key_from(record)
             object_as_dict = dataclasses.asdict(record)
@@ -134,7 +139,7 @@ class HistoryLog:
             return HistoricalRecord(
                 workspace_id=self._workspace_id,
                 run_id=self._run_id,
-                snapshot_id=str(snapshot_id),
+                snapshot_id=snapshot_id,
                 run_start_time=run_start_time,
                 object_type=self._object_type,
                 object_type_version=self._object_type_version,
