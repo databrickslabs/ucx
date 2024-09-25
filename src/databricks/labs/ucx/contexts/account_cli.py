@@ -3,7 +3,6 @@ from os import environ
 
 from databricks.sdk import AccountClient
 
-
 from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
