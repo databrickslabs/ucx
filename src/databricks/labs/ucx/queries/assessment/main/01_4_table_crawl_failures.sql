@@ -31,8 +31,7 @@ WITH latest_job_runs AS (
     USING (job_id, job_run_id)
   WHERE
     workflow_name IN ('assessment')
-),
-WITH table_crawl_failures AS (
+), table_crawl_failures AS (
 SELECT
     timestamp,
     REGEXP_EXTRACT(message, '^failed-table-crawl: (.+?) -> (.+?): (.+)$', 1) AS error_reason,
@@ -42,14 +41,12 @@ SELECT
     job_id,
     workflow_name,
     task_name
-FROM latest_job_runs
+FROM logs_latest_job_runs
   WHERE
     STARTSWITH(message, 'failed-table-crawl: ')
 )
 SELECT
   timestamp,
-  workspace_group,
-  account_group,
   error_message,
   job_run_id,
   job_id,
