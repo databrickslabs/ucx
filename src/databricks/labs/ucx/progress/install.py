@@ -2,12 +2,6 @@ import datetime as dt
 import logging
 from dataclasses import dataclass
 
-from databricks.labs.lsql.backends import Dataclass, SqlBackend
-from databricks.sdk.errors import InternalError
-from databricks.sdk.retries import retried
-
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
-
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
@@ -15,18 +9,37 @@ from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Record:
-    workspace_id: int  # The workspace id
-    run_id: int  # The workflow run id that crawled the objects
-    run_start_time: dt.datetime  # The workflow run timestamp that crawled the objects
-    object_type: str  # The object type, e.g. TABLE, VIEW. Forms a composite key together with object_id
-    object_id: str  # The object id, e.g. hive_metastore.database.table. Forms a composite key together with object_id
-    object_data: str  # The object data; the attributes of the corresponding ucx data class, e.g. table name, table ...
-    failures: list[str]  # The failures indicating the object is not UC compatible
-    owner: str  # The object owner
-    ucx_version: str  # The ucx semantic version
-    snapshot_id: int  # An identifier for the snapshot
+@dataclass(frozen=True, kw_only=True)
+class HistoricalRecord:
+    workspace_id: int
+    """The identifier of the workspace where this record was generated."""
+
+    run_id: int
+    """An identifier of the workflow run that generated this record."""
+
+    snapshot_id: int
+    """An identifier that is unique to the records produced for a given snapshot."""
+
+    run_start_time: dt.datetime
+    """When this record was generated."""
+
+    object_type: str
+    """The inventory table for which this record was generated."""
+
+    object_type_version: int
+    """Versioning of inventory table, for forward compatibility."""
+
+    object_id: list[str]
+    """The type-specific identifier for this inventory record."""
+
+    object_data: str
+    """Type-specific JSON-encoded data of the inventory record."""
+
+    object_owner: str
+    """The identity that has ownership of the object."""
+
+    failures: list[str]
+    """The list of problems associated with the object that this inventory record covers."""
 
 
 class ProgressTrackingInstallation:
@@ -41,5 +54,5 @@ class ProgressTrackingInstallation:
     def run(self) -> None:
         self._schema_deployer.deploy_schema()
         self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
-        self._schema_deployer.deploy_table("history_records", Record)
+        self._schema_deployer.deploy_table("historical_records", HistoricalRecord)
         logger.info("Installation completed successfully!")
