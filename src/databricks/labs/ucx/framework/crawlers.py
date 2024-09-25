@@ -48,7 +48,7 @@ class CrawlerBase(ABC, Generic[Result]):
         self._schema = self._valid(schema)
         self._table = self._valid(table)
         self._backend = backend
-        self._history_log = history_log
+        self._history_appender = history_log.appender(klass) if history_log is not None else None
         self._fetch = backend.fetch
         self._exec = backend.execute
         self._klass = klass
@@ -178,6 +178,5 @@ class CrawlerBase(ABC, Generic[Result]):
     ) -> None:
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
         self._backend.save_table(self.full_name, items, self._klass, mode=mode)
-        if self._history_log:
-            appender = self._history_log.appender(self._klass)
-            appender.append_snapshot(items, run_start_time=crawl_start_time)
+        if self._history_appender:
+            self._history_appender.append_snapshot(items, run_start_time=crawl_start_time)
