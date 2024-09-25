@@ -5,7 +5,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
+@retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     ws,
     installation_ctx,
@@ -25,7 +25,7 @@ def test_running_real_assessment_job(
 
     populate_for_linting(installation_ctx.installation)
 
-    installation_ctx.deployed_workflows.run_workflow("assessment")
+    installation_ctx.deployed_workflows.run_workflow("assessment", max_wait=timedelta(minutes=25))
     assert installation_ctx.deployed_workflows.validate_step("assessment")
 
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
