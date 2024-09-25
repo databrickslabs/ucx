@@ -29,9 +29,6 @@ class HistoricalRecord:
     object_type: str
     """The inventory table for which this record was generated."""
 
-    object_type_version: int
-    """Versioning of inventory table, for forward compatibility."""
-
     object_id: list[str]
     """The type-specific identifier for this inventory record."""
 
@@ -43,6 +40,9 @@ class HistoricalRecord:
 
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
+
+    object_type_version: int = 0
+    """Versioning of inventory table, for forward compatibility."""
 
 
 class ProgressTrackingInstallation:
