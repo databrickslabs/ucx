@@ -894,6 +894,15 @@ def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
     ws.catalogs.create.assert_called_once()
 
 
+def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
+
+    assert "CREATE SCHEMA" in mock_backend.queries[0]
+    assert "CREATE TABLE" in mock_backend.queries[1]
+
+
 @pytest.mark.parametrize("run_as_collection", [False, True])
 def test_migrate_tables_calls_migrate_table_job_run_now(
     run_as_collection,
