@@ -20,11 +20,14 @@ class HistoricalRecord:
     run_as: str
     """The identity of the account that ran the workflow that generated this record."""
 
+    run_start_time: dt.datetime
+    """When this record was generated."""
+
     snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
 
-    run_start_time: dt.datetime
-    """When this record was generated."""
+    failures: list[str]
+    """The list of problems associated with the object that this inventory record covers."""
 
     object_type: str
     """The inventory table for which this record was generated."""
@@ -37,9 +40,6 @@ class HistoricalRecord:
 
     object_owner: str
     """The identity that has ownership of the object."""
-
-    failures: list[str]
-    """The list of problems associated with the object that this inventory record covers."""
 
     object_type_version: int = 0
     """Versioning of inventory table, for forward compatibility."""
