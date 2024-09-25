@@ -1187,7 +1187,7 @@ def pytest_ignore_collect(path):
 @pytest.fixture
 def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffix, log_workspace_link):
 
-    def create(installation, **kwargs):
+    def create(installation, **_kwargs):
         # create args
         data = {"name": f"dummy-{make_random(4)}"}
         # create file to run
@@ -1200,7 +1200,7 @@ def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffi
             new_cluster=ClusterSpec(
                 num_workers=1,
                 node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                spark_version=ws.clusters.select_spark_version(latest=True)
+                spark_version=ws.clusters.select_spark_version(latest=True),
             ),
             spark_python_task=SparkPythonTask(python_file=str(file_path)),
             timeout_seconds=0,
