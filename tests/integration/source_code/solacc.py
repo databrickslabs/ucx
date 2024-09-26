@@ -77,7 +77,7 @@ def _collect_uninferrable_count(advices: list[LocatedAdvice]):
 
 
 def _collect_unparseable(advices: list[LocatedAdvice]):
-    return set(located_advice for located_advice in advices if located_advice.advice.code == 'parse-error')
+    return list(located_advice for located_advice in advices if located_advice.advice.code == 'parse-error')
 
 
 def _print_advices(advices: list[LocatedAdvice]):
@@ -197,7 +197,11 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
             logger.error(f"Error during parsing of {unparseable.path}: {unparseable.advice.message}".replace("\n", " "))
             # populate solacc-unparsed.txt
             with solacc.unparsed_files_path.open(mode="a", encoding="utf-8") as f:
-                f.write(unparseable.path.relative_to(dist).as_posix())
+                try:
+                    path = unparseable.path.relative_to(dist)
+                except ValueError:
+                    path = unparseable.path
+                f.write(path.as_posix())
                 f.write("\n")
     # collect missing imports
     for missing_import in _collect_missing_imports(advices):
