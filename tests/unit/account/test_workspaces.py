@@ -1,3 +1,4 @@
+import logging
 import io
 import json
 from unittest.mock import create_autospec
@@ -6,7 +7,7 @@ import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceConflict
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
@@ -494,3 +495,57 @@ def test_get_accessible_workspaces():
     acc.config.auth_type = "databricks-cli"
     account_workspaces = AccountWorkspaces(acc)
     assert len(account_workspaces.get_accessible_workspaces()) == 1
+
+
+def test_account_workspaces_can_administer_when_user_in_admins_group() -> None:
+    acc = create_autospec(AccountClient)
+    ws = create_autospec(WorkspaceClient)
+    acc.get_workspace_client.return_value = ws
+    ws.current_user.me.return_value = User(user_name="test", groups=[ComplexValue(display="admins")])
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    assert account_workspaces.can_administer(workspace)
+
+
+@pytest.mark.parametrize("groups", [[ComplexValue(display="not-admins")], None])
+def test_account_workspaces_cannot_administer_when_user_not_in_admins_group(caplog, groups) -> None:
+    acc = create_autospec(AccountClient)
+    ws = create_autospec(WorkspaceClient)
+    acc.get_workspace_client.return_value = ws
+    ws.current_user.me.return_value = User(user_name="test", groups=groups)
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User 'test' is not a workspace admin: test" in caplog.messages
+
+
+def test_account_workspaces_can_administer_handles_not_found_error_for_get_workspace_client(caplog) -> None:
+    acc = create_autospec(AccountClient)
+    acc.get_workspace_client.side_effect = NotFound
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User cannot access workspace: test" in caplog.messages
+
+
+def test_account_workspaces_can_administer_handles_permission_denied_error_for_current_user(caplog) -> None:
+    acc = create_autospec(AccountClient)
+    ws = create_autospec(WorkspaceClient)
+    acc.get_workspace_client.return_value = ws
+    ws.current_user.me.side_effect = PermissionDenied(
+        "This API is disabled for users without the databricks-sql-access or workspace-access entitlements"
+    )
+    account_workspaces = AccountWorkspaces(acc)
+    workspace = Workspace(deployment_name="test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.workspaces"):
+        can_administer = account_workspaces.can_administer(workspace)
+    assert not can_administer
+    assert "User cannot access workspace: test" in caplog.messages

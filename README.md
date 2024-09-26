@@ -95,6 +95,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
+  * [`create-ucx-catalog` command](#create-ucx-catalog-command)
 * [Table migration commands](#table-migration-commands)
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
@@ -107,6 +108,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-locations` command](#migrate-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
   * [`skip` command](#skip-command)
+  * [`unskip` command](#unskip-command)
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
   * [`migrate-tables` command](#migrate-tables-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
@@ -127,6 +129,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
   * [`upload` command](#upload-command)
   * [`download` command](#download-command)
+  * [`join-collection` command](#join-collection command)
+  * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
     * [Insufficient Privileges](#insufficient-privileges)
@@ -396,6 +400,9 @@ which can be used for further analysis and decision-making through the [assessme
 9. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
 10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
 11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
+12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration problems. It also collects direct filesystem access patterns that require attention.
+13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration problems. It also collects direct filesystem access patterns that require attention.
+
 
 ![report](docs/assessment-report.png)
 
@@ -711,11 +718,16 @@ in the Migration dashboard.
 
 > Please note that this is an experimental workflow.
 
-The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
-workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+The `experimental-workflow-linter` workflow lints accessible code from 2 sources:
+ - all workflows/jobs present in the workspace
+ - all dashboards/queries present in the workspace
+The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+The linting also locates direct filesystem access that need to be migrated.
 
-Once the workflow completes, the output will be stored in `$inventory_database.workflow_problems` table, and displayed
-in the Migration dashboard.
+Once the workflow completes:
+ - problems are stored in the `$inventory_database.workflow_problems`/`$inventory_database.query_problems` table
+ - direct filesystem access are stored in the `$inventory_database.directfs_in_paths`/`$inventory_database.directfs_in_queries` table
+ - all the above are displayed in the Migration dashboard.
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
 
@@ -1187,9 +1199,23 @@ a region, and you want to see which ones are available for assignment.
 databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-id <metastore-id>]
 ```
 
-This command assigns a metastore to a workspace with `workspace-id`. If there is only a single metastore in the workspace
-region, it will be automatically assigned to the workspace. If there are multiple metastores available, you need to specify
-the metastore id of the metastore you want to assign to the workspace.
+This command assigns a metastore to a workspace with `--workspace-id`. If there is only a single metastore in the
+workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
+available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-ucx-catalog` command
+
+```commandline
+databricks labs ucx create-ucx-catalog
+16:12:59  INFO [d.l.u.hive_metastore.catalog_schema] Validating UC catalog: ucx
+Please provide storage location url for catalog: ucx (default: metastore): ...
+16:13:01  INFO [d.l.u.hive_metastore.catalog_schema] Creating UC catalog: ucx
+```
+
+Create and setup UCX artifact catalog. Amongst other things, the artifacts are used for tracking the migration progress
+across workspaces.
 
 # Table migration commands
 
@@ -1438,6 +1464,15 @@ is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration of a particular schema or table.
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `unskip` command
+
+```commandline
+databricks labs ucx unskip --schema X [--table Y]
+```
+This command removes the mark set by the [`skip` command](#skip-command) on the given schema or table.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1806,6 +1841,40 @@ $ databricks labs ucx download --file <file_path> --run-as-collection True
 
 Download a csv file from a single workspace (`--run-as-collection False`) or a collection of workspaces
 (`--run-as-collection True`). This command is especially useful when downloading the same file from multiple workspaces.
+
+## `join-collection` command
+
+```text
+$ databricks labs ucx join-collection --workspace-ids <comma seperate list of workspace ids> --profile <account-profile>
+```
+
+`join-collection` command joins 2 or more workspaces into a collection. This helps in running supported cli commands as a collection
+`join-collection` command updates config.yml file on each workspace ucx installation with installed_workspace_ids attribute.
+In order to run `join-collectioon` command a user should:
+ - be an Account admin on the Databricks account
+ - be a Workspace admin on all the workspaces to be joined as a collection) or a collection of workspaces
+ - have installed UCX on the workspace
+The `join-collection` command will fail and throw an error msg if the above conditions are not met.
+
+## collection eligible command
+
+Once `join-collection` command is run, it allows user to run multiple cli commands as a collection. The following cli commands
+are eligible to be run as a collection. User can run the below commands as collection by passing an additional flag `--run-as-collection=True`
+- `ensure-assessment-run`
+- `create-table-mapping`
+- `principal-prefix-access`
+- `migrate-credentials`
+- `create-uber-principal`
+- `create-missing-principals`
+- `validate-external-location`
+- `migrate-locations`
+- `create-catalog-schemas`
+- `migrate-tables`
+- `migrate-acls`
+- `migrate-dbsql-dashboards`
+- `validate-group-membership`
+Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
+
 
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.

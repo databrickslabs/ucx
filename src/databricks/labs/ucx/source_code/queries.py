@@ -49,13 +49,13 @@ class QueryLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now(timezone.utc)
+        dashboard_ids = self._dashboard_ids_in_scope()
+        logger.info(f"Running {len(dashboard_ids)} linting tasks...")
         linted_queries: set[str] = set()
-        all_dashboards = list(self._ws.dashboards.list())
-        logger.info(f"Running {len(all_dashboards)} linting tasks...")
         all_problems: list[QueryProblem] = []
         all_dfsas: list[DirectFsAccess] = []
         # first lint and collect queries from dashboards
-        for dashboard_id in self._dashboard_ids_in_scope():
+        for dashboard_id in dashboard_ids:
             dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
             problems, dfsas = self._lint_and_collect_from_dashboard(dashboard, linted_queries)
             all_problems.extend(problems)
@@ -66,7 +66,7 @@ class QueryLinter:
             linted_queries.add(query.id)
             problems = self.lint_query(query)
             all_problems.extend(problems)
-            dfsas = self.collect_dfsas_from_query(query)
+            dfsas = self.collect_dfsas_from_query("no-dashboard-id", query)
             all_dfsas.extend(dfsas)
         # dump problems
         logger.info(f"Saving {len(all_problems)} linting problems...")
@@ -123,7 +123,7 @@ class QueryLinter:
                         dashboard_name=dashboard_name,
                     )
                 )
-            dfsas = self.collect_dfsas_from_query(query)
+            dfsas = self.collect_dfsas_from_query(dashboard_id, query)
             for dfsa in dfsas:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
@@ -155,11 +155,11 @@ class QueryLinter:
             )
 
     @classmethod
-    def collect_dfsas_from_query(cls, query: LegacyQuery) -> Iterable[DirectFsAccess]:
+    def collect_dfsas_from_query(cls, dashboard_id: str, query: LegacyQuery) -> Iterable[DirectFsAccess]:
         if query.query is None:
             return
         linter = DirectFsAccessSqlLinter()
-        source_id = query.id or "no id"
+        source_id = f"{dashboard_id}/{query.id}"
         source_name = query.name or "<anonymous>"
         source_timestamp = cls._read_timestamp(query.updated_at)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]

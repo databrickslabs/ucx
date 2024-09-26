@@ -199,24 +199,15 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
     ]
 
 
-def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(simple_dependency_resolver):
+def test_dependency_resolver_raises_problem_for_uninferrable_sys_path(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
-        Path("sys-path-with-fstring.py"), CurrentSessionState()
+        Path("sys-path-with-uninferrable.py"), CurrentSessionState()
     )
     assert list(maybe.problems) == [
         DependencyProblem(
             code='sys-path-cannot-compute-value',
-            message="Can't update sys.path from f'{name_2}' because the expression cannot be computed",
-            source_path=Path('sys-path-with-fstring.py'),
-            start_line=4,
-            start_col=16,
-            end_line=4,
-            end_col=27,
-        ),
-        DependencyProblem(
-            code='sys-path-cannot-compute-value',
             message="Can't update sys.path from name because the expression cannot be computed",
-            source_path=Path('sys-path-with-fstring.py'),
+            source_path=Path('sys-path-with-uninferrable.py'),
             start_line=7,
             start_col=20,
             end_line=7,

@@ -1,3 +1,4 @@
+import logging
 import sys
 
 from databricks.labs.lsql.backends import MockBackend
@@ -41,11 +42,11 @@ def test_table_size_crawler(mocker):
     assert TableSize("hive_metastore", "db1", "table2", 200) in results
 
 
-def test_table_size_unknown_error(mocker):
+def test_table_size_unknown_error(mocker, caplog):
     errors = {}
     rows = {
         "table_size": [],
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
         ],
         "SHOW DATABASES": [("db1",)],
@@ -56,16 +57,17 @@ def test_table_size_unknown_error(mocker):
     tsc = TableSizeCrawler(backend, "inventory_database")
     tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = Exception(...)
 
-    results = tsc.snapshot()
+    with caplog.at_level(logging.WARNING):
+        results = tsc.snapshot()
 
     assert len(results) == 0
 
 
-def test_table_size_table_or_view_not_found(mocker):
+def test_table_size_table_or_view_not_found(mocker, caplog):
     errors = {}
     rows = {
         "table_size": [],
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
         ],
         "SHOW DATABASES": [("db1",)],
@@ -80,16 +82,18 @@ def test_table_size_table_or_view_not_found(mocker):
         "[TABLE_OR_VIEW_NOT_FOUND]"
     )
 
-    results = tsc.snapshot()
+    with caplog.at_level(logging.WARNING):
+        results = tsc.snapshot()
 
     assert len(results) == 0
+    assert "Failed to evaluate hive_metastore.db1.table1 table size. Table not found" in caplog.text
 
 
-def test_table_size_delta_table_not_found(mocker):
+def test_table_size_delta_table_not_found(mocker, caplog):
     errors = {}
     rows = {
         "table_size": [],
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
         ],
         "SHOW DATABASES": [("db1",)],
@@ -104,16 +108,18 @@ def test_table_size_delta_table_not_found(mocker):
         "[DELTA_TABLE_NOT_FOUND]"
     )
 
-    results = tsc.snapshot()
+    with caplog.at_level(logging.WARNING):
+        results = tsc.snapshot()
 
     assert len(results) == 0
+    assert "Failed to evaluate hive_metastore.db1.table1 table size. Table not found" in caplog.text
 
 
-def test_table_size_when_table_corrupted(mocker):
+def test_table_size_when_table_corrupted(mocker, caplog):
     errors = {}
     rows = {
         "table_size": [],
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
         ],
         "SHOW DATABASES": [("db1",)],
@@ -127,16 +133,18 @@ def test_table_size_when_table_corrupted(mocker):
         "[DELTA_MISSING_TRANSACTION_LOG]"
     )
 
-    results = tsc.snapshot()
+    with caplog.at_level(logging.WARNING):
+        results = tsc.snapshot()
 
     assert len(results) == 0
+    assert "Delta table hive_metastore.db1.table1 is corrupt: missing transaction log" in caplog.text
 
 
-def test_table_size_when_delta_invalid_format_error(mocker):
+def test_table_size_when_delta_invalid_format_error(mocker, caplog):
     errors = {}
     rows = {
         "table_size": [],
-        "hive_metastore.inventory_database.tables": [
+        "`hive_metastore`.`inventory_database`.`tables`": [
             ("hive_metastore", "db1", "table1", "MANAGED", "DELTA", "dbfs:/location/table", None),
         ],
         "SHOW DATABASES": [("db1",)],
@@ -150,6 +158,11 @@ def test_table_size_when_delta_invalid_format_error(mocker):
         "[DELTA_INVALID_FORMAT]"
     )
 
-    results = tsc.snapshot()
+    with caplog.at_level(logging.WARNING):
+        results = tsc.snapshot()
 
     assert len(results) == 0
+    assert (
+        "Unable to read Delta table hive_metastore.db1.table1, please check table structure and try again."
+        in caplog.text
+    )

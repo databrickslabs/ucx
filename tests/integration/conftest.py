@@ -1,3 +1,4 @@
+import io
 import json
 from collections.abc import Callable, Generator
 import functools
@@ -9,11 +10,15 @@ from datetime import timedelta
 from functools import cached_property
 import shutil
 import subprocess
+from pathlib import Path
+
 import pytest  # pylint: disable=wrong-import-order
+import yaml
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
@@ -23,8 +28,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.iam import Group
+from databricks.sdk.service.jobs import Task, SparkPythonTask
 from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
@@ -369,10 +376,19 @@ class StaticMountCrawler(Mounts):
 
 
 class CommonUtils:
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+    def __init__(
+        self,
+        make_catalog_fixture,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+        make_random_fixture,
+    ):
+        self._make_catalog = make_catalog_fixture
         self._make_schema = make_schema_fixture
         self._env_or_skip = env_or_skip_fixture
         self._ws = ws_fixture
+        self._make_random = make_random_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -428,6 +444,10 @@ class CommonUtils:
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
+    def ucx_catalog(self) -> str:
+        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+
+    @cached_property
     def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
@@ -435,14 +455,22 @@ class CommonUtils:
 class MockRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ) -> None:
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -528,6 +556,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
@@ -663,19 +692,46 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> MockRuntimeContext:
-    ctx = MockRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
+def runtime_ctx(
+    ws,
+    sql_backend,
+    make_catalog,
+    make_schema,
+    make_table,
+    make_udf,
+    make_group,
+    env_or_skip,
+    make_random,
+) -> MockRuntimeContext:
+    ctx = MockRuntimeContext(
+        make_catalog,
+        make_schema,
+        make_table,
+        make_udf,
+        make_group,
+        env_or_skip,
+        ws,
+        make_random,
+    )
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
 class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
+        make_catalog_fixture,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
+        make_random_fixture,
     ):
-        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(
+            make_catalog_fixture,
+            make_schema_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
+            make_random_fixture,
+        )
         WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
@@ -715,8 +771,8 @@ class MockLocalAzureCli(MockWorkspaceContext):
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
+def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_backend):
+    ctx = MockLocalAzureCli(make_catalog, make_schema, env_or_skip, ws, make_random)
     return ctx.replace(sql_backend=sql_backend)
 
 
@@ -773,8 +829,9 @@ class MockInstallationContext(MockRuntimeContext):
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        make_table_fixture,
+        make_catalog_fixture,
         make_schema_fixture,
+        make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
         env_or_skip_fixture,
@@ -785,14 +842,15 @@ class MockInstallationContext(MockRuntimeContext):
         watchdog_purge_suffix,
     ):
         super().__init__(
-            make_table_fixture,
+            make_catalog_fixture,
             make_schema_fixture,
+            make_table_fixture,
             make_udf_fixture,
             make_group_fixture,
             env_or_skip_fixture,
             ws_fixture,
+            make_random_fixture,
         )
-        self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
         self._watchdog_purge_suffix = watchdog_purge_suffix
@@ -948,8 +1006,9 @@ class MockInstallationContext(MockRuntimeContext):
 def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
-    make_table,
+    make_catalog,
     make_schema,
+    make_table,
     make_udf,
     make_group,
     env_or_skip,
@@ -959,8 +1018,9 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
-        make_table,
+        make_catalog,
         make_schema,
+        make_table,
         make_udf,
         make_group,
         env_or_skip,
@@ -1175,3 +1235,71 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
+
+
+@pytest.fixture
+def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffix, log_workspace_link):
+
+    def create(installation, **_kwargs):
+        # create args
+        data = {"name": f"dummy-{make_random(4)}"}
+        # create file to run
+        file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
+        file_path = WorkspacePath(ws, installation.install_folder()) / file_name
+        file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
+        task = Task(
+            task_key=make_random(4),
+            description=make_random(4),
+            new_cluster=ClusterSpec(
+                num_workers=1,
+                node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                spark_version=ws.clusters.select_spark_version(latest=True),
+            ),
+            spark_python_task=SparkPythonTask(python_file=str(file_path)),
+            timeout_seconds=0,
+        )
+        data["tasks"] = [task]
+        # add RemoveAfter tag for job cleanup
+        data["tags"] = [{"key": "RemoveAfter", "value": watchdog_remove_after}]
+        job = ws.jobs.create(**data)
+        log_workspace_link(data["name"], f'job/{job.job_id}', anchor=False)
+        return job
+
+    yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
+
+
+@pytest.fixture
+def populate_for_linting(
+    ws,
+    make_random,
+    make_job,
+    make_notebook,
+    make_query,
+    make_dashboard,
+    create_file_job,
+    watchdog_purge_suffix,
+):
+
+    def create_notebook_job(installation):
+        path = Path(installation.install_folder()) / f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
+        notebook_text = "spark.read.parquet('dbfs://mnt/foo1/bar1')"
+        notebook_path = make_notebook(path=path, content=io.BytesIO(notebook_text.encode("utf-8")))
+        return make_job(notebook_path=notebook_path)
+
+    def populate_workspace(installation):
+        # keep linting scope to minimum to avoid test timeouts
+        file_job = create_file_job(installation=installation)
+        notebook_job = create_notebook_job(installation=installation)
+        query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
+        dashboard = make_dashboard(query=query)
+        # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
+        config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
+        text = config_path.read_text()
+        config = yaml.safe_load(text)
+        config["include_job_ids"] = [file_job.job_id, notebook_job.job_id]
+        config["include_dashboard_ids"] = [dashboard.id]
+        text = yaml.dump(config)
+        config_path.unlink()
+        config_path.write_text(text)
+
+    return populate_workspace

@@ -46,10 +46,10 @@ classifiers = [
 
 dependencies = ["databricks-sdk~=0.30",
                 "databricks-labs-lsql>=0.5,<0.13",
-                "databricks-labs-blueprint>=0.8,<0.9",
+                "databricks-labs-blueprint>=0.8,<0.10",
                 "PyYAML>=6.0.0,<7.0.0",
                 "sqlglot>=25.5.0,<25.23",
-                "astroid>=3.2.2"]
+                "astroid>=3.3.1"]
 
 [project.optional-dependencies]
 pylsp = [
@@ -74,7 +74,7 @@ dependencies = [
     "black~=24.3.0",
     "coverage[toml]~=7.4.4",
     "mypy~=1.9.0",
-    "pylint~=3.2.2",
+    "pylint~=3.3.1",
     "pylint-pytest==2.0.0a0",
     "databricks-labs-pylint~=0.4.0",
     "databricks-labs-pytester>=0.2.1",
@@ -209,7 +209,7 @@ fail-under = 10.0
 # ignore-list. The regex matches against paths and can be in Posix or Windows
 # format. Because '\\' represents the directory delimiter on Windows systems, it
 # can't be used as an escape character.
- ignore-paths='^tests/unit/source_code/samples/.*$'
+ignore-paths='^tests/unit/source_code/samples/.*$'
 
 # Files or directories matching the regular expression patterns are skipped. The
 # regex matches against base names, not paths. The default value ignores Emacs
@@ -587,7 +587,10 @@ disable = [
     "fixme",
     "consider-using-assignment-expr",
     "logging-fstring-interpolation",
-    "consider-using-any-or-all"
+    "consider-using-any-or-all",
+    "too-many-positional-arguments",
+    "unnecessary-default-type-args",
+    "logging-not-lazy"
 ]
 
 # Enable the message, report, category or checker with the given id(s). You can
