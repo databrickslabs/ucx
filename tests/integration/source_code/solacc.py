@@ -1,8 +1,11 @@
+import dataclasses
+import json
 import logging
 import os
 import shutil
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -20,7 +23,8 @@ logger = logging.getLogger("verify-accelerators")
 
 this_file = Path(__file__)
 dist = (this_file / '../../../../dist').resolve().absolute()
-
+build = dist.parent / "build"
+build.mkdir(exist_ok=True)
 
 def _get_repos_to_clone() -> dict[str, str]:
     params = {'per_page': 100, 'page': 1}
@@ -76,9 +80,23 @@ def _collect_unparseable(advices: list[LocatedAdvice]):
 
 
 def _print_advices(advices: list[LocatedAdvice]):
-    for located_advice in advices:
-        message = located_advice.message_relative_to(dist.parent)
-        sys.stdout.write(f"{message}\n")
+    messages = list(f"{located_advice.message_relative_to(dist.parent).replace('\n',' ')}\n" for located_advice in advices)
+    if os.getenv("CI"):
+        advices_path = build / "advices.txt"
+        with advices_path.open("a") as advices_file:
+            advices_file.writelines(messages)
+    else:
+        [sys.stdout.write(message) for message in messages]
+
+
+@dataclass
+class _SolaccStats:
+    run_id: str
+    name: str
+    start_timestamp: datetime
+    end_timestamp: datetime
+    files_count: int
+    files_size: int
 
 
 @dataclass
@@ -89,6 +107,7 @@ class _SolaccContext:
     parseable_count = 0
     uninferrable_count = 0
     missing_imports: dict[str, dict[str, int]] = field(default_factory=dict)
+    stats: list[_SolaccStats] = field(default_factory=list)
 
     @classmethod
     def create(cls, for_all_dirs: bool):
@@ -153,7 +172,19 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     files_to_skip = set(solacc.files_to_skip) if solacc.files_to_skip else set()
     linted_files = set(files_to_skip)
     # lint solution
+    start_timestamp = datetime.now(timezone.utc)
     advices = list(ctx.local_code_linter.lint_path(soldir, linted_files))
+    end_timestamp = datetime.now(timezone.utc)
+    # record stats
+    stats = _SolaccStats(
+        run_id = os.getenv("GITHUB_RUN_ATTEMPT") or "local",
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        name = soldir.name,
+        files_count = len(all_files),
+        files_size = sum(path.stat().st_size for path in [soldir / filename for filename in all_files])
+        )
+    solacc.stats.append(stats)
     # collect unparseable files
     unparseables = _collect_unparseable(advices)
     solacc.parseable_count += len(linted_files) - len(files_to_skip) - len(set(advice.path for advice in unparseables))
@@ -178,8 +209,8 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
 def _lint_repos(clone_urls, sol_to_lint: str | None):
     solacc = _SolaccContext.create(sol_to_lint is not None)
     if sol_to_lint:
-        # don't clone if linting just one file, assumption is we're troubleshooting
-        _lint_dir(solacc, dist / sol_to_lint)
+        sol_dir = _clone_repo(clone_urls[sol_to_lint], sol_to_lint)
+        _lint_dir(solacc, sol_dir)
     else:
         names: list[str] = list(clone_urls.keys())
         for name in sorted(names, key=str.casefold):
@@ -199,6 +230,12 @@ def _lint_repos(clone_urls, sol_to_lint: str | None):
         f"not computed: {solacc.uninferrable_count}"
     )
     solacc.log_missing_imports()
+    # log stats
+    stats_path = build / "stats.json"
+    with stats_path.open("a") as stats_file:
+        for stats in solacc.stats:
+            message = json.dumps(dataclasses.asdict(stats), default=str)
+            stats_file.writelines([message])
     # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
