@@ -26,6 +26,7 @@ dist = (this_file / '../../../../dist').resolve().absolute()
 build = dist.parent / "build"
 build.mkdir(exist_ok=True)
 
+
 def _get_repos_to_clone() -> dict[str, str]:
     params = {'per_page': 100, 'page': 1}
     to_clone: dict[str, str] = {}
@@ -80,7 +81,9 @@ def _collect_unparseable(advices: list[LocatedAdvice]):
 
 
 def _print_advices(advices: list[LocatedAdvice]):
-    messages = list(f"{located_advice.message_relative_to(dist.parent).replace('\n',' ')}\n" for located_advice in advices)
+    messages = list(
+        f"{located_advice.message_relative_to(dist.parent).replace('\n',' ')}\n" for located_advice in advices
+    )
     if os.getenv("CI"):
         advices_path = build / "advices.txt"
         with advices_path.open("a") as advices_file:
@@ -177,13 +180,13 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     end_timestamp = datetime.now(timezone.utc)
     # record stats
     stats = _SolaccStats(
-        run_id = os.getenv("GITHUB_RUN_ATTEMPT") or "local",
+        run_id=os.getenv("GITHUB_RUN_ATTEMPT") or "local",
         start_timestamp=start_timestamp,
         end_timestamp=end_timestamp,
-        name = soldir.name,
-        files_count = len(all_files),
-        files_size = sum(path.stat().st_size for path in [soldir / filename for filename in all_files])
-        )
+        name=soldir.name,
+        files_count=len(all_files),
+        files_size=sum(path.stat().st_size for path in [soldir / filename for filename in all_files]),
+    )
     solacc.stats.append(stats)
     # collect unparseable files
     unparseables = _collect_unparseable(advices)
