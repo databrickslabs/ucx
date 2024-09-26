@@ -52,10 +52,10 @@ class WorkflowRunRecorder:
         self._workflow_id = workflow_id
         self._workflow_run_id = workflow_run_id
 
-    def record(self) -> None:
+    def record(self, *, start_time: dt.datetime) -> None:
         """Record a workflow run in the database."""
         workflow_run = WorkflowRun(
-            started_at=dt.datetime.now(),  # TODO: Update this
+            started_at=start_time,
             finished_at=dt.datetime.now(),
             workspace_id=self._ws.get_workspace_id(),
             workflow_name=self._workflow_name,
