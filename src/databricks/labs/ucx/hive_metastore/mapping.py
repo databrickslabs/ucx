@@ -135,24 +135,28 @@ class TableMapping:
         except BadRequest as err:
             logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True)
 
-    def unskip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
-        # Removes skip mark from the table property
-        try:
-            table = load_table(schema_name, table_name)
-            if table is None:
-                raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
-            self._sql_backend.execute(
-                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}' );"
+    def unskip_table_or_view(
+        self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]
+    ) -> None:
+        """Removes skip mark from the table property.
+
+        Args:
+            schema_name (str): The schema name of the table to be unskipped.
+            table_name (str): The table name of the table to be unskipped.
+            load_table (Callable[[str, str], Table | None]): A function that loads a table from the metastore.
+        """
+        table = load_table(schema_name, table_name)
+        if table is None:
+            logger.error(
+                f"Failed to remove skip marker from table: {schema_name}.{table_name}. Table not found.",
             )
-        except NotFound as err:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
-                logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}. Table not found.")
-            else:
-                logger.error(
-                    f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True
-                )
-        except BadRequest as err:
-            logger.error(f"Failed to apply skip marker for Table {schema_name}.{table_name}: {err!s}", exc_info=True)
+            return
+        try:
+            self._sql_backend.execute(
+                f"ALTER {table.kind} {escape_sql_identifier(table.full_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
+            )
+        except (NotFound, BadRequest) as e:
+            logger.error(f"Failed to remove skip marker from table: {table.full_name}", exc_info=e)
 
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
@@ -168,19 +172,18 @@ class TableMapping:
         except BadRequest as err:
             logger.error(err)
 
-    def unskip_schema(self, schema: str):
-        # Removes skip mark from the schema property
+    def unskip_schema(self, schema: str) -> None:
+        """Removes skip mark from the schema property.
+
+        Args:
+            schema (str): The schema name of the table to be unskipped.
+        """
         try:
             self._sql_backend.execute(
-                f"ALTER SCHEMA {escape_sql_identifier(schema)} UNSET DBPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
+                f"ALTER SCHEMA hive_metastore.{escape_sql_identifier(schema)} UNSET DBPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
             )
-        except NotFound as err:
-            if "[SCHEMA_NOT_FOUND]" in str(err):
-                logger.error(f"Failed to remove skip marker for Schema {schema}. Schema not found.")
-            else:
-                logger.error(err)
-        except BadRequest as err:
-            logger.error(err)
+        except (NotFound, BadRequest) as e:
+            logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
 
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
         rules = self.load()
