@@ -147,7 +147,10 @@ class TableMapping:
         """
         table = load_table(schema_name, table_name)
         if table is None:
-            raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+            logger.error(
+                f"Failed to remove skip marker from table: {schema_name}.{table_name}. Table not found.",
+            )
+            return
         try:
             self._sql_backend.execute(
                 f"ALTER {table.kind} {escape_sql_identifier(table.full_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
