@@ -1,11 +1,11 @@
 import logging
 from datetime import timedelta
+
 import pytest
-
 from databricks.labs.blueprint.tui import MockPrompts
-
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
+from databricks.sdk.service.catalog import CatalogInfo
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
@@ -14,6 +14,21 @@ from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_after) -> None:
+    # Delete catalog created for testing to test the creation of a new catalog
+    runtime_ctx.workspace_client.catalogs.delete(runtime_ctx.ucx_catalog, force=True)
+    prompts = MockPrompts({f"Please provide storage location url for catalog: {runtime_ctx.ucx_catalog}": "metastore"})
+
+    runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
+
+    @retried(on=[NotFound], timeout=timedelta(seconds=20))
+    def get_catalog(name: str) -> CatalogInfo:
+        return ws.catalogs.get(name)
+
+    assert get_catalog(runtime_ctx.ucx_catalog)
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

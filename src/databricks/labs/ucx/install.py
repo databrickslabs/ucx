@@ -234,6 +234,7 @@ class WorkspaceInstaller(WorkspaceContext):
         inventory_database = self.prompts.question(
             "Inventory Database stored in hive_metastore", default=default_database, valid_regex=r"^\w+$"
         )
+        ucx_catalog = self.prompts.question("Catalog to store UCX artifacts in", default="ucx", valid_regex=r"^\w+$")
         log_level = self.prompts.question("Log level", default="INFO").upper()
         num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))
         configure_groups = ConfigureGroups(self.prompts)
@@ -248,6 +249,7 @@ class WorkspaceInstaller(WorkspaceContext):
         )
         return WorkspaceConfig(
             inventory_database=inventory_database,
+            ucx_catalog=ucx_catalog,
             workspace_group_regex=configure_groups.workspace_group_regex,
             workspace_group_replace=configure_groups.workspace_group_replace,
             account_group_regex=configure_groups.account_group_regex,

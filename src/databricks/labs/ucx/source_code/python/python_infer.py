@@ -10,9 +10,7 @@ from astroid import (  # type: ignore
     Const,
     decorators,
     Dict,
-    FormattedValue,
     Instance,
-    JoinedStr,
     Name,
     NodeNG,
     Uninferable,
@@ -64,10 +62,6 @@ class InferredValue:
         # deal with node types that don't implement 'inferred()'
         if node is Uninferable or isinstance(node, Const):
             yield [node]
-        elif isinstance(node, JoinedStr):
-            yield from cls._infer_values_from_joined_string(node)
-        elif isinstance(node, FormattedValue):
-            yield from _LocalInferredValue.do_infer_values(node.value)
         else:
             yield from cls._safe_infer_internal(node)
 
@@ -90,20 +84,6 @@ class InferredValue:
             if inferred == node:
                 continue
             yield from _LocalInferredValue.do_infer_values(inferred)
-
-    @classmethod
-    def _infer_values_from_joined_string(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
-        assert isinstance(node, JoinedStr)
-        yield from cls._infer_values_from_joined_values(node.values)
-
-    @classmethod
-    def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
-        if len(nodes) == 1:
-            yield from _LocalInferredValue.do_infer_values(nodes[0])
-            return
-        for firsts in _LocalInferredValue.do_infer_values(nodes[0]):
-            for remains in cls._infer_values_from_joined_values(nodes[1:]):
-                yield list(firsts) + list(remains)
 
     def __init__(self, atoms: Iterable[NodeNG]):
         self._atoms = list(atoms)

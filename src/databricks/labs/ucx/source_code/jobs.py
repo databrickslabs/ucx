@@ -86,8 +86,8 @@ class WorkflowTask(Dependency):
     @property
     def lineage(self) -> list[LineageAtom]:
         job_name = (None if self._job.settings is None else self._job.settings.name) or "unknown job"
-        job_lineage = LineageAtom("JOB", str(self._job.job_id), {"name": job_name})
-        task_lineage = LineageAtom("TASK", self._task.task_key)
+        job_lineage = LineageAtom("WORKFLOW", str(self._job.job_id), {"name": job_name})
+        task_lineage = LineageAtom("TASK", f"{self._job.job_id}/{self._task.task_key}")
         return [job_lineage, task_lineage]
 
 
@@ -469,8 +469,8 @@ class WorkflowLinter:
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
         for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
             atoms = [
-                LineageAtom(object_type="JOB", object_id=job_id, other={"name": job_name}),
-                LineageAtom(object_type="TASK", object_id=task.task_key),
+                LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
             ]
             yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 

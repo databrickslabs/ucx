@@ -111,5 +111,5 @@ def mock_notebook_resolver():
 
 
 @pytest.fixture
-def mock_backend():
+def mock_backend() -> MockBackend:
     return MockBackend()

@@ -337,7 +337,8 @@ class Dependency:
 
     @property
     def lineage(self) -> list[LineageAtom]:
-        return [LineageAtom(object_type="PATH", object_id=str(self.path))]
+        object_type = "NOTEBOOK" if is_a_notebook(self.path) else "FILE"
+        return [LineageAtom(object_type=object_type, object_id=str(self.path))]
 
 
 class SourceContainer(abc.ABC):
