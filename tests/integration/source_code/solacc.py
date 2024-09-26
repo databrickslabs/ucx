@@ -82,7 +82,7 @@ def _collect_unparseable(advices: list[LocatedAdvice]):
 
 def _print_advices(advices: list[LocatedAdvice]):
     messages = list(
-        f"{located_advice.message_relative_to(dist.parent).replace('\n',' ')}\n" for located_advice in advices
+        located_advice.message_relative_to(dist.parent).replace('\n', ' ') + '\n' for located_advice in advices
     )
     if os.getenv("CI"):
         advices_path = build / "advices.txt"
