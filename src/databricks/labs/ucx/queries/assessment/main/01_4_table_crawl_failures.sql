@@ -47,6 +47,8 @@ FROM logs_latest_job_runs
 )
 SELECT
   timestamp,
+  error_reason,
+  error_entity,
   error_message,
   job_run_id,
   job_id,
