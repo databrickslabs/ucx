@@ -41,7 +41,7 @@ class HistoricalRecord:
     object_data: str
     """Type-specific JSON-encoded data of the inventory record."""
 
-    object_owner: str
+    owner: str
     """The identity that has ownership of the object."""
 
     object_type_version: int = 0
