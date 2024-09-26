@@ -89,7 +89,8 @@ def _print_advices(advices: list[LocatedAdvice]):
         with advices_path.open("a") as advices_file:
             advices_file.writelines(messages)
     else:
-        [sys.stdout.write(message) for message in messages]
+        for message in messages:
+            sys.stdout.write(message)
 
 
 @dataclass
