@@ -36,8 +36,8 @@ class WorkflowRun:
     """The workflow run final status"""
 
 
-class HistoryInstallation:
-    """Install resources for UCX's artifacts history."""
+class ProgressTrackingInstaller:
+    """Install resources for UCX's progress tracking."""
 
     _SCHEMA = "history"
 

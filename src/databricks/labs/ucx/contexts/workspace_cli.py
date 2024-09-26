@@ -18,7 +18,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.progress.install import HistoryInstallation
+from databricks.labs.ucx.progress.install import ProgressTrackingInstaller
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator, LocalCodeLinter
@@ -181,8 +181,8 @@ class WorkspaceContext(CliContext):
         return NotebookLoader()
 
     @cached_property
-    def history_installation(self) -> HistoryInstallation:
-        return HistoryInstallation(self.sql_backend, self.config.ucx_catalog)
+    def progress_tracking_installer(self) -> ProgressTrackingInstaller:
+        return ProgressTrackingInstaller(self.sql_backend, self.config.ucx_catalog)
 
 
 class LocalCheckoutContext(WorkspaceContext):
