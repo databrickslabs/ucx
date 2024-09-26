@@ -47,4 +47,5 @@ class HistoryInstallation:
 
     def run(self) -> None:
         self._schema_deployer.deploy_schema()
+        self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
         logger.info("Installation completed successfully!")
