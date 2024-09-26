@@ -45,7 +45,7 @@ class FromTableSqlLinter(SqlLinter, Fixer):
         for table in expression.find_all(Table):
             try:
                 yield from self._unsafe_lint_expression(expression, table)
-            except Exception as _: # pylint: disable=broad-exception-caught
+            except Exception as _:  # pylint: disable=broad-exception-caught
                 yield Failure(
                     code='sql-parse-error',
                     message=f"Could not parse SQL expression: {expression} ",
