@@ -51,7 +51,7 @@ class WorkflowRunRecorder:
     ):
         self._ws = ws
         self._sql_backend = sql_backend
-        self._full_table_name = f"{self._catalog}.multiworkspace.workflow_runs"
+        self._full_table_name = f"{catalog}.multiworkspace.workflow_runs"
         self._workflow_start_time = workflow_start_time
         self._workflow_name = workflow_name
         self._workflow_id = workflow_id
