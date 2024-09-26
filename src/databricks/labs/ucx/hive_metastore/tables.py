@@ -474,7 +474,7 @@ class TablesCrawler(CrawlerBase[Table]):
             return None
 
 
-class FasterTableScanCrawler(CrawlerBase):
+class FasterTableScanCrawler(CrawlerBase[Table]):
     def _try_fetch(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
