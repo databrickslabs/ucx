@@ -68,7 +68,7 @@ class WorkflowRunRecorder:
             workflow_id=self._workflow_id,
             workflow_run_id=self._workflow_run_id,
             workflow_run_attempt=self._workflow_run_attempt,
-            run_as="UNKOWN",  # TODO Update this,
+            run_as="UNKOWN",  # TODO Update this
             status="RUNNING",  # Always RUNNING as it is called during a running workflow
         )
         self._sql_backend.save_table(
