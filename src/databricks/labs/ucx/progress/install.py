@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import Dataclass, SqlBackend
 from databricks.sdk.errors import InternalError
@@ -10,20 +9,6 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Record:
-    workspace_id: int  # The workspace id
-    run_id: int  # The workflow run id that crawled the objects
-    run_start_time: dt.datetime  # The workflow run timestamp that crawled the objects
-    object_type: str  # The object type, e.g. TABLE, VIEW. Forms a composite key together with object_id
-    object_id: str  # The object id, e.g. hive_metastore.database.table. Forms a composite key together with object_id
-    object_data: str  # The object data; the attributes of the corresponding ucx data class, e.g. table name, table ...
-    failures: list  # The failures indicating the object is not UC compatible
-    owner: str  # The object owner
-    ucx_version: str  # The ucx semantic version
-    snapshot_id: int  # An identifier for the snapshot
 
 
 class HistoryInstallation:
@@ -40,7 +25,6 @@ class HistoryInstallation:
 
     def run(self) -> None:
         self._create_schema()
-        self._create_table("records", Record)
         logger.info("Installation completed successfully!")
 
     @retried(on=[InternalError], timeout=dt.timedelta(minutes=1))

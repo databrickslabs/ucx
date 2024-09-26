@@ -900,7 +900,6 @@ def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
 
     assert "CREATE SCHEMA" in mock_backend.queries[0]
-    assert "CREATE TABLE" in mock_backend.queries[1]
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])
