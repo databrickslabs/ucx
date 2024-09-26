@@ -30,7 +30,7 @@ def location_migration_for_test(ws, mock_backend, mock_installation, azurerm=Non
     azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
     tables_crawler = TablesCrawler(mock_backend, 'ucx')
     mounts_crawler = Mounts(mock_backend, ws, 'ucx')
-    principal_acl = PrincipalACL(ws, mock_backend, mock_installation, tables_crawler, mounts_crawler, {})
+    principal_acl = PrincipalACL(ws, mock_backend, mock_installation, tables_crawler, mounts_crawler, lambda: [])
     external_locations_migration = ExternalLocationsMigration(
         ws, location_crawler, azure_resource_permissions, azurerm, principal_acl
     )

@@ -340,7 +340,7 @@ class MigrationCount:
     what_count: dict[What, int]
 
 
-class TablesCrawler(CrawlerBase):
+class TablesCrawler(CrawlerBase[Table]):
     def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
