@@ -1,6 +1,6 @@
 import logging
 from sqlglot import parse as parse_sql
-from sqlglot.expressions import Table, Expression, Use, Create
+from sqlglot.expressions import Table, Expression, Use, Create, Drop
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer
 
@@ -47,6 +47,10 @@ class FromTableSqlLinter(SqlLinter, Fixer):
                 # Sqlglot captures the database name in the Use statement as a Table, with
                 # the schema  as the table name.
                 self._session_state.schema = table.name
+                continue
+            if isinstance(expression, Drop) and getattr(expression, "kind", None) == "SCHEMA":
+                # Sqlglot captures the schema name in the Drop statement as a Table, with
+                # the schema  as the db name.
                 continue
             if isinstance(expression, Create) and getattr(expression, "kind", None) == "SCHEMA":
                 # Sqlglot captures the schema name in the Create statement as a Table, with
