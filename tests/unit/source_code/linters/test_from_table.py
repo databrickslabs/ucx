@@ -87,6 +87,14 @@ def test_parses_create_schema(migration_index):
     assert not list(advices)
 
 
+def test_parses_drop_schema(migration_index):
+    query = "DROP SCHEMA xyz"
+    session_state = CurrentSessionState(schema="old")
+    ftf = FromTableSqlLinter(migration_index, session_state=session_state)
+    advices = ftf.lint(query)
+    assert not list(advices)
+
+
 def test_raises_advice_when_parsing_unsupported_sql(migration_index):
     query = "XDESCRIBE DETAILS xyz"  # not a valid query
     session_state = CurrentSessionState(schema="old")
