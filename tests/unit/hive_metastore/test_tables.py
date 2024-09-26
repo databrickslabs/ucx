@@ -582,8 +582,8 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_moc
         "[delta.appendOnly=true, " "delta.autoOptimize=false, " "personalAccessToken=*******, " "password=*******]"
     )
 
+def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mocker, spark_table_crawl_mocker):
 
-def test_fast_table_scan_crawler_crawl_test_warnings(caplog, mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -595,11 +595,53 @@ def test_fast_table_scan_crawler_crawl_test_warnings(caplog, mocker):
     ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     # pylint: disable=protected-access
-    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.side_effect = Exception("Test warning")
-    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.side_effect = Exception("Test warning")
-    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.side_effect = Exception("Test warning")
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.side_effect = Exception("Test listDatabases warning")
 
     with caplog.at_level(logging.WARNING):
         ftsc.snapshot()
+    assert "Test listDatabases warning" in caplog.text
 
-    assert "Test warning" in caplog.text
+def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker, spark_table_crawl_mocker):
+
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    mock_list_databases_iterator, _ , _ = spark_table_crawl_mocker
+
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.side_effect = Exception("Test listTables warning")
+
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+    assert "Test listTables warning" in caplog.text
+
+def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, spark_table_crawl_mocker):
+
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    mock_list_databases_iterator, mock_list_tables_iterator , _ = spark_table_crawl_mocker
+
+
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.side_effect = Exception("Test getTable warning")
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+    assert "Test getTable warning" in caplog.text
