@@ -39,7 +39,7 @@ class WorkflowRun:
 class ProgressTrackingInstaller:
     """Install resources for UCX's progress tracking."""
 
-    _SCHEMA = "history"
+    _SCHEMA = "multiworkspace"
 
     def __init__(self, sql_backend: SqlBackend, ucx_catalog: str) -> None:
         # `mod` is required parameter, but it's not used in this context.
