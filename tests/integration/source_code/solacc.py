@@ -22,7 +22,7 @@ this_file = Path(__file__)
 dist = (this_file / '../../../../dist').resolve().absolute()
 
 
-def clone_all():
+def _clone_all():
     params = {'per_page': 100, 'page': 1}
     to_clone = []
     while True:
@@ -49,7 +49,7 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
-def collect_missing_imports(advices: list[LocatedAdvice]):
+def _collect_missing_imports(advices: list[LocatedAdvice]):
     missing_imports: set[str] = set()
     for located_advice in advices:
         if located_advice.advice.code == 'import-not-found':
@@ -57,7 +57,7 @@ def collect_missing_imports(advices: list[LocatedAdvice]):
     return missing_imports
 
 
-def collect_uninferrable_count(advices: list[LocatedAdvice]):
+def _collect_uninferrable_count(advices: list[LocatedAdvice]):
     not_computed = 0
     for located_advice in advices:
         if "computed" in located_advice.advice.message:
@@ -65,15 +65,19 @@ def collect_uninferrable_count(advices: list[LocatedAdvice]):
     return not_computed
 
 
-def print_advices(advices: list[LocatedAdvice], file: Path):
+def _collect_unparseable(advices: list[LocatedAdvice]):
+    return set(located_advice for located_advice in advices if located_advice.advice.code == 'parse-error')
+
+
+def _print_advices(advices: list[LocatedAdvice]):
     for located_advice in advices:
-        message = located_advice.message_relative_to(dist.parent, default=file)
+        message = located_advice.message_relative_to(dist.parent)
         sys.stdout.write(f"{message}\n")
 
 
 @dataclass
-class SolaccContext:
-    unparsed_path: Path | None = None
+class _SolaccContext:
+    unparsed_files_path: Path | None = None
     files_to_skip: set[str] | None = None
     total_count = 0
     parseable_count = 0
@@ -93,7 +97,7 @@ class SolaccContext:
         if for_all_dirs and malformed.exists():
             lines = malformed.read_text(encoding="utf-8").split("\n")
             files_to_skip = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
-        return SolaccContext(unparsed_path=unparsed_path, files_to_skip=files_to_skip)
+        return _SolaccContext(unparsed_files_path=unparsed_path, files_to_skip=files_to_skip)
 
     def register_missing_import(self, missing_import: str):
         prefix = missing_import.split(".")[0]
@@ -114,29 +118,6 @@ class SolaccContext:
                 logger.info(f"  {item}: {count} occurrences")
 
 
-def lint_one(solacc: SolaccContext, file: Path, ctx: LocalCheckoutContext) -> None:
-    try:
-        advices = list(ctx.local_code_linter.lint_path(file, set()))
-        solacc.parseable_count += 1
-        for missing_import in collect_missing_imports(advices):
-            solacc.register_missing_import(missing_import)
-        solacc.uninferrable_count += collect_uninferrable_count(advices)
-        print_advices(advices, file)
-    except Exception as e:  # pylint: disable=broad-except
-        # here we're most likely catching astroid & sqlglot errors
-        # when linting single file, log exception details
-        logger.error(
-            f"Error during parsing of {file}: {e}".replace("\n", " "),
-            exc_info=e if solacc.unparsed_path is None else None,
-        )
-        if solacc.unparsed_path:
-            logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
-            # populate solacc-unparsed.txt
-            with solacc.unparsed_path.open(mode="a", encoding="utf-8") as f:
-                f.write(file.relative_to(dist).as_posix())
-                f.write("\n")
-
-
 class _CleanablePathLookup(PathLookup):
 
     def __init__(self):
@@ -153,33 +134,46 @@ class _CleanablePathLookup(PathLookup):
                 shutil.rmtree(path)
 
 
-def lint_dir(solacc: SolaccContext, soldir: Path, file_to_lint: str | None = None):
+def _lint_dir(solacc: _SolaccContext, soldir: Path):
     path_lookup = _CleanablePathLookup()
     ws = WorkspaceClient(host='...', token='...')
     ctx = LocalCheckoutContext(ws).replace(
         linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state),
         path_lookup=path_lookup,
     )
-    all_files = list(soldir.glob('**/*.py')) if file_to_lint is None else [Path(soldir, file_to_lint)]
+    all_files = list(soldir.glob('**/*.py')) + list(soldir.glob('**/*.sql'))
     solacc.total_count += len(all_files)
-    for file in all_files:
-        if solacc.files_to_skip and file.relative_to(dist).as_posix() in solacc.files_to_skip:
-            continue
-        lint_one(solacc, file, ctx)
+    # pre-populate linted_files such that files to skip are not linted
+    files_to_skip = set(solacc.files_to_skip) if solacc.files_to_skip else set()
+    linted_files = set(files_to_skip)
+    # lint solution
+    advices = list(ctx.local_code_linter.lint_path(soldir, linted_files))
+    # collect unparseable files
+    unparseables = _collect_unparseable(advices)
+    solacc.parseable_count += len(linted_files) - len(files_to_skip) - len(set(advice.path for advice in unparseables))
+    if solacc.unparsed_files_path:
+        for unparseable in unparseables:
+            logger.error(f"Error during parsing of {unparseable.path}: {unparseable.advice.message}".replace("\n", " "))
+            # populate solacc-unparsed.txt
+            with solacc.unparsed_files_path.open(mode="a", encoding="utf-8") as f:
+                f.write(unparseable.path.relative_to(dist).as_posix())
+                f.write("\n")
+    # collect missing imports
+    for missing_import in _collect_missing_imports(advices):
+        solacc.register_missing_import(missing_import)
+    # collect uninferrable
+    solacc.uninferrable_count += _collect_uninferrable_count(advices)
+    # display advices
+    _print_advices(advices)
     # cleanup tmp dirs
     path_lookup.clean_tmp_sys_paths()
 
 
-def lint_file(file_to_lint: str):
-    solacc = SolaccContext.create(False)
-    file_path = Path(file_to_lint)
-    lint_dir(solacc, file_path.parent, file_path.name)
-
-
-def lint_all():
-    solacc = SolaccContext.create(True)
-    for soldir in os.listdir(dist):
-        lint_dir(solacc, dist / soldir)
+def _lint_dirs(dir_to_lint: str | None):
+    solacc = _SolaccContext.create(dir_to_lint is not None)
+    all_dirs = os.listdir(dist) if dir_to_lint is None else [dir_to_lint]
+    for soldir in all_dirs:
+        _lint_dir(solacc, dist / soldir)
     all_files_len = solacc.total_count - (len(solacc.files_to_skip) if solacc.files_to_skip else 0)
     parseable_pct = int(solacc.parseable_count / all_files_len * 100)
     missing_imports_count = sum(sum(details.values()) for details in solacc.missing_imports.values())
@@ -198,16 +192,13 @@ def lint_all():
 def main(args: list[str]):
     install_logger()
     logging.root.setLevel(logging.INFO)
-    file_to_lint = args[1] if len(args) > 1 else None
-    if file_to_lint:
+    dir_to_lint = args[1] if len(args) > 1 else None
+    if not dir_to_lint:
         # don't clone if linting just one file, assumption is we're troubleshooting
-        logger.info("Linting...")
-        lint_file(file_to_lint)
-        return
-    logger.info("Cloning...")
-    clone_all()
+        logger.info("Cloning...")
+        _clone_all()
     logger.info("Linting...")
-    lint_all()
+    _lint_dirs(dir_to_lint)
 
 
 if __name__ == "__main__":
