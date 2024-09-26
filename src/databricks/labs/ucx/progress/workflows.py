@@ -111,3 +111,17 @@ class MigrationProgress(Workflow):
         The results of the scan are stored in the `$inventory.migration_status` inventory table.
         """
         ctx.migration_status_refresher.snapshot(force_refresh=True)
+
+    @job_task(
+        depends_on=[
+            crawl_grants,
+            assess_jobs,
+            assess_clusters,
+            assess_pipelines,
+            crawl_cluster_policies,
+            refresh_table_migration_status,
+        ]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run (of this workflow."""
+        ctx.workflow_run_recorder.record()
