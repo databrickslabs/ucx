@@ -155,15 +155,8 @@ class TableMapping:
             self._sql_backend.execute(
                 f"ALTER {table.kind} {escape_sql_identifier(table.full_name)} UNSET TBLPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
             )
-        except NotFound as e:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(e) or "[DELTA_TABLE_NOT_FOUND]" in str(e):
-                logger.error(
-                    f"Failed to remove skip marker from table: {schema_name}.{table_name}. Table not found.", exc_info=e
-                )
-            else:
-                logger.error(f"Failed to remove skip marker from table: {schema_name}.{table_name}", exc_info=e)
-        except BadRequest as e:
-            logger.error(f"Failed to remove skip marker from table: {schema_name}.{table_name}: {e!s}", exc_info=e)
+        except (NotFound, BadRequest) as e:
+            logger.error(f"Failed to remove skip marker from table: {table.full_name}", exc_info=e)
 
     def skip_schema(self, schema: str):
         # Marks a schema to be skipped in the migration process by applying a table property
@@ -189,12 +182,7 @@ class TableMapping:
             self._sql_backend.execute(
                 f"ALTER SCHEMA hive_metastore.{escape_sql_identifier(schema)} UNSET DBPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
             )
-        except NotFound as e:
-            if "[SCHEMA_NOT_FOUND]" in str(e):
-                logger.error(f"Failed to remove skip marker from schema: {schema}. Schema not found.", exc_info=e)
-            else:
-                logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
-        except BadRequest as e:
+        except (NotFound, BadRequest) as e:
             logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
 
     def get_tables_to_migrate(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:

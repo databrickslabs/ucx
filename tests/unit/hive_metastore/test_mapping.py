@@ -211,7 +211,7 @@ def test_skip_happy_path(caplog):
     assert len(caplog.records) == 0
 
 
-def test_unskip_on_table():
+def test_unskip_on_table() -> None:
     ws = create_autospec(WorkspaceClient)
     mock_backend = MockBackend()
     installation = MockInstallation()
@@ -225,7 +225,7 @@ def test_unskip_on_table():
     )
 
 
-def test_unskip_on_view():
+def test_unskip_on_view() -> None:
     ws = create_autospec(WorkspaceClient)
     mock_backend = MockBackend()
     installation = MockInstallation()
@@ -241,7 +241,7 @@ def test_unskip_on_view():
     )
 
 
-def test_unskip_on_schema():
+def test_unskip_on_schema() -> None:
     ws = create_autospec(WorkspaceClient)
     mock_backend = MockBackend()
     installation = MockInstallation()
@@ -273,7 +273,7 @@ def test_unskip_badrequest(caplog) -> None:
     mapping = TableMapping(installation, ws, sbe)
     table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
     mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
-    assert [rec.message for rec in caplog.records if "bad command" in rec.message.lower()]
+    assert [rec.message for rec in caplog.records if "failed to remove skip marker " in rec.message.lower()]
     ws.tables.get.assert_not_called()
 
 
