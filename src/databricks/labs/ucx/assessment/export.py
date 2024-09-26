@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class AssessmentExporter:
-    # File and Path Constants
-    _EXPORT_FILE_NAME = "ucx_assessment_results.zip"
 
     def __init__(self, sql_backend: SqlBackend, config: WorkspaceConfig):
         self._sql_backend = sql_backend
