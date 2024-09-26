@@ -6,7 +6,7 @@ from databricks.labs.blueprint.installation import Installation, MockInstallatio
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.errors.platform import ResourceConflict
 from databricks.sdk.service.catalog import TableInfo
 
@@ -209,6 +209,72 @@ def test_skip_happy_path(caplog):
     mapping.skip_schema(schema="schema")
     sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
+
+
+def test_unskip_on_table() -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_backend = MockBackend()
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, mock_backend)
+    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
+    mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
+    ws.tables.get.assert_not_called()
+    assert (
+        f"ALTER TABLE `catalog`.`schema`.`table` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        in mock_backend.queries
+    )
+
+
+def test_unskip_on_view() -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_backend = MockBackend()
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, mock_backend)
+    view = Table(
+        catalog="catalog", database="schema", name="view", object_type="table", table_format="csv", view_text="stuff"
+    )
+    mapping.unskip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
+    ws.tables.get.assert_not_called()
+    assert (
+        f"ALTER VIEW `catalog`.`schema`.`view` UNSET TBLPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        in mock_backend.queries
+    )
+
+
+def test_unskip_on_schema() -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_backend = MockBackend()
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, mock_backend)
+    mapping.unskip_schema(schema="schema")
+    ws.tables.get.assert_not_called()
+    assert (
+        f"ALTER SCHEMA hive_metastore.`schema` UNSET DBPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        in mock_backend.queries
+    )
+
+
+def test_unskip_missing_table(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, sbe)
+    mapping.unskip_table_or_view(schema_name='foo', table_name="table", load_table=lambda schema, table: None)
+    assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
+    ws.tables.get.assert_not_called()
+
+
+def test_unskip_badrequest(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    sbe = create_autospec(SqlBackend)
+    sbe.execute.side_effect = BadRequest("[Bad command]")
+    installation = MockInstallation()
+    mapping = TableMapping(installation, ws, sbe)
+    table = Table(catalog="catalog", database="schema", name="table", object_type="table", table_format="csv")
+    mapping.unskip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
+    assert [rec.message for rec in caplog.records if "failed to remove skip marker " in rec.message.lower()]
+    ws.tables.get.assert_not_called()
 
 
 def test_skip_missing_schema(caplog):

@@ -101,7 +101,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
 
 @ucx.command
 def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
-    """Create a unskip comment on a schema or a table"""
+    """Unset the skip mark from a schema or a table"""
     logger.info("Running unskip command")
     if not schema:
         logger.error("--schema is a required parameter.")
