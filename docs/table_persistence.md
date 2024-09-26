@@ -14,6 +14,8 @@ Table Utilization:
 | permissions              | RW                  |                           | RW             | RO                      |              | RO             |                             |                 |
 | jobs                     | RW                  | RW                        |                |                         | RO           |                |                             |                 |
 | clusters                 | RW                  | RW                        |                |                         |              |                |                             |                 |
+| directfs_in_paths        | RW                  |                           |                |                         |              |                |                             | RW              |
+| directfs_in_queries      | RW                  |                           |                |                         |              |                |                             | RW              |
 | external_locations       | RW                  |                           |                | RO                      |              |                |                             |                 |
 | workspace                | RW                  |                           | RO             |                         | RO           |                |                             |                 |
 | workspace_objects        | RW                  |                           |                |                         |              |                |                             |                 |
@@ -26,7 +28,8 @@ Table Utilization:
 | submit_runs              | RW                  |                           |                |                         |              |                |                             |                 |
 | policies                 | RW                  | RW                        |                |                         |              |                |                             |                 |
 | migration_status         |                     | RW                        |                | RW                      |              | RW             |                             |                 |
-| workflow_problems        |                     |                           |                |                         |              |                |                             | RW              |
+| query_problems           | RW                  |                           |                |                         |              |                |                             | RW              |
+| workflow_problems        | RW                  |                           |                |                         |              |                |                             | RW              |
 | udfs                     | RW                  | RW                        | RO             |                         |              |                |                             |                 |
 | logs                     | RW                  |                           | RW             | RW                      |              | RW             | RW                          |                 |
 | recon_results            |                     |                           |                |                         |              |                | RW                          |                 |
