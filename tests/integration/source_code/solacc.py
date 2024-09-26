@@ -22,9 +22,9 @@ this_file = Path(__file__)
 dist = (this_file / '../../../../dist').resolve().absolute()
 
 
-def _clone_all():
+def _get_repos_to_clone() -> dict[str, str]:
     params = {'per_page': 100, 'page': 1}
-    to_clone = []
+    to_clone: dict[str, str] = {}
     while True:
         result = requests.get(
             'https://api.github.com/orgs/databricks-industry-solutions/repos',
@@ -35,18 +35,24 @@ def _clone_all():
             break
         if 'message' in result:
             logger.error(result['message'])
-            return
+            return to_clone
         params['page'] += 1
         for repo in result:
-            to_clone.append(repo['clone_url'])
+            name = repo['name']
+            if name == '.github':
+                continue
+            to_clone[name] = repo['clone_url']
+    return to_clone
+
+
+def _clone_repo(repo_url, repo_name):
     dist.mkdir(exist_ok=True)
-    to_clone = sorted(to_clone)  # [:10]
-    for url in to_clone:
-        dst = dist / url.split("/")[-1].split(".")[0]
-        if dst.exists():
-            continue
-        logger.info(f'Cloning {url} into {dst}')
-        run_command(f'git clone {url} {dst}')
+    dst = dist / repo_name
+    if dst.exists():
+        return dst
+    logger.info(f'Cloning {repo_url} into {dst}')
+    run_command(f'git clone {repo_url} {dst}')
+    return dst
 
 
 def _collect_missing_imports(advices: list[LocatedAdvice]):
@@ -169,11 +175,20 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     path_lookup.clean_tmp_sys_paths()
 
 
-def _lint_dirs(dir_to_lint: str | None):
-    solacc = _SolaccContext.create(dir_to_lint is not None)
-    all_dirs = os.listdir(dist) if dir_to_lint is None else [dir_to_lint]
-    for soldir in all_dirs:
-        _lint_dir(solacc, dist / soldir)
+def _lint_repos(clone_urls, sol_to_lint: str | None):
+    solacc = _SolaccContext.create(sol_to_lint is not None)
+    if sol_to_lint:
+        # don't clone if linting just one file, assumption is we're troubleshooting
+        _lint_dir(solacc, dist / sol_to_lint)
+    else:
+        names: list[str] = list(clone_urls.keys())
+        for name in sorted(names, key=str.casefold):
+            logger.info(f"Cloning {name}...")
+            sol_dir = _clone_repo(clone_urls[name], name)
+            logger.info(f"Linting {name}...")
+            _lint_dir(solacc, sol_dir)
+            if os.getenv("CI"):
+                shutil.rmtree(sol_dir)
     all_files_len = solacc.total_count - (len(solacc.files_to_skip) if solacc.files_to_skip else 0)
     parseable_pct = int(solacc.parseable_count / all_files_len * 100)
     missing_imports_count = sum(sum(details.values()) for details in solacc.missing_imports.values())
@@ -192,13 +207,10 @@ def _lint_dirs(dir_to_lint: str | None):
 def main(args: list[str]):
     install_logger()
     logging.root.setLevel(logging.INFO)
-    dir_to_lint = args[1] if len(args) > 1 else None
-    if not dir_to_lint:
-        # don't clone if linting just one file, assumption is we're troubleshooting
-        logger.info("Cloning...")
-        _clone_all()
-    logger.info("Linting...")
-    _lint_dirs(dir_to_lint)
+    sol_to_lint = args[1] if len(args) > 1 else None
+    logger.info("Fetching repos to clone...")
+    repo_urls = _get_repos_to_clone()
+    _lint_repos(repo_urls, sol_to_lint)
 
 
 if __name__ == "__main__":
