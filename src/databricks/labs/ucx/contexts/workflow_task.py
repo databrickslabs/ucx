@@ -120,4 +120,5 @@ class RuntimeContext(GlobalContext):
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
+            workflow_start_time=self.named_parameters["workflow_start_time"],
         )
