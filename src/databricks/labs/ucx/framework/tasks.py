@@ -1,3 +1,4 @@
+import datetime as dt
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -65,6 +66,7 @@ def parse_args(*argv) -> dict[str, str]:
 class Workflow:
     def __init__(self, name: str):
         self._name = name
+        self._start_time = dt.datetime.now()
 
     @property
     def name(self):
