@@ -25,6 +25,9 @@ class WorkflowRun:
     workflow_run_id: int
     """The workflow run id."""
 
+    workflow_run_attempt: int
+    """The workflow run attempt."""
+
     run_as: str
     """The identity the workflow was run as`"""
 
@@ -43,7 +46,7 @@ class WorkflowRunRecorder:
         workflow_name: str,
         workflow_id: int,
         workflow_run_id: int,
-        attempt: int,
+        workflow_run_attempt: int,
     ):
         self._ws = ws
         self._sql_backend = sql_backend
@@ -51,6 +54,7 @@ class WorkflowRunRecorder:
         self._workflow_name = workflow_name
         self._workflow_id = workflow_id
         self._workflow_run_id = workflow_run_id
+        self._workflow_run_attempt = workflow_run_attempt
 
     def record(self, *, start_time: dt.datetime) -> None:
         """Record a workflow run in the database."""
@@ -61,6 +65,7 @@ class WorkflowRunRecorder:
             workflow_name=self._workflow_name,
             workflow_id=self._workflow_id,
             workflow_run_id=self._workflow_run_id,
+            workflow_run_attempt=self._workflow_run_attempt,
             run_as="UNKOWN",  # TODO Update this,
             status="RUNNING",  # Always RUNNING as it is called during a running workflow
         )
