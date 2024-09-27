@@ -106,7 +106,7 @@ class _SolaccStats:
 @dataclass
 class _SolaccContext:
     unparsed_files_path: Path | None = None
-    files_to_skip: set[str] | None = None
+    files_to_skip: set[Path] | None = None
     total_count = 0
     parseable_count = 0
     uninferrable_count = 0
@@ -125,7 +125,7 @@ class _SolaccContext:
         malformed = Path(__file__).parent / "solacc-malformed.txt"
         if for_all_dirs and malformed.exists():
             lines = malformed.read_text(encoding="utf-8").split("\n")
-            files_to_skip = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
+            files_to_skip = set(dist / line for line in lines if len(line) > 0 and not line.startswith("#"))
         return _SolaccContext(unparsed_files_path=unparsed_path, files_to_skip=files_to_skip)
 
     def register_missing_import(self, missing_import: str):
