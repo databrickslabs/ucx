@@ -113,7 +113,7 @@ class TableMapping:
         try:
             return self._installation.load(list[Rule], filename=self.FILENAME)
         except NotFound:
-            msg = "Please run: databricks labs ucx table-mapping"
+            msg = "Please run: databricks labs ucx create-table-mapping"
             raise ValueError(msg) from None
 
     def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):

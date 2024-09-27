@@ -8,6 +8,8 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import WorkspaceClient, AccountClient
@@ -49,8 +51,76 @@ def mock_installation() -> MockInstallation:
     )
 
 
+class CustomIterator:
+    def __init__(self, values):
+        self._values = iter(values)
+        self._has_next = True
+
+    def hasNext(self):  # pylint: disable=invalid-name
+        try:
+            self._next_value = next(self._values)
+            self._has_next = True
+        except StopIteration:
+            self._has_next = False
+        return self._has_next
+
+    def next(self):
+        if self._has_next:
+            return self._next_value
+        raise StopIteration
+
+
 @pytest.fixture
-def run_workflow(mocker, mock_installation):
+def spark_table_crawl_mocker(mocker):
+    def create_product_element_mock(key, value):
+        def product_element_side_effect(index):
+            if index == 0:
+                return key
+            if index == 1:
+                return value
+            raise IndexError(f"Invalid index: {index}")
+
+        mock = mocker.Mock()
+        mock.productElement.side_effect = product_element_side_effect
+        return mock
+
+    mock_list_databases_iterator = mocker.Mock()
+    mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
+    mock_list_tables_iterator = mocker.Mock()
+    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1"])
+
+    mock_property_1 = create_product_element_mock("delta.appendOnly", "true")
+    mock_property_2 = create_product_element_mock("delta.autoOptimize", "false")
+    mock_property_pat = create_product_element_mock("personalAccessToken", "e32kfkasdas")
+    mock_property_password = create_product_element_mock("password", "very_secret")
+
+    mock_storage_properties_list = [
+        mock_property_1,
+        mock_property_2,
+        mock_property_pat,
+        mock_property_password,
+    ]
+    mock_properties_iterator = mocker.Mock()
+    mock_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
+
+    mock_partition_col_iterator = mocker.Mock()
+    mock_partition_col_iterator.iterator.return_value = CustomIterator(["age", "name"])
+
+    get_table_mock = mocker.Mock()
+    get_table_mock.provider().isDefined.return_value = True
+    get_table_mock.provider().get.return_value = "delta"
+    get_table_mock.storage().locationUri().isDefined.return_value = False
+
+    get_table_mock.viewText().isDefined.return_value = True
+    get_table_mock.viewText().get.return_value = "mock table text"
+    get_table_mock.properties.return_value = mock_properties_iterator
+    get_table_mock.partitionColumnNames.return_value = mock_partition_col_iterator
+
+    return mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock
+
+
+@pytest.fixture
+def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
     def inner(cb, **replace) -> RuntimeContext:
         with _lock, patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
             pyspark_sql_session = mocker.Mock()
@@ -66,6 +136,8 @@ def run_workflow(mocker, mock_installation):
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
                 replace['config'] = mock_installation.load(WorkspaceConfig)
+            if 'tables_crawler' not in replace:
+                replace['tables_crawler'] = TablesCrawler(replace['sql_backend'], replace['config'].inventory_database)
 
             module = __import__(cb.__module__, fromlist=[cb.__name__])
             klass, method = cb.__qualname__.split('.', 1)
@@ -73,8 +145,20 @@ def run_workflow(mocker, mock_installation):
             current_task = getattr(workflow, method)
 
             ctx = RuntimeContext().replace(**replace)
+            if isinstance(ctx.tables_crawler, FasterTableScanCrawler):
+                mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock = spark_table_crawl_mocker
+                # pylint: disable=protected-access
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = (
+                    mock_list_databases_iterator
+                )
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = (
+                    mock_list_tables_iterator
+                )
+                ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = (
+                    get_table_mock
+                )
+                # pylint: enable=protected-access
             current_task(ctx)
-
             return ctx
 
     yield inner

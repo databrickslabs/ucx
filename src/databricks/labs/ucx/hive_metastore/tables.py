@@ -411,11 +411,13 @@ class TablesCrawler(CrawlerBase[Table]):
         After performing initial scan of all tables, starts making parallel
         DESCRIBE TABLE EXTENDED queries for every table.
 
-        Production tasks would most likely be executed through `tables.scala`
+        Production tasks would most likely be executed through FasterTableScanCrawler
         within `crawl_tables` task due to `spark.sharedState.externalCatalog`
         lower-level APIs not requiring a roundtrip to storage, which is not
         possible for Azure storage with credentials supplied through Spark
         conf (see https://github.com/databrickslabs/ucx/issues/249).
+
+        FasterTableScanCrawler uses the _jsparkSession to utilize faster scanning with Scala APIs.
 
         See also https://github.com/databrickslabs/ucx/issues/247
         """
@@ -475,10 +477,14 @@ class TablesCrawler(CrawlerBase[Table]):
 
 
 class FasterTableScanCrawler(CrawlerBase):
-    def _try_fetch(self) -> Iterable[Table]:
-        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
-            yield Table(*row)
+    """
+    FasterTableScanCrawler is a specialized version of TablesCrawler that uses spark._jsparkSession to utilize
+    faster scanning with Scala APIs.
+
+    For integration testing, FasterTableScanCrawler is tested using the larger assessment test rather than
+    just the class. Testing the class individually would require utilizing a remote spark connection with the
+    Databricks workspace.
+    """
 
     def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         self._backend = backend
@@ -504,16 +510,25 @@ class FasterTableScanCrawler(CrawlerBase):
         return scala_option.get() if scala_option.isDefined() else None
 
     def _all_databases(self) -> list[str]:
-        if not self._include_database:
-            return list(self._iterator(self._external_catalog.listDatabases()))
-        return self._include_database
+        try:
+            if not self._include_database:
+                return list(self._iterator(self._external_catalog.listDatabases()))
+            return self._include_database
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logger.error(f"failed-table-crawl: listing databases -> catalog : {err}", exc_info=True)
+            return []
 
     def _list_tables(self, database: str) -> list[str]:
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Failed to list tables in {database}: {err}")
+            logger.warning(f"failed-table-crawl: listing tables from database -> {database} : {err}", exc_info=True)
             return []
+
+    def _try_fetch(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Table(*row)
 
     @staticmethod
     def _format_properties_list(properties_list: list) -> str:
@@ -555,8 +570,8 @@ class FasterTableScanCrawler(CrawlerBase):
             view_text = self._option_as_python(raw_table.viewText())
             table_properties = list(self._iterator(raw_table.properties()))
             formatted_table_properties = self._format_properties_list(table_properties)
-        except Exception:  # pylint: disable=broad-exception-caught
-            logger.warning(f"Couldn't fetch information for table: {full_name}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"failed-table-crawl: describing table -> {full_name}: {e}", exc_info=True)
             return None
         return Table(
             catalog=catalog,
@@ -583,9 +598,16 @@ class FasterTableScanCrawler(CrawlerBase):
         catalog_tables, errors = Threads.gather("describing tables in ", tasks)
         if len(errors) > 0:
             logger.warning(f"Detected {len(errors)} errors while scanning tables in ")
+
+        logger.info(f"Finished scanning {len(catalog_tables)} tables")
         return catalog_tables
 
     def _get_table_names(self, database: str) -> list[str]:
+        """
+        Lists tables names in the specified database.
+        :param database:
+        :return: list of table names
+        """
         table_names = []
         table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
         for table_batch in table_names_batches:
@@ -593,6 +615,13 @@ class FasterTableScanCrawler(CrawlerBase):
         return table_names
 
     def _create_describe_tasks(self, catalog: str, database: str, table_names: list[str]) -> list[partial]:
+        """
+        Creates a list of partial functions for describing tables.
+        :param catalog:
+        :param database:
+        :param table_names:
+        :return: list of partial functions
+        """
         tasks = []
         for table in table_names:
             tasks.append(partial(self._describe, catalog, database, table))
