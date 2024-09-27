@@ -111,8 +111,10 @@ main(f'--config=/Workspace{config_file}',
      f'--task=' + dbutils.widgets.get('task'),
      f'--job_id=' + dbutils.widgets.get('job_id'),
      f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--start_time=' + dbutils.widgets.get('start_time'),
      f'--attempt=' + dbutils.widgets.get('attempt'),
-     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'),
+     f'--workspace_id=' + dbutils.widgets.get('workspace_id'))
 """
 
 
