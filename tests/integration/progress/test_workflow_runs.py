@@ -9,7 +9,7 @@ def test_workflow_run_recorder_records_workflow_run(installation_ctx) -> None:
         "workflow": "test",
         "job_id": "123",
         "parent_run_id": "456",
-        "workflow_start_time": start_time.isoformat(),
+        "start_time": start_time.isoformat(),
     }
     ctx = installation_ctx.replace(named_parameters=named_parameters)
     ctx.progress_tracking_installation.run()

@@ -16,6 +16,9 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
     installation_ctx.deployed_workflows.run_workflow("assessment")
     assert installation_ctx.deployed_workflows.validate_step("assessment")
 
+    # After the assessment, a user (maybe) installs the progress tracking
+    installation_ctx.progress_tracking_installation.run()
+
     # Run the migration-progress workflow until completion.
     installation_ctx.deployed_workflows.run_workflow("migration-progress-experimental")
     assert installation_ctx.deployed_workflows.validate_step("migration-progress-experimental")
