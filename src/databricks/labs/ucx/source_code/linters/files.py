@@ -167,8 +167,6 @@ class LocalCodeLinter:
             def _process_dependency(
                 self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
             ) -> Iterable[LocatedAdvice]:
-                if dependency.path in linted_paths:
-                    return
                 ctx = context_factory()
                 # FileLinter will determine which file/notebook linter to use
                 linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
