@@ -163,7 +163,13 @@ class NotebookLinter:
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
-        yield from self._load_tree_from_notebook(self._notebook, True)
+        has_failure = False
+        for advice in self._load_tree_from_notebook(self._notebook, True):
+            if isinstance(advice, Failure): # happens when a cell is unparseable
+                has_failure = True
+            yield advice
+        if has_failure:
+            return
         for cell in self._notebook.cells:
             if not self._context.is_supported(cell.language.language):
                 continue
