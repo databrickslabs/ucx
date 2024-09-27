@@ -800,6 +800,7 @@ def test_mount_listing_misplaced_flat_file():
         ),
     ]
 
+
 def test_mount_dont_list_partitions():
     client = create_autospec(WorkspaceClient)
 
@@ -842,9 +843,7 @@ def test_mount_infinite_loop():
 
     folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", 0, "")
     partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", 0, "")
-    file = FileInfo(
-        "dbfs:/mnt/test_mount/entity/xxx=yyy/document=2023-12-20", "document=2023-12-20", "", ""
-    )
+    file = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/document=2023-12-20", "document=2023-12-20", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
@@ -884,7 +883,9 @@ def test_mount_exclude_checkpoint_dir():
     first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", 0, "")
     second_folder = FileInfo("dbfs:/mnt/test_mount/entity/domain/", "domain/", 0, "")
     csv = FileInfo("dbfs:/mnt/test_mount/entity/domain/test.csv", "test.csv", "", "")
-    checkpoint_dir = FileInfo("dbfs:/mnt/test_mount/entity/domain/streaming_checkpoint/", "streaming_checkpoint/", 0, "")
+    checkpoint_dir = FileInfo(
+        "dbfs:/mnt/test_mount/entity/domain/streaming_checkpoint/", "streaming_checkpoint/", 0, ""
+    )
     offsets = FileInfo("dbfs:/mnt/test_mount/entity/domain/streaming_checkpoint/offsets/", "offsets/", 0, "")
     commit = FileInfo("dbfs:/mnt/test_mount/entity/domain/streaming_checkpoint/commits/", "commits/", 0, "")
     state = FileInfo("dbfs:/mnt/test_mount/entity/domain/streaming_checkpoint/state/", "state/", 0, "")
