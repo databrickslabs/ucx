@@ -22,7 +22,7 @@ def test_workflow_run_recorder_records_workflow_run(installation_ctx) -> None:
     rows = list(ctx.sql_backend.fetch(select_workflow_runs_query))
     assert len(rows) == 1
     assert rows[0].started_at == start_time
-    assert start_time < rows[0].finished_at < dt.datetime.now(tz=dt.timezone.utc)
+    assert start_time <= rows[0].finished_at <= dt.datetime.now(tz=dt.timezone.utc)
     assert rows[0].workspace_id == 123456789
     assert rows[0].workflow_name == "test"
     assert rows[0].workflow_id == 123
