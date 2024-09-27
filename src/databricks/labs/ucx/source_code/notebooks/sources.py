@@ -165,7 +165,7 @@ class NotebookLinter:
     def lint(self) -> Iterable[Advice]:
         has_failure = False
         for advice in self._load_tree_from_notebook(self._notebook, True):
-            if isinstance(advice, Failure): # happens when a cell is unparseable
+            if isinstance(advice, Failure):  # happens when a cell is unparseable
                 has_failure = True
             yield advice
         if has_failure:

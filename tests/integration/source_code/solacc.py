@@ -121,7 +121,7 @@ class _SolaccContext:
             unparsed_path = Path(Path(__file__).parent, "solacc-unparsed.txt")
             if unparsed_path.exists():
                 os.remove(unparsed_path)
-        files_to_skip: set[str] | None = None
+        files_to_skip: set[Path] | None = None
         malformed = Path(__file__).parent / "solacc-malformed.txt"
         if for_all_dirs and malformed.exists():
             lines = malformed.read_text(encoding="utf-8").split("\n")
