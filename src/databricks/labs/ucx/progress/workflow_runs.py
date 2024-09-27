@@ -1,8 +1,13 @@
 import datetime as dt
+import logging
 from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -70,9 +75,12 @@ class WorkflowRunRecorder:
             workflow_run_attempt=self._workflow_run_attempt,
             run_as="UNKOWN",  # TODO Update this
         )
-        self._sql_backend.save_table(
-            self._full_table_name,
-            [workflow_run],
-            WorkflowRun,
-            mode="append",
-        )
+        try:
+            self._sql_backend.save_table(
+                self._full_table_name,
+                [workflow_run],
+                WorkflowRun,
+                mode="append",
+            )
+        except NotFound as e:
+            logger.error(f"Workflow run table not found: {self._full_table_name}", exc_info=e)
