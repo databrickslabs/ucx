@@ -39,19 +39,19 @@ class WorkflowRunRecorder:
 
     def __init__(
         self,
-        ws: WorkspaceClient,
         sql_backend: SqlBackend,
         ucx_catalog: str,
         *,
+        workspace_id: int,
         workflow_name,
         workflow_id: int,
         workflow_run_id: int,
         workflow_run_attempt: int,
         workflow_start_time: str,
     ):
-        self._ws = ws
         self._sql_backend = sql_backend
         self._full_table_name = f"{ucx_catalog}.multiworkspace.workflow_runs"
+        self._workspace_id = workspace_id
         self._workflow_name = workflow_name
         self._workflow_start_time = workflow_start_time
         self._workflow_id = workflow_id
@@ -63,7 +63,7 @@ class WorkflowRunRecorder:
         workflow_run = WorkflowRun(
             started_at=dt.datetime.fromisoformat(self._workflow_start_time),
             finished_at=dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0),
-            workspace_id=self._ws.get_workspace_id(),
+            workspace_id=self._workspace_id,
             workflow_name=self._workflow_name,
             workflow_id=self._workflow_id,
             workflow_run_id=self._workflow_run_id,

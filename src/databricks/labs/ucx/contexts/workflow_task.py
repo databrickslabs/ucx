@@ -114,9 +114,9 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def workflow_run_recorder(self):
         return WorkflowRunRecorder(
-            self.workspace_client,
             self.sql_backend,
             self.config.ucx_catalog,
+            workspace_id=int(self.named_parameters["workspace_id"]),
             workflow_name=self.named_parameters["workflow"],
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
