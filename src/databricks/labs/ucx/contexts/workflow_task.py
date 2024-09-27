@@ -117,6 +117,7 @@ class RuntimeContext(GlobalContext):
             self.workspace_client,
             self.sql_backend,
             self.config.ucx_catalog,
+            workflow_name=self.named_parameters["workflow"],
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
