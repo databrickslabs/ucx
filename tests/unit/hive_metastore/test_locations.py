@@ -2,6 +2,7 @@ from unittest.mock import Mock, call, create_autospec
 import sys
 
 import pytest
+import sys
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
@@ -799,7 +800,6 @@ def test_mount_listing_misplaced_flat_file():
             "adls://bucket/entity/domain/z_dir",
         ),
     ]
-
 
 def test_mount_dont_list_partitions():
     client = create_autospec(WorkspaceClient)
