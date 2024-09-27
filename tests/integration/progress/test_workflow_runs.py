@@ -1,14 +1,27 @@
+import datetime as dt
+
+
 def test_workflow_run_recorder_records_workflow_run(az_cli_ctx, runtime_ctx) -> None:
     az_cli_ctx.progress_tracking_installer.run()
-    query = f"SELECT 1 FROM {az_cli_ctx.ucx_catalog}.multiworkspace.workflow_runs"
+    query = f"SELECT * FROM {az_cli_ctx.ucx_catalog}.multiworkspace.workflow_runs"
     assert not any(az_cli_ctx.sql_backend.fetch(query))
 
+    start_time = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0)
     named_parameters = {
         "job_id": "123",
         "parent_run_id": "456",
-        "workflow_start_time": "2024-10-11T01:42:02.000000",
+        "workflow_start_time": start_time.isoformat(),
     }
     ctx = runtime_ctx.replace(named_parameters=named_parameters, ucx_catalog=az_cli_ctx.ucx_catalog)
     ctx.workflow_run_recorder.record(workflow_name="test")
 
-    assert any(az_cli_ctx.sql_backend.fetch(query))
+    rows = list(az_cli_ctx.sql_backend.fetch(query))
+    assert len(rows) == 1
+    assert rows[0].started_at == start_time
+    assert start_time < rows[0].finished_at < dt.datetime.now(tz=dt.timezone.utc)
+    assert rows[0].workspace_id == ctx.workspace_client.get_workspace_id()
+    assert rows[0].workflow_name == "test"
+    assert rows[0].workflow_id == 123
+    assert rows[0].workflow_run_id == 456
+    assert rows[0].workflow_run_attempt == 0
+    assert rows[0].run_as == "UNKNOWN"  # TODO: Update this
