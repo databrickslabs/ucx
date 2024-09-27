@@ -116,7 +116,6 @@ class RuntimeContext(GlobalContext):
         return WorkflowRunRecorder(
             self.workspace_client,
             self.sql_backend,
-            workflow_name=self.named_parameters["job_name"],
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),

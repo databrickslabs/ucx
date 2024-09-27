@@ -43,7 +43,6 @@ class WorkflowRunRecorder:
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
         *,
-        workflow_name: str,
         workflow_id: int,
         workflow_run_id: int,
         workflow_run_attempt: int,
@@ -53,18 +52,21 @@ class WorkflowRunRecorder:
         self._sql_backend = sql_backend
         self._full_table_name = f"{catalog}.multiworkspace.workflow_runs"
         self._workflow_start_time = workflow_start_time
-        self._workflow_name = workflow_name
         self._workflow_id = workflow_id
         self._workflow_run_id = workflow_run_id
         self._workflow_run_attempt = workflow_run_attempt
 
-    def record(self) -> None:
-        """Record a workflow run in the database."""
+    def record(self, *, workflow_name: str) -> None:
+        """Record a workflow run in the database.
+
+        Args:
+            workflow_name (str): The UCX internal workflow name.
+        """
         workflow_run = WorkflowRun(
             started_at=dt.datetime.fromisoformat(self._workflow_start_time),
             finished_at=dt.datetime.now(),
             workspace_id=self._ws.get_workspace_id(),
-            workflow_name=self._workflow_name,
+            workflow_name=workflow_name,
             workflow_id=self._workflow_id,
             workflow_run_id=self._workflow_run_id,
             workflow_run_attempt=self._workflow_run_attempt,

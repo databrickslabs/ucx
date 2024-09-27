@@ -124,4 +124,4 @@ class MigrationProgress(Workflow):
     )
     def record_workflow_run(self, ctx: RuntimeContext) -> None:
         """Record the workflow run of this workflow."""
-        ctx.workflow_run_recorder.record()
+        ctx.workflow_run_recorder.record(self._name)
