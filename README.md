@@ -80,6 +80,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`table-migrated-to-uc`](#table-migrated-to-uc)
       * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
       * [`unsupported-magic-line`](#unsupported-magic-line)
+  * [(EXPERIMENTAL) Migration Progress Workflow](#experimental-migration-progress-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -126,7 +127,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
   * [`upload` command](#upload-command)
   * [`download` command](#download-command)
-  * [`join-collection` command](#join-collection command)
+  * [`join-collection` command](#join-collection-command)
   * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
@@ -994,6 +995,19 @@ This message indicates the code that could not be analysed by UCX. User must che
 
 [[back to top](#databricks-labs-ucx)]
 
+## [EXPERIMENTAL] Migration Progress Workflow
+
+The `migration-process-experimental` workflow updates a subset of the inventory tables to track migration status of
+workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
+progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
+
+- `workflow_runs`: Tracks the status of the workflow runs.
+
+_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
+
+[[back to top](#databricks-labs-ucx)]
+
 # Utility commands
 
 ## `logs` command
@@ -1029,13 +1043,10 @@ listed with the [`workflows` command](#workflows-command).
 databricks labs ucx update-migration-progress
 ```
 
-This command updates a subset of the inventory tables that are used to track workspace resources that need to be
-migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for
-it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current
-state of the workspace.
-
-_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by
-the [assessment workflow](#assessment-workflow)._
+This command runs the [(experimental) migration progress workflow](#experimental-migration-progress-workflow) to update
+the migration status of worksapce resources that need to be migrated. It does this by triggering
+the `migration-process-experimental` workflow to run on a workspace and waiting for
+it to complete.
 
 Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can
 be fixed with the [`repair-run` command](#repair-run-command).
