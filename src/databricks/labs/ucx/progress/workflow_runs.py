@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 

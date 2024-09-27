@@ -992,7 +992,6 @@ class MockInstallationContext(MockRuntimeContext):
     def progress_tracking_installation(self) -> ProgressTrackingInstallation:
         return ProgressTrackingInstallation(self.sql_backend, self.ucx_catalog)
 
-
     @cached_property
     def extend_prompts(self):
         return {}
