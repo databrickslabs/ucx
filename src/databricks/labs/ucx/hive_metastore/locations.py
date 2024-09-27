@@ -586,8 +586,9 @@ class TablesInMounts(CrawlerBase[Table]):
                         # this can spin for hours if there is a large enough directory
                         partitioned_table_counter += 1
                         if partitioned_table_counter > 10:
-                            logger.info(f"Exiting after 10 reps:")
-                            [logger.info("\t" + file.name) for file in file_infos[:10]]
+                            logger.debug("Exiting after 10 reps:")
+                            for file in file_infos[:10]:
+                                logger.debug("\t" + file.name)
                             break
                     # Happens when previous entries where partitioned folders and the current one is delta_log
                     if parent_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
@@ -678,9 +679,11 @@ class TablesInMounts(CrawlerBase[Table]):
         # - file should not be partitioned
         # - file name should not start with part-
         # - brackets are not allowed in dbutils.fa.ls
-        return file_info.size == 0 \
-            and file_info.name != "_delta_log/" \
-            and not self._is_partitioned(file_info.name) \
-            and not file_info.name.startswith("part-") \
-            and not any([char in file_info.name for char in "[]"]) \
+        return (
+            file_info.size == 0
+            and file_info.name != "_delta_log/"
+            and not self._is_partitioned(file_info.name)
+            and not file_info.name.startswith("part-")
+            and not any([char in file_info.name for char in "[]"])
             and not self._is_streaming_checkpoint_dir(file_info)
+        )
