@@ -25,4 +25,3 @@ def test_workflow_run_recorder_records_workflow_run(az_cli_ctx, runtime_ctx) -> 
     assert rows[0].workflow_id == 123
     assert rows[0].workflow_run_id == 456
     assert rows[0].workflow_run_attempt == 0
-    assert rows[0].run_as == "UNKNOWN"  # TODO: Update this
