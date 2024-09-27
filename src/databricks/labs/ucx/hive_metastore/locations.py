@@ -567,45 +567,66 @@ class TablesInMounts(CrawlerBase[Table]):
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
         file_infos = self._dbutils.fs.ls(root_dir)
-        for file_info in file_infos:
-            if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
-                logger.debug(f"Path {file_info.path} is irrelevant")
-                continue
+        if file_infos:
+            partitioned_table_counter = 0
+            for file_info in file_infos:
+                if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
+                    logger.debug(f"Path {file_info.path} is irrelevant")
+                    continue
 
-            root_path = os.path.dirname(root_dir)
-            previous_entry = delta_log_folders.get(root_path)
-            table_in_mount = self._assess_path(file_info)
+                root_path = os.path.dirname(root_dir)
+                parent_entry = delta_log_folders.get(root_path)
+                table_in_mount = self._assess_path(file_info)
 
-            if previous_entry:
-                # Happens when first folder was _delta_log and next folders are partitioned folder
-                if previous_entry.format == "DELTA" and self._is_partitioned(file_info.name):
-                    delta_log_folders[root_path] = TableInMount(format=previous_entry.format, is_partitioned=True)
-                # Happens when previous entries where partitioned folders and the current one is delta_log
-                if previous_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
-                    delta_log_folders[root_path] = TableInMount(format=table_in_mount.format, is_partitioned=True)
-                continue
+                if parent_entry:
+                    # Happens when first folder was _delta_log and next folders are partitioned folder
+                    if parent_entry.format == "DELTA" and self._is_partitioned(file_info.name):
+                        delta_log_folders[root_path] = TableInMount(format=parent_entry.format, is_partitioned=True)
+                        logger.debug(f"Added {parent_entry.format} table for {root_path} (partitioned delta)")
+                        # this can spin for hours if there is a large enough directory
+                        partitioned_table_counter += 1
+                        if partitioned_table_counter > 10:
+                            logger.info(f"Exiting after 10 reps:")
+                            [logger.info("\t" + file.name) for file in file_infos[:10]]
+                            break
+                    # Happens when previous entries where partitioned folders and the current one is delta_log
+                    if parent_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
+                        delta_log_folders[root_path] = TableInMount(format=table_in_mount.format, is_partitioned=True)
+                        logger.debug(f"Added {parent_entry.format} table for {root_path} (delta in partitioned)")
 
-            if self._is_partitioned(file_info.name):
-                partition_format = self._find_partition_file_format(file_info.path)
-                if partition_format:
-                    delta_log_folders[root_path] = partition_format
-                continue
+                    if self._is_recursible_dir(file_info):
+                        self._find_delta_log_folders(file_info.path, delta_log_folders)
 
-            if not table_in_mount:
-                self._find_delta_log_folders(file_info.path, delta_log_folders)
-                continue
+                elif self._is_partitioned(file_info.name):
+                    partition_format = self._find_partition_file_format(file_info.path)
+                    if partition_format:
+                        delta_log_folders[root_path] = partition_format
+                        logger.debug(f"Added {partition_format.format} table for {root_path} (partitioned)")
 
-            delta_log_folders[root_path] = table_in_mount
+                elif not table_in_mount:
+                    if self._is_recursible_dir(file_info):
+                        self._find_delta_log_folders(file_info.path, delta_log_folders)
+
+                elif table_in_mount.format == "DELTA" and file_info.name == "_delta_log/":
+                    delta_log_folders[root_path] = table_in_mount
+                    logger.debug(f"Added {table_in_mount.format} table for {root_path} (normal delta)")
+
+                else:
+                    delta_log_folders[root_path] = table_in_mount
+                    logger.debug(f"Added {table_in_mount.format} table for {root_path} (general)")
+                    if self._is_recursible_dir(file_info):
+                        self._find_delta_log_folders(file_info.path, delta_log_folders)
+
         return delta_log_folders
 
     def _find_partition_file_format(self, root_dir: str) -> TableInMount | None:
-        logger.info(f"Listing {root_dir}")
+        logger.info(f"Listing partitioned file {root_dir}")
         file_infos = self._dbutils.fs.ls(root_dir)
         for file_info in file_infos:
             path_extension = self._assess_path(file_info)
             if path_extension:
                 return TableInMount(format=path_extension.format, is_partitioned=True)
-            if self._is_partitioned(file_info.name):
+            if self._is_partitioned(file_info.name) and file_info.path != root_dir:
                 return self._find_partition_file_format(file_info.path)
         return None
 
@@ -645,3 +666,21 @@ class TablesInMounts(CrawlerBase[Table]):
 
     def _is_irrelevant(self, file_name: str) -> bool:
         return any(pattern in file_name for pattern in self._fiter_paths)
+
+    def _is_streaming_checkpoint_dir(self, file_info: FileInfo) -> bool:
+        path_dirs = [file.name for file in self._dbutils.fs.ls(file_info.path) if file.size == 0]
+        return 'commits/' in path_dirs and 'offsets/' in path_dirs
+
+    def _is_recursible_dir(self, file_info: FileInfo) -> bool:
+        # Rules for recursing into a folder
+        # - should be size 0 (usually a directory)
+        # - should not be the _delta_log directory
+        # - file should not be partitioned
+        # - file name should not start with part-
+        # - brackets are not allowed in dbutils.fa.ls
+        return file_info.size == 0 \
+            and file_info.name != "_delta_log/" \
+            and not self._is_partitioned(file_info.name) \
+            and not file_info.name.startswith("part-") \
+            and not any([char in file_info.name for char in "[]"]) \
+            and not self._is_streaming_checkpoint_dir(file_info)
