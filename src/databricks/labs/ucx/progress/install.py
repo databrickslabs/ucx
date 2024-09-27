@@ -7,7 +7,7 @@ from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 logger = logging.getLogger(__name__)
 
 
-class ProgressTrackingInstaller:
+class ProgressTrackingInstallation:
     """Install resources for UCX's progress tracking."""
 
     _SCHEMA = "multiworkspace"

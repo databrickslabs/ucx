@@ -2,7 +2,7 @@ import datetime as dt
 
 
 def test_workflow_run_recorder_records_workflow_run(az_cli_ctx, runtime_ctx) -> None:
-    az_cli_ctx.progress_tracking_installer.run()
+    az_cli_ctx.progress_tracking_installation.run()
     query = f"SELECT * FROM {az_cli_ctx.ucx_catalog}.multiworkspace.workflow_runs"
     assert not any(az_cli_ctx.sql_backend.fetch(query))
 
