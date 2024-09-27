@@ -1,3 +1,4 @@
+import logging
 import sys
 
 import pytest
@@ -5,25 +6,6 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
-
-
-class CustomIterator:
-    def __init__(self, values):
-        self._values = iter(values)
-        self._has_next = True
-
-    def hasNext(self):  # pylint: disable=invalid-name
-        try:
-            self._next_value = next(self._values)
-            self._has_next = True
-        except StopIteration:
-            self._has_next = False
-        return self._has_next
-
-    def next(self):
-        if self._has_next:
-            return self._next_value
-        raise StopIteration
 
 
 def test_is_delta_true():
@@ -570,21 +552,9 @@ def test_fast_table_scan_crawler_already_crawled(mocker):
     assert len(results) == 3
 
 
-def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
+def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
-
-    def create_product_element_mock(key, value):
-        def product_element_side_effect(index):
-            if index == 0:
-                return key
-            if index == 1:
-                return value
-            raise IndexError(f"Invalid index: {index}")
-
-        mock = mocker.Mock()
-        mock.productElement.side_effect = product_element_side_effect
-        return mock
 
     errors = {}
     rows = {
@@ -592,38 +562,7 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
-
-    mock_list_databases_iterator = mocker.Mock()
-    mock_list_databases_iterator.iterator.return_value = CustomIterator(["default", "test_database"])
-    mock_list_tables_iterator = mocker.Mock()
-    mock_list_tables_iterator.iterator.return_value = CustomIterator(["table1"])
-
-    mock_property_1 = create_product_element_mock("delta.appendOnly", "true")
-    mock_property_2 = create_product_element_mock("delta.autoOptimize", "false")
-    mock_property_pat = create_product_element_mock("personalAccessToken", "e32kfkasdas")
-    mock_property_password = create_product_element_mock("password", "very_secret")
-
-    mock_storage_properties_list = [
-        mock_property_1,
-        mock_property_2,
-        mock_property_pat,
-        mock_property_password,
-    ]
-    mock_properties_iterator = mocker.Mock()
-    mock_properties_iterator.iterator.return_value = CustomIterator(mock_storage_properties_list)
-
-    mock_partition_col_iterator = mocker.Mock()
-    mock_partition_col_iterator.iterator.return_value = CustomIterator(["age", "name"])
-
-    get_table_mock = mocker.Mock()
-    get_table_mock.provider().isDefined.return_value = True
-    get_table_mock.provider().get.return_value = "delta"
-    get_table_mock.storage().locationUri().isDefined.return_value = False
-
-    get_table_mock.viewText().isDefined.return_value = True
-    get_table_mock.viewText().get.return_value = "mock table text"
-    get_table_mock.properties.return_value = mock_properties_iterator
-    get_table_mock.partitionColumnNames.return_value = mock_partition_col_iterator
+    mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock = spark_table_crawl_mocker
 
     # pylint: disable=protected-access
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
@@ -642,3 +581,74 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker):
     assert results[0].storage_properties == (
         "[delta.appendOnly=true, " "delta.autoOptimize=false, " "personalAccessToken=*******, " "password=*******]"
     )
+
+
+def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mocker, spark_table_crawl_mocker):
+
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    # pylint: disable=protected-access
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.side_effect = Exception(
+        "Test listDatabases warning"
+    )
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+    assert "Test listDatabases warning" in caplog.text
+
+
+def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker, spark_table_crawl_mocker):
+
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    mock_list_databases_iterator, _, _ = spark_table_crawl_mocker
+
+    # pylint: disable=protected-access
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.side_effect = Exception(
+        "Test listTables warning"
+    )
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+    assert "Test listTables warning" in caplog.text
+
+
+def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, spark_table_crawl_mocker):
+
+    pyspark_sql_session = mocker.Mock()
+    sys.modules["pyspark.sql.session"] = pyspark_sql_session
+
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.tables": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
+
+    mock_list_databases_iterator, mock_list_tables_iterator, _ = spark_table_crawl_mocker
+
+    # pylint: disable=protected-access
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = mock_list_databases_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = mock_list_tables_iterator
+    ftsc._spark._jsparkSession.sharedState().externalCatalog().getTable.side_effect = Exception("Test getTable warning")
+
+    with caplog.at_level(logging.WARNING):
+        ftsc.snapshot()
+    assert "Test getTable warning" in caplog.text
