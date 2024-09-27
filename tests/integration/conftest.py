@@ -53,7 +53,7 @@ from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
-
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
@@ -987,6 +987,11 @@ class MockInstallationContext(MockRuntimeContext):
             self.prompts,
             self.product_info,
         )
+
+    @cached_property
+    def progress_tracking_installation(self) -> ProgressTrackingInstallation:
+        return ProgressTrackingInstallation(self.sql_backend, self.ucx_catalog)
+
 
     @cached_property
     def extend_prompts(self):
