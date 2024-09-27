@@ -39,6 +39,7 @@ class WorkflowRunRecorder:
         self,
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
+        ucx_catalog: str,
         *,
         workflow_id: int,
         workflow_run_id: int,
@@ -47,7 +48,7 @@ class WorkflowRunRecorder:
     ):
         self._ws = ws
         self._sql_backend = sql_backend
-        self._full_table_name = f"{catalog}.multiworkspace.workflow_runs"
+        self._full_table_name = f"{ucx_catalog}.multiworkspace.workflow_runs"
         self._workflow_start_time = workflow_start_time
         self._workflow_id = workflow_id
         self._workflow_run_id = workflow_run_id
