@@ -31,9 +31,6 @@ class WorkflowRun:
     run_as: str
     """The identity the workflow was run as`"""
 
-    status: str
-    """The workflow run final status"""
-
 
 class WorkflowRunRecorder:
     """Record workflow runs in a database."""
@@ -71,7 +68,6 @@ class WorkflowRunRecorder:
             workflow_run_id=self._workflow_run_id,
             workflow_run_attempt=self._workflow_run_attempt,
             run_as="UNKOWN",  # TODO Update this
-            status="RUNNING",  # Always RUNNING as it is called during a running workflow
         )
         self._sql_backend.save_table(
             self._full_table_name,
