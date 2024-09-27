@@ -237,6 +237,14 @@
     "audioread.rawread": [],
     "audioread.version": []
   },
+  "autocommand": {
+    "autocommand": [],
+    "autocommand.autoasync": [],
+    "autocommand.autocommand": [],
+    "autocommand.automain": [],
+    "autocommand.autoparse": [],
+    "autocommand.errors": []
+  },
   "azure": {
     "azure.digitaltwins": [],
     "azure.digitaltwins.core": []
@@ -974,6 +982,21 @@
     "backcall": [],
     "backcall._signatures": [],
     "backcall.backcall": []
+  },
+  "backports.tarfile": {
+    "backports": [],
+    "backports.tarfile": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: //"
+      }
+    ],
+    "backports.tarfile.compat": [],
+    "backports.tarfile.compat.py38": []
   },
   "bcrypt": {
     "bcrypt": []
@@ -5491,6 +5514,68 @@
     "importlib_metadata.compat.py39": [],
     "importlib_metadata.diagnose": []
   },
+  "importlib_resources": {
+    "importlib_resources": [],
+    "importlib_resources._adapters": [],
+    "importlib_resources._common": [],
+    "importlib_resources._itertools": [],
+    "importlib_resources.abc": [],
+    "importlib_resources.compat": [],
+    "importlib_resources.compat.py38": [],
+    "importlib_resources.compat.py39": [],
+    "importlib_resources.functional": [],
+    "importlib_resources.future": [],
+    "importlib_resources.future.adapters": [],
+    "importlib_resources.readers": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "importlib_resources.simple": [],
+    "importlib_resources.tests": [],
+    "importlib_resources.tests._path": [],
+    "importlib_resources.tests.compat": [],
+    "importlib_resources.tests.compat.py312": [],
+    "importlib_resources.tests.compat.py39": [],
+    "importlib_resources.tests.data01": [],
+    "importlib_resources.tests.data01.subdirectory": [],
+    "importlib_resources.tests.data02": [],
+    "importlib_resources.tests.data02.one": [],
+    "importlib_resources.tests.data02.two": [],
+    "importlib_resources.tests.test_compatibilty_files": [],
+    "importlib_resources.tests.test_contents": [],
+    "importlib_resources.tests.test_custom": [],
+    "importlib_resources.tests.test_files": [],
+    "importlib_resources.tests.test_functional": [],
+    "importlib_resources.tests.test_open": [],
+    "importlib_resources.tests.test_path": [],
+    "importlib_resources.tests.test_read": [],
+    "importlib_resources.tests.test_reader": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "importlib_resources.tests.test_resource": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /path/which/shall/not/be/named"
+      }
+    ],
+    "importlib_resources.tests.util": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "importlib_resources.tests.zip": []
+  },
+  "inflect": {
+    "inflect": [],
+    "inflect.compat": [],
+    "inflect.compat.py38": []
+  },
   "iniconfig": {
     "iniconfig": []
   },
@@ -5602,11 +5687,22 @@
     "jaraco.classes.meta": [],
     "jaraco.classes.properties": []
   },
+  "jaraco.collections": {
+    "jaraco.collections": []
+  },
   "jaraco.context": {
     "jaraco.context": []
   },
   "jaraco.functools": {
     "jaraco.functools": []
+  },
+  "jaraco.text": {
+    "jaraco.text": [],
+    "jaraco.text.layouts": [],
+    "jaraco.text.show-newlines": [],
+    "jaraco.text.strip-prefix": [],
+    "jaraco.text.to-dvorak": [],
+    "jaraco.text.to-qwerty": []
   },
   "jedi": {
     "jedi": []
@@ -28952,6 +29048,21 @@
     "trl.trainer.sft_config": [],
     "trl.trainer.sft_trainer": [],
     "trl.trainer.utils": []
+  },
+  "typeguard": {
+    "typeguard": [],
+    "typeguard._checkers": [],
+    "typeguard._config": [],
+    "typeguard._decorators": [],
+    "typeguard._exceptions": [],
+    "typeguard._functions": [],
+    "typeguard._importhook": [],
+    "typeguard._memo": [],
+    "typeguard._pytest_plugin": [],
+    "typeguard._suppression": [],
+    "typeguard._transformer": [],
+    "typeguard._union_transformer": [],
+    "typeguard._utils": []
   },
   "types-python-dateutil": {},
   "types-pyyaml": {},
