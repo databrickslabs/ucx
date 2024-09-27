@@ -58,7 +58,6 @@ TEST_NIGHTLY_CI_RESOURCES_PURGE_TIMEOUT = timedelta(hours=3)  # Buffer for debug
 # See https://docs.databricks.com/en/jobs/parameter-value-references.html#supported-value-references
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
-    "job_name": "{{job.name}}",
     "run_id": "{{run_id}}",
     "start_time": "{{job.start_time.iso_datetime}}",
     "attempt": "{{job.repair_count}}",
