@@ -28,4 +28,3 @@ def test_workflow_run_record_records_workflow_run(mock_backend) -> None:
     assert rows[0].workflow_id == 123
     assert rows[0].workflow_run_id == 456
     assert rows[0].workflow_run_attempt == 0
-

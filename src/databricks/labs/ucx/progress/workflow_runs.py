@@ -42,7 +42,7 @@ class WorkflowRunRecorder:
         ucx_catalog: str,
         *,
         workspace_id: int,
-        workflow_name,
+        workflow_name: str,
         workflow_id: int,
         workflow_run_id: int,
         workflow_run_attempt: int,
