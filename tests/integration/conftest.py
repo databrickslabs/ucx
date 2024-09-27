@@ -445,7 +445,7 @@ class CommonUtils:
 
     @cached_property
     def ucx_catalog(self) -> str:
-        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+        return self._make_catalog(name=f"ucx_{self._make_random()}").name
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
