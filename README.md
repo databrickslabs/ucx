@@ -1029,11 +1029,16 @@ listed with the [`workflows` command](#workflows-command).
 databricks labs ucx update-migration-progress
 ```
 
-This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+This command updates a subset of the inventory tables that are used to track workspace resources that need to be
+migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for
+it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current
+state of the workspace.
 
-_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
+_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
 
-Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can
+be fixed with the [`repair-run` command](#repair-run-command).
 
 [[back to top](#databricks-labs-ucx)]
 
