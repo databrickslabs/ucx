@@ -484,9 +484,15 @@ class PipCommand(MagicCommand):
         Sources:
             https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
         """
+        # strip preliminary comments
+        pip_idx = code.find("pip")
+        if pip_idx > 0 and code[pip_idx - 1] in {'%', '!'}:
+            pip_idx -= 1
+        code = code[pip_idx:]
+        # look for standalone '\n'
         match = cls._splitter.search(code)
         if match:
             code = code[: match.start()]  # Remove code after non-escaped newline
+        # make single line
         code = code.replace("\\\n", " ")
-        lexer = shlex.split(code, posix=True)
-        return list(lexer)
+        return shlex.split(code, posix=True)
