@@ -949,6 +949,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_databases=self.created_databases,
             include_object_permissions=self.include_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            ucx_catalog=self.ucx_catalog,
         )
         workspace_config = self.config_transform(workspace_config)
         self.installation.save(workspace_config)
