@@ -67,7 +67,7 @@ class WorkflowRunRecorder:
         """
         workflow_run = WorkflowRun(
             started_at=dt.datetime.fromisoformat(self._workflow_start_time),
-            finished_at=dt.datetime.now(),
+            finished_at=dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0),
             workspace_id=self._ws.get_workspace_id(),
             workflow_name=workflow_name,
             workflow_id=self._workflow_id,
