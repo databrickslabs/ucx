@@ -62,6 +62,7 @@ EXTRA_TASK_PARAMS = {
     "start_time": "{{job.start_time.iso_datetime}}",
     "attempt": "{{job.repair_count}}",
     "parent_run_id": "{{parent_run_id}}",
+    "workspace_id": "{{workspace.id}}",
 }
 DEBUG_NOTEBOOK = """# Databricks notebook source
 # MAGIC %md
