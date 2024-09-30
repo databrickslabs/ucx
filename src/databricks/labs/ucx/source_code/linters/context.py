@@ -79,18 +79,18 @@ class LinterContext:
             return SqlSequentialLinter(cast(list[SqlLinter], self._linters[language]))
         raise ValueError(f"Unsupported language: {language}")
 
-    def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
+    def fixer(self, language: Language, advice_code: str) -> Fixer | None:
         if language not in self._fixers:
             return None
         for fixer in self._fixers[language]:
-            if fixer.name == diagnostic_code:
+            if advice_code in fixer.supported_advice_codes:
                 return fixer
         return None
 
-    def apply_fixes(self, language: Language, code: str) -> str:
+    def apply_fixes(self, language: Language, source_code: str) -> str:
         linter = self.linter(language)
-        for advice in linter.lint(code):
+        for advice in linter.lint(source_code):
             fixer = self.fixer(language, advice.code)
             if fixer:
-                code = fixer.apply(code)
-        return code
+                source_code = fixer.apply(source_code)
+        return source_code

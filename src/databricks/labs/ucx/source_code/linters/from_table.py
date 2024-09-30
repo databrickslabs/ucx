@@ -34,8 +34,8 @@ class FromTableSqlLinter(SqlLinter, Fixer):
         self._session_state: CurrentSessionState = session_state
 
     @property
-    def name(self) -> str:
-        return 'table-migrate'
+    def supported_advice_codes(self) -> list[str]:
+        return ['table-migrate']
 
     @property
     def schema(self):
