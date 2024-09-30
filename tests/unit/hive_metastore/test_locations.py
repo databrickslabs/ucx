@@ -1,9 +1,12 @@
 from unittest.mock import Mock, call, create_autospec
 
 import pytest
+
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.ucx.hive_metastore.federation import DbfsRootResolver
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.dbutils import FileInfo, MountInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
@@ -719,3 +722,10 @@ def test_mount_listing_seen_tables():
     assert results[0].location == "adls://bucket/table1"
     assert results[1].location == "dbfs:/mnt/test_mount/table2"
     assert results[2].location is None
+
+
+def test_dbfs_root_resolution():
+    command_executor_mock = create_autospec(CommandExecutor)
+    command_executor_mock.run.return_value = "s3://bucket/dbfsrootpath"
+    root_resolver = DbfsRootResolver(command_executor_mock)
+    assert root_resolver.run() == "s3://bucket/dbfsrootpath"
