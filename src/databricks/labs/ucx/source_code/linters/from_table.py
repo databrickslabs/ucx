@@ -2,7 +2,7 @@ import logging
 from sqlglot import parse as parse_sql
 from sqlglot.expressions import Table, Expression, Use, Create, Drop
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer, Failure
+from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer, Failure, TableInfo
 
 logger = logging.getLogger(__name__)
 
@@ -57,40 +57,49 @@ class FromTableSqlLinter(SqlLinter, Fixer):
                 )
 
     def _unsafe_lint_expression(self, expression: Expression, table: Table):
-        if isinstance(expression, Use):
-            # Sqlglot captures the database name in the Use statement as a Table, with
-            # the schema  as the table name.
-            self._session_state.schema = table.name
+        info = self._collect_table_info(expression, table)
+        if not info:
             return
-        if isinstance(expression, Drop) and getattr(expression, "kind", None) == "SCHEMA":
-            # Sqlglot captures the schema name in the Drop statement as a Table, with
-            # the schema  as the db name.
-            return
-        if isinstance(expression, Create) and getattr(expression, "kind", None) == "SCHEMA":
-            # Sqlglot captures the schema name in the Create statement as a Table, with
-            # the schema  as the db name.
-            self._session_state.schema = table.db
-            return
-
-        # we only migrate tables in the hive_metastore catalog
-        if self._catalog(table) != 'hive_metastore':
-            return
-        # Sqlglot uses db instead of schema, watch out for that
-        src_schema = table.db if table.db else self._session_state.schema
-        if not src_schema:
-            logger.error(f"Could not determine schema for table {table.name}")
-            return
-        dst = self._index.get(src_schema, table.name)
+        dst = self._index.get(info.schema_name, info.table_name)
         if not dst:
             return
         yield Deprecation(
             code='table-migrated-to-uc',
-            message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
+            message=f"Table {info.schema_name}.{info.table_name} is migrated to {dst.destination()} in Unity Catalog",
             # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
             start_line=0,
             start_col=0,
             end_line=0,
             end_col=1024,
+        )
+
+    def _collect_table_info(self, expression: Expression, table: Table) -> TableInfo | None:
+        if isinstance(expression, Use):
+            # Sqlglot captures the database name in the Use statement as a Table, with
+            # the schema  as the table name.
+            self._session_state.schema = table.name
+            return None
+        if isinstance(expression, Drop) and getattr(expression, "kind", None) == "SCHEMA":
+            # Sqlglot captures the schema name in the Drop statement as a Table, with
+            # the schema  as the db name.
+            return None
+        if isinstance(expression, Create) and getattr(expression, "kind", None) == "SCHEMA":
+            # Sqlglot captures the schema name in the Create statement as a Table, with
+            # the schema  as the db name.
+            self._session_state.schema = table.db
+            return None
+
+        # we only migrate tables in the hive_metastore catalog
+        if self._catalog(table) != 'hive_metastore':
+            return None
+        # Sqlglot uses db instead of schema, watch out for that
+        src_schema = table.db if table.db else self._session_state.schema
+        if not src_schema:
+            logger.error(f"Could not determine schema for table {table.name}")
+            return None
+        return TableInfo(schema_name=src_schema,
+                         table_name=table.name,
+                         source_id= TableInfo.UNKNOWN,
         )
 
     @staticmethod

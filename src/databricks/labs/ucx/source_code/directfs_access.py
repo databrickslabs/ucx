@@ -13,6 +13,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.source_code.base import LineageAtom
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -21,14 +22,6 @@ else:
 
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class LineageAtom:
-
-    object_type: str
-    object_id: str
-    other: dict[str, str] | None = None
 
 
 @dataclass

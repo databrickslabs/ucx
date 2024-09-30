@@ -6,7 +6,8 @@ import locale
 import logging
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
@@ -321,3 +322,24 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         logger.warning(f"Could not read file {path}")
         return False
     return file_header == magic_header
+
+
+@dataclass
+class LineageAtom:
+
+    object_type: str
+    object_id: str
+    other: dict[str, str] | None = None
+
+
+@dataclass
+class TableInfo:
+    UNKNOWN = "unknown"
+
+    schema_name: str
+    table_name: str
+    source_id: str = UNKNOWN
+    source_timestamp: datetime = datetime.fromtimestamp(0)
+    source_lineage: list[LineageAtom] = field(default_factory=list)
+    assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
+    assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
