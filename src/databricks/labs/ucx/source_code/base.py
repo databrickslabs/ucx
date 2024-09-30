@@ -336,6 +336,7 @@ class LineageAtom:
 class TableInfo:
     UNKNOWN = "unknown"
 
+    catalog_name: str
     schema_name: str
     table_name: str
     source_id: str = UNKNOWN

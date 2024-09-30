@@ -1,5 +1,7 @@
 import logging
-from sqlglot import parse as parse_sql
+from collections.abc import Iterable
+
+from sqlglot import parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table, Expression, Use, Create, Drop
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer, Failure, TableInfo
@@ -73,6 +75,24 @@ class FromTableSqlLinter(SqlLinter, Fixer):
             end_col=1024,
         )
 
+    def collect_legacy_table_infos(self, sql_code: str) -> Iterable[TableInfo]:
+        try:
+            expressions = parse_sql(sql_code, read='databricks')
+            for expression in expressions:
+                if not expression:
+                    continue
+                yield from self._collect_table_infos(expression)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
+            yield self.sql_parse_failure(sql_code)
+
+    def _collect_table_infos(self, expression: Expression) -> Iterable[TableInfo]:
+        for table in expression.find_all(Table):
+            info = self._collect_table_info(expression, table)
+            if info is None:
+                continue
+            yield info
+
     def _collect_table_info(self, expression: Expression, table: Table) -> TableInfo | None:
         if isinstance(expression, Use):
             # Sqlglot captures the database name in the Use statement as a Table, with
@@ -90,16 +110,17 @@ class FromTableSqlLinter(SqlLinter, Fixer):
             return None
 
         # we only migrate tables in the hive_metastore catalog
-        if self._catalog(table) != 'hive_metastore':
+        catalog_name = self._catalog(table)
+        if catalog_name != 'hive_metastore':
             return None
         # Sqlglot uses db instead of schema, watch out for that
         src_schema = table.db if table.db else self._session_state.schema
         if not src_schema:
             logger.error(f"Could not determine schema for table {table.name}")
             return None
-        return TableInfo(schema_name=src_schema,
+        return TableInfo(catalog_name=catalog_name,
+                         schema_name=src_schema,
                          table_name=table.name,
-                         source_id= TableInfo.UNKNOWN,
         )
 
     @staticmethod
