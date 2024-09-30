@@ -11,12 +11,14 @@ class Assessment(Workflow):
     def __init__(self):
         super().__init__('assessment')
 
-    @job_task(notebook="hive_metastore/tables.scala")
+    @job_task
     def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
-        as _database name_, _table name_, _table type_, _table location_, etc., in the table named
-        `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
-        example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
+        as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
+        `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
+        stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
+        cannot easily be migrated to Unity Catalog."""
+        ctx.tables_crawler.snapshot()
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):

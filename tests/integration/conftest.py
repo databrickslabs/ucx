@@ -563,6 +563,15 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
             include_databases=self.created_databases,
         )
 
+    @cached_property
+    def tables_crawler(self) -> TablesCrawler:
+        """
+        Returns a TablesCrawler instance with the tables that were created in the context.
+        Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
+        :return: TablesCrawler
+        """
+        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+
     def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
         default_table_format = "HIVE" if is_hiveserde else ""
