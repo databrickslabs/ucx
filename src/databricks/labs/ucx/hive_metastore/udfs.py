@@ -33,7 +33,7 @@ class Udf:  # pylint: disable=too-many-instance-attributes
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
 
-class UdfsCrawler(CrawlerBase):
+class UdfsCrawler(CrawlerBase[Udf]):
     def __init__(self, backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
         """
         Initializes a UdfsCrawler instance.

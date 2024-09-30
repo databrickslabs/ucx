@@ -22,7 +22,7 @@ class TableSize:
     size_in_bytes: int
 
 
-class TableSizeCrawler(CrawlerBase):
+class TableSizeCrawler(CrawlerBase[TableSize]):
     def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesSizeCrawler instance.
