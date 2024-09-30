@@ -315,7 +315,6 @@ class DfsaPyCollector(DfsaCollector, ABC):
 class DfsaSqlCollector(DfsaCollector, ABC): ...
 
 
-
 # The default schema to use when the schema is not specified in a table reference
 # See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
 DEFAULT_CATALOG = 'hive_metastore'

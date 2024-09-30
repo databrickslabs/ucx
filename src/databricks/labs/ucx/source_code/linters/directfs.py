@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import logging
 from abc import ABC
 from collections.abc import Iterable
@@ -11,7 +10,11 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
     PythonLinter,
-    SqlLinter, DfsaPyCollector, DirectFsAccessNode, DfsaSqlCollector, DirectFsAccess,
+    SqlLinter,
+    DfsaPyCollector,
+    DirectFsAccessNode,
+    DfsaSqlCollector,
+    DirectFsAccess,
 )
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue

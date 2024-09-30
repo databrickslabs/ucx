@@ -13,7 +13,10 @@ from databricks.labs.ucx.source_code.base import (
     SqlLinter,
     TablePyCollector,
     TableSqlCollector,
-    TableCollector, DfsaCollector, DfsaPyCollector, DfsaSqlCollector,
+    TableCollector,
+    DfsaCollector,
+    DfsaPyCollector,
+    DfsaSqlCollector,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter

@@ -17,7 +17,9 @@ from databricks.labs.ucx.source_code.base import (
     TableInfo,
     TableNode,
     TablePyCollector,
-    TableSqlCollector, DfsaPyCollector, DfsaSqlCollector,
+    TableSqlCollector,
+    DfsaPyCollector,
+    DfsaSqlCollector,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS, DirectFsAccessNode
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
