@@ -4,13 +4,20 @@ from collections.abc import Iterable
 from sqlglot import parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table, Expression, Use
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer, TableInfo
+from databricks.labs.ucx.source_code.base import (
+    Deprecation,
+    CurrentSessionState,
+    SqlLinter,
+    Fixer,
+    TableInfo,
+    TableSqlCollector,
+)
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlExpression, SqlParser
 
 logger = logging.getLogger(__name__)
 
 
-class FromTableSqlLinter(SqlLinter, Fixer):
+class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
     """Linter and Fixer for table migrations in SQL queries.
 
     This class is responsible for identifying and fixing table migrations in
@@ -59,7 +66,7 @@ class FromTableSqlLinter(SqlLinter, Fixer):
                 end_col=1024,
             )
 
-    def collect_legacy_table_infos(self, sql_code: str) -> Iterable[TableInfo]:
+    def collect_tables(self, sql_code: str) -> Iterable[TableInfo]:
         try:
             yield from SqlParser.walk_expressions(
                 sql_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)

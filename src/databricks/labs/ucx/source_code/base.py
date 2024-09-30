@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Self, Any
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
@@ -172,6 +173,146 @@ class Fixer(ABC):
     def apply(self, code: str) -> str: ...
 
 
+@dataclass
+class LineageAtom:
+
+    object_type: str
+    object_id: str
+    other: dict[str, str] | None = None
+
+
+@dataclass
+class SourceInfo:
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        source_lineage = data.get("source_lineage", None)
+        if isinstance(source_lineage, list) and len(source_lineage) > 0 and isinstance(source_lineage[0], dict):
+            lineage_atoms = [LineageAtom(**lineage) for lineage in source_lineage]
+            data["source_lineage"] = lineage_atoms
+        return cls(**data)
+
+    UNKNOWN = "unknown"
+
+    source_id: str = UNKNOWN
+    source_timestamp: datetime = datetime.fromtimestamp(0)
+    source_lineage: list[LineageAtom] = field(default_factory=list)
+    assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
+    assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
+
+    def replace_source(
+        self,
+        source_id: str | None = None,
+        source_lineage: list[LineageAtom] | None = None,
+        source_timestamp: datetime | None = None,
+    ):
+        return dataclasses.replace(
+            self,
+            source_id=source_id or self.source_id,
+            source_timestamp=source_timestamp or self.source_timestamp,
+            source_lineage=source_lineage or self.source_lineage,
+        )
+
+    def replace_assessment_infos(
+        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
+    ):
+        return dataclasses.replace(
+            self,
+            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
+            assessment_end_timestamp=assessment_end or self.assessment_end_timestamp,
+        )
+
+
+@dataclass
+class TableInfo(SourceInfo):
+
+    @classmethod
+    def parse(cls, value: str, default_schema: str) -> TableInfo:
+        parts = value.split(".")
+        if len(parts) >= 3:
+            catalog_name = parts.pop(0)
+        else:
+            catalog_name = "hive_metastore"
+        if len(parts) >= 2:
+            schema_name = parts.pop(0)
+        else:
+            schema_name = default_schema
+        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
+
+    catalog_name: str = SourceInfo.UNKNOWN
+    schema_name: str = SourceInfo.UNKNOWN
+    table_name: str = SourceInfo.UNKNOWN
+
+
+class TableCollector(ABC):
+
+    @abstractmethod
+    def collect_tables(self, source_code: str) -> Iterable[TableInfo]: ...
+
+
+@dataclass
+class TableNode:
+    table: TableInfo
+    node: NodeNG
+
+
+class TablePyCollector(TableCollector, ABC):
+
+    def collect_tables(self, source_code: str):
+        tree = Tree.normalize_and_parse(source_code)
+        for table_node in self.collect_tables_from_tree(tree):
+            yield table_node.table
+
+    @abstractmethod
+    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableNode]: ...
+    @abstractmethod
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableNode]: ...
+
+
+class TableSqlCollector(TableCollector, ABC): ...
+
+
+@dataclass
+class DirectFsAccess(SourceInfo):
+    """A record describing a Direct File System Access"""
+
+    path: str = SourceInfo.UNKNOWN
+    is_read: bool = False
+    is_write: bool = False
+
+
+@dataclass
+class DirectFsAccessNode:
+    dfsa: DirectFsAccess
+    node: NodeNG
+
+
+class DfsaCollector(ABC):
+
+    @abstractmethod
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]: ...
+
+
+class DfsaPyCollector(DfsaCollector, ABC):
+
+    def collect_dfsas(self, source_code: str):
+        tree = Tree.normalize_and_parse(source_code)
+        for dfsa_node in self.collect_dfsas_from_tree(tree):
+            yield dfsa_node.dfsa
+
+    @abstractmethod
+    def collect_dfsas_from_source(
+        self, source_code: str, inherited_tree: Tree | None
+    ) -> Iterable[DirectFsAccessNode]: ...
+
+    @abstractmethod
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
+
+
+class DfsaSqlCollector(DfsaCollector, ABC): ...
+
+
+
 # The default schema to use when the schema is not specified in a table reference
 # See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
 DEFAULT_CATALOG = 'hive_metastore'
@@ -219,20 +360,42 @@ class CurrentSessionState:
             return None
 
 
-class SqlSequentialLinter(SqlLinter):
+class SqlSequentialLinter(SqlLinter, DfsaCollector, TableCollector):
 
-    def __init__(self, linters: list[SqlLinter]):
+    def __init__(
+        self,
+        linters: list[SqlLinter],
+        dfsa_collectors: list[DfsaSqlCollector],
+        table_collectors: list[TableSqlCollector],
+    ):
         self._linters = linters
+        self._dfsa_collectors = dfsa_collectors
+        self._table_collectors = table_collectors
 
     def lint_expression(self, expression: Expression) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint_expression(expression)
 
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        for collector in self._dfsa_collectors:
+            yield from collector.collect_dfsas(source_code)
 
-class PythonSequentialLinter(Linter):
+    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
+        for collector in self._table_collectors:
+            yield from collector.collect_tables(source_code)
 
-    def __init__(self, linters: list[PythonLinter]):
+
+class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
+
+    def __init__(
+        self,
+        linters: list[PythonLinter],
+        dfsa_collectors: list[DfsaPyCollector],
+        table_collectors: list[TablePyCollector],
+    ):
         self._linters = linters
+        self._dfsa_collectors = dfsa_collectors
+        self._table_collectors = table_collectors
         self._tree: Tree | None = None
 
     def lint(self, code: str) -> Iterable[Advice]:
@@ -268,6 +431,28 @@ class PythonSequentialLinter(Linter):
         except AstroidSyntaxError as e:
             # error already reported when linting enclosing notebook
             logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
+
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        try:
+            tree = self._parse_and_append(source_code)
+            yield from self._collect_dfsas_from_tree(tree)
+        except AstroidSyntaxError as e:
+            logger.warning('syntax-error', exc_info=e)
+
+    def _collect_dfsas_from_tree(self, tree: Tree):
+        for collector in self._dfsa_collectors:
+            yield from collector.collect_dfsas_from_tree(tree)
+
+    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
+        try:
+            tree = self._parse_and_append(source_code)
+            yield from self._collect_tables_from_tree(tree)
+        except AstroidSyntaxError as e:
+            logger.warning('syntax-error', exc_info=e)
+
+    def _collect_tables_from_tree(self, tree: Tree):
+        for collector in self._table_collectors:
+            yield from collector.collect_tables_from_tree(tree)
 
     def _make_tree(self) -> Tree:
         if self._tree is None:
@@ -322,39 +507,3 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         logger.warning(f"Could not read file {path}")
         return False
     return file_header == magic_header
-
-
-@dataclass
-class LineageAtom:
-
-    object_type: str
-    object_id: str
-    other: dict[str, str] | None = None
-
-
-@dataclass
-class TableInfo:
-
-    UNKNOWN = "unknown"
-
-    @classmethod
-    def parse(cls, value: str, default_schema: str) -> TableInfo:
-        parts = value.split(".")
-        if len(parts) >= 3:
-            catalog_name = parts.pop(0)
-        else:
-            catalog_name = "hive_metastore"
-        if len(parts) >= 2:
-            schema_name = parts.pop(0)
-        else:
-            schema_name = default_schema
-        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
-
-    catalog_name: str
-    schema_name: str
-    table_name: str
-    source_id: str = UNKNOWN
-    source_timestamp: datetime = datetime.fromtimestamp(0)
-    source_lineage: list[LineageAtom] = field(default_factory=list)
-    assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
-    assessment_end_timestamp: datetime = datetime.fromtimestamp(0)

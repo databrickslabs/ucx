@@ -2,9 +2,9 @@ from datetime import datetime
 
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.source_code.base import LineageAtom
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
-    LineageAtom,
     DirectFsAccess,
 )
 

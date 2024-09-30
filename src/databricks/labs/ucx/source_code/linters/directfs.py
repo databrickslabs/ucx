@@ -11,9 +11,8 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
     PythonLinter,
-    SqlLinter,
+    SqlLinter, DfsaPyCollector, DirectFsAccessNode, DfsaSqlCollector, DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlParser, SqlExpression
@@ -55,12 +54,6 @@ DIRECT_FS_ACCESS_PATTERNS = [
     # "/mnt/" is detected by the below pattern,
     RootPattern("/", ["Volumes/", "Workspace/"]),
 ]
-
-
-@dataclass
-class DirectFsAccessNode:
-    dfsa: DirectFsAccess
-    node: NodeNG
 
 
 class _DetectDirectFsAccessVisitor(TreeVisitor):
@@ -156,7 +149,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         return self._directfs_nodes
 
 
-class DirectFsAccessPyLinter(PythonLinter):
+class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
 
     def __init__(self, session_state: CurrentSessionState, prevent_spark_duplicates=True):
         self._session_state = session_state
@@ -176,17 +169,20 @@ class DirectFsAccessPyLinter(PythonLinter):
             )
             yield advisory
 
-    def collect_dfsas(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
+    def collect_dfsas_from_source(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
         tree = Tree.new_module()
         if inherited_tree:
             tree.append_tree(inherited_tree)
         tree.append_tree(Tree.normalize_and_parse(python_code))
+        yield from self.collect_dfsas_from_tree(tree)
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         visitor = _DetectDirectFsAccessVisitor(self._session_state, self._prevent_spark_duplicates)
         visitor.visit(tree.node)
         yield from visitor.directfs_nodes
 
 
-class DirectFsAccessSqlLinter(SqlLinter):
+class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
 
     def lint_expression(self, expression: Expression):
         for dfsa in self._collect_dfsas(SqlExpression(expression)):
@@ -200,7 +196,7 @@ class DirectFsAccessSqlLinter(SqlLinter):
                 end_col=1024,
             )
 
-    def collect_dfsas(self, sql_code: str):
+    def collect_dfsas(self, sql_code: str) -> Iterable[DirectFsAccess]:
         yield from SqlParser.walk_expressions(sql_code, self._collect_dfsas)
 
     @classmethod
