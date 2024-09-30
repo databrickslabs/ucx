@@ -779,5 +779,13 @@ def lint_local_code(
     linter.lint(prompts, None if path is None else Path(path))
 
 
+@ucx.command
+def export_assessment(w: WorkspaceClient, prompts: Prompts):
+    """Export the UCX assessment queries to a zip file."""
+    ctx = WorkspaceContext(w)
+    exporter = ctx.assessment_exporter
+    exporter.export_results(prompts)
+
+
 if __name__ == "__main__":
     ucx()

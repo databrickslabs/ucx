@@ -22,6 +22,7 @@ from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
@@ -248,6 +249,10 @@ class GlobalContext(abc.ABC):
             self.migration_status_refresher,
             self.migrate_grants,
         )
+
+    @cached_property
+    def assessment_exporter(self):
+        return AssessmentExporter(self.sql_backend, self.config)
 
     @cached_property
     def acl_migrator(self):
