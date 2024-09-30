@@ -96,8 +96,12 @@ class LocatedAdvice:
             logger.debug(f'THIS IS A BUG! {advice.code}:{advice.message} has unknown path')
         if default is not None:
             path = default
-        path = path.relative_to(base)
-        return f"./{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
+        try:
+            path = path.relative_to(base)
+        except ValueError:
+            logger.debug(f'Not a relative path: {path} to base: {base}')
+        # increment start_line because it is 0-based whereas IDEs are usually 1-based
+        return f"./{path.as_posix()}:{advice.start_line+1}:{advice.start_col}: [{advice.code}] {advice.message}"
 
 
 class Advisory(Advice):
