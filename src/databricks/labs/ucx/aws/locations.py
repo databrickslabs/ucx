@@ -27,7 +27,9 @@ class AWSExternalLocationsMigration:
         self._external_locations = external_locations
         self._aws_resource_permissions = aws_resource_permissions
         self._principal_acl = principal_acl
-        self._enable_hms_federation = enable_hms_federation
+        # When HMS federation is enabled, the fallback bit is set for all the
+        # locations which are created by UCX.
+        self._enable_fallback_mode = enable_hms_federation
 
     def run(self):
         """
@@ -51,7 +53,7 @@ class AWSExternalLocationsMigration:
                 path,
                 credential_dict[role_arn],
                 skip_validation=True,
-                fallback=self._enable_hms_federation
+                fallback=self._enable_fallback_mode
             )
         self._principal_acl.apply_location_acl()
 
