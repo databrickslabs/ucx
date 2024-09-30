@@ -4,8 +4,7 @@ from abc import ABC
 from collections.abc import Iterable
 
 from astroid import Attribute, Call, Const, InferenceError, JoinedStr, Name, NodeNG  # type: ignore
-from sqlglot import Expression as SqlExpression, parse as parse_sql, ParseError as SqlParseError
-from sqlglot.expressions import Alter, Create, Delete, Drop, Identifier, Insert, Literal, Select
+from sqlglot.expressions import Alter, Create, Delete, Drop, Expression, Identifier, Insert, Literal, Select
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -17,6 +16,7 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
+from databricks.labs.ucx.source_code.sql.sql_parser import SqlParser, SqlExpression
 
 logger = logging.getLogger(__name__)
 
@@ -188,8 +188,8 @@ class DirectFsAccessPyLinter(PythonLinter):
 
 class DirectFsAccessSqlLinter(SqlLinter):
 
-    def lint_expression(self, expression: SqlExpression):
-        for dfsa in self._collect_dfsas(expression):
+    def lint_expression(self, expression: Expression):
+        for dfsa in self._collect_dfsas(SqlExpression(expression)):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
                 message=f"The use of direct filesystem references is deprecated: {dfsa.path}",
@@ -201,14 +201,7 @@ class DirectFsAccessSqlLinter(SqlLinter):
             )
 
     def collect_dfsas(self, sql_code: str):
-        try:
-            expressions = parse_sql(sql_code, read='databricks')
-            for expression in expressions:
-                if not expression:
-                    continue
-                yield from self._collect_dfsas(expression)
-        except SqlParseError as e:
-            logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
+        yield from SqlParser.walk_expressions(sql_code, self._collect_dfsas)
 
     @classmethod
     def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:
@@ -230,7 +223,7 @@ class DirectFsAccessSqlLinter(SqlLinter):
             yield from cls._collect_dfsa_from_node(identifier, identifier.this)
 
     @classmethod
-    def _collect_dfsa_from_node(cls, expression: SqlExpression, path: str) -> Iterable[DirectFsAccess]:
+    def _collect_dfsa_from_node(cls, expression: Expression, path: str) -> Iterable[DirectFsAccess]:
         if any(pattern.matches(path) for pattern in DIRECT_FS_ACCESS_PATTERNS):
             is_read = cls._is_read(expression)
             is_write = cls._is_write(expression)
@@ -241,17 +234,17 @@ class DirectFsAccessSqlLinter(SqlLinter):
             )
 
     @classmethod
-    def _is_read(cls, expression: SqlExpression | None) -> bool:
+    def _is_read(cls, expression: Expression | None) -> bool:
         expression = cls._walk_up(expression)
         return isinstance(expression, Select)
 
     @classmethod
-    def _is_write(cls, expression: SqlExpression | None) -> bool:
+    def _is_write(cls, expression: Expression | None) -> bool:
         expression = cls._walk_up(expression)
         return isinstance(expression, (Create, Alter, Drop, Insert, Delete))
 
     @classmethod
-    def _walk_up(cls, expression: SqlExpression | None) -> SqlExpression | None:
+    def _walk_up(cls, expression: Expression | None) -> Expression | None:
         if expression is None:
             return None
         if isinstance(expression, (Create, Alter, Drop, Insert, Delete, Select)):

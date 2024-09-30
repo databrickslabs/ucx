@@ -107,15 +107,18 @@ def test_raises_advice_when_parsing_unsupported_sql(migration_index):
 
 
 @pytest.mark.parametrize(
-    "query, expected", [
-    ("SELECT * FROM hive_metastore.old.things", [("hive_metastore", "old", "things")]),
+    "query, expected",
+    [
+        ("SELECT * FROM hive_metastore.old.things", [("hive_metastore", "old", "things")]),
         ("SELECT * FROM old.things", [("hive_metastore", "old", "things")]),
         ("SELECT * FROM brand.new.things", []),
         ("SELECT * FROM new.things", [("hive_metastore", "new", "things")]),
-        ]
+    ],
 )
 def test_collects_table_infos(query, expected, migration_index):
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
-    tuples = list((info.catalog_name, info.schema_name, info.table_name) for info in ftf.collect_legacy_table_infos(query))
+    tuples = list(
+        (info.catalog_name, info.schema_name, info.table_name) for info in ftf.collect_legacy_table_infos(query)
+    )
     assert tuples == expected

@@ -334,7 +334,21 @@ class LineageAtom:
 
 @dataclass
 class TableInfo:
+
     UNKNOWN = "unknown"
+
+    @classmethod
+    def parse(cls, value: str, default_schema: str) -> TableInfo:
+        parts = value.split(".")
+        if len(parts) >= 3:
+            catalog_name = parts.pop(0)
+        else:
+            catalog_name = "hive_metastore"
+        if len(parts) >= 2:
+            schema_name = parts.pop(0)
+        else:
+            schema_name = default_schema
+        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
 
     catalog_name: str
     schema_name: str

@@ -14,6 +14,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
     Fixer,
+    TableInfo,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -100,7 +101,8 @@ class SparkCallMatcher(_TableNameMatcher):
                     node=node,
                 )
                 continue
-            dst = self._find_dest(index, inferred.as_string(), from_table.schema)
+            info = TableInfo.parse(inferred.as_string(), from_table.schema)
+            dst = self._find_dest(index, info)
             if dst is None:
                 continue
             yield Deprecation.from_node(
@@ -113,17 +115,17 @@ class SparkCallMatcher(_TableNameMatcher):
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
-        dst = self._find_dest(index, table_arg.value, from_table.schema)
+        # TODO locate constant when value is inferred
+        info = TableInfo.parse(table_arg.value, from_table.schema)
+        dst = self._find_dest(index, info)
         if dst is not None:
             table_arg.value = dst.destination()
 
-    @staticmethod
-    def _find_dest(index: TableMigrationIndex, value: str, schema: str):
-        parts = value.split(".")
-        # Ensure that unqualified table references use the current schema
-        if len(parts) == 1:
-            return index.get(schema, parts[0])
-        return None if len(parts) != 2 else index.get(parts[0], parts[1])
+    @classmethod
+    def _find_dest(cls, index: TableMigrationIndex, table: TableInfo):
+        if table.catalog_name != "hive_metastore":
+            return None
+        return index.get(table.schema_name, table.table_name)
 
 
 @dataclass
