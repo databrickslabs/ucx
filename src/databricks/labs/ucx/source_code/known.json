@@ -1118,6 +1118,9 @@
       }
     ]
   },
+  "brotli": {
+    "brotli": []
+  },
   "btyd": {
     "btyd": [],
     "btyd.datasets": [],
