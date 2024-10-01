@@ -732,13 +732,19 @@ class MigrateGrants:
         sql_backend: SqlBackend,
         group_manager: GroupManager,
         grant_loaders: list[Callable[[], Iterable[Grant]]],
+        /,
+        dry_run: bool = False,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
+        self._dry_run = dry_run
 
     def apply(self, src: Table, uc_table_key: str) -> bool:
         for grant in self._match_grants(src):
+            if self._dry_run:
+                logger.info(f"Granting {grant.action_type} on {uc_table_key} to {grant.principal}")
+                continue
             acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
             if acl_migrate_sql is None:
                 logger.warning(
