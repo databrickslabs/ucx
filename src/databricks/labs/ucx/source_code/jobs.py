@@ -53,6 +53,7 @@ from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.table_info import TableInfoCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +348,7 @@ class WorkflowLinter:
         path_lookup: PathLookup,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
+        table_infos_crawler: TableInfoCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
@@ -354,6 +356,7 @@ class WorkflowLinter:
         self._path_lookup = path_lookup
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
+        self._table_infos_crawler = table_infos_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -369,9 +372,11 @@ class WorkflowLinter:
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
         job_dfsas: list[DirectFsAccess] = []
-        for problems, dfsas in job_results:
+        job_tables: list[TableInfo] = []
+        for problems, dfsas, tables in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
+            job_tables.extend(tables)
         logger.info(f"Saving {len(job_problems)} linting problems...")
         sql_backend.save_table(
             f'{inventory_database}.workflow_problems',
@@ -380,27 +385,30 @@ class WorkflowLinter:
             mode='overwrite',
         )
         self._directfs_crawler.dump_all(job_dfsas)
+        self._table_infos_crawler.dump_all(job_tables)
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[TableInfo]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
-            return ([], [])
+            return ([], [], [])
 
-        problems, dfsas = self._lint_job(job)
+        problems, dfsas, tables = self._lint_job(job)
         if len(problems) > 0:
             problem_messages = "\n".join([problem.as_message() for problem in problems])
             logger.warning(f"Found job problems:\n{problem_messages}")
-        return problems, dfsas
+        return problems, dfsas, tables
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[TableInfo]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccess] = []
+        table_infos: list[TableInfo] = []
+
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -431,7 +439,16 @@ class WorkflowLinter:
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
-        return problems, dfsas
+            assessment_start = datetime.now(timezone.utc)
+            task_tables = self._collect_task_tables(job, task, graph, session_state)
+            assessment_end = datetime.now(timezone.utc)
+            for table_info in task_tables:
+                table_info = table_info.replace_assessment_infos(
+                    assessment_start=assessment_start, assessment_end=assessment_end
+                )
+                table_infos.append(table_info)
+
+        return problems, dfsas, table_infos
 
     def _build_task_dependency_graph(
         self, task: jobs.Task, job: jobs.Job
@@ -469,10 +486,23 @@ class WorkflowLinter:
     def _collect_task_dfsas(
         self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
     ) -> Iterable[DirectFsAccess]:
-        # walker doesn't register lineage for job/task
+        # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
         for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+            atoms = [
+                LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
+            ]
+            yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
+
+    def _collect_task_tables(
+        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
+    ) -> Iterable[TableInfo]:
+        # need to add lineage for job/task because walker doesn't register them
+        job_id = str(job.job_id)
+        job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
+        for dfsa in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
