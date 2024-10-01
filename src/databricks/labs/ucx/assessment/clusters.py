@@ -143,8 +143,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
 
 class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
-        super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
-        self._ws = ws
+        super().__init__(ws, sbe, "hive_metastore", schema, "clusters", ClusterInfo)
 
     def _crawl(self) -> Iterable[ClusterInfo]:
         all_clusters = list(self._ws.clusters.list())
@@ -192,8 +191,7 @@ class PolicyInfo:
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "policies", PolicyInfo)
-        self._ws = ws
+        super().__init__(ws, sbe, "hive_metastore", schema, "policies", PolicyInfo)
 
     def _crawl(self) -> Iterable[PolicyInfo]:
         all_policices = list(self._ws.cluster_policies.list())

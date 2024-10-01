@@ -16,7 +16,7 @@ def test_permissions_snapshot(ws, sql_backend, inventory_schema):
         def object_types(self) -> set[str]:
             return {"bcd", "fgh"}
 
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [StubbedCrawler()])
+    permission_manager = PermissionManager(ws, sql_backend, inventory_schema, [StubbedCrawler()])
     snapshot = list(permission_manager.snapshot())
     # Snapshotting is multithreaded, meaning the order of results is non-deterministic.
     snapshot.sort(key=lambda x: x.object_id)

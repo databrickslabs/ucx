@@ -331,8 +331,8 @@ def get_azure_spark_conf():
 
 
 class StaticTablesCrawler(TablesCrawler):
-    def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
-        super().__init__(sb, schema)
+    def __init__(self, ws: WorkspaceClient, sb: SqlBackend, schema: str, tables: list[TableInfo]):
+        super().__init__(ws, sb, schema)
         self._tables = [
             Table(
                 catalog=_.catalog_name,
@@ -570,7 +570,12 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
         :return: TablesCrawler
         """
-        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return TablesCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.config.include_databases,
+        )
 
     def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow

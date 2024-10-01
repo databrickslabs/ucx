@@ -120,7 +120,7 @@ def spark_table_crawl_mocker(mocker):
 
 
 @pytest.fixture
-def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
+def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
     def inner(cb, **replace) -> RuntimeContext:
         with _lock, patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
             pyspark_sql_session = mocker.Mock()
@@ -128,16 +128,17 @@ def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
             if 'installation' not in replace:
                 replace['installation'] = mock_installation
             if 'workspace_client' not in replace:
-                ws = create_autospec(WorkspaceClient)
-                ws.api_client.do.return_value = {}
-                ws.permissions.get.return_value = {}
                 replace['workspace_client'] = ws
             if 'sql_backend' not in replace:
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
                 replace['config'] = mock_installation.load(WorkspaceConfig)
             if 'tables_crawler' not in replace:
-                replace['tables_crawler'] = TablesCrawler(replace['sql_backend'], replace['config'].inventory_database)
+                replace['tables_crawler'] = TablesCrawler(
+                    replace['workspace_client'],
+                    replace['sql_backend'],
+                    replace['config'].inventory_database,
+                )
 
             module = __import__(cb.__module__, fromlist=[cb.__name__])
             klass, method = cb.__qualname__.split('.', 1)
@@ -197,3 +198,12 @@ def mock_notebook_resolver():
 @pytest.fixture
 def mock_backend() -> MockBackend:
     return MockBackend()
+
+
+@pytest.fixture
+def ws() -> WorkspaceClient:
+    client = create_autospec(WorkspaceClient)
+    client.api_client.do.return_value = {}
+    client.permissions.get.return_value = {}
+    client.get_workspace_id.return_value = "12345"
+    return client

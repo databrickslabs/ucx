@@ -4,12 +4,11 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +22,26 @@ class TableSize:
 
 
 class TableSizeCrawler(CrawlerBase[TableSize]):
-    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    # TODO: Ensure TablesCrawler and FasterTableScanCrawler share a common interface.
+    def __init__(self, tables_crawler: TablesCrawler | FasterTableScanCrawler) -> None:
         """
         Initializes a TablesSizeCrawler instance.
 
         Args:
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
-            schema: The schema name for the inventory persistence.
+            tables_crawler (TablesCrawler): The crawler to use to obtain the table inventory.
         """
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        self._backend = backend
-        super().__init__(backend, "hive_metastore", schema, "table_size", TableSize)
-        self._tables_crawler = TablesCrawler(backend, schema, include_databases)
+        super().__init__(
+            tables_crawler._ws,
+            tables_crawler._backend,
+            "hive_metastore",
+            tables_crawler._schema,
+            "table_size",
+            TableSize,
+        )
+        self._tables_crawler = tables_crawler
         self._spark = SparkSession.builder.getOrCreate()
 
     def _crawl(self) -> Iterable[TableSize]:

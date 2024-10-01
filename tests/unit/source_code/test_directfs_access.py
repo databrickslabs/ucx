@@ -9,9 +9,9 @@ from databricks.labs.ucx.source_code.directfs_access import (
 )
 
 
-def test_crawler_appends_dfsas():
+def test_crawler_appends_dfsas(ws):
     backend = MockBackend()
-    crawler = DirectFsAccessCrawler.for_paths(backend, "schema")
+    crawler = DirectFsAccessCrawler.for_paths(ws, backend, "schema")
     dfsas = list(
         DirectFsAccess(
             path=path,

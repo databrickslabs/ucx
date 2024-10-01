@@ -76,8 +76,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     """
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
-        self._ws = ws
+        super().__init__(ws, sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._table_crawler = table_crawler
 
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:

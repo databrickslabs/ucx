@@ -10,6 +10,7 @@ from typing import Any
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -80,22 +81,30 @@ class DirectFsAccess:
 class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     @classmethod
-    def for_paths(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler(backend, schema, "directfs_in_paths")
+    def for_paths(cls, ws: WorkspaceClient, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler(ws, backend, schema, "directfs_in_paths")
 
     @classmethod
-    def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
-        return DirectFsAccessCrawler(backend, schema, "directfs_in_queries")
+    def for_queries(cls, ws: WorkspaceClient, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
+        return DirectFsAccessCrawler(ws, backend, schema, "directfs_in_queries")
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, schema: str, table: str):
         """
         Initializes a DFSACrawler instance.
 
         Args:
+            ws (WorkspaceClient): The client associated with this workspace.
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
+        super().__init__(
+            ws=ws,
+            backend=backend,
+            catalog="hive_metastore",
+            schema=schema,
+            table=table,
+            klass=DirectFsAccess,
+        )
 
     def dump_all(self, dfsas: Sequence[DirectFsAccess]):
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one

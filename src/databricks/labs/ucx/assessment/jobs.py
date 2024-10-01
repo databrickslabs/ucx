@@ -72,8 +72,7 @@ class JobsMixin:
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
-        self._ws = ws
+        super().__init__(ws, sbe, "hive_metastore", schema, "jobs", JobInfo)
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
@@ -159,8 +158,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
     ]
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str, num_days_history: int):
-        super().__init__(sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
-        self._ws = ws
+        super().__init__(ws, sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
         self._num_days_history = num_days_history
 
     @staticmethod

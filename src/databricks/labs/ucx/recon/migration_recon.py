@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -38,6 +39,7 @@ class ReconResult:
 class MigrationRecon(CrawlerBase[ReconResult]):
     def __init__(
         self,
+        ws: WorkspaceClient,
         sbe: SqlBackend,
         schema: str,
         migration_status_refresher: TableMigrationStatusRefresher,
@@ -46,7 +48,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         data_comparator: DataComparator,
         default_threshold: float,
     ):
-        super().__init__(sbe, "hive_metastore", schema, "recon_results", ReconResult)
+        super().__init__(ws, sbe, "hive_metastore", schema, "recon_results", ReconResult)
         self._migration_status_refresher = migration_status_refresher
         self._table_mapping = table_mapping
         self._schema_comparator = schema_comparator

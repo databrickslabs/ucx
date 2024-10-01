@@ -174,16 +174,16 @@ ROWS = {
 }
 
 
-def test_crawler_no_data():
+def test_crawler_no_data(ws):
     sql_backend = MockBackend()
-    table = TablesCrawler(sql_backend, "schema")
-    udf = UdfsCrawler(sql_backend, "schema")
+    table = TablesCrawler(ws, sql_backend, "schema")
+    udf = UdfsCrawler(ws, sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = list(crawler.snapshot())
     assert len(grants) == 0
 
 
-def test_crawler_crawl():
+def test_crawler_crawl(ws):
     sql_backend = MockBackend(
         rows={
             "SHOW DATABASES": SHOW_DATABASES[
@@ -238,14 +238,14 @@ def test_crawler_crawl():
             action_type="SELECT",
         ),
     }
-    table = TablesCrawler(sql_backend, "schema")
-    udf = UdfsCrawler(sql_backend, "schema")
+    table = TablesCrawler(ws, sql_backend, "schema")
+    udf = UdfsCrawler(ws, sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = list(crawler.snapshot())
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
 
 
-def test_crawler_udf_crawl():
+def test_crawler_udf_crawl(ws):
     sql_backend = MockBackend(
         rows={
             "SHOW DATABASES": SHOW_DATABASES[("database_one",),],
@@ -287,33 +287,33 @@ def test_crawler_udf_crawl():
         ),
     }
 
-    table = TablesCrawler(sql_backend, "schema")
-    udf = UdfsCrawler(sql_backend, "schema")
+    table = TablesCrawler(ws, sql_backend, "schema")
+    udf = UdfsCrawler(ws, sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     grants = list(crawler.snapshot())
 
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
 
 
-def test_crawler_snapshot_when_no_data():
+def test_crawler_snapshot_when_no_data(ws):
     sql_backend = MockBackend()
-    table = TablesCrawler(sql_backend, "schema")
-    udf = UdfsCrawler(sql_backend, "schema")
+    table = TablesCrawler(ws, sql_backend, "schema")
+    udf = UdfsCrawler(ws, sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     snapshot = list(crawler.snapshot())
     assert len(snapshot) == 0
 
 
-def test_crawler_snapshot_with_data():
+def test_crawler_snapshot_with_data(ws):
     sql_backend = MockBackend(rows=ROWS)
-    table = TablesCrawler(sql_backend, "schema")
-    udf = UdfsCrawler(sql_backend, "schema")
+    table = TablesCrawler(ws, sql_backend, "schema")
+    udf = UdfsCrawler(ws, sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
     snapshot = list(crawler.snapshot())
     assert len(snapshot) == 3
 
 
-def test_grants_returning_error_when_showing_grants():
+def test_grants_returning_error_when_showing_grants(ws):
     errors = {"SHOW GRANTS ON TABLE `hive_metastore`.`test_database`.`table1`": "error"}
     rows = {
         "SHOW DATABASES": SHOW_DATABASES[
@@ -334,8 +334,8 @@ def test_grants_returning_error_when_showing_grants():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
+    table_crawler = TablesCrawler(ws, backend, "default")
+    udf = UdfsCrawler(ws, backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
     results = list(crawler.snapshot())
@@ -352,7 +352,7 @@ def test_grants_returning_error_when_showing_grants():
     ]
 
 
-def test_grants_returning_error_when_describing():
+def test_grants_returning_error_when_describing(ws):
     errors = {"DESCRIBE TABLE EXTENDED `hive_metastore`.`test_database`.`table1`": "error"}
     rows = {
         "SHOW DATABASES": SHOW_DATABASES[("test_database",),],
@@ -370,8 +370,8 @@ def test_grants_returning_error_when_describing():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
+    table_crawler = TablesCrawler(ws, backend, "default")
+    udf = UdfsCrawler(ws, backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
     results = list(crawler.snapshot())
@@ -388,7 +388,7 @@ def test_grants_returning_error_when_describing():
     ]
 
 
-def test_udf_grants_returning_error_when_showing_grants():
+def test_udf_grants_returning_error_when_showing_grants(ws):
     errors = {"SHOW GRANTS ON FUNCTION `hive_metastore`.`test_database`.`function_bad`": "error"}
     rows = {
         "SHOW DATABASES": SHOW_DATABASES[
@@ -409,8 +409,8 @@ def test_udf_grants_returning_error_when_showing_grants():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
+    table_crawler = TablesCrawler(ws, backend, "default")
+    udf = UdfsCrawler(ws, backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
     results = list(crawler.snapshot())
@@ -427,7 +427,7 @@ def test_udf_grants_returning_error_when_showing_grants():
     ]
 
 
-def test_udf_grants_returning_error_when_describing():
+def test_udf_grants_returning_error_when_describing(ws):
     errors = {"DESCRIBE FUNCTION EXTENDED `hive_metastore`.`test_database`.`function_bad`": "error"}
     rows = {
         "SHOW DATABASES": SHOW_DATABASES[("test_database",),],
@@ -445,8 +445,8 @@ def test_udf_grants_returning_error_when_describing():
     }
 
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
+    table_crawler = TablesCrawler(ws, backend, "default")
+    udf = UdfsCrawler(ws, backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
     results = list(crawler.snapshot())
@@ -463,7 +463,7 @@ def test_udf_grants_returning_error_when_describing():
     ]
 
 
-def test_crawler_should_filter_databases():
+def test_crawler_should_filter_databases(ws):
     sql_backend = MockBackend(
         rows={
             "SHOW TABLES FROM `hive_metastore`\\.`database_one`": SHOW_TABLES[("database_one", "table_one", "true"),],
@@ -490,8 +490,8 @@ def test_crawler_should_filter_databases():
         ),
     }
 
-    table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
-    udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
+    table = TablesCrawler(ws, sql_backend, "schema", include_databases=["database_one"])
+    udf = UdfsCrawler(ws, sql_backend, "schema", include_databases=["database_one"])
     crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
     grants = list(crawler.snapshot())
 

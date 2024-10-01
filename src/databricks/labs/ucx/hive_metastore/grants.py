@@ -199,10 +199,11 @@ class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
     def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
+        assert tc._ws == udf._ws
         assert tc._backend == udf._backend
         assert tc._catalog == udf._catalog
         assert tc._schema == udf._schema
-        super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
+        super().__init__(tc._ws, tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
         self._udf = udf
         self._include_databases = include_databases

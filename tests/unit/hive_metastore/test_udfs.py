@@ -23,23 +23,23 @@ SHOW_DATABASES = MockBackend.rows("databaseName")
 SHOW_FUNCTIONS = MockBackend.rows("function")
 
 
-def test_udfs_returning_error_when_describing():
+def test_udfs_returning_error_when_describing(ws):
     errors = {"DESCRIBE FUNCTION EXTENDED hive_metastore.database.function1": "error"}
     rows = {
         "SHOW DATABASES": SHOW_DATABASES[("database",),],
         "SHOW USER FUNCTIONS FROM hive_metastore.database": SHOW_FUNCTIONS[("hive_metastore.database.function1",),],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    udf_crawler = UdfsCrawler(backend, "default")
+    udf_crawler = UdfsCrawler(ws, backend, "default")
     results = udf_crawler.snapshot()
     assert len(results) == 0
 
 
-def test_tables_crawler_should_filter_by_database():
+def test_tables_crawler_should_filter_by_database(ws):
     rows = {
         "SHOW USER FUNCTIONS FROM `hive_metastore`.`database`": SHOW_FUNCTIONS[("hive_metastore.database.function1",),],
     }
     backend = MockBackend(rows=rows)
-    udf_crawler = UdfsCrawler(backend, "default", ["database"])
+    udf_crawler = UdfsCrawler(ws, backend, "default", ["database"])
     results = udf_crawler.snapshot()
     assert len(results) == 1

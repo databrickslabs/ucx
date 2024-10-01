@@ -201,6 +201,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def permission_manager(self):
         return PermissionManager(
+            self.workspace_client,
             self.sql_backend,
             self.inventory_database,
             [
@@ -232,11 +233,21 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def udfs_crawler(self):
-        return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return UdfsCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.config.include_databases,
+        )
 
     @cached_property
     def tables_crawler(self):
-        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return TablesCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.config.include_databases,
+        )
 
     @cached_property
     def tables_migrator(self):
@@ -443,11 +454,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def directfs_access_crawler_for_paths(self):
-        return DirectFsAccessCrawler.for_paths(self.sql_backend, self.inventory_database)
+        return DirectFsAccessCrawler.for_paths(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def directfs_access_crawler_for_queries(self):
-        return DirectFsAccessCrawler.for_queries(self.sql_backend, self.inventory_database)
+        return DirectFsAccessCrawler.for_queries(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self):
@@ -476,6 +487,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def migration_recon(self):
         return MigrationRecon(
+            self.workspace_client,
             self.sql_backend,
             self.inventory_database,
             self.migration_status_refresher,

@@ -13,6 +13,7 @@ from sqlglot.errors import ParseError
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -341,15 +342,16 @@ class MigrationCount:
 
 
 class TablesCrawler(CrawlerBase[Table]):
-    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
 
         Args:
+            ws (WorkspaceClient): A client for the current workspace.
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        super().__init__(ws, backend, "hive_metastore", schema, "tables", Table)
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:
@@ -486,14 +488,14 @@ class FasterTableScanCrawler(CrawlerBase[Table]):
     Databricks workspace.
     """
 
-    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         self._backend = backend
         self._include_database = include_databases
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        super().__init__(ws, backend, "hive_metastore", schema, "tables", Table)
         self._spark = SparkSession.builder.getOrCreate()
 
     @cached_property

@@ -4,7 +4,6 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 
@@ -14,8 +13,8 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup, Migration
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
 
-def test_inventory_permission_manager_init(mock_backend):
-    permission_manager = PermissionManager(mock_backend, "test_database", [])
+def test_inventory_permission_manager_init(ws, mock_backend):
+    permission_manager = PermissionManager(ws, mock_backend, "test_database", [])
 
     assert permission_manager.full_name == "hive_metastore.test_database.permissions"
 
@@ -23,7 +22,7 @@ def test_inventory_permission_manager_init(mock_backend):
 _PermissionsRow = Row.factory(["object_id", "object_type", "raw"])
 
 
-def test_snapshot_fetch() -> None:
+def test_snapshot_fetch(ws) -> None:
     """Verify that the snapshot will load existing data from the inventory."""
     sql_backend = MockBackend(
         rows={
@@ -32,18 +31,18 @@ def test_snapshot_fetch() -> None:
             ],
         }
     )
-    permission_manager = PermissionManager(sql_backend, "test_database", [])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [])
 
     output = list(permission_manager.snapshot())
     assert output[0] == Permissions(object_id="object1", object_type="clusters", raw="test acl")
 
 
-def test_snapshot_crawl_fallback(mocker) -> None:
+def test_snapshot_crawl_fallback(ws, mocker) -> None:
     """Verify that the snapshot will first attempt to load the (empty) inventory and then crawl."""
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
     sql_backend = MockBackend(rows={"SELECT object_id, object_type, raw FROM ": []})
-    permission_manager = PermissionManager(sql_backend, "test_database", [some_crawler])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [some_crawler])
 
     permission_manager.snapshot()
 
@@ -52,7 +51,7 @@ def test_snapshot_crawl_fallback(mocker) -> None:
     )
 
 
-def test_manager_snapshot_crawl_ignore_disabled_features(mock_backend, mocker):
+def test_manager_snapshot_crawl_ignore_disabled_features(ws, mock_backend, mocker):
     def raise_error():
         raise DatabricksError(
             "Model serving is not enabled for your shard. "
@@ -62,7 +61,7 @@ def test_manager_snapshot_crawl_ignore_disabled_features(mock_backend, mocker):
 
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), raise_error]
-    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
+    permission_manager = PermissionManager(ws, mock_backend, "test_database", [some_crawler])
 
     permission_manager.snapshot()
 
@@ -71,7 +70,7 @@ def test_manager_snapshot_crawl_ignore_disabled_features(mock_backend, mocker):
     )
 
 
-def test_manager_snapshot_crawl_with_error(mock_backend, mocker):
+def test_manager_snapshot_crawl_with_error(ws, mock_backend, mocker):
     def raise_error():
         raise DatabricksError(
             "Fail the job",
@@ -83,14 +82,14 @@ def test_manager_snapshot_crawl_with_error(mock_backend, mocker):
 
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: Permissions("a", "b", "c"), raise_error, raise_error_no_code]
-    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
+    permission_manager = PermissionManager(ws, mock_backend, "test_database", [some_crawler])
 
     with pytest.raises(ManyError) as expected_err:
         permission_manager.snapshot()
     assert len(expected_err.value.errs) == 2
 
 
-def test_manager_apply(mocker):
+def test_manager_apply(ws, mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -142,7 +141,7 @@ def test_manager_apply(mocker):
     # this emulates a real applier and call to an API
     mock_applier.get_apply_task = lambda item, _: lambda: applied_items.add(f"{item.object_id} {item.object_id}")
 
-    permission_manager = PermissionManager(sql_backend, "test_database", [mock_applier])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [mock_applier])
     group_migration_state = MigrationState(
         [
             MigratedGroup(
@@ -163,7 +162,7 @@ def test_manager_apply(mocker):
     assert {"test2 test2", "test test"} == applied_items
 
 
-def test_unregistered_support():
+def test_unregistered_support(ws):
     sql_backend = MockBackend(
         rows={
             "SELECT": [
@@ -171,11 +170,11 @@ def test_unregistered_support():
             ]
         }
     )
-    permission_manager = PermissionManager(sql_backend, "test", [])
+    permission_manager = PermissionManager(ws, sql_backend, "test", [])
     permission_manager.apply_group_permissions(migration_state=MigrationState([]))
 
 
-def test_manager_verify():
+def test_manager_verify(ws):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -208,14 +207,14 @@ def test_manager_verify():
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: lambda: items.add(f"{item.object_id} {item.object_id}")
 
-    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [mock_verifier])
     result = permission_manager.verify_group_permissions()
 
     assert result
     assert {"test test"} == items
 
 
-def test_manager_verify_not_supported_type():
+def test_manager_verify_not_supported_type(ws):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -243,13 +242,13 @@ def test_manager_verify_not_supported_type():
 
     mock_verifier = create_autospec(AclSupport)  # pylint: disable=mock-no-usage
     mock_verifier.object_types = lambda: {"not_supported"}
-    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [mock_verifier])
 
     with pytest.raises(ValueError):
         permission_manager.verify_group_permissions()
 
 
-def test_manager_verify_no_tasks():
+def test_manager_verify_no_tasks(ws):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -280,14 +279,13 @@ def test_manager_verify_no_tasks():
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: None
 
-    permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
+    permission_manager = PermissionManager(ws, sql_backend, "test_database", [mock_verifier])
     result = permission_manager.verify_group_permissions()
 
     assert result
 
 
-def test_manager_apply_experimental_no_tasks(caplog):
-    ws = create_autospec(WorkspaceClient)
+def test_manager_apply_experimental_no_tasks(ws, caplog):
     group_migration_state = MigrationState([])
 
     with caplog.at_level("INFO"):

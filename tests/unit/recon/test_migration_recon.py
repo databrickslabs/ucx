@@ -1,8 +1,4 @@
-from unittest.mock import create_autospec
-
-import pytest
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
@@ -13,14 +9,6 @@ from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadata
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from tests.unit import mock_table_mapping
-
-
-@pytest.fixture
-def ws():
-    client = create_autospec(WorkspaceClient)
-    client.get_workspace_id.return_value = "12345"
-    return client
-
 
 MIGRATION_STATUS = MockBackend.rows(
     "src_schema",
@@ -74,11 +62,12 @@ def test_migrate_recon_should_produce_proper_queries(
         "WITH compare_results": data_comp_row_factory[(102, 100, 2),],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_crawler = TablesCrawler(ws, backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     metadata_retriever = DatabricksTableMetadataRetriever(backend)
     data_profiler = StandardDataProfiler(backend, metadata_retriever)
     migration_recon = MigrationRecon(
+        ws,
         backend,
         "inventory_database",
         migration_status_refresher,
