@@ -93,7 +93,8 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         for pattern in DIRECT_FS_ACCESS_PATTERNS:
             if not pattern.matches(value):
                 continue
-            # don't capture calls not originating from spark or dbutils
+            # only capture calls originating from spark or dbutils
+            # because there is no other known way to manipulate data directly from file system
             is_from_spark = False
             is_from_db_utils = Tree(call_node).is_from_module("dbutils")
             if not is_from_db_utils:
