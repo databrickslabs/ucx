@@ -80,7 +80,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`table-migrated-to-uc`](#table-migrated-to-uc)
       * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
       * [`unsupported-magic-line`](#unsupported-magic-line)
-  * [(EXPERIMENTAL) Migration Progress Workflow](#experimental-migration-progress-workflow)
+  * [[EXPERIMENTAL] Migration Progress Workflow](#experimental-migration-progress-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -997,7 +997,7 @@ This message indicates the code that could not be analysed by UCX. User must che
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
-The `migration-process-experimental` workflow updates a subset of the inventory tables to track migration status of
+The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
 workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
 progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
 
@@ -1044,8 +1044,8 @@ databricks labs ucx update-migration-progress
 ```
 
 This command runs the [(experimental) migration progress workflow](#experimental-migration-progress-workflow) to update
-the migration status of worksapce resources that need to be migrated. It does this by triggering
-the `migration-process-experimental` workflow to run on a workspace and waiting for
+the migration status of workspace resources that need to be migrated. It does this by triggering
+the `migration-progress-experimental` workflow to run on a workspace and waiting for
 it to complete.
 
 Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can
