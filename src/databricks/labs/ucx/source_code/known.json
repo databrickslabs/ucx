@@ -81,8 +81,24 @@
     "accelerate.utils.transformer_engine": [],
     "accelerate.utils.versions": []
   },
+  "aiohappyeyeballs": {
+    "aiohappyeyeballs": [],
+    "aiohappyeyeballs._staggered": [],
+    "aiohappyeyeballs.impl": [],
+    "aiohappyeyeballs.types": [],
+    "aiohappyeyeballs.utils": []
+  },
   "aiohttp": {
     "aiohttp": []
+  },
+  "aiohttp-cors": {
+    "aiohttp_cors": [],
+    "aiohttp_cors.abc": [],
+    "aiohttp_cors.cors_config": [],
+    "aiohttp_cors.mixin": [],
+    "aiohttp_cors.preflight_handler": [],
+    "aiohttp_cors.resource_options": [],
+    "aiohttp_cors.urldispatcher_router_adapter": []
   },
   "aiosignal": {
     "aiosignal": []
