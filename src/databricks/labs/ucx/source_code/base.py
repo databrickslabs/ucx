@@ -298,7 +298,7 @@ class DfsaCollector(ABC):
 
 class DfsaPyCollector(DfsaCollector, ABC):
 
-    def collect_dfsas(self, source_code: str):
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         tree = Tree.normalize_and_parse(source_code)
         for dfsa_node in self.collect_dfsas_from_tree(tree):
             yield dfsa_node.dfsa
@@ -387,7 +387,7 @@ class SqlSequentialLinter(SqlLinter, DfsaCollector, TableCollector):
             yield from collector.collect_tables(source_code)
 
 
-class PythonSequentialLinter(Linter, DfsaPyCollector, TablePyCollector):
+class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def __init__(
         self,
@@ -434,29 +434,25 @@ class PythonSequentialLinter(Linter, DfsaPyCollector, TablePyCollector):
             # error already reported when linting enclosing notebook
             logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
 
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccessNode]:
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         try:
             tree = self._parse_and_append(source_code)
-            yield from self.collect_dfsas_from_tree(tree)
+            for dfsa_node in self.collect_dfsas_from_tree(tree):
+                yield dfsa_node.dfsa
         except AstroidSyntaxError as e:
             logger.warning('syntax-error', exc_info=e)
-
-    def collect_dfsas_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
-        raise Exception()
 
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas_from_tree(tree)
 
-    def collect_tables(self, source_code: str) -> Iterable[TableInfoNode]:
+    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
         try:
             tree = self._parse_and_append(source_code)
-            yield from self.collect_tables_from_tree(tree)
+            for table_node in self.collect_tables_from_tree(tree):
+                yield table_node.table
         except AstroidSyntaxError as e:
             logger.warning('syntax-error', exc_info=e)
-
-    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableInfoNode]:
-        raise Exception()
 
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
         for collector in self._table_collectors:

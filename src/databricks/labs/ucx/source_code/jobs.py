@@ -593,8 +593,7 @@ class TablesCollectorWalker(_CollectorWalker[TableInfo]):
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[TableInfo]:
         collector = self._linter_context.tables_collector(Language.PYTHON)
         assert isinstance(collector, PythonSequentialLinter)
-        for table_node in collector.collect_tables_from_source(source, inherited_tree):
-            yield table_node.table
+        yield from collector.collect_tables(source)
 
     def _collect_from_sql(self, source: str) -> Iterable[TableInfo]:
         collector = self._linter_context.tables_collector(Language.SQL)
