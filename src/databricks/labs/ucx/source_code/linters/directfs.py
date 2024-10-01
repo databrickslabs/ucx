@@ -172,11 +172,11 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
             )
             yield advisory
 
-    def collect_dfsas_from_source(self, python_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
+    def collect_dfsas_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
         tree = Tree.new_module()
         if inherited_tree:
             tree.append_tree(inherited_tree)
-        tree.append_tree(Tree.normalize_and_parse(python_code))
+        tree.append_tree(Tree.normalize_and_parse(source_code))
         yield from self.collect_dfsas_from_tree(tree)
 
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
@@ -199,8 +199,8 @@ class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
                 end_col=1024,
             )
 
-    def collect_dfsas(self, sql_code: str) -> Iterable[DirectFsAccess]:
-        yield from SqlParser.walk_expressions(sql_code, self._collect_dfsas)
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        yield from SqlParser.walk_expressions(source_code, self._collect_dfsas)
 
     @classmethod
     def _collect_dfsas(cls, expression: SqlExpression) -> Iterable[DirectFsAccess]:

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
-from typing import TypeVar, cast
+from typing import TypeVar
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -33,7 +33,7 @@ from databricks.labs.ucx.source_code.base import (
     SourceInfo,
     TableInfo,
     LineageAtom,
-    TablePyCollector,
+    PythonSequentialLinter,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -546,8 +546,8 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
         src_id = str(path)
         for cell in notebook.cells:
-            for t in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield t.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+            for item in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
+                yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -567,8 +567,8 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             return
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
         src_id = str(path)
-        for t in iterable:
-            yield t.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+        for item in iterable:
+            yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
 
     @abstractmethod
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[T]: ...
@@ -591,17 +591,10 @@ class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):
 class TablesCollectorWalker(_CollectorWalker[TableInfo]):
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[TableInfo]:
-        collector: TablePyCollector = cast(TablePyCollector, self._linter_context.tables_collector(Language.PYTHON))
-        # linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
+        collector = self._linter_context.tables_collector(Language.PYTHON)
+        assert isinstance(collector, PythonSequentialLinter)
         for table_node in collector.collect_tables_from_source(source, inherited_tree):
             yield table_node.table
-        # linter = SparkTableNamePyLinter(self._session_state)
-        # for table_info in linter.collect_table_infos(source, inherited_tree):
-        #     yield dfsa_node.dfsa
-        # from_table = FromTableSqlLinter(self._migration_index, self._session_state)
-        # linter = SparkSqlPyLinter(from_table, None)
-        # for table_info in linter.collect_table_infos(source, inherited_tree):
-        #     yield dfsa_node.dfsa
 
     def _collect_from_sql(self, source: str) -> Iterable[TableInfo]:
         collector = self._linter_context.tables_collector(Language.SQL)

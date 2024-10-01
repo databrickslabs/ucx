@@ -66,10 +66,10 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
                 end_col=1024,
             )
 
-    def collect_tables(self, sql_code: str) -> Iterable[TableInfo]:
+    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
         try:
             yield from SqlParser.walk_expressions(
-                sql_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
+                source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
             )
         except SqlParseError as _:
             pass  # TODO establish a strategy

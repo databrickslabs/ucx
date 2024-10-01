@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     SqlLinter,
     Fixer,
     TableInfo,
-    TableNode,
+    TableInfoNode,
     TablePyCollector,
     TableSqlCollector,
     DfsaPyCollector,
@@ -358,11 +358,11 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             return None
         return matcher if matcher.matches(node) else None
 
-    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableNode]:
+    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableInfoNode]:
         tree = Tree.normalize_and_parse(source_code)
         yield from self.collect_tables_from_tree(tree)
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
         for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
@@ -441,15 +441,15 @@ class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
     def __init__(self, sql_collector: TableSqlCollector):
         self._sql_collector = sql_collector
 
-    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableNode]:
+    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableInfoNode]:
         tree = Tree.normalize_and_parse(source_code)
         yield from self.collect_tables_from_tree(tree)
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
         assert self._sql_collector
         for call_node, query in self._visit_call_nodes(tree):
             for value in InferredValue.infer_from_node(query):
                 if not value.is_inferred():
                     continue  # TODO error handling strategy
                 for table in self._sql_collector.collect_tables(value.as_string()):
-                    yield TableNode(table, call_node)
+                    yield TableInfoNode(table, call_node)
