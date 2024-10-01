@@ -1088,6 +1088,16 @@
     "blinker._utilities": [],
     "blinker.base": []
   },
+  "blis": {
+    "blis": [],
+    "blis.about": [],
+    "blis.benchmark": [],
+    "blis.tests": [],
+    "blis.tests.common": [],
+    "blis.tests.conftest": [],
+    "blis.tests.test_dotv": [],
+    "blis.tests.test_gemm": []
+  },
   "bokeh": {
     "bokeh": []
   },
