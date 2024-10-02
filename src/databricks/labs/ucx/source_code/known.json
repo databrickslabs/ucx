@@ -1403,6 +1403,15 @@
     "cloudpickle.cloudpickle": [],
     "cloudpickle.cloudpickle_fast": []
   },
+  "colorful": {
+    "colorful": [],
+    "colorful.ansi": [],
+    "colorful.colors": [],
+    "colorful.core": [],
+    "colorful.styles": [],
+    "colorful.terminal": [],
+    "colorful.utils": []
+  },
   "comm": {
     "comm": [],
     "comm.base_comm": []
