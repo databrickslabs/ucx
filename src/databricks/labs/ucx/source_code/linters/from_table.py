@@ -1,13 +1,23 @@
 import logging
-from sqlglot import parse as parse_sql
-from sqlglot.expressions import Table, Expression, Use, Create, Drop
+from collections.abc import Iterable
+
+from sqlglot import parse as parse_sql, ParseError as SqlParseError
+from sqlglot.expressions import Table, Expression, Use
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter, Fixer, Failure
+from databricks.labs.ucx.source_code.base import (
+    Deprecation,
+    CurrentSessionState,
+    SqlLinter,
+    Fixer,
+    UsedTable,
+    TableSqlCollector,
+)
+from databricks.labs.ucx.source_code.sql.sql_parser import SqlExpression, SqlParser
 
 logger = logging.getLogger(__name__)
 
 
-class FromTableSqlLinter(SqlLinter, Fixer):
+class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
     """Linter and Fixer for table migrations in SQL queries.
 
     This class is responsible for identifying and fixing table migrations in
@@ -42,56 +52,27 @@ class FromTableSqlLinter(SqlLinter, Fixer):
         return self._session_state.schema
 
     def lint_expression(self, expression: Expression):
-        for table in expression.find_all(Table):
-            try:
-                yield from self._unsafe_lint_expression(expression, table)
-            except Exception as _:  # pylint: disable=broad-exception-caught
-                yield Failure(
-                    code='sql-parse-error',
-                    message=f"Could not parse SQL expression: {expression} ",
-                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                )
+        for info in SqlExpression(expression).collect_table_infos("hive_metastore", self._session_state):
+            dst = self._index.get(info.schema_name, info.table_name)
+            if not dst:
+                return
+            yield Deprecation(
+                code='table-migrated-to-uc',
+                message=f"Table {info.schema_name}.{info.table_name} is migrated to {dst.destination()} in Unity Catalog",
+                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                start_line=0,
+                start_col=0,
+                end_line=0,
+                end_col=1024,
+            )
 
-    def _unsafe_lint_expression(self, expression: Expression, table: Table):
-        if isinstance(expression, Use):
-            # Sqlglot captures the database name in the Use statement as a Table, with
-            # the schema  as the table name.
-            self._session_state.schema = table.name
-            return
-        if isinstance(expression, Drop) and getattr(expression, "kind", None) == "SCHEMA":
-            # Sqlglot captures the schema name in the Drop statement as a Table, with
-            # the schema  as the db name.
-            return
-        if isinstance(expression, Create) and getattr(expression, "kind", None) == "SCHEMA":
-            # Sqlglot captures the schema name in the Create statement as a Table, with
-            # the schema  as the db name.
-            self._session_state.schema = table.db
-            return
-
-        # we only migrate tables in the hive_metastore catalog
-        if self._catalog(table) != 'hive_metastore':
-            return
-        # Sqlglot uses db instead of schema, watch out for that
-        src_schema = table.db if table.db else self._session_state.schema
-        if not src_schema:
-            logger.error(f"Could not determine schema for table {table.name}")
-            return
-        dst = self._index.get(src_schema, table.name)
-        if not dst:
-            return
-        yield Deprecation(
-            code='table-migrated-to-uc',
-            message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
-            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
-        )
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
+        try:
+            yield from SqlParser.walk_expressions(
+                source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
+            )
+        except SqlParseError as _:
+            pass  # TODO establish a strategy
 
     @staticmethod
     def _catalog(table):
