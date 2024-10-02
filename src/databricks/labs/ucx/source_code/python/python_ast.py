@@ -4,7 +4,7 @@ from abc import ABC
 import logging
 import re
 from collections.abc import Iterable
-from typing import TypeVar, cast
+from typing import TypeVar, cast, Any
 
 from astroid import (  # type: ignore
     Assign,
@@ -23,9 +23,9 @@ from astroid import (  # type: ignore
     parse,
     Uninferable,
 )
+from astroid.modutils import BUILTIN_MODULES  # type: ignore
 
 logger = logging.getLogger(__name__)
-
 missing_handlers: set[str] = set()
 
 
@@ -289,6 +289,30 @@ class Tree:
             start = start + num_lines if start > 0 else start - num_lines
         return self
 
+    def get_call_name(self) -> str:
+        if not isinstance(self._node, Call):
+            return ""
+        func = self._node.func
+        if isinstance(func, Name):
+            return func.name
+        elif isinstance(func, Attribute):
+            return func.attrname
+        else:
+            return ""  # not supported yet
+
+    def is_builtin(self) -> bool:
+        if isinstance(self._node, Name):
+            name = self._node.name
+            builtins = cast(dict[str, Any], __builtins__)
+            if name in builtins.keys():
+                return True
+            astroid_name = f"_{name}"
+            return BUILTIN_MODULES.get(astroid_name, None) is not None
+        if isinstance(self._node, Call):
+            return Tree(self._node.func).is_builtin()
+        if isinstance(self._node, Attribute):
+            return Tree(self._node.expr).is_builtin()
+        return False  # not supported yet
 
 class _LocalTree(Tree):
 

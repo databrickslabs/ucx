@@ -233,3 +233,26 @@ df.write.format("delta").saveAsTable("old.things")
 def test_counts_lines(source: str, line_count: int):
     tree = Tree.normalize_and_parse(source)
     assert tree.line_count() == line_count
+
+
+@pytest.mark.parametrize(
+    "source, name, is_builtin", [
+        ("x = open()", "open", True),
+        ("import datetime; x = datetime.datetime.now()", "now", True),
+        ("import stuff; x = stuff()", "stuff", False),
+        ("""def stuff():
+  pass
+x = stuff()""", "stuff", False),
+    ])
+def test_is_builtin(source, name, is_builtin):
+    tree = Tree.normalize_and_parse(source)
+    nodes = list(tree.node.get_children())
+    for node in nodes:
+        if isinstance(node, Assign):
+            tree = Tree(node.value)
+            func_name = tree.get_call_name()
+            assert func_name == name
+            assert tree.is_builtin() == is_builtin
+            return
+    assert False  # could not locate call
+
