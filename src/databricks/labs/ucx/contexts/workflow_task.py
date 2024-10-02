@@ -112,7 +112,7 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def workflow_run_recorder(self):
+    def workflow_run_recorder(self) -> WorkflowRunRecorder:
         return WorkflowRunRecorder(
             self.sql_backend,
             self.config.ucx_catalog,
