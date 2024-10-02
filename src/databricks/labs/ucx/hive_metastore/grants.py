@@ -732,19 +732,16 @@ class MigrateGrants:
         sql_backend: SqlBackend,
         group_manager: GroupManager,
         grant_loaders: list[Callable[[], Iterable[Grant]]],
-        /,
-        dry_run: bool = False,
+        installation: Installation,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
-        self._dry_run = dry_run
+        self._installation = installation
+        self._source_grants_csv = "source_grants.csv"
 
     def apply(self, src: Table, uc_table_key: str) -> bool:
         for grant in self._match_grants(src):
-            if self._dry_run:
-                logger.info(f"Granting {grant.action_type} on {uc_table_key} to {grant.principal}")
-                continue
             acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -758,6 +755,9 @@ class MigrateGrants:
             except DatabricksError as e:
                 logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {uc_table_key}: {e}")
         return True
+
+    def save_grants(self):
+        self._installation.save(self._grants, filename=self._source_grants_csv)
 
     @cached_property
     def _workspace_to_account_group_names(self) -> dict[str, str]:
@@ -796,13 +796,22 @@ class ACLMigrator:
         workspace_info: WorkspaceInfo,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
+        /,
+        dry_run: bool = False,
     ):
         self._table_crawler = tables_crawler
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
+        self._dry_run = dry_run
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
+        # Migrate ACLs for all tables that have been migrated
+        # Saving the source grants to a file for review
+        self._migrate_grants.save_grants()
+        if self._dry_run:
+            logger.info("Dry run: skipping ACL migration")
+            return
         workspace_name = self._workspace_info.current()
         tables = list(self._table_crawler.snapshot())
         if not tables:

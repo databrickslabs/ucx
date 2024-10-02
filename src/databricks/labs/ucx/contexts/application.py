@@ -268,6 +268,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.group_manager,
             grant_loaders,
+            self.installation,
         )
 
     @cached_property
