@@ -5,7 +5,7 @@ from typing import TypeVar
 from sqlglot import parse, ParseError
 from sqlglot.expressions import Table, Expression, Use, Create, Drop
 
-from databricks.labs.ucx.source_code.base import TableInfo, CurrentSessionState
+from databricks.labs.ucx.source_code.base import UsedTable, CurrentSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class SqlExpression:
     def __init__(self, expression: Expression):
         self._expression = expression
 
-    def collect_table_infos(self, required_catalog: str, session_state: CurrentSessionState) -> Iterable[TableInfo]:
+    def collect_table_infos(self, required_catalog: str, session_state: CurrentSessionState) -> Iterable[UsedTable]:
         for table in self._expression.find_all(Table):
             info = self._collect_table_info(table, required_catalog, session_state)
             if info:
@@ -26,7 +26,7 @@ class SqlExpression:
 
     def _collect_table_info(
         self, table: Table, required_catalog: str, session_state: CurrentSessionState
-    ) -> TableInfo | None:
+    ) -> UsedTable | None:
         if isinstance(self._expression, Use):
             # Sqlglot captures the database name in the Use statement as a Table, with
             # the schema  as the table name.
@@ -50,7 +50,7 @@ class SqlExpression:
         if not src_schema:
             logger.error(f"Could not determine schema for table {table.name}")
             return None
-        return TableInfo(
+        return UsedTable(
             catalog_name=catalog_name,
             schema_name=src_schema,
             table_name=table.name,

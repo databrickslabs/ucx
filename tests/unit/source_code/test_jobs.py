@@ -25,7 +25,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.table_info import TableInfoCrawler
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 def test_job_problem_as_message():
@@ -240,9 +240,9 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
 
     ws = create_autospec(WorkspaceClient)
     directfs_crawler = create_autospec(DirectFsAccessCrawler)
-    table_info_crawler = create_autospec(TableInfoCrawler)
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
     linter = WorkflowLinter(
-        ws, dependency_resolver, mock_path_lookup, empty_index, directfs_crawler, table_info_crawler
+        ws, dependency_resolver, mock_path_lookup, empty_index, directfs_crawler, used_tables_crawler
     )
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
@@ -255,7 +255,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
         linter.lint_job(1234)
 
     directfs_crawler.assert_not_called()
-    table_info_crawler.assert_not_called()
+    used_tables_crawler.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 

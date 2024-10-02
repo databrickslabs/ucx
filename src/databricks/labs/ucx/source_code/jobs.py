@@ -31,7 +31,7 @@ from databricks.labs.ucx.source_code.base import (
     file_language,
     guess_encoding,
     SourceInfo,
-    TableInfo,
+    UsedTable,
     LineageAtom,
     PythonSequentialLinter,
 )
@@ -53,7 +53,7 @@ from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.table_info import TableInfoCrawler
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -348,7 +348,7 @@ class WorkflowLinter:
         path_lookup: PathLookup,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
-        table_infos_crawler: TableInfoCrawler,
+        used_tables_crawler: UsedTablesCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
@@ -356,7 +356,7 @@ class WorkflowLinter:
         self._path_lookup = path_lookup
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
-        self._table_infos_crawler = table_infos_crawler
+        self._used_tables_crawler = used_tables_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -372,7 +372,7 @@ class WorkflowLinter:
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
         job_dfsas: list[DirectFsAccess] = []
-        job_tables: list[TableInfo] = []
+        job_tables: list[UsedTable] = []
         for problems, dfsas, tables in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
@@ -385,11 +385,11 @@ class WorkflowLinter:
             mode='overwrite',
         )
         self._directfs_crawler.dump_all(job_dfsas)
-        self._table_infos_crawler.dump_all(job_tables)
+        self._used_tables_crawler.dump_all(job_tables)
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[TableInfo]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
@@ -404,10 +404,10 @@ class WorkflowLinter:
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[TableInfo]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccess] = []
-        table_infos: list[TableInfo] = []
+        table_infos: list[UsedTable] = []
 
         assert job.job_id is not None
         assert job.settings is not None
@@ -498,7 +498,7 @@ class WorkflowLinter:
 
     def _collect_task_tables(
         self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[TableInfo]:
+    ) -> Iterable[UsedTable]:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
@@ -618,13 +618,13 @@ class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):
         yield from collector.collect_dfsas(source)
 
 
-class TablesCollectorWalker(_CollectorWalker[TableInfo]):
+class TablesCollectorWalker(_CollectorWalker[UsedTable]):
 
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[TableInfo]:
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[UsedTable]:
         collector = self._linter_context.tables_collector(Language.PYTHON)
         assert isinstance(collector, PythonSequentialLinter)
         yield from collector.collect_tables(source)
 
-    def _collect_from_sql(self, source: str) -> Iterable[TableInfo]:
+    def _collect_from_sql(self, source: str) -> Iterable[UsedTable]:
         collector = self._linter_context.tables_collector(Language.SQL)
         yield from collector.collect_tables(source)

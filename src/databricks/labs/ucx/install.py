@@ -75,7 +75,7 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
-from databricks.labs.ucx.source_code.base import TableInfo
+from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.source_code.queries import QueryProblem
@@ -125,8 +125,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "recon_results", ReconResult),
             functools.partial(table, "directfs_in_paths", DirectFsAccess),
             functools.partial(table, "directfs_in_queries", DirectFsAccess),
-            functools.partial(table, "table_infos_in_paths", TableInfo),
-            functools.partial(table, "table_infos_in_queries", TableInfo),
+            functools.partial(table, "used_tables_in_paths", UsedTable),
+            functools.partial(table, "used_tables_in_queries", UsedTable),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -136,7 +136,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
     deployer.deploy_view("directfs", "queries/views/directfs.sql")
-    deployer.deploy_view("table_infos", "queries/views/table_infos.sql")
+    deployer.deploy_view("used_tables", "queries/views/used_tables.sql")
 
 
 def extract_major_minor(version_string):

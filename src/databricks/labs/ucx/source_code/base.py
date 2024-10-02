@@ -4,6 +4,7 @@ import codecs
 import dataclasses
 import locale
 import logging
+import sys
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -21,9 +22,9 @@ from databricks.labs.blueprint.paths import WorkspacePath
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
-try:
+if sys.version_info >= (3, 11):
     from typing import Self
-except ImportError:
+else:
     from typing_extensions import Self
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
@@ -232,10 +233,10 @@ class SourceInfo:
 
 
 @dataclass
-class TableInfo(SourceInfo):
+class UsedTable(SourceInfo):
 
     @classmethod
-    def parse(cls, value: str, default_schema: str) -> TableInfo:
+    def parse(cls, value: str, default_schema: str) -> UsedTable:
         parts = value.split(".")
         if len(parts) >= 3:
             catalog_name = parts.pop(0)
@@ -245,7 +246,7 @@ class TableInfo(SourceInfo):
             schema_name = parts.pop(0)
         else:
             schema_name = default_schema
-        return TableInfo(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
+        return UsedTable(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
 
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
@@ -255,12 +256,12 @@ class TableInfo(SourceInfo):
 class TableCollector(ABC):
 
     @abstractmethod
-    def collect_tables(self, source_code: str) -> Iterable[TableInfo]: ...
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]: ...
 
 
 @dataclass
 class TableInfoNode:
-    table: TableInfo
+    table: UsedTable
     node: NodeNG
 
 
@@ -387,7 +388,7 @@ class SqlSequentialLinter(SqlLinter, DfsaCollector, TableCollector):
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas(source_code)
 
-    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         for collector in self._table_collectors:
             yield from collector.collect_tables(source_code)
 
@@ -451,7 +452,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas_from_tree(tree)
 
-    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             tree = self._parse_and_append(source_code)
             for table_node in self.collect_tables_from_tree(tree):

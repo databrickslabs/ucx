@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     SqlLinter,
     Fixer,
-    TableInfo,
+    UsedTable,
     TableSqlCollector,
 )
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlExpression, SqlParser
@@ -66,7 +66,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
                 end_col=1024,
             )
 
-    def collect_tables(self, source_code: str) -> Iterable[TableInfo]:
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             yield from SqlParser.walk_expressions(
                 source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)

@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
     Fixer,
-    TableInfo,
+    UsedTable,
     TableInfoNode,
     TablePyCollector,
     TableSqlCollector,
@@ -106,7 +106,7 @@ class SparkCallMatcher(_TableNameMatcher):
                     node=node,
                 )
                 continue
-            info = TableInfo.parse(inferred.as_string(), from_table.schema)
+            info = UsedTable.parse(inferred.as_string(), from_table.schema)
             dst = self._find_dest(index, info)
             if dst is None:
                 continue
@@ -121,13 +121,13 @@ class SparkCallMatcher(_TableNameMatcher):
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
         # TODO locate constant when value is inferred
-        info = TableInfo.parse(table_arg.value, from_table.schema)
+        info = UsedTable.parse(table_arg.value, from_table.schema)
         dst = self._find_dest(index, info)
         if dst is not None:
             table_arg.value = dst.destination()
 
     @classmethod
-    def _find_dest(cls, index: TableMigrationIndex, table: TableInfo):
+    def _find_dest(cls, index: TableMigrationIndex, table: UsedTable):
         if table.catalog_name != "hive_metastore":
             return None
         return index.get(table.schema_name, table.table_name)

@@ -7,7 +7,7 @@ SELECT
     source_lineage,
     assessment_start_timestamp,
     assessment_end_timestamp
-FROM $inventory.table_infos_in_paths
+FROM $inventory.used_tables_in_paths
 UNION ALL
 SELECT
     catalog_name,
@@ -18,4 +18,4 @@ SELECT
     source_lineage,
     assessment_start_timestamp,
     assessment_end_timestamp
-FROM $inventory.table_infos_in_queries
+FROM $inventory.used_tables_in_queries
