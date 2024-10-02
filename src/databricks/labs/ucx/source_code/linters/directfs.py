@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     SqlLinter,
 )
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
-from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor
+from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeVisitor, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
             # only capture 'open' calls or calls originating from spark or dbutils
             # because there is no other known way to manipulate data directly from file system
             tree = Tree(call_node)
-            is_open = tree.get_call_name() == "open" and tree.is_builtin()
+            is_open = TreeHelper.get_call_name(call_node) == "open" and tree.is_builtin()
             is_from_db_utils = False if is_open else tree.is_from_module("dbutils")
             is_from_spark = False if is_open or is_from_db_utils else tree.is_from_module("spark")
             if not (is_open or is_from_db_utils or is_from_spark):

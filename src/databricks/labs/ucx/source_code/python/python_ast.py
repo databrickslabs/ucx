@@ -289,17 +289,6 @@ class Tree:
             start = start + num_lines if start > 0 else start - num_lines
         return self
 
-    def get_call_name(self) -> str:
-        if not isinstance(self._node, Call):
-            return ""
-        func = self._node.func
-        if isinstance(func, Name):
-            return func.name
-        elif isinstance(func, Attribute):
-            return func.attrname
-        else:
-            return ""  # not supported yet
-
     def is_builtin(self) -> bool:
         if isinstance(self._node, Name):
             name = self._node.name
@@ -314,6 +303,7 @@ class Tree:
             return Tree(self._node.expr).is_builtin()
         return False  # not supported yet
 
+
 class _LocalTree(Tree):
 
     def is_from_module_visited(self, name: str, visited_nodes: set[NodeNG]) -> bool:
@@ -321,6 +311,17 @@ class _LocalTree(Tree):
 
 
 class TreeHelper(ABC):
+
+    @classmethod
+    def get_call_name(cls, call: Call) -> str:
+        if not isinstance(call, Call):
+            return ""
+        func = call.func
+        if isinstance(func, Name):
+            return func.name
+        if isinstance(func, Attribute):
+            return func.attrname
+        return ""  # not supported yet
 
     @classmethod
     def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
