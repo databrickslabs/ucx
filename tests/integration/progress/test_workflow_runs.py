@@ -5,7 +5,6 @@ def test_workflow_run_recorder_records_workflow_run(installation_ctx) -> None:
     """Ensure that the workflow run recorder records a workflow run"""
     start_time = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0)
     named_parameters = {
-        "workspace_id": 123456789,
         "workflow": "test",
         "job_id": "123",
         "parent_run_id": "456",
@@ -23,7 +22,7 @@ def test_workflow_run_recorder_records_workflow_run(installation_ctx) -> None:
     assert len(rows) == 1
     assert rows[0].started_at == start_time
     assert start_time <= rows[0].finished_at <= dt.datetime.now(tz=dt.timezone.utc)
-    assert rows[0].workspace_id == 123456789
+    assert rows[0].workspace_id == installation_ctx.workspace_client.get_workspace_id()
     assert rows[0].workflow_name == "test"
     assert rows[0].workflow_id == 123
     assert rows[0].workflow_run_id == 456
