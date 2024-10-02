@@ -1,3 +1,4 @@
+from unittest import mock
 from unittest.mock import create_autospec
 
 import pytest
@@ -45,3 +46,17 @@ def test_query_liner_refresh_report_writes_query_problems(migration_index, mock_
     assert mock_backend.has_rows_written_for("`test`.query_problems")
     ws.dashboards.list.assert_called_once()
     crawlers.assert_not_called()
+
+
+def test_lints_queries(migration_index, mock_backend) -> None:
+    with mock.patch("databricks.labs.ucx.source_code.queries.Redash") as mocked_redash:
+        query = LegacyQuery(id="123", query="XSELECT * from nowhere")
+        mocked_redash.get_queries_from_dashboard.return_value = [query]
+        ws = create_autospec(WorkspaceClient)
+        crawlers = create_autospec(DirectFsAccessCrawler)
+        linter = QueryLinter(ws, migration_index, crawlers, ["1"])
+        linter.refresh_report(mock_backend, inventory_database="test")
+
+        assert mock_backend.has_rows_written_for("`test`.query_problems")
+        ws.dashboards.list.assert_called_once()
+        crawlers.assert_not_called()
