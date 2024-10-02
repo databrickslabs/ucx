@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import sys
 from abc import ABC
 import logging
 import re
 from collections.abc import Iterable
-from typing import TypeVar, cast, Any
+from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
     Assign,
@@ -292,11 +293,7 @@ class Tree:
     def is_builtin(self) -> bool:
         if isinstance(self._node, Name):
             name = self._node.name
-            builtins = cast(dict[str, Any], __builtins__)
-            if name in builtins.keys():
-                return True
-            names = sys.builtin_module_names
-            return f"_{name}" in names
+            return name in dir(builtins) or name in sys.stdlib_module_names or name in sys.builtin_module_names
         if isinstance(self._node, Call):
             return Tree(self._node.func).is_builtin()
         if isinstance(self._node, Attribute):
