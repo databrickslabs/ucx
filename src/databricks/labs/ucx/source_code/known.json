@@ -2486,6 +2486,13 @@
     "dbignite.readers": [],
     "dbignite.version": []
   },
+  "dbl-tempo": {
+    "tempo": [],
+    "tempo.interpol": [],
+    "tempo.intervals": [],
+    "tempo.resample": [],
+    "tempo.utils": []
+  },
   "dbldatagen": {
     "dbldatagen": [],
     "dbldatagen._version": [],
