@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 
 class RuntimeContext(GlobalContext):
@@ -108,4 +109,17 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.inventory_database,
             int(self.named_parameters.get("attempt", "0")),
+        )
+
+    @cached_property
+    def workflow_run_recorder(self) -> WorkflowRunRecorder:
+        return WorkflowRunRecorder(
+            self.sql_backend,
+            self.config.ucx_catalog,
+            workspace_id=self.workspace_client.get_workspace_id(),
+            workflow_name=self.named_parameters["workflow"],
+            workflow_id=int(self.named_parameters["job_id"]),
+            workflow_run_id=int(self.named_parameters["parent_run_id"]),
+            workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
+            workflow_start_time=self.named_parameters["start_time"],
         )

@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import cast
 from unittest import mock
 
 import pytest
 
 from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 def test_checks_compatibility():
@@ -21,6 +23,10 @@ def test_checks_compatibility():
     assert os_path.known
     assert not os_path.problems
 
+    other = known.module_compatibility(cast(str, None))
+    assert not other.known
+    assert not other.problems
+
 
 def test_checks_library_compatibility():
     known = KnownList()
@@ -32,6 +38,10 @@ def test_checks_library_compatibility():
     s3fs = known.distribution_compatibility("s3fs")
     assert s3fs.known
     assert len(s3fs.problems) == 1
+
+    other = known.distribution_compatibility(cast(str, None))
+    assert not other.known
+    assert not other.problems
 
 
 def test_loads_known_json():
@@ -51,3 +61,19 @@ def test_rebuild_trivial():
     # No-op: the known.json file is already up-to-date
     cwd = Path.cwd()
     KnownList.rebuild(cwd)
+
+
+def test_analyze_dist_info():
+
+    class TestKnownList(KnownList):
+
+        @classmethod
+        def analyze_cachetools_dist_info(cls):
+            path_lookup = PathLookup.from_sys_path(Path.cwd())
+            for library_root in path_lookup.library_roots:
+                for dist_info_folder in library_root.glob("*.dist-info"):
+                    if "cachetools" in dist_info_folder.as_posix():
+                        cls._analyze_dist_info(dist_info_folder, {}, library_root)
+                        return
+
+    TestKnownList.analyze_cachetools_dist_info()
