@@ -1333,6 +1333,9 @@
     "chronos": [],
     "chronos.main": []
   },
+  "circuitbreaker": {
+    "circuitbreaker": []
+  },
   "clang": {
     "clang": [],
     "clang.cindex": [
