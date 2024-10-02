@@ -60,6 +60,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
     delete_missing_principals,
+    export_assessment,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -1123,3 +1124,19 @@ def test_delete_principals(ws):
     prompts = MockPrompts({"Select the list of roles *": "0"})
     delete_missing_principals(ws, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
+
+
+def test_export_assessment(ws, tmp_path):
+    query_choice = {"assessment_name": "main", "option": 3}
+    mock_prompts = MockPrompts(
+        {
+            "Choose a path to save the UCX Assessment results": tmp_path.as_posix(),
+            "Choose which assessment results to export": query_choice["option"],
+        }
+    )
+
+    export_assessment(ws, mock_prompts)
+    # Construct the expected filename based on the query_choice
+    expected_filename = f"export_{query_choice['assessment_name']}_results.zip"
+    # Assert that the file exists in the temporary path
+    assert len(list(tmp_path.glob(expected_filename))) == 1

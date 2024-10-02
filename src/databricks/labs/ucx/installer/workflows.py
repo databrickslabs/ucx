@@ -196,6 +196,7 @@ def _render_export() -> None:
     html_content = '''
     <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform:translateY(-2px) ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style>
     <div class="export-container"><h2>Export Results</h2><a href='{workspace_host}/files/excel-export/ucx_assessment_main.xlsx?o={workspace_id}' target='_blank' download>Download Results</a></div>
+
     '''
     displayHTML(html_content)
 

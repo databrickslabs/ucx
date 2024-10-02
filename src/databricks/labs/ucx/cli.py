@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 
+
 ucx = App(__file__)
 logger = get_logger(__file__)
 
