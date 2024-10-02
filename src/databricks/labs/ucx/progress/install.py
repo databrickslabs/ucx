@@ -13,7 +13,7 @@ class ProgressTrackingInstallation:
     _SCHEMA = "multiworkspace"
 
     def __init__(self, sql_backend: SqlBackend, ucx_catalog: str) -> None:
-        # `mod` is required parameter, but it's not used in this context.
+        # `mod` is a required parameter, though, it's not used in this context without views.
         self._schema_deployer = SchemaDeployer(sql_backend, self._SCHEMA, mod=None, catalog=ucx_catalog)
 
     def run(self) -> None:
