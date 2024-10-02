@@ -1547,16 +1547,6 @@
   },
   "confection": {
     "confection": [],
-    "confection.tests": [],
-    "confection.tests.conftest": [],
-    "confection.tests.test_config": [],
-    "confection.tests.test_frozen_structures": [],
-    "confection.tests.util": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "confection.util": []
   },
   "contourpy": {
