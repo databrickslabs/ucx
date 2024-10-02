@@ -77,5 +77,3 @@ def test_analyze_dist_info():
                         return
 
     TestKnownList.analyze_cachetools_dist_info()
-
-
