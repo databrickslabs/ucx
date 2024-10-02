@@ -2308,6 +2308,25 @@
     "dbignite.readers": [],
     "dbignite.version": []
   },
+  "dbl-tempo": {
+    "tempo": [],
+    "tempo.interpol": [],
+    "tempo.intervals": [],
+    "tempo.io": [
+      {
+        "code": "cannot-autofix-table-reference",
+        "message": "Can't migrate table_name argument in ''optimize {} zorder by {}'.format(tabName, '(' + ','.join(partitionCols + optimizationCols) + ')')' because its value cannot be computed"
+      }
+    ],
+    "tempo.resample": [],
+    "tempo.tsdf": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "tempo.utils": []
+  },
   "dbldatagen": {
     "dbldatagen": [],
     "dbldatagen._version": [],
