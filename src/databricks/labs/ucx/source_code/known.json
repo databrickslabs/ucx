@@ -1410,6 +1410,101 @@
   "click": {
     "click": []
   },
+  "cloudpathlib": {
+    "cloudpathlib": [],
+    "cloudpathlib.anypath": [],
+    "cloudpathlib.azure": [],
+    "cloudpathlib.azure.azblobclient": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.azure.azblobpath": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.client": [],
+    "cloudpathlib.cloudpath": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /Uninferable"
+      }
+    ],
+    "cloudpathlib.enums": [],
+    "cloudpathlib.exceptions": [],
+    "cloudpathlib.gs": [],
+    "cloudpathlib.gs.gsclient": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.gs.gspath": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.local": [],
+    "cloudpathlib.local.implementations": [],
+    "cloudpathlib.local.implementations.azure": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.local.implementations.gs": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "cloudpathlib.local.implementations.s3": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: s3://"
+      }
+    ],
+    "cloudpathlib.local.localclient": [],
+    "cloudpathlib.local.localpath": [],
+    "cloudpathlib.s3": [],
+    "cloudpathlib.s3.s3client": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: s3://Uninferable"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: s3://Uninferable/Uninferable"
+      }
+    ],
+    "cloudpathlib.s3.s3path": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: s3://"
+      }
+    ],
+    "cloudpathlib.url_utils": []
+  },
   "cloudpickle": {
     "cloudpickle": [],
     "cloudpickle.cloudpickle": [],
