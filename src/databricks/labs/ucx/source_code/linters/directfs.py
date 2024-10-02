@@ -95,8 +95,9 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
                 continue
             # only capture calls originating from spark or dbutils
             # because there is no other known way to manipulate data directly from file system
-            is_from_db_utils = Tree(call_node).is_from_module("dbutils")
-            is_from_spark = False if is_from_db_utils else Tree(call_node).is_from_module("spark")
+            tree = Tree(call_node)
+            is_from_db_utils = tree.is_from_module("dbutils")
+            is_from_spark = False if is_from_db_utils else tree.is_from_module("spark")
             if not (is_from_db_utils or is_from_spark):
                 return
             # avoid duplicate advices that are reported by SparkSqlPyLinter
