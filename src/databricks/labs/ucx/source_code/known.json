@@ -1565,6 +1565,10 @@
     "confection": [],
     "confection.util": []
   },
+  "configparser": {
+    "backports.configparser": [],
+    "backports.configparser.compat": []
+  },
   "contourpy": {
     "contourpy": []
   },
