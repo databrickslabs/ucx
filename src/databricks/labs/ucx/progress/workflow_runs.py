@@ -58,7 +58,7 @@ class WorkflowRunRecorder:
         self._workflow_run_attempt = workflow_run_attempt
 
     def record(self) -> None:
-        """Record a workflow run in the database."""
+        """Record a workflow run."""
         workflow_run = WorkflowRun(
             started_at=dt.datetime.fromisoformat(self._workflow_start_time),
             finished_at=dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0),
