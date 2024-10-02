@@ -1613,6 +1613,17 @@
     "pyximport.pyxbuild": [],
     "pyximport.pyximport": []
   },
+  "dacite": {
+    "dacite": [],
+    "dacite.cache": [],
+    "dacite.config": [],
+    "dacite.core": [],
+    "dacite.data": [],
+    "dacite.dataclasses": [],
+    "dacite.exceptions": [],
+    "dacite.frozen_dict": [],
+    "dacite.types": []
+  },
   "databricks-arc": {
     "arc": [],
     "arc.autolinker": [],
