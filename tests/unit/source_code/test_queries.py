@@ -50,7 +50,7 @@ def test_query_liner_refresh_report_writes_query_problems(migration_index, mock_
 
 def test_lints_queries(migration_index, mock_backend) -> None:
     with mock.patch("databricks.labs.ucx.source_code.queries.Redash") as mocked_redash:
-        query = LegacyQuery(id="123", query="XSELECT * from nowhere")
+        query = LegacyQuery(id="123", query="SELECT * from nowhere")
         mocked_redash.get_queries_from_dashboard.return_value = [query]
         ws = create_autospec(WorkspaceClient)
         crawlers = create_autospec(DirectFsAccessCrawler)
@@ -58,5 +58,5 @@ def test_lints_queries(migration_index, mock_backend) -> None:
         linter.refresh_report(mock_backend, inventory_database="test")
 
         assert mock_backend.has_rows_written_for("`test`.query_problems")
-        ws.dashboards.list.assert_called_once()
+        ws.dashboards.list.assert_not_called()
         crawlers.assert_not_called()
