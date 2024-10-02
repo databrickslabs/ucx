@@ -611,6 +611,7 @@ def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceConte
     """
     workspace_context = ctx or WorkspaceContext(w)
     workspace_context.catalog_schema.create_ucx_catalog(prompts)
+    workspace_context.progress_tracking_installation.run()
 
 
 @ucx.command
