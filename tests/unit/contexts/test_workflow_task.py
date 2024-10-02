@@ -24,8 +24,8 @@ def test_context_attribute_class(tmp_path, attribute, klass) -> None:
     config = WorkspaceConfig("str")
     named_parameters = {
         "workflow": "test",
-        "job_id": 123,
-        "parent_run_id": 456,
+        "job_id": "123",
+        "parent_run_id": "456",
         "start_time": dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).isoformat(),
     }
 
