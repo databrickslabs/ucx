@@ -112,8 +112,7 @@ main(f'--config=/Workspace{config_file}',
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
-EXPORT_TO_EXCEL_NOTEBOOK = """
-# Databricks notebook source
+EXPORT_TO_EXCEL_NOTEBOOK = """# Databricks notebook source
 # MAGIC %md
 # MAGIC ##### Exporter of UCX assessment results
 # MAGIC ##### Instructions:
@@ -165,7 +164,7 @@ lock = Lock()
 
 # DBTITLE 1,Assessment Export
 FILE_NAME = "ucx_assessment_main.xlsx"
-TMP_PATH = f"/Workspace{ctx.installation.install_folder()}/tmp/"
+TMP_PATH = f"/Workspace{{ctx.installation.install_folder()}}/tmp/"
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
 
@@ -194,8 +193,10 @@ def _to_excel(dataset: Dataset, writer: ...) -> None:
 
 def _render_export() -> None:
     '''Render an HTML link for downloading the results.'''
-    html_content = f'''
-            <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform 0.3s ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style><div class="export-container"><h2>Export Results</h2><a href='{workspace_host}files/excel-export/ucx_assessment_main.xlsx?o={workspace_id}' target='_blank' download>Download Results</a></div>
+    html_content = '''
+    <style>@font-face{{font-family:'DM Sans';src:url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');font-weight:400;font-style:normal}}body{{font-family:'DM Sans',Arial,sans-serif}}.export-container{{text-align:center;margin-top:20px}}.export-container h2{{color:#1B3139;font-size:24px;margin-bottom:20px}}.export-container a{{display:inline-block;padding:12px 25px;background-color:#1B3139;color:#fff;text-decoration:none;border-radius:4px;font-size:18px;font-weight:500;transition:background-color 0.3s ease,transform:translateY(-2px) ease}}.export-container a:hover{{background-color:#FF3621;transform:translateY(-2px)}}</style>
+    <div class="export-container"><h2>Export Results</h2><a href='{workspace_host}/files/excel-export/ucx_assessment_main.xlsx?o={workspace_id}' target='_blank' download>Download Results</a></div>
+
     '''
     displayHTML(html_content)
 
@@ -597,6 +598,7 @@ class WorkflowsDeployment(InstallationMixin):
         self.remove_jobs(keep=desired_workflows)
         self._install_state.save()
         self._create_debug(remote_wheels)
+        self._create_export(remote_wheels)
         self._create_readme()
 
     def remove_jobs(self, *, keep: set[str] | None = None) -> None:
