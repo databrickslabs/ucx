@@ -172,13 +172,6 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
             )
             yield advisory
 
-    def collect_dfsas_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccessNode]:
-        tree = Tree.new_module()
-        if inherited_tree:
-            tree.append_tree(inherited_tree)
-        tree.append_tree(Tree.normalize_and_parse(source_code))
-        yield from self.collect_dfsas_from_tree(tree)
-
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         visitor = _DetectDirectFsAccessVisitor(self._session_state, self._prevent_spark_duplicates)
         visitor.visit(tree.node)

@@ -273,8 +273,6 @@ class TablePyCollector(TableCollector, ABC):
             yield table_node.table
 
     @abstractmethod
-    def collect_tables_from_source(self, source_code: str, inherited_tree: Tree | None) -> Iterable[TableInfoNode]: ...
-    @abstractmethod
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]: ...
 
 
@@ -308,11 +306,6 @@ class DfsaPyCollector(DfsaCollector, ABC):
         tree = Tree.normalize_and_parse(source_code)
         for dfsa_node in self.collect_dfsas_from_tree(tree):
             yield dfsa_node.dfsa
-
-    @abstractmethod
-    def collect_dfsas_from_source(
-        self, source_code: str, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccessNode]: ...
 
     @abstractmethod
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
