@@ -53,7 +53,7 @@ from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
-
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
@@ -445,7 +445,7 @@ class CommonUtils:
 
     @cached_property
     def ucx_catalog(self) -> str:
-        return self._make_catalog(name=f"ucx-{self._make_random()}").name
+        return self._make_catalog(name=f"ucx_{self._make_random()}").name
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
@@ -748,6 +748,7 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
         return WorkspaceConfig(
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
+            ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
         )
@@ -948,6 +949,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_databases=self.created_databases,
             include_object_permissions=self.include_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            ucx_catalog=self.ucx_catalog,
         )
         workspace_config = self.config_transform(workspace_config)
         self.installation.save(workspace_config)
@@ -985,6 +987,10 @@ class MockInstallationContext(MockRuntimeContext):
             self.prompts,
             self.product_info,
         )
+
+    @cached_property
+    def progress_tracking_installation(self) -> ProgressTrackingInstallation:
+        return ProgressTrackingInstallation(self.sql_backend, self.ucx_catalog)
 
     @cached_property
     def extend_prompts(self):
