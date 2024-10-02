@@ -3,7 +3,7 @@ from collections.abc import Callable, Iterable, Iterator
 from typing import TypeVar
 
 from sqlglot import parse, ParseError
-from sqlglot.expressions import Table, Expression, Use, Create, Drop
+from sqlglot.expressions import Create, Delete, Drop, Expression, Select, Table, Update, Use
 
 from databricks.labs.ucx.source_code.base import UsedTable, CurrentSessionState
 
@@ -54,6 +54,8 @@ class SqlExpression:
             catalog_name=catalog_name,
             schema_name=src_schema,
             table_name=table.name,
+            is_read=isinstance(self._expression, Select),
+            is_write=isinstance(self._expression, (Create, Update, Delete)),
         )
 
     def find_all(self, klass: type[E]) -> Iterator[E]:

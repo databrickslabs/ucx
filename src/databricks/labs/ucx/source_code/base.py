@@ -251,6 +251,8 @@ class UsedTable(SourceInfo):
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
     table_name: str = SourceInfo.UNKNOWN
+    is_read: bool = True
+    is_write: bool = False
 
 
 class TableCollector(ABC):
