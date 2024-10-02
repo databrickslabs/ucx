@@ -1525,102 +1525,18 @@
   "cmdstanpy": {
     "cmdstanpy": [],
     "cmdstanpy._version": [],
-    "cmdstanpy.cmdstan_args": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
-    "cmdstanpy.compilation": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
-    "cmdstanpy.install_cmdstan": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
-    "cmdstanpy.install_cxx_toolchain": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /CURRENTUSER"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /DIR=\"{}\""
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /NOICONS"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /NORESTART"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /SILENT"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /SP-"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /SUPPRESSMSGBOXES"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /VERYSILENT"
-      }
-    ],
-    "cmdstanpy.model": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "cmdstanpy.progress": [],
     "cmdstanpy.stanfit": [],
     "cmdstanpy.stanfit.gq": [],
     "cmdstanpy.stanfit.laplace": [],
-    "cmdstanpy.stanfit.mcmc": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "cmdstanpy.stanfit.metadata": [],
     "cmdstanpy.stanfit.mle": [],
     "cmdstanpy.stanfit.pathfinder": [],
     "cmdstanpy.stanfit.runset": [],
     "cmdstanpy.stanfit.vb": [],
     "cmdstanpy.utils": [],
-    "cmdstanpy.utils.cmdstan": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /proc/self/exe"
-      }
-    ],
     "cmdstanpy.utils.command": [],
     "cmdstanpy.utils.data_munging": [],
-    "cmdstanpy.utils.filesystem": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "cmdstanpy.utils.json": [],
     "cmdstanpy.utils.logging": [],
     "cmdstanpy.utils.stancsv": []
