@@ -1140,6 +1140,18 @@
   "cachetools": {
     "cachetools": []
   },
+  "catalogue": {
+    "catalogue": [],
+    "catalogue._importlib_metadata": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "catalogue._importlib_metadata._compat": [],
+    "catalogue.tests": [],
+    "catalogue.tests.test_catalogue": []
+  },
   "causal-learn": {
     "causallearn": [],
     "causallearn.graph.AdjacencyConfusion": [],
