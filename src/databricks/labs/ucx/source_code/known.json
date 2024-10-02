@@ -1605,6 +1605,12 @@
   "cycler": {
     "cycler": []
   },
+  "cymem": {
+    "cymem": [],
+    "cymem.about": [],
+    "cymem.tests": [],
+    "cymem.tests.test_import": []
+  },
   "cython": {
     "Cython.Build.BuildExecutable": [],
     "Cython.Build.Cythonize": [],
