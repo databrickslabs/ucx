@@ -17,7 +17,7 @@ class MockWorkspaceClient:
     "attribute, klass",
     [
         ("workflow_run_recorder", WorkflowRunRecorder),
-    ]
+    ],
 )
 def test_context_attribute_class(tmp_path, attribute, klass) -> None:
     """Increase coverage with these tests"""
@@ -26,10 +26,12 @@ def test_context_attribute_class(tmp_path, attribute, klass) -> None:
         "workflow": "test",
         "job_id": 123,
         "parent_run_id": 456,
-        "start_time": dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).isoformat()
+        "start_time": dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).isoformat(),
     }
 
-    ctx = RuntimeContext(named_parameters=named_parameters).replace(config=config, sql_backend=None, workspace_client=MockWorkspaceClient())
+    ctx = RuntimeContext(named_parameters=named_parameters).replace(
+        config=config, sql_backend=None, workspace_client=MockWorkspaceClient()
+    )
 
     assert hasattr(ctx, attribute)
     assert isinstance(getattr(ctx, attribute), klass)
