@@ -1088,6 +1088,16 @@
     "blinker._utilities": [],
     "blinker.base": []
   },
+  "blis": {
+    "blis": [],
+    "blis.about": [],
+    "blis.benchmark": [],
+    "blis.tests": [],
+    "blis.tests.common": [],
+    "blis.tests.conftest": [],
+    "blis.tests.test_dotv": [],
+    "blis.tests.test_gemm": []
+  },
   "bokeh": {
     "bokeh": []
   },
@@ -1108,6 +1118,9 @@
       }
     ]
   },
+  "brotli": {
+    "brotli": []
+  },
   "btyd": {
     "btyd": [],
     "btyd.datasets": [],
@@ -1126,6 +1139,18 @@
   },
   "cachetools": {
     "cachetools": []
+  },
+  "catalogue": {
+    "catalogue": [],
+    "catalogue._importlib_metadata": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "catalogue._importlib_metadata._compat": [],
+    "catalogue.tests": [],
+    "catalogue.tests.test_catalogue": []
   },
   "causal-learn": {
     "causallearn": [],

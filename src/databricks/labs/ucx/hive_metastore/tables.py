@@ -476,7 +476,7 @@ class TablesCrawler(CrawlerBase[Table]):
             return None
 
 
-class FasterTableScanCrawler(CrawlerBase):
+class FasterTableScanCrawler(CrawlerBase[Table]):
     """
     FasterTableScanCrawler is a specialized version of TablesCrawler that uses spark._jsparkSession to utilize
     faster scanning with Scala APIs.
