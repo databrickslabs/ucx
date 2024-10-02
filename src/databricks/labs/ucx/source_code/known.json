@@ -1966,6 +1966,16 @@
   "databricks-sdk": {
     "databricks.sdk": []
   },
+  "dataclasses-json": {
+    "dataclasses_json": [],
+    "dataclasses_json.api": [],
+    "dataclasses_json.cfg": [],
+    "dataclasses_json.core": [],
+    "dataclasses_json.mm": [],
+    "dataclasses_json.stringcase": [],
+    "dataclasses_json.undefined": [],
+    "dataclasses_json.utils": []
+  },
   "datasets": {
     "datasets": [],
     "datasets.arrow_dataset": [],
@@ -7994,6 +8004,21 @@
   "markupsafe": {
     "markupsafe": [],
     "markupsafe._native": []
+  },
+  "marshmallow": {
+    "marshmallow": [],
+    "marshmallow.base": [],
+    "marshmallow.class_registry": [],
+    "marshmallow.decorators": [],
+    "marshmallow.error_store": [],
+    "marshmallow.exceptions": [],
+    "marshmallow.fields": [],
+    "marshmallow.orderedset": [],
+    "marshmallow.schema": [],
+    "marshmallow.types": [],
+    "marshmallow.utils": [],
+    "marshmallow.validate": [],
+    "marshmallow.warnings": []
   },
   "matplotlib": {
     "matplotlib": [],
@@ -29093,6 +29118,9 @@
   "types-python-dateutil": {},
   "types-pyyaml": {},
   "types-requests": {},
+  "typing-inspect": {
+    "typing_inspect": []
+  },
   "typing_extensions": {
     "typing_extensions": []
   },
