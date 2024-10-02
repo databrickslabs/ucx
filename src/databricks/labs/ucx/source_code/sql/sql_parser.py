@@ -62,8 +62,8 @@ class SqlExpression:
 
 class SqlParser:
 
-    @staticmethod
-    def walk_expressions(sql_code: str, callback: Callable[[SqlExpression], Iterable[T]]) -> Iterable[T]:
+    @classmethod
+    def walk_expressions(cls, sql_code: str, callback: Callable[[SqlExpression], Iterable[T]]) -> Iterable[T]:
         try:
             expressions = parse(sql_code, read='databricks')
             for expression in expressions:
