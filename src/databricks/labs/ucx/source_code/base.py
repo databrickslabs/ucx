@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Self, Any
+from typing import Any
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
@@ -20,6 +20,11 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.paths import WorkspacePath
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
