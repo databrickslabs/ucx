@@ -1545,6 +1545,20 @@
     "comm": [],
     "comm.base_comm": []
   },
+  "confection": {
+    "confection": [],
+    "confection.tests": [],
+    "confection.tests.conftest": [],
+    "confection.tests.test_config": [],
+    "confection.tests.test_frozen_structures": [],
+    "confection.tests.util": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "confection.util": []
+  },
   "contourpy": {
     "contourpy": []
   },
@@ -27943,6 +27957,162 @@
   },
   "sqlparse": {
     "sqlparse": []
+  },
+  "srsly": {
+    "srsly": [],
+    "srsly._json_api": [],
+    "srsly._msgpack_api": [],
+    "srsly._pickle_api": [],
+    "srsly._yaml_api": [],
+    "srsly.about": [],
+    "srsly.cloudpickle": [],
+    "srsly.cloudpickle.cloudpickle": [],
+    "srsly.cloudpickle.cloudpickle_fast": [],
+    "srsly.cloudpickle.compat": [],
+    "srsly.msgpack": [],
+    "srsly.msgpack._ext_type": [],
+    "srsly.msgpack._msgpack_numpy": [],
+    "srsly.msgpack._version": [],
+    "srsly.msgpack.exceptions": [],
+    "srsly.msgpack.util": [],
+    "srsly.ruamel_yaml": [],
+    "srsly.ruamel_yaml.anchor": [],
+    "srsly.ruamel_yaml.comments": [],
+    "srsly.ruamel_yaml.compat": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /var/tmp/srsly.ruamel_yaml.log"
+      }
+    ],
+    "srsly.ruamel_yaml.composer": [],
+    "srsly.ruamel_yaml.configobjwalker": [],
+    "srsly.ruamel_yaml.constructor": [],
+    "srsly.ruamel_yaml.cyaml": [],
+    "srsly.ruamel_yaml.dumper": [],
+    "srsly.ruamel_yaml.emitter": [],
+    "srsly.ruamel_yaml.error": [],
+    "srsly.ruamel_yaml.events": [],
+    "srsly.ruamel_yaml.loader": [],
+    "srsly.ruamel_yaml.main": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /*/__plug_in__.py"
+      }
+    ],
+    "srsly.ruamel_yaml.nodes": [],
+    "srsly.ruamel_yaml.parser": [],
+    "srsly.ruamel_yaml.reader": [],
+    "srsly.ruamel_yaml.representer": [],
+    "srsly.ruamel_yaml.resolver": [],
+    "srsly.ruamel_yaml.scalarbool": [],
+    "srsly.ruamel_yaml.scalarfloat": [],
+    "srsly.ruamel_yaml.scalarint": [],
+    "srsly.ruamel_yaml.scalarstring": [],
+    "srsly.ruamel_yaml.scanner": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "srsly.ruamel_yaml.serializer": [],
+    "srsly.ruamel_yaml.timestamp": [],
+    "srsly.ruamel_yaml.tokens": [],
+    "srsly.ruamel_yaml.util": [],
+    "srsly.tests": [],
+    "srsly.tests.cloudpickle": [],
+    "srsly.tests.cloudpickle.cloudpickle_file_test": [],
+    "srsly.tests.cloudpickle.cloudpickle_test": [],
+    "srsly.tests.cloudpickle.testutils": [],
+    "srsly.tests.msgpack": [],
+    "srsly.tests.msgpack.test_buffer": [],
+    "srsly.tests.msgpack.test_case": [],
+    "srsly.tests.msgpack.test_except": [],
+    "srsly.tests.msgpack.test_extension": [],
+    "srsly.tests.msgpack.test_format": [],
+    "srsly.tests.msgpack.test_limits": [],
+    "srsly.tests.msgpack.test_memoryview": [],
+    "srsly.tests.msgpack.test_newspec": [],
+    "srsly.tests.msgpack.test_numpy": [],
+    "srsly.tests.msgpack.test_pack": [],
+    "srsly.tests.msgpack.test_read_size": [],
+    "srsly.tests.msgpack.test_seq": [],
+    "srsly.tests.msgpack.test_sequnpack": [],
+    "srsly.tests.msgpack.test_stricttype": [],
+    "srsly.tests.msgpack.test_subtype": [],
+    "srsly.tests.msgpack.test_unpack": [],
+    "srsly.tests.ruamel_yaml": [],
+    "srsly.tests.ruamel_yaml.roundtrip": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /Users/pritish.pai/projects/ucx/.venv/bin/python"
+      }
+    ],
+    "srsly.tests.ruamel_yaml.test_a_dedent": [],
+    "srsly.tests.ruamel_yaml.test_add_xxx": [],
+    "srsly.tests.ruamel_yaml.test_anchor": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ],
+    "srsly.tests.ruamel_yaml.test_api_change": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /tstFile.yaml"
+      }
+    ],
+    "srsly.tests.ruamel_yaml.test_appliance": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      },
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /data"
+      }
+    ],
+    "srsly.tests.ruamel_yaml.test_class_register": [],
+    "srsly.tests.ruamel_yaml.test_collections": [],
+    "srsly.tests.ruamel_yaml.test_comment_manipulation": [],
+    "srsly.tests.ruamel_yaml.test_comments": [],
+    "srsly.tests.ruamel_yaml.test_contextmanager": [],
+    "srsly.tests.ruamel_yaml.test_copy": [],
+    "srsly.tests.ruamel_yaml.test_datetime": [],
+    "srsly.tests.ruamel_yaml.test_deprecation": [],
+    "srsly.tests.ruamel_yaml.test_documents": [],
+    "srsly.tests.ruamel_yaml.test_fail": [],
+    "srsly.tests.ruamel_yaml.test_float": [],
+    "srsly.tests.ruamel_yaml.test_flowsequencekey": [],
+    "srsly.tests.ruamel_yaml.test_indentation": [],
+    "srsly.tests.ruamel_yaml.test_int": [],
+    "srsly.tests.ruamel_yaml.test_issues": [],
+    "srsly.tests.ruamel_yaml.test_json_numbers": [],
+    "srsly.tests.ruamel_yaml.test_line_col": [],
+    "srsly.tests.ruamel_yaml.test_literal": [],
+    "srsly.tests.ruamel_yaml.test_none": [],
+    "srsly.tests.ruamel_yaml.test_numpy": [],
+    "srsly.tests.ruamel_yaml.test_program_config": [],
+    "srsly.tests.ruamel_yaml.test_spec_examples": [],
+    "srsly.tests.ruamel_yaml.test_string": [],
+    "srsly.tests.ruamel_yaml.test_tag": [],
+    "srsly.tests.ruamel_yaml.test_version": [],
+    "srsly.tests.ruamel_yaml.test_yamlfile": [],
+    "srsly.tests.ruamel_yaml.test_yamlobject": [],
+    "srsly.tests.ruamel_yaml.test_z_check_debug_leftovers": [],
+    "srsly.tests.ruamel_yaml.test_z_data": [],
+    "srsly.tests.test_json_api": [],
+    "srsly.tests.test_msgpack_api": [],
+    "srsly.tests.test_pickle_api": [],
+    "srsly.tests.test_yaml_api": [],
+    "srsly.tests.ujson": [],
+    "srsly.tests.ujson.test_ujson": [],
+    "srsly.tests.util": [],
+    "srsly.ujson": [],
+    "srsly.util": []
   },
   "ssh-import-id": {
     "ssh_import_id": [],
