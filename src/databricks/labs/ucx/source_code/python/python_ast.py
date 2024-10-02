@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from abc import ABC
 import logging
 import re
@@ -23,7 +24,6 @@ from astroid import (  # type: ignore
     parse,
     Uninferable,
 )
-from astroid.modutils import BUILTIN_MODULES  # type: ignore
 
 logger = logging.getLogger(__name__)
 missing_handlers: set[str] = set()
@@ -295,8 +295,8 @@ class Tree:
             builtins = cast(dict[str, Any], __builtins__)
             if name in builtins.keys():
                 return True
-            astroid_name = f"_{name}"
-            return BUILTIN_MODULES.get(astroid_name, None) is not None
+            names = sys.builtin_module_names
+            return f"_{name}" in names
         if isinstance(self._node, Call):
             return Tree(self._node.func).is_builtin()
         if isinstance(self._node, Attribute):
