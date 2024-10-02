@@ -51,6 +51,8 @@ def test_detects_dfsa_paths(code, expected):
     "code, expected",
     [
         ("load_data('/dbfs/mnt/data')", 0),
+        ("""with open('/dbfs/mnt/data') as f:
+  f.read()""", 1),
         ("dbutils.fs('/data')", 1),
         ("dbutils.fs('/dbfs/mnt/data', '/data')", 2),
         ("# load_data('/dbfs/mnt/data', '/data')", 0),

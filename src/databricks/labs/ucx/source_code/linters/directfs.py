@@ -93,12 +93,13 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         for pattern in DIRECT_FS_ACCESS_PATTERNS:
             if not pattern.matches(value):
                 continue
-            # only capture calls originating from spark or dbutils
+            # only capture 'open' calls or calls originating from spark or dbutils
             # because there is no other known way to manipulate data directly from file system
             tree = Tree(call_node)
-            is_from_db_utils = tree.is_from_module("dbutils")
-            is_from_spark = False if is_from_db_utils else tree.is_from_module("spark")
-            if not (is_from_db_utils or is_from_spark):
+            is_open = tree.get_call_name() == "open" and tree.is_builtin()
+            is_from_db_utils = False if is_open else tree.is_from_module("dbutils")
+            is_from_spark = False if is_open or is_from_db_utils else tree.is_from_module("spark")
+            if not (is_open or is_from_db_utils or is_from_spark):
                 return
             # avoid duplicate advices that are reported by SparkSqlPyLinter
             if self._prevent_spark_duplicates and is_from_spark:
