@@ -1522,6 +1522,25 @@
     "colorful.terminal": [],
     "colorful.utils": []
   },
+  "cmdstanpy": {
+    "cmdstanpy": [],
+    "cmdstanpy._version": [],
+    "cmdstanpy.progress": [],
+    "cmdstanpy.stanfit": [],
+    "cmdstanpy.stanfit.gq": [],
+    "cmdstanpy.stanfit.laplace": [],
+    "cmdstanpy.stanfit.metadata": [],
+    "cmdstanpy.stanfit.mle": [],
+    "cmdstanpy.stanfit.pathfinder": [],
+    "cmdstanpy.stanfit.runset": [],
+    "cmdstanpy.stanfit.vb": [],
+    "cmdstanpy.utils": [],
+    "cmdstanpy.utils.command": [],
+    "cmdstanpy.utils.data_munging": [],
+    "cmdstanpy.utils.json": [],
+    "cmdstanpy.utils.logging": [],
+    "cmdstanpy.utils.stancsv": []
+  },
   "comm": {
     "comm": [],
     "comm.base_comm": []
@@ -27931,6 +27950,12 @@
   },
   "stack-data": {
     "stack_data": []
+  },
+  "stanio": {
+    "stanio": [],
+    "stanio.csv": [],
+    "stanio.json": [],
+    "stanio.reshape": []
   },
   "starlette": {
     "starlette": [],
