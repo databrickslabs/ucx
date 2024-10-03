@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -33,6 +33,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     AwsACL,
     AzureACL,
     ComputeLocations,
+    Grant,
     GrantsCrawler,
     MigrateGrants,
     PrincipalACL,
@@ -263,7 +264,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def migrate_grants(self) -> MigrateGrants:
-        grant_loaders = [
+        grant_loaders: list[Callable[[], Iterable[Grant]]] = [
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
         ]
