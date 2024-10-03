@@ -15,15 +15,7 @@ logger = logging.getLogger(__name__)
 
 class UsedTablesCrawler(CrawlerBase[UsedTable]):
 
-    @classmethod
-    def for_paths(cls, backend: SqlBackend, schema) -> UsedTablesCrawler:
-        return UsedTablesCrawler(backend, schema, "used_tables_in_paths")
-
-    @classmethod
-    def for_queries(cls, backend: SqlBackend, schema) -> UsedTablesCrawler:
-        return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
-
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+    def __init__(self, backend: SqlBackend, schema: str, table: str) -> None:
         """
         Initializes a DFSACrawler instance.
 
@@ -33,7 +25,15 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
         """
         super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=UsedTable)
 
-    def dump_all(self, tables: Sequence[UsedTable]):
+    @classmethod
+    def for_paths(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
+        return UsedTablesCrawler(backend, schema, "used_tables_in_paths")
+
+    @classmethod
+    def for_queries(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
+        return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
+
+    def dump_all(self, tables: Sequence[UsedTable]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 3 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR

@@ -17,6 +17,7 @@ from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -55,7 +56,6 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
-from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -423,7 +423,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def workflow_linter(self):
+    def workflow_linter(self) -> WorkflowLinter:
         return WorkflowLinter(
             self.workspace_client,
             self.dependency_resolver,
