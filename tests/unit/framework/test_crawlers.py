@@ -76,7 +76,7 @@ def test_snapshot_crawls_when_no_prior_crawl() -> None:
     assert [Baz(first="first")] == result
 
 
-def test_snapshot_crawls_when_prior_crawl_yielded_no_data(ws) -> None:
+def test_snapshot_crawls_when_prior_crawl_yielded_no_data() -> None:
     """Check that the crawler is invoked when the fetcher reports that the inventory exists but doesn't contain data."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(return_value=[])

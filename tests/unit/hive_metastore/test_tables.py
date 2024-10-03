@@ -158,7 +158,7 @@ def test_uc_sql_when_table_is_in_mount(schema, partitions, table_schema):
     assert table.sql_migrate_table_in_mount(target, table_schema) == expected
 
 
-def test_tables_returning_error_when_describing(ws):
+def test_tables_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED `hive_metastore`.`database`.`table1`": "error"}
     rows = {
         "SHOW DATABASES": [("database",)],

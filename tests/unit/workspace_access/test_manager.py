@@ -162,7 +162,7 @@ def test_manager_apply(mocker):
     assert {"test2 test2", "test test"} == applied_items
 
 
-def test_unregistered_support(ws):
+def test_unregistered_support():
     sql_backend = MockBackend(
         rows={
             "SELECT": [
@@ -174,7 +174,7 @@ def test_unregistered_support(ws):
     permission_manager.apply_group_permissions(migration_state=MigrationState([]))
 
 
-def test_manager_verify(ws):
+def test_manager_verify():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -214,7 +214,7 @@ def test_manager_verify(ws):
     assert {"test test"} == items
 
 
-def test_manager_verify_not_supported_type(ws):
+def test_manager_verify_not_supported_type():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -248,7 +248,7 @@ def test_manager_verify_not_supported_type(ws):
         permission_manager.verify_group_permissions()
 
 
-def test_manager_verify_no_tasks(ws):
+def test_manager_verify_no_tasks():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [

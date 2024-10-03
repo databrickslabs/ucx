@@ -1027,7 +1027,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
 
 
-def test_table_in_mount_mapping_with_table_owner(ws):
+def test_table_in_mount_mapping_with_table_owner():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
     backend = MockBackend(
@@ -1067,7 +1067,7 @@ def test_table_in_mount_mapping_with_table_owner(ws):
     migrate_grants.apply.assert_called()
 
 
-def test_table_in_mount_mapping_with_partition_information(ws):
+def test_table_in_mount_mapping_with_partition_information():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
     backend = MockBackend(
