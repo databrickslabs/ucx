@@ -90,14 +90,6 @@ class PythonCodeAnalyzer:
             context.tree.append_globals(globs)
         return context
 
-    def _build_full_tree(self, inherited_context: Tree | None) -> Tree:
-        full_tree = Tree.new_module()
-        if inherited_context is not None:
-            full_tree = full_tree.append_tree(inherited_context)
-            full_tree = full_tree.renumber(-1)
-        tree = Tree.normalize_and_parse(self._python_code)
-        return full_tree.append_tree(tree)
-
     def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
         tree = Tree.normalize_and_parse(self._python_code)

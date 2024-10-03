@@ -2,7 +2,8 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.base import LineageAtom
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.sdk.service.iam import PermissionLevel
 

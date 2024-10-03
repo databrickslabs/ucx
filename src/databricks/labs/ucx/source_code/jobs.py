@@ -3,12 +3,14 @@ import functools
 import logging
 import shutil
 import tempfile
+from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
+from typing import TypeVar
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -17,6 +19,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
@@ -27,9 +30,12 @@ from databricks.labs.ucx.source_code.base import (
     is_a_notebook,
     file_language,
     guess_encoding,
+    SourceInfo,
+    UsedTable,
+    LineageAtom,
+    PythonSequentialLinter,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
-    LineageAtom,
     DirectFsAccessCrawler,
     DirectFsAccess,
 )
@@ -43,11 +49,11 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphWalker,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -342,6 +348,7 @@ class WorkflowLinter:
         path_lookup: PathLookup,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
+        used_tables_crawler: UsedTablesCrawler,
         include_job_ids: list[int] | None = None,
     ):
         self._ws = ws
@@ -349,6 +356,7 @@ class WorkflowLinter:
         self._path_lookup = path_lookup
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
+        self._used_tables_crawler = used_tables_crawler
         self._include_job_ids = include_job_ids
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
@@ -364,9 +372,11 @@ class WorkflowLinter:
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
         job_dfsas: list[DirectFsAccess] = []
-        for problems, dfsas in job_results:
+        job_tables: list[UsedTable] = []
+        for problems, dfsas, tables in job_results:
             job_problems.extend(problems)
             job_dfsas.extend(dfsas)
+            job_tables.extend(tables)
         logger.info(f"Saving {len(job_problems)} linting problems...")
         sql_backend.save_table(
             f'{inventory_database}.workflow_problems',
@@ -375,27 +385,30 @@ class WorkflowLinter:
             mode='overwrite',
         )
         self._directfs_crawler.dump_all(job_dfsas)
+        self._used_tables_crawler.dump_all(job_tables)
         if len(errors) > 0:
             raise ManyError(errors)
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
-            return ([], [])
+            return ([], [], [])
 
-        problems, dfsas = self._lint_job(job)
+        problems, dfsas, tables = self._lint_job(job)
         if len(problems) > 0:
             problem_messages = "\n".join([problem.as_message() for problem in problems])
             logger.warning(f"Found job problems:\n{problem_messages}")
-        return problems, dfsas
+        return problems, dfsas, tables
 
     _UNKNOWN = Path('<UNKNOWN>')
 
-    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess]]:
+    def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccess] = []
+        table_infos: list[UsedTable] = []
+
         assert job.job_id is not None
         assert job.settings is not None
         assert job.settings.name is not None
@@ -426,7 +439,16 @@ class WorkflowLinter:
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
-        return problems, dfsas
+            assessment_start = datetime.now(timezone.utc)
+            task_tables = self._collect_task_tables(job, task, graph, session_state)
+            assessment_end = datetime.now(timezone.utc)
+            for table_info in task_tables:
+                table_info = table_info.replace_assessment_infos(
+                    assessment_start=assessment_start, assessment_end=assessment_end
+                )
+                table_infos.append(table_info)
+
+        return problems, dfsas, table_infos
 
     def _build_task_dependency_graph(
         self, task: jobs.Task, job: jobs.Job
@@ -464,10 +486,23 @@ class WorkflowLinter:
     def _collect_task_dfsas(
         self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
     ) -> Iterable[DirectFsAccess]:
-        # walker doesn't register lineage for job/task
+        # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state):
+        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+            atoms = [
+                LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
+                LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
+            ]
+            yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
+
+    def _collect_task_tables(
+        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
+    ) -> Iterable[UsedTable]:
+        # need to add lineage for job/task because walker doesn't register them
+        job_id = str(job.job_id)
+        job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
+        for dfsa in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
@@ -489,7 +524,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         super().__init__(graph, walked_paths, path_lookup)
         self._key = key
         self._session_state = session_state
-        self._migration_index = migration_index
+        self._linter_context = LinterContext(migration_index, session_state)
 
     def _log_walk_one(self, dependency: Dependency):
         logger.info(f'Linting {self._key} dependency: {dependency}')
@@ -497,14 +532,16 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
     ) -> Iterable[LocatedAdvice]:
-        ctx = LinterContext(self._migration_index, self._session_state)
         # FileLinter determines which file/notebook linter to use
-        linter = FileLinter(ctx, path_lookup, self._session_state, dependency.path, inherited_tree)
+        linter = FileLinter(self._linter_context, path_lookup, self._session_state, dependency.path, inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
 
 
-class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
+T = TypeVar("T", bound=SourceInfo)
+
+
+class _CollectorWalker(DependencyGraphWalker[T], ABC):
 
     def __init__(
         self,
@@ -512,13 +549,15 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
         walked_paths: set[Path],
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
+        migration_index: TableMigrationIndex,
     ):
         super().__init__(graph, walked_paths, path_lookup)
         self._session_state = session_state
+        self._linter_context = LinterContext(migration_index, session_state)
 
     def _process_dependency(
         self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[T]:
         language = file_language(dependency.path)
         if not language:
             logger.warning(f"Unknown language for {dependency.path}")
@@ -532,13 +571,13 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def _collect_from_notebook(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
+    ) -> Iterable[T]:
         notebook = Notebook.parse(path, source, language.language)
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
         src_id = str(path)
         for cell in notebook.cells:
-            for dfsa in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+            for item in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
+                yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
@@ -547,8 +586,8 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
 
     def _collect_from_source(
         self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
-    ) -> Iterable[DirectFsAccess]:
-        iterable: Iterable[DirectFsAccess] | None = None
+    ) -> Iterable[T]:
+        iterable: Iterable[T] | None = None
         if language is CellLanguage.SQL:
             iterable = self._collect_from_sql(source)
         if language is CellLanguage.PYTHON:
@@ -558,14 +597,34 @@ class DfsaCollectorWalker(DependencyGraphWalker[DirectFsAccess]):
             return
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
         src_id = str(path)
-        for dfsa in iterable:
-            yield dfsa.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+        for item in iterable:
+            yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
+
+    @abstractmethod
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[T]: ...
+
+    @abstractmethod
+    def _collect_from_sql(self, source: str) -> Iterable[T]: ...
+
+
+class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
-        linter = DirectFsAccessPyLinter(self._session_state, prevent_spark_duplicates=False)
-        for dfsa_node in linter.collect_dfsas(source, inherited_tree):
-            yield dfsa_node.dfsa
+        collector = self._linter_context.dfsa_collector(Language.PYTHON)
+        yield from collector.collect_dfsas(source)
 
     def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
-        linter = DirectFsAccessSqlLinter()
-        yield from linter.collect_dfsas(source)
+        collector = self._linter_context.dfsa_collector(Language.SQL)
+        yield from collector.collect_dfsas(source)
+
+
+class TablesCollectorWalker(_CollectorWalker[UsedTable]):
+
+    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[UsedTable]:
+        collector = self._linter_context.tables_collector(Language.PYTHON)
+        assert isinstance(collector, PythonSequentialLinter)
+        yield from collector.collect_tables(source)
+
+    def _collect_from_sql(self, source: str) -> Iterable[UsedTable]:
+        collector = self._linter_context.tables_collector(Language.SQL)
+        yield from collector.collect_tables(source)
