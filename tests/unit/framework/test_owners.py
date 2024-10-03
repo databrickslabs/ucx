@@ -23,34 +23,6 @@ class _OwnershipFixture(Ownership[Record]):
         return self._owner_fn(record)
 
 
-def _setup_workspace_users(ws, workspace_users: list[iam.User]) -> None:
-    ws.users.list.return_value = workspace_users
-
-
-def _setup_account_users(ws, account_users: Sequence[iam.User]) -> None:
-    def stub_rest_call(method: str, path: str | None = None, query: dict | None = None) -> dict:
-        if method == "GET" and path == "/api/2.0/account/scim/v2/Users" and query:
-            return {"Resources": [user.as_dict() for user in account_users]}
-        msg = f"Call not mocked: {method} {path}"
-        raise NotImplementedError(msg)
-
-    ws.api_client.do.side_effect = stub_rest_call
-
-
-def _setup_groups(ws, groups: list[iam.Group]) -> None:
-    groups_by_id = {group.id: group for group in groups}
-
-    def stub_groups_get(group_id: str) -> iam.Group:
-        try:
-            return groups_by_id[group_id]
-        except KeyError as e:
-            msg = f"Group not found: {group_id}"
-            raise NotFound(msg) from e
-
-    ws.groups.get.side_effect = stub_groups_get
-    ws.groups.list.return_value = groups
-
-
 def _setup_accounts(
     ws,
     *,
@@ -58,9 +30,27 @@ def _setup_accounts(
     workspace_users: Sequence[iam.User] = (),
     groups: Sequence[iam.Group] = (),
 ) -> None:
-    _setup_workspace_users(ws, list(workspace_users))
-    _setup_account_users(ws, account_users)
-    _setup_groups(ws, list(groups))
+    # Stub for the workspace users.
+    ws.users.list.return_value = list(workspace_users)
+
+    # Stub for the groups.
+    groups_by_id = {group.id: group for group in groups}
+    def stub_groups_get(group_id: str) -> iam.Group:
+        try:
+            return groups_by_id[group_id]
+        except KeyError as e:
+            msg = f"Group not found: {group_id}"
+            raise NotFound(msg) from e
+    ws.groups.get.side_effect = stub_groups_get
+    ws.groups.list.return_value = groups
+
+    # Stub for the account users.
+    def stub_rest_call(method: str, path: str | None = None, query: dict | None = None) -> dict:
+        if method == "GET" and path == "/api/2.0/account/scim/v2/Users" and query:
+            return {"Resources": [user.as_dict() for user in account_users]}
+        msg = f"Call not mocked: {method} {path}"
+        raise NotImplementedError(msg)
+    ws.api_client.do.side_effect = stub_rest_call
 
 
 def _create_workspace_admin(user_name: str, admins_group_id: str) -> iam.User:
@@ -96,8 +86,7 @@ def test_ownership_prefers_record_owner(ws) -> None:
 
 def test_ownership_admin_user_fallback(ws) -> None:
     """Verify that if no owner for the record can be found, an admin user is returned instead."""
-    account_users = [iam.User(user_name="jane", active=True, roles=[iam.ComplexValue(value="account_admin")])]
-    _setup_account_users(ws, account_users)
+    _setup_accounts(ws, account_users=[_create_account_admin("jane")])
 
     ownership = _OwnershipFixture[str](ws)
     owner = ownership.owner_of("school")
