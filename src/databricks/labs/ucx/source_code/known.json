@@ -3698,12 +3698,6 @@
     "diskcache.cli": [],
     "diskcache.core": [],
     "diskcache.djangocache": [],
-    "diskcache.fanout": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "diskcache.persistent": [],
     "diskcache.recipes": []
   },
