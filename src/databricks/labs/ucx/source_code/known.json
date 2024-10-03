@@ -6631,6 +6631,25 @@
     "ipywidgets.widgets.widget_time": [],
     "ipywidgets.widgets.widget_upload": []
   },
+  "isodate": {
+    "isodate": [],
+    "isodate.duration": [],
+    "isodate.isodates": [],
+    "isodate.isodatetime": [],
+    "isodate.isoduration": [],
+    "isodate.isoerror": [],
+    "isodate.isostrf": [],
+    "isodate.isotime": [],
+    "isodate.isotzinfo": [],
+    "isodate.tests": [],
+    "isodate.tests.test_date": [],
+    "isodate.tests.test_datetime": [],
+    "isodate.tests.test_duration": [],
+    "isodate.tests.test_pickle": [],
+    "isodate.tests.test_strf": [],
+    "isodate.tests.test_time": [],
+    "isodate.tzinfo": []
+  },
   "isoduration": {
     "isoduration": [],
     "isoduration.constants": [],
