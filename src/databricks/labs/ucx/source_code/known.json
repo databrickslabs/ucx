@@ -5147,13 +5147,7 @@
     "google_auth_oauthlib.flow": [],
     "google_auth_oauthlib.helpers": [],
     "google_auth_oauthlib.interactive": [],
-    "google_auth_oauthlib.tool": [],
-    "scripts.readme-gen.readme_gen": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ]
+    "google_auth_oauthlib.tool": []
   },
   "google-pasta": {
     "pasta": []
