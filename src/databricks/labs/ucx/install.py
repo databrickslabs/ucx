@@ -165,15 +165,15 @@ class WorkspaceInstaller(WorkspaceContext):
         self._tasks = tasks if tasks else Workflows.all().tasks()
 
     @cached_property
-    def upgrades(self):
+    def upgrades(self) -> Upgrades:
         return Upgrades(self.product_info, self.installation)
 
     @cached_property
-    def policy_installer(self):
+    def policy_installer(self) -> ClusterPolicyInstaller:
         return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         try:
             return self.product_info.current_installation(self.workspace_client)
         except NotFound:
@@ -820,12 +820,13 @@ class AccountInstaller(AccountContext):
 
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        try:
+        try:  # pylint: disable=too-many-try-statements
             # if user is account admin list all the available workspace the user has admin access on.
             # This code is run if joining collection after installation or through cli
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
             for workspace in accessible_workspaces:
-                ids_to_workspace[workspace.workspace_id] = workspace
+                if workspace.workspace_id is not None:
+                    ids_to_workspace[workspace.workspace_id] = workspace
             if join_on_install:
                 # if run as part of ucx installation allow user to select from the list to join
                 target_workspace = self._get_collection_workspace(accessible_workspaces, account_client)

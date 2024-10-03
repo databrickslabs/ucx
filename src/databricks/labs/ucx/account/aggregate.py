@@ -49,7 +49,7 @@ class AccountAggregate:
         self._workspace_context_factory = workspace_context_factory
 
     @cached_property
-    def _workspace_contexts(self):
+    def _workspace_contexts(self) -> list[WorkspaceContext]:
         contexts = []
         for workspace_client in self._account_workspaces.workspace_clients():
             ctx = self._workspace_context_factory(workspace_client)

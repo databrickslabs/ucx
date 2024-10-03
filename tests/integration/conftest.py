@@ -26,12 +26,12 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam
+from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.iam import Group
-from databricks.sdk.service.jobs import Task, SparkPythonTask
+from databricks.sdk.service.jobs import SparkPythonTask
 from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
@@ -46,6 +46,7 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePe
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
@@ -436,7 +437,7 @@ class CommonUtils:
         self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         return MockInstallation()
 
     @cached_property
@@ -564,7 +565,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def tables_crawler(self) -> TablesCrawler:
+    def tables_crawler(self):
         """
         Returns a TablesCrawler instance with the tables that were created in the context.
         Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
@@ -658,14 +659,15 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return list(created_databases)
 
     @cached_property
-    def created_groups(self):
+    def created_groups(self) -> list[str]:
         created_groups = []
         for group in self._groups:
-            created_groups.append(group.display_name)
+            if group.display_name is not None:
+                created_groups.append(group.display_name)
         return created_groups
 
     @cached_property
-    def azure_service_principal_crawler(self):
+    def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
         return StaticServicePrincipalCrawler(
             self._spn_infos,
             self.workspace_client,
@@ -674,7 +676,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def mounts_crawler(self):
+    def mounts_crawler(self) -> StaticMountCrawler:
         mount = Mount(
             f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/a'
         )
@@ -686,7 +688,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def group_manager(self):
+    def group_manager(self) -> GroupManager:
         return GroupManager(
             self.sql_backend,
             self.workspace_client,
@@ -768,7 +770,7 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
 
 class MockLocalAzureCli(MockWorkspaceContext):
     @cached_property
-    def azure_cli_authenticated(self):
+    def azure_cli_authenticated(self) -> bool:
         if not self.is_azure:
             pytest.skip("Azure only")
         if self.connect_config.auth_type != "azure-cli":
@@ -788,7 +790,7 @@ def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_back
 
 class MockLocalAwsCli(MockWorkspaceContext):
     @cached_property
-    def aws_cli_run_command(self):
+    def aws_cli_run_command(self) -> Callable[[str | list[str]], tuple[int, str, str]]:
         if not self.is_aws:
             pytest.skip("Aws only")
         if not shutil.which("aws"):
@@ -796,7 +798,7 @@ class MockLocalAwsCli(MockWorkspaceContext):
         return run_command
 
     @cached_property
-    def aws_profile(self):
+    def aws_profile(self) -> str:
         return self._env_or_skip("AWS_PROFILE")
 
 
@@ -884,7 +886,7 @@ class MockInstallationContext(MockRuntimeContext):
         return ws_group, acc_group
 
     @cached_property
-    def running_clusters(self):
+    def running_clusters(self) -> tuple[str, str, str]:
         logger.debug("Waiting for clusters to start...")
         default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -902,15 +904,15 @@ class MockInstallationContext(MockRuntimeContext):
         return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         return Installation(self.workspace_client, self.product_info.product_name())
 
     @cached_property
-    def account_client(self):
+    def account_client(self) -> AccountClient:
         return AccountClient(product="ucx", product_version=__version__)
 
     @cached_property
-    def account_installer(self):
+    def account_installer(self) -> AccountInstaller:
         return AccountInstaller(self.account_client)
 
     @cached_property
@@ -918,7 +920,7 @@ class MockInstallationContext(MockRuntimeContext):
         return {**os.environ}
 
     @cached_property
-    def workspace_installer(self):
+    def workspace_installer(self) -> WorkspaceInstaller:
         return WorkspaceInstaller(
             self.workspace_client,
             self.environ,
@@ -929,7 +931,7 @@ class MockInstallationContext(MockRuntimeContext):
         return lambda wc: wc
 
     @cached_property
-    def include_object_permissions(self):
+    def include_object_permissions(self) -> None:
         return None
 
     @cached_property
@@ -956,15 +958,15 @@ class MockInstallationContext(MockRuntimeContext):
         return workspace_config
 
     @cached_property
-    def product_info(self):
+    def product_info(self) -> ProductInfo:
         return ProductInfo.for_testing(WorkspaceConfig)
 
     @cached_property
-    def tasks(self):
+    def tasks(self) -> list[Task]:
         return Workflows.all().tasks()
 
     @cached_property
-    def workflows_deployment(self):
+    def workflows_deployment(self) -> WorkflowsDeployment:
         return WorkflowsDeployment(
             self.config,
             self.installation,
@@ -976,7 +978,7 @@ class MockInstallationContext(MockRuntimeContext):
         )
 
     @cached_property
-    def workspace_installation(self):
+    def workspace_installation(self) -> WorkspaceInstallation:
         return WorkspaceInstallation(
             self.config,
             self.installation,
@@ -993,15 +995,15 @@ class MockInstallationContext(MockRuntimeContext):
         return ProgressTrackingInstallation(self.sql_backend, self.ucx_catalog)
 
     @cached_property
-    def extend_prompts(self):
+    def extend_prompts(self) -> dict[str, str]:
         return {}
 
     @cached_property
-    def renamed_group_prefix(self):
+    def renamed_group_prefix(self) -> str:
         return f"rename-{self.product_info.product_name()}-"
 
     @cached_property
-    def prompts(self):
+    def prompts(self) -> MockPrompts:
         return MockPrompts(
             {
                 r'Open job overview in your browser.*': 'no',
@@ -1262,7 +1264,7 @@ def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffi
         file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
         file_path = WorkspacePath(ws, installation.install_folder()) / file_name
         file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
-        task = Task(
+        task = jobs.Task(
             task_key=make_random(4),
             description=make_random(4),
             new_cluster=ClusterSpec(
