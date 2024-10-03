@@ -189,14 +189,13 @@ def test_graph_builder_parse_error(
     analyser = PythonCodeAnalyzer(graph.new_dependency_graph_context(), "this is not valid python")
 
     # Run the test.
-    problems = analyser.build_graph()
+    problems = []
+    for problem in analyser.build_graph():
+        if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code"):
+            problems.append(problem)
 
     # Check results.
-    assert [
-        problem
-        for problem in problems
-        if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code")
-    ]
+    assert problems
 
 
 def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):

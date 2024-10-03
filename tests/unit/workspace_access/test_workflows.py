@@ -76,9 +76,8 @@ def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
-    ws.permission_migration.migrate_permissions.side_effect = [
-        MigratePermissionsResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
-    ]
+    resp = [MigratePermissionsResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)]
+    ws.permission_migration.migrate_permissions.side_effect = resp
     sql_backend = MockBackend(rows=rows)
 
     run_workflow(PermissionsMigrationAPI.apply_permissions, sql_backend=sql_backend, workspace_client=ws)

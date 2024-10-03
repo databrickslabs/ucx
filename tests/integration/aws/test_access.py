@@ -56,14 +56,13 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         aws_cli_ctx.principal_acl,
     )
     external_location_migration.run()
-    external_location = [
-        external_location
-        for external_location in list(ws.external_locations.list())
-        if external_location.name == f"bucket{rand}_folder1"
-    ]
-    assert len(external_location) == 1
-    assert external_location[0].url == f"s3://bucket{rand}/FOLDER1"
-    assert external_location[0].credential_name == f"ucx_{rand}"
+    out = []
+    for external_location in list(ws.external_locations.list()):
+        if external_location.name == f"bucket{rand}_folder1":
+            out.append(external_location)
+    assert len(out) == 1
+    assert out[0].url == f"s3://bucket{rand}/FOLDER1"
+    assert out[0].credential_name == f"ucx_{rand}"
 
 
 def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster_policy, aws_cli_ctx):
