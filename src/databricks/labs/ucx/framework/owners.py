@@ -1,12 +1,12 @@
 import functools
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
 from typing import ClassVar, Generic, Protocol, TypeVar, final
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
 
 logger = logging.getLogger(__name__)
@@ -19,25 +19,18 @@ class DataclassInstance(Protocol):
 Record = TypeVar("Record")
 
 
-class Ownership(ABC, Generic[Record]):
-    """Determine an owner for a given type of object."""
-
-    _cached_workspace_admins: dict[int, str | Exception] = {}
-    """Cached user names of workspace administrators, keyed by workspace id."""
-
-    @classmethod
-    def reset_cache(cls) -> None:
-        """Reset the cache of discovered administrators that we maintain at class level."""
-        # Intended for use by tests.
-        cls._cached_workspace_admins = {}
-
-    def __init__(self, ws: WorkspaceClient) -> None:
+class _AdministratorFinder(ABC):
+    def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    @staticmethod
-    def _has_role(user: User, role: str) -> bool:
-        """Determine whether a user has a given role or not."""
-        return user.roles is not None and any(r.value == role for r in user.roles)
+    @abstractmethod
+    def find_admin_users(self) -> Iterable[User]:
+        """Locate active admin users."""
+        raise NotImplementedError()
+
+
+class WorkspaceAdministratorFinder(_AdministratorFinder):
+    """Locate the users that are in the 'admin' workspace group for a given workspace."""
 
     @staticmethod
     def _member_of_group_named(user: User, group_name: str) -> bool:
@@ -63,7 +56,7 @@ class Ownership(ABC, Generic[Record]):
             if group.meta and group.meta.resource_type == "WorkspaceGroup":
                 yield group_id
 
-    def _find_workspace_admins(self) -> Iterable[User]:
+    def find_admin_users(self) -> Iterable[User]:
         """Enumerate the active workspace administrators in a given workspace.
 
         Returns:
@@ -94,7 +87,16 @@ class Ownership(ABC, Generic[Record]):
                 msg = f"Multiple 'admins' workspace groups found; something is wrong: {admin_groups}"
                 raise RuntimeError(msg)
 
-    def _find_account_admins(self) -> Iterable[User]:
+
+class AccountAdministratorFinder(_AdministratorFinder):
+    """Locate the users that are account administrators for this workspace."""
+
+    @staticmethod
+    def _has_role(user: User, role: str) -> bool:
+        """Determine whether a user has a given role or not."""
+        return user.roles is not None and any(r.value == role for r in user.roles)
+
+    def find_admin_users(self) -> Iterable[User]:
         """Enumerate the active account administrators associated with a given workspace.
 
         Returns:
@@ -109,19 +111,68 @@ class Ownership(ABC, Generic[Record]):
         # Reference: https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/groups#account-admin
         return (user for user in all_users if user.active and user.user_name and self._has_role(user, "account_admin"))
 
-    def _find_an_admin(self) -> User | None:
-        """Locate an active administrator for the current workspace.
 
-        If an active workspace administrator can be located, this is returned. When there are multiple, they are sorted
-        alphabetically by user-name and the first is returned. If there are no workspace administrators then an active
-        account administrator is sought, again returning the first alphabetically by user-name if there is more than one.
+class AdministratorLocator:
+    """Locate a workspace administrator, if possible.
 
-        Returns:
-            the first (alphabetically by user-name) active workspace or account administrator, or `None` if neither can
-            be found.
+    This will first try to find an active workspace administrator. If there are multiple, the first (alphabetically
+    sorted by user-name) will be used. If no active workspace administrators can be found then an account administrator
+    is sought, again returning the first alphabetically by user-name if more than one is found.
+    """
+
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        *,
+        finders: Sequence[Callable[[WorkspaceClient], _AdministratorFinder]] = (
+            WorkspaceAdministratorFinder,
+            AccountAdministratorFinder,
+        ),
+    ) -> None:
         """
+        Initialize the instance, which will try to locate administrators using the workspace for the supplied client.
+
+        Args:
+            ws (WorkspaceClient): the client for workspace in which to locate admin users.
+            finders: a sequence of factories that will be instantiated on demand to locate admin users.
+        """
+        self._ws = ws
+        self._finders = finders
+
+    @cached_property
+    def _workspace_id(self) -> int:
+        # Makes a REST call, so we cache it.
+        return self._ws.get_workspace_id()
+
+    @cached_property
+    def _found_admin(self) -> str | None:
+        # Lazily instantiate and query the finders in an attempt to locate an admin user.
+        finders = (finder(self._ws) for finder in self._finders)
+        # If a finder returns multiple admin users, use the first (alphabetically by user-name).
         first_user = functools.partial(min, default=None, key=lambda user: user.user_name)
-        return first_user(self._find_workspace_admins()) or first_user(self._find_account_admins())
+        found_admin_users: Iterable[User | None] = (first_user(finder.find_admin_users()) for finder in finders)
+        return next((user.user_name for user in found_admin_users if user), None)
+
+    @property
+    def workspace_administrator(self) -> str:
+        """The user-name of an admin user for the workspace.
+
+        Raises:
+              RuntimeError if an admin user cannot be found in the current workspace.
+        """
+        found_admin = self._found_admin
+        if found_admin is None:
+            msg = f"No active workspace or account administrator can be found for workspace: {self._workspace_id}"
+            raise RuntimeError(msg)
+        return found_admin
+
+
+class Ownership(ABC, Generic[Record]):
+    """Determine an owner for a given type of object."""
+
+    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator) -> None:
+        self._ws = ws
+        self._admin_locator = admin_locator
 
     @final
     def owner_of(self, record: Record) -> str:
@@ -139,38 +190,7 @@ class Ownership(ABC, Generic[Record]):
         Raises:
             RuntimeError if there are no active administrators for the current workspace.
         """
-        return self._get_owner(record) or self._workspace_admin
-
-    @cached_property
-    def _workspace_admin(self) -> str:
-        # Avoid repeatedly hitting the shared cache.
-        return self._find_an_administrator()
-
-    @final
-    def _find_an_administrator(self) -> str:
-        # Finding an administrator is quite expensive, so we ensure that for a given workspace we only do it once.
-        # Found administrators are cached on a class attribute. The method here:
-        #  - is thread-safe, with the compromise that we might perform some redundant lookups during init.
-        #  - no administrator is converted into an error.
-        #  - an error during lookup is preserved and raised for subsequent requests, to avoid too many REST calls.
-        workspace_id = self._ws.get_workspace_id()
-        found_admin_or_error = self._cached_workspace_admins.get(workspace_id, None)
-        if found_admin_or_error is None:
-            logger.debug(f"Locating an active workspace or account administrator for workspace: {workspace_id}")
-            try:
-                user = self._find_an_admin()
-            except DatabricksError as e:
-                found_admin_or_error = e
-            else:
-                found_admin_or_error = user.user_name if user is not None else None
-                # If not found, convert once into the error that we will raise each time.
-                if found_admin_or_error is None:
-                    msg = f"No active workspace or account administrator can be found for workspace: {workspace_id}"
-                    found_admin_or_error = RuntimeError(msg)  # pylint: disable=redefined-variable-type
-            self._cached_workspace_admins[workspace_id] = found_admin_or_error
-        if isinstance(found_admin_or_error, Exception):
-            raise found_admin_or_error
-        return found_admin_or_error
+        return self._get_owner(record) or self._admin_locator.workspace_administrator
 
     @abstractmethod
     def _get_owner(self, record: Record) -> str | None:

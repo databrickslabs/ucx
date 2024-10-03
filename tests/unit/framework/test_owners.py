@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.framework.owners import Ownership, Record
+from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, Record
 
 
 class _OwnershipFixture(Ownership[Record]):
@@ -15,8 +15,9 @@ class _OwnershipFixture(Ownership[Record]):
         ws: WorkspaceClient,
         *,
         owner_fn: Callable[[Record], str | None] = lambda _: None,
+        admin_locator: AdministratorLocator | None = None,
     ):
-        super().__init__(ws)
+        super().__init__(ws, admin_locator if admin_locator is not None else AdministratorLocator(ws))
         self._owner_fn = owner_fn
 
     def _get_owner(self, record: Record) -> str | None:
@@ -70,12 +71,6 @@ def _create_account_admin(user_name: str) -> iam.User:
 
 def _create_workspace_group(display_name: str, group_id: str) -> iam.Group:
     return iam.Group(display_name=display_name, id=group_id, meta=iam.ResourceMeta(resource_type="WorkspaceGroup"))
-
-
-@pytest.fixture(autouse=True)
-def _clear_ownership_cache() -> None:
-    """Ensure that the class-level cache of workspace owners is cleared before each test."""
-    Ownership.reset_cache()
 
 
 def test_ownership_prefers_record_owner(ws) -> None:
@@ -169,36 +164,3 @@ def test_ownership_error_when_no_owner_can_be_located(ws) -> None:
     expected_message = f"No active workspace or account administrator can be found for workspace: {workspace_id}"
     with pytest.raises(RuntimeError, match=re.escape(expected_message)):
         _ = ownership.owner_of("school")
-
-
-def test_ownership_fallback_instance_cache(ws) -> None:
-    """Verify that the fallback owner is cached on each instance to avoid many REST calls."""
-    _setup_accounts(ws, account_users=[_create_account_admin("jane")])
-
-    ownership = _OwnershipFixture[str](ws)
-    owner1 = ownership.owner_of("school")
-    owner2 = ownership.owner_of("school")
-
-    assert owner1 is owner2
-    ws.get_workspace_id.assert_called_once()
-
-
-def test_ownership_fallback_class_cache(ws) -> None:
-    """Verify that the fallback owner for a workspace is cached at class level to avoid many REST calls."""
-    _setup_accounts(ws, account_users=[_create_account_admin("jane")])
-
-    owner1 = _OwnershipFixture[str](ws).owner_of("school")
-    owner2 = _OwnershipFixture[str](ws).owner_of("school")
-
-    assert owner1 is owner2
-    ws.users.list.assert_called_once()
-
-
-def test_ownership_fallback_class_cache_multiple_workspaces(ws) -> None:
-    """Verify that cache of workspace administrators supports multiple workspaces."""
-    pytest.xfail("Not yet implemented")
-
-
-def test_ownership_fallback_error_handling(ws) -> None:
-    """Verify that the class-level administrator-cache and tracks errors to avoid many REST calls."""
-    pytest.xfail("Not yet implemented")
