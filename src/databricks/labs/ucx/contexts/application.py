@@ -49,12 +49,6 @@ from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
-from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
-from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
-from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
-from databricks.labs.ucx.recon.migration_recon import MigrationRecon
-from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.known import KnownList
@@ -64,7 +58,6 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
