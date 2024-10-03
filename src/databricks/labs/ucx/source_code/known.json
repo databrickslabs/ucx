@@ -7129,6 +7129,9 @@
     "json5.tool": [],
     "json5.version": []
   },
+  "jsonpatch": {
+    "jsonpatch": []
+  },
   "jsonpointer": {
     "jsonpointer": []
   },
