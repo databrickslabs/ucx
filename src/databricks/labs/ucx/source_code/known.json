@@ -3715,13 +3715,7 @@
   "dm-tree": {
     "tree": [],
     "tree.sequence": [],
-    "tree.tree_benchmark": [],
-    "tree.tree_test": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ]
+    "tree.tree_benchmark": []
   },
   "docker": {
     "docker": []
