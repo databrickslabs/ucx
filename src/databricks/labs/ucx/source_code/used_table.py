@@ -15,14 +15,6 @@ logger = logging.getLogger(__name__)
 
 class UsedTablesCrawler(CrawlerBase[UsedTable]):
 
-    @classmethod
-    def for_paths(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
-        return UsedTablesCrawler(backend, schema, "used_tables_in_paths")
-
-    @classmethod
-    def for_queries(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
-        return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
-
     def __init__(self, backend: SqlBackend, schema: str, table: str) -> None:
         """
         Initializes a DFSACrawler instance.
@@ -32,6 +24,14 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=UsedTable)
+
+    @classmethod
+    def for_paths(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
+        return UsedTablesCrawler(backend, schema, "used_tables_in_paths")
+
+    @classmethod
+    def for_queries(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
+        return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
 
     def dump_all(self, tables: Sequence[UsedTable]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 3 crawlers, not just one
