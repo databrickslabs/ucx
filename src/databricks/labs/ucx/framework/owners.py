@@ -112,7 +112,7 @@ class Ownership(ABC, Generic[Record]):
             the first (alphabetically by user-name) active workspace or account administrator, or `None` if neither can
             be found.
         """
-        first_user = functools.partial(min, default=None, key=lambda user: user.name)
+        first_user = functools.partial(min, default=None, key=lambda user: user.user_name)
         return first_user(self._find_workspace_admins()) or first_user(self._find_account_admins())
 
     @final
