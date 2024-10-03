@@ -1557,15 +1557,6 @@
     "cloudpickle.cloudpickle": [],
     "cloudpickle.cloudpickle_fast": []
   },
-  "colorful": {
-    "colorful": [],
-    "colorful.ansi": [],
-    "colorful.colors": [],
-    "colorful.core": [],
-    "colorful.styles": [],
-    "colorful.terminal": [],
-    "colorful.utils": []
-  },
   "cmdstanpy": {
     "cmdstanpy": [],
     "cmdstanpy._version": [],
@@ -1584,6 +1575,15 @@
     "cmdstanpy.utils.json": [],
     "cmdstanpy.utils.logging": [],
     "cmdstanpy.utils.stancsv": []
+  },
+  "colorful": {
+    "colorful": [],
+    "colorful.ansi": [],
+    "colorful.colors": [],
+    "colorful.core": [],
+    "colorful.styles": [],
+    "colorful.terminal": [],
+    "colorful.utils": []
   },
   "comm": {
     "comm": [],
@@ -5140,6 +5140,20 @@
   "google-auth": {
     "google.auth": [],
     "google.oauth2": []
+  },
+  "google-auth-oauthlib": {
+    "docs.conf": [],
+    "google_auth_oauthlib": [],
+    "google_auth_oauthlib.flow": [],
+    "google_auth_oauthlib.helpers": [],
+    "google_auth_oauthlib.interactive": [],
+    "google_auth_oauthlib.tool": [],
+    "scripts.readme-gen.readme_gen": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "The use of direct filesystem references is deprecated: /"
+      }
+    ]
   },
   "google-pasta": {
     "pasta": []
@@ -25065,6 +25079,23 @@
   },
   "requests": {
     "requests": []
+  },
+  "requests-oauthlib": {
+    "requests_oauthlib": [],
+    "requests_oauthlib.compliance_fixes": [],
+    "requests_oauthlib.compliance_fixes.douban": [],
+    "requests_oauthlib.compliance_fixes.ebay": [],
+    "requests_oauthlib.compliance_fixes.facebook": [],
+    "requests_oauthlib.compliance_fixes.fitbit": [],
+    "requests_oauthlib.compliance_fixes.instagram": [],
+    "requests_oauthlib.compliance_fixes.mailchimp": [],
+    "requests_oauthlib.compliance_fixes.plentymarkets": [],
+    "requests_oauthlib.compliance_fixes.slack": [],
+    "requests_oauthlib.compliance_fixes.weibo": [],
+    "requests_oauthlib.oauth1_auth": [],
+    "requests_oauthlib.oauth1_session": [],
+    "requests_oauthlib.oauth2_auth": [],
+    "requests_oauthlib.oauth2_session": []
   },
   "rfc3339-validator": {
     "rfc3339_validator": []
