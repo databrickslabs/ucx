@@ -436,7 +436,7 @@ class CommonUtils:
         self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
-    def installation(self) -> MockInstallation:
+    def installation(self) -> Installation:
         return MockInstallation()
 
     @cached_property
