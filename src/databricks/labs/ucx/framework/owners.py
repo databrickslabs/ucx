@@ -66,7 +66,9 @@ class Ownership(ABC, Generic[Record]):
         logger.debug("Enumerating users to locate active workspace administrators...")
         all_users = self._ws.users.list(attributes="id,active,userName,groups")
         # The groups attribute is a flattened list of groups a user belongs to; hunt for the 'admins' workspace group.
-        admin_users = [user for user in all_users if user.active and self._member_of_group_named(user, "admins")]
+        admin_users = [
+            user for user in all_users if user.active and user.user_name and self._member_of_group_named(user, "admins")
+        ]
         logger.debug(f"Verifying membership of the 'admins' workspace group for users: {admin_users}")
         candidate_group_ids = (
             group.value
@@ -97,7 +99,7 @@ class Ownership(ABC, Generic[Record]):
         )
         assert isinstance(response, dict)
         all_users = (User.from_dict(resource) for resource in response.get("Resources", []))
-        return (user for user in all_users if user.active and self._has_role(user, "account_admin"))
+        return (user for user in all_users if user.active and user.user_name and self._has_role(user, "account_admin"))
 
     def _find_an_admin(self) -> User | None:
         """Locate an active administrator for the current workspace.
