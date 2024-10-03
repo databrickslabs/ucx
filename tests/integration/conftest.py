@@ -661,7 +661,8 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
     def created_groups(self) -> list[str]:
         created_groups = []
         for group in self._groups:
-            created_groups.append(group.display_name)
+            if group.display_name is not None:
+                created_groups.append(group.display_name)
         return created_groups
 
     @cached_property
