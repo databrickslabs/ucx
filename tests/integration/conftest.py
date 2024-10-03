@@ -436,7 +436,7 @@ class CommonUtils:
         self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> MockInstallation:
         return MockInstallation()
 
     @cached_property
@@ -658,14 +658,14 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return list(created_databases)
 
     @cached_property
-    def created_groups(self):
+    def created_groups(self) -> list[Group]:
         created_groups = []
         for group in self._groups:
             created_groups.append(group.display_name)
         return created_groups
 
     @cached_property
-    def azure_service_principal_crawler(self):
+    def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
         return StaticServicePrincipalCrawler(
             self._spn_infos,
             self.workspace_client,
@@ -674,7 +674,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def mounts_crawler(self):
+    def mounts_crawler(self) -> StaticMountCrawler:
         mount = Mount(
             f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/a'
         )
@@ -686,7 +686,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def group_manager(self):
+    def group_manager(self) -> GroupManager:
         return GroupManager(
             self.sql_backend,
             self.workspace_client,
@@ -768,7 +768,7 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
 
 class MockLocalAzureCli(MockWorkspaceContext):
     @cached_property
-    def azure_cli_authenticated(self):
+    def azure_cli_authenticated(self) -> bool:
         if not self.is_azure:
             pytest.skip("Azure only")
         if self.connect_config.auth_type != "azure-cli":
@@ -788,7 +788,7 @@ def az_cli_ctx(ws, env_or_skip, make_catalog, make_schema, make_random, sql_back
 
 class MockLocalAwsCli(MockWorkspaceContext):
     @cached_property
-    def aws_cli_run_command(self):
+    def aws_cli_run_command(self) -> Callable[[str | list[str]], tuple[int, str, str]]:
         if not self.is_aws:
             pytest.skip("Aws only")
         if not shutil.which("aws"):
@@ -796,7 +796,7 @@ class MockLocalAwsCli(MockWorkspaceContext):
         return run_command
 
     @cached_property
-    def aws_profile(self):
+    def aws_profile(self) -> str:
         return self._env_or_skip("AWS_PROFILE")
 
 
@@ -884,7 +884,7 @@ class MockInstallationContext(MockRuntimeContext):
         return ws_group, acc_group
 
     @cached_property
-    def running_clusters(self):
+    def running_clusters(self) -> tuple[int, int, int]:
         logger.debug("Waiting for clusters to start...")
         default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
@@ -902,15 +902,15 @@ class MockInstallationContext(MockRuntimeContext):
         return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         return Installation(self.workspace_client, self.product_info.product_name())
 
     @cached_property
-    def account_client(self):
+    def account_client(self) -> AccountClient:
         return AccountClient(product="ucx", product_version=__version__)
 
     @cached_property
-    def account_installer(self):
+    def account_installer(self) -> AccountInstaller:
         return AccountInstaller(self.account_client)
 
     @cached_property
@@ -918,7 +918,7 @@ class MockInstallationContext(MockRuntimeContext):
         return {**os.environ}
 
     @cached_property
-    def workspace_installer(self):
+    def workspace_installer(self) -> WorkspaceInstaller:
         return WorkspaceInstaller(
             self.workspace_client,
             self.environ,
@@ -929,7 +929,7 @@ class MockInstallationContext(MockRuntimeContext):
         return lambda wc: wc
 
     @cached_property
-    def include_object_permissions(self):
+    def include_object_permissions(self) -> None:
         return None
 
     @cached_property
@@ -956,15 +956,15 @@ class MockInstallationContext(MockRuntimeContext):
         return workspace_config
 
     @cached_property
-    def product_info(self):
+    def product_info(self) -> ProductInfo:
         return ProductInfo.for_testing(WorkspaceConfig)
 
     @cached_property
-    def tasks(self):
+    def tasks(self) -> list[Task]:
         return Workflows.all().tasks()
 
     @cached_property
-    def workflows_deployment(self):
+    def workflows_deployment(self) -> WorkflowsDeployment:
         return WorkflowsDeployment(
             self.config,
             self.installation,
@@ -976,7 +976,7 @@ class MockInstallationContext(MockRuntimeContext):
         )
 
     @cached_property
-    def workspace_installation(self):
+    def workspace_installation(self) -> WorkspaceInstallation:
         return WorkspaceInstallation(
             self.config,
             self.installation,
@@ -993,15 +993,15 @@ class MockInstallationContext(MockRuntimeContext):
         return ProgressTrackingInstallation(self.sql_backend, self.ucx_catalog)
 
     @cached_property
-    def extend_prompts(self):
+    def extend_prompts(self) -> dict[str, str]:
         return {}
 
     @cached_property
-    def renamed_group_prefix(self):
+    def renamed_group_prefix(self) -> str:
         return f"rename-{self.product_info.product_name()}-"
 
     @cached_property
-    def prompts(self):
+    def prompts(self) -> MockPrompts:
         return MockPrompts(
             {
                 r'Open job overview in your browser.*': 'no',

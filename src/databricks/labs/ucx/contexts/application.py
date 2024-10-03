@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
+from typing import Callable
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -28,12 +29,13 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
-    AzureACL,
-    GrantsCrawler,
-    PrincipalACL,
-    AwsACL,
-    MigrateGrants,
     ACLMigrator,
+    AwsACL,
+    AzureACL,
+    ComputeLocations,
+    GrantsCrawler,
+    MigrateGrants,
+    PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
@@ -102,11 +104,11 @@ class GlobalContext(abc.ABC):
         return self._named_parameters
 
     @cached_property
-    def product_info(self):
+    def product_info(self) -> ProductInfo:
         return ProductInfo.from_class(WorkspaceConfig)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         return Installation.current(self.workspace_client, self.product_info.product_name())
 
     @cached_property
@@ -134,7 +136,7 @@ class GlobalContext(abc.ABC):
         return self.config.inventory_database
 
     @cached_property
-    def workspace_listing(self):
+    def workspace_listing(self) -> generic.WorkspaceListing:
         return generic.WorkspaceListing(
             self.workspace_client,
             self.sql_backend,
@@ -144,7 +146,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def generic_permissions_support(self):
+    def generic_permissions_support(self) -> generic.GenericPermissionsSupport:
         models_listing = generic.models_listing(self.workspace_client, self.config.num_threads)
         acl_listing = [
             generic.Listing(self.workspace_client.clusters.list, "cluster_id", "clusters"),
@@ -169,7 +171,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def redash_permissions_support(self):
+    def redash_permissions_support(self) -> redash.RedashPermissionsSupport:
         acl_listing = [
             redash.Listing(self.workspace_client.alerts.list, sql.ObjectTypePlural.ALERTS),
             redash.Listing(self.workspace_client.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
@@ -182,17 +184,17 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def scim_entitlements_support(self):
+    def scim_entitlements_support(self) -> ScimSupport:
         return ScimSupport(self.workspace_client, include_object_permissions=self.config.include_object_permissions)
 
     @cached_property
-    def secret_scope_acl_support(self):
+    def secret_scope_acl_support(self) -> SecretScopesSupport:
         return SecretScopesSupport(
             self.workspace_client, include_object_permissions=self.config.include_object_permissions
         )
 
     @cached_property
-    def legacy_table_acl_support(self):
+    def legacy_table_acl_support(self) -> TableAclSupport:
         return TableAclSupport(
             self.grants_crawler,
             self.sql_backend,
@@ -200,7 +202,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def permission_manager(self):
+    def permission_manager(self) -> PermissionManager:
         return PermissionManager(
             self.sql_backend,
             self.inventory_database,
@@ -214,7 +216,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def group_manager(self):
+    def group_manager(self) -> GroupManager:
         return GroupManager(
             self.sql_backend,
             self.workspace_client,
@@ -228,19 +230,19 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def grants_crawler(self):
+    def grants_crawler(self) -> GrantsCrawler:
         return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
 
     @cached_property
-    def udfs_crawler(self):
+    def udfs_crawler(self) -> UdfsCrawler:
         return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def tables_crawler(self):
+    def tables_crawler(self) -> TablesCrawler:
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def tables_migrator(self):
+    def tables_migrator(self) -> TablesMigrator:
         return TablesMigrator(
             self.tables_crawler,
             self.workspace_client,
@@ -251,7 +253,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def acl_migrator(self):
+    def acl_migrator(self) -> ACLMigrator:
         return ACLMigrator(
             self.tables_crawler,
             self.workspace_info,
@@ -260,7 +262,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def migrate_grants(self):
+    def migrate_grants(self) -> MigrateGrants:
         grant_loaders = [
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
@@ -272,23 +274,23 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def table_move(self):
+    def table_move(self) -> TableMove:
         return TableMove(self.workspace_client, self.sql_backend)
 
     @cached_property
-    def mounts_crawler(self):
+    def mounts_crawler(self) -> Mounts:
         return Mounts(self.sql_backend, self.workspace_client, self.inventory_database)
 
     @cached_property
-    def azure_service_principal_crawler(self):
+    def azure_service_principal_crawler(self) -> AzureServicePrincipalCrawler:
         return AzureServicePrincipalCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def external_locations(self):
+    def external_locations(self) -> ExternalLocations:
         return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def azure_acl(self):
+    def azure_acl(self) -> AzureACL:
         return AzureACL(
             self.workspace_client,
             self.sql_backend,
@@ -297,7 +299,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def aws_acl(self):
+    def aws_acl(self) -> AwsACL:
         return AwsACL(
             self.workspace_client,
             self.sql_backend,
@@ -305,7 +307,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def principal_locations_retriever(self):
+    def principal_locations_retriever(self) -> Callable[[], list[ComputeLocations]]:
         def inner():
             if self.is_azure:
                 return self.azure_acl.get_eligible_locations_principals()
@@ -316,7 +318,7 @@ class GlobalContext(abc.ABC):
         return inner
 
     @cached_property
-    def principal_acl(self):
+    def principal_acl(self) -> PrincipalACL:
         return PrincipalACL(
             self.workspace_client,
             self.sql_backend,
@@ -327,7 +329,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def migration_status_refresher(self):
+    def migration_status_refresher(self) -> TableMigrationStatusRefresher:
         return TableMigrationStatusRefresher(
             self.workspace_client,
             self.sql_backend,
@@ -336,15 +338,15 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def iam_credential_manager(self):
+    def iam_credential_manager(self) -> CredentialManager:
         return CredentialManager(self.workspace_client)
 
     @cached_property
-    def table_mapping(self):
+    def table_mapping(self) -> TableMapping:
         return TableMapping(self.installation, self.workspace_client, self.sql_backend)
 
     @cached_property
-    def catalog_schema(self):
+    def catalog_schema(self) -> CatalogSchema:
         return CatalogSchema(
             self.workspace_client,
             self.table_mapping,
@@ -355,31 +357,31 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def verify_timeout(self):
+    def verify_timeout(self) -> timedelta:
         return timedelta(minutes=2)
 
     @cached_property
-    def wheels(self):
+    def wheels(self) -> WheelsV2:
         return WheelsV2(self.installation, self.product_info)
 
     @cached_property
-    def install_state(self):
+    def install_state(self) -> InstallState:
         return InstallState.from_installation(self.installation)
 
     @cached_property
-    def deployed_workflows(self):
+    def deployed_workflows(self) -> DeployedWorkflows:
         return DeployedWorkflows(self.workspace_client, self.install_state)
 
     @cached_property
-    def workspace_info(self):
+    def workspace_info(self) -> WorkspaceInfo:
         return WorkspaceInfo(self.installation, self.workspace_client)
 
     @cached_property
-    def verify_has_metastore(self):
+    def verify_has_metastore(self) -> VerifyHasMetastore:
         return VerifyHasMetastore(self.workspace_client)
 
     @cached_property
-    def pip_resolver(self):
+    def pip_resolver(self) -> PythonLibraryResolver:
         return PythonLibraryResolver(self.allow_list)
 
     @cached_property
@@ -387,37 +389,37 @@ class GlobalContext(abc.ABC):
         return NotebookLoader()
 
     @cached_property
-    def notebook_resolver(self):
+    def notebook_resolver(self) -> NotebookResolver:
         return NotebookResolver(self.notebook_loader)
 
     @cached_property
-    def site_packages_path(self):
+    def site_packages_path(self) -> Path:
         lookup = self.path_lookup
         return next(path for path in lookup.library_roots if "site-packages" in path.as_posix())
 
     @cached_property
-    def path_lookup(self):
+    def path_lookup(self) -> PathLookup:
         # TODO find a solution to enable a different cwd per job/task (maybe it's not necessary or possible?)
         return PathLookup.from_sys_path(Path.cwd())
 
     @cached_property
-    def file_loader(self):
+    def file_loader(self) -> FileLoader:
         return FileLoader()
 
     @cached_property
-    def folder_loader(self):
+    def folder_loader(self) -> FolderLoader:
         return FolderLoader(self.notebook_loader, self.file_loader)
 
     @cached_property
-    def allow_list(self):
+    def allow_list(self) -> KnownList:
         return KnownList()
 
     @cached_property
-    def file_resolver(self):
+    def file_resolver(self) -> ImportFileResolver:
         return ImportFileResolver(self.file_loader, self.allow_list)
 
     @cached_property
-    def dependency_resolver(self):
+    def dependency_resolver(self) -> DependencyResolver:
         return DependencyResolver(
             self.pip_resolver, self.notebook_resolver, self.file_resolver, self.file_resolver, self.path_lookup
         )
@@ -435,7 +437,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def query_linter(self):
+    def query_linter(self) -> QueryLinter:
         return QueryLinter(
             self.workspace_client,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
@@ -444,11 +446,11 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def directfs_access_crawler_for_paths(self):
+    def directfs_access_crawler_for_paths(self) -> DirectFsAccessCrawler:
         return DirectFsAccessCrawler.for_paths(self.sql_backend, self.inventory_database)
 
     @cached_property
-    def directfs_access_crawler_for_queries(self):
+    def directfs_access_crawler_for_queries(self) -> DirectFsAccessCrawler:
         return DirectFsAccessCrawler.for_queries(self.sql_backend, self.inventory_database)
 
     @cached_property
@@ -460,7 +462,7 @@ class GlobalContext(abc.ABC):
         return UsedTablesCrawler.for_queries(self.sql_backend, self.inventory_database)
 
     @cached_property
-    def redash(self):
+    def redash(self) -> Redash:
         return Redash(
             self.migration_status_refresher.index(),
             self.workspace_client,
@@ -468,23 +470,23 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def metadata_retriever(self):
+    def metadata_retriever(self) -> DatabricksTableMetadataRetriever:
         return DatabricksTableMetadataRetriever(self.sql_backend)
 
     @cached_property
-    def schema_comparator(self):
+    def schema_comparator(self) -> StandardSchemaComparator:
         return StandardSchemaComparator(self.metadata_retriever)
 
     @cached_property
-    def data_profiler(self):
+    def data_profiler(self) -> StandardDataProfiler:
         return StandardDataProfiler(self.sql_backend, self.metadata_retriever)
 
     @cached_property
-    def data_comparator(self):
+    def data_comparator(self) -> StandardDataComparator:
         return StandardDataComparator(self.sql_backend, self.data_profiler)
 
     @cached_property
-    def migration_recon(self):
+    def migration_recon(self) -> MigrationRecon:
         return MigrationRecon(
             self.sql_backend,
             self.inventory_database,

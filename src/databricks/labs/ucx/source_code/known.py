@@ -8,6 +8,7 @@ import pkgutil
 import re
 import sys
 from dataclasses import dataclass
+from email.message import Message
 from functools import cached_property
 from pathlib import Path
 
@@ -208,7 +209,7 @@ class DistInfo:
         return files
 
     @cached_property
-    def _metadata(self):
+    def _metadata(self) -> Message:
         with Path(self._path, "METADATA").open(encoding=_DEFAULT_ENCODING) as f:
             return email.message_from_file(f)
 

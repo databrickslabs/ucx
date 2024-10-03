@@ -19,21 +19,21 @@ class AccountContext(CliContext):
         return self._ac
 
     @cached_property
-    def workspace_ids(self):
+    def workspace_ids(self) -> list[int]:
         return [int(_.strip()) for _ in self.named_parameters.get("workspace_ids", "").split(",") if _]
 
     @cached_property
-    def account_workspaces(self):
+    def account_workspaces(self) -> AccountWorkspaces:
         return AccountWorkspaces(self.account_client, self.workspace_ids)
 
     @cached_property
-    def account_aggregate(self):
+    def account_aggregate(self) -> AccountAggregate:
         return AccountAggregate(self.account_workspaces)
 
     @cached_property
-    def is_account_install(self):
+    def is_account_install(self) -> bool:
         return environ.get("UCX_FORCE_INSTALL") == "account"
 
     @cached_property
-    def account_metastores(self):
+    def account_metastores(self) -> AccountMetastores:
         return AccountMetastores(self.account_client)

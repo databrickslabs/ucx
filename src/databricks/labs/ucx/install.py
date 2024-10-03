@@ -165,15 +165,15 @@ class WorkspaceInstaller(WorkspaceContext):
         self._tasks = tasks if tasks else Workflows.all().tasks()
 
     @cached_property
-    def upgrades(self):
+    def upgrades(self) -> Upgrades:
         return Upgrades(self.product_info, self.installation)
 
     @cached_property
-    def policy_installer(self):
+    def policy_installer(self) -> ClusterPolicyInstaller:
         return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         try:
             return self.product_info.current_installation(self.workspace_client)
         except NotFound:
