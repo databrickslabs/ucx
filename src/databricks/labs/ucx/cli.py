@@ -643,7 +643,7 @@ def migrate_tables(
         deployed_workflows = workspace_context.deployed_workflows
         deployed_workflows.run_workflow("migrate-tables")
 
-        tables = workspace_context.tables_crawler.snapshot()
+        tables = list(workspace_context.tables_crawler.snapshot())
         hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
         if len(hiveserde_tables) > 0:
             percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
