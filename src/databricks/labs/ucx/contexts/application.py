@@ -1,9 +1,10 @@
 import abc
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Iterable
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState

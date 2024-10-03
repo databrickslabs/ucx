@@ -1,8 +1,8 @@
 import logging
 import os
 import shutil
+from collections.abc import Callable
 from functools import cached_property
-from typing import Callable
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
