@@ -67,7 +67,7 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
     assert result['count'] > 0
 
 
-def test_job_linter_no_problems(simple_ctx, make_job):
+def test_job_linter_no_problems(simple_ctx, make_job) -> None:
     j = make_job()
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
@@ -218,7 +218,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
