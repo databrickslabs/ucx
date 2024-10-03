@@ -1,7 +1,7 @@
 from unittest.mock import Mock, call, create_autospec
+import sys
 
 import pytest
-import sys
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
@@ -304,7 +304,7 @@ def test_match_table_external_locations():
     assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations
 
 
-def test_mount_listing_multiple_folders():
+def test_mount_listing_multiple_folders() -> None:
     client = create_autospec(WorkspaceClient)
 
     first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", 0, "")
