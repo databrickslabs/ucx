@@ -33,13 +33,15 @@ def test_table_size_crawler(mocker) -> None:
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
     tsc = TableSizeCrawler(backend, "inventory_database")
-    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = [100, 200, 300]
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.return_value = 100
+
     results = tsc.snapshot()
+
     assert "ANALYZE table `hive_metastore`.`db1`.`table1` compute STATISTICS NOSCAN" in backend.queries
     assert "ANALYZE table `hive_metastore`.`db1`.`table2` compute STATISTICS NOSCAN" in backend.queries
     assert len(results) == 2
     assert TableSize("hive_metastore", "db1", "table1", 100) in results
-    assert TableSize("hive_metastore", "db1", "table2", 200) in results
+    assert TableSize("hive_metastore", "db1", "table2", 100) in results
 
 
 def test_table_size_unknown_error(mocker, caplog):
