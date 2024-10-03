@@ -56,7 +56,6 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
-from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -495,14 +494,6 @@ class GlobalContext(abc.ABC):
             self.data_comparator,
             self.config.recon_tolerance_percent,
         )
-
-    @cached_property
-    def used_tables_crawler_for_paths(self) -> UsedTablesCrawler:
-        return UsedTablesCrawler.for_paths(self.sql_backend, self.config.ucx_catalog)
-
-    @cached_property
-    def used_tables_crawler_for_queries(self) -> UsedTablesCrawler:
-        return UsedTablesCrawler.for_paths(self.sql_backend, self.config.ucx_catalog)
 
 
 class CliContext(GlobalContext, abc.ABC):
