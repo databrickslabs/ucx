@@ -33,10 +33,10 @@ def test_running_real_assessment_job(
     view = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 2+2 AS four", view=True)
     non_delta = installation_ctx.make_table(schema_name=source_schema.name, non_delta=True)
     installation_ctx = installation_ctx.replace(
-        config_transform = lambda wc: dataclasses.replace(
+        config_transform=lambda wc: dataclasses.replace(
             wc,
             include_object_permissions=[f"cluster-policies:{cluster_policy.policy_id}"],
-            include_databases=[source_schema.name]
+            include_databases=[source_schema.name],
         ),
     )
     installation_ctx.workspace_installation.run()
