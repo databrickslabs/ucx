@@ -12,8 +12,8 @@ from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.redash import Redash

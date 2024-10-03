@@ -14,8 +14,14 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
     Fixer,
+    UsedTable,
+    TableInfoNode,
+    TablePyCollector,
+    TableSqlCollector,
+    DfsaPyCollector,
+    DfsaSqlCollector,
 )
-from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS, DirectFsAccessNode
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
@@ -100,7 +106,8 @@ class SparkCallMatcher(_TableNameMatcher):
                     node=node,
                 )
                 continue
-            dst = self._find_dest(index, inferred.as_string(), from_table.schema)
+            info = UsedTable.parse(inferred.as_string(), from_table.schema)
+            dst = self._find_dest(index, info)
             if dst is None:
                 continue
             yield Deprecation.from_node(
@@ -113,17 +120,17 @@ class SparkCallMatcher(_TableNameMatcher):
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
-        dst = self._find_dest(index, table_arg.value, from_table.schema)
+        # TODO locate constant when value is inferred
+        info = UsedTable.parse(table_arg.value, from_table.schema)
+        dst = self._find_dest(index, info)
         if dst is not None:
             table_arg.value = dst.destination()
 
-    @staticmethod
-    def _find_dest(index: TableMigrationIndex, value: str, schema: str):
-        parts = value.split(".")
-        # Ensure that unqualified table references use the current schema
-        if len(parts) == 1:
-            return index.get(schema, parts[0])
-        return None if len(parts) != 2 else index.get(parts[0], parts[1])
+    @classmethod
+    def _find_dest(cls, index: TableMigrationIndex, table: UsedTable):
+        if table.catalog_name != "hive_metastore":
+            return None
+        return index.get(table.schema_name, table.table_name)
 
 
 @dataclass
@@ -309,7 +316,7 @@ class SparkTableNameMatchers:
         return self._matchers
 
 
-class SparkTableNamePyLinter(PythonLinter, Fixer):
+class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
 
     def __init__(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state):
         self._from_table = from_table
@@ -351,8 +358,29 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
             return None
         return matcher if matcher.matches(node) else None
 
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+        for node in tree.walk():
+            matcher = self._find_matcher(node)
+            if matcher is None:
+                continue
+            assert isinstance(node, Call)
+            yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
-class SparkSqlPyLinter(PythonLinter, Fixer):
+
+class _SparkSqlAnalyzer:
+
+    @classmethod
+    def _visit_call_nodes(cls, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
+        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
+        visitor.visit(tree.node)
+        for call_node in visitor.matched_nodes:
+            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
+            if query is None:
+                continue
+            yield call_node, query
+
+
+class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
@@ -375,15 +403,6 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
                 for advice in self._sql_linter.lint(value.as_string()):
                     yield advice.replace_from_node(call_node)
 
-    def _visit_call_nodes(self, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
-        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
-        visitor.visit(tree.node)
-        for call_node in visitor.matched_nodes:
-            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
-            if query is None:
-                continue
-            yield call_node, query
-
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
             return code
@@ -396,3 +415,33 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
             new_query = self._sql_fixer.apply(query.value)
             query.value = new_query
         return tree.node.as_string()
+
+
+class SparkSqlDfsaPyCollector(_SparkSqlAnalyzer, DfsaPyCollector):
+
+    def __init__(self, sql_collector: DfsaSqlCollector):
+        self._sql_collector = sql_collector
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
+        assert self._sql_collector
+        for call_node, query in self._visit_call_nodes(tree):
+            for value in InferredValue.infer_from_node(query):
+                if not value.is_inferred():
+                    continue  # TODO error handling strategy
+                for dfsa in self._sql_collector.collect_dfsas(value.as_string()):
+                    yield DirectFsAccessNode(dfsa, call_node)
+
+
+class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
+
+    def __init__(self, sql_collector: TableSqlCollector):
+        self._sql_collector = sql_collector
+
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+        assert self._sql_collector
+        for call_node, query in self._visit_call_nodes(tree):
+            for value in InferredValue.infer_from_node(query):
+                if not value.is_inferred():
+                    continue  # TODO error handling strategy
+                for table in self._sql_collector.collect_tables(value.as_string()):
+                    yield TableInfoNode(table, call_node)
