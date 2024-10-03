@@ -1557,15 +1557,6 @@
     "cloudpickle.cloudpickle": [],
     "cloudpickle.cloudpickle_fast": []
   },
-  "colorful": {
-    "colorful": [],
-    "colorful.ansi": [],
-    "colorful.colors": [],
-    "colorful.core": [],
-    "colorful.styles": [],
-    "colorful.terminal": [],
-    "colorful.utils": []
-  },
   "cmdstanpy": {
     "cmdstanpy": [],
     "cmdstanpy._version": [],
@@ -1584,6 +1575,15 @@
     "cmdstanpy.utils.json": [],
     "cmdstanpy.utils.logging": [],
     "cmdstanpy.utils.stancsv": []
+  },
+  "colorful": {
+    "colorful": [],
+    "colorful.ansi": [],
+    "colorful.colors": [],
+    "colorful.core": [],
+    "colorful.styles": [],
+    "colorful.terminal": [],
+    "colorful.utils": []
   },
   "comm": {
     "comm": [],
@@ -8128,6 +8128,45 @@
     "livereload.management.commands.livereload": [],
     "livereload.server": [],
     "livereload.watcher": []
+  },
+  "llvmlite": {
+    "llvmlite": [],
+    "llvmlite._version": [],
+    "llvmlite.binding": [],
+    "llvmlite.binding.analysis": [],
+    "llvmlite.binding.common": [],
+    "llvmlite.binding.context": [],
+    "llvmlite.binding.dylib": [],
+    "llvmlite.binding.executionengine": [],
+    "llvmlite.binding.ffi": [],
+    "llvmlite.binding.initfini": [],
+    "llvmlite.binding.linker": [],
+    "llvmlite.binding.module": [],
+    "llvmlite.binding.object_file": [],
+    "llvmlite.binding.options": [],
+    "llvmlite.binding.orcjit": [],
+    "llvmlite.binding.passmanagers": [],
+    "llvmlite.binding.targets": [],
+    "llvmlite.binding.transforms": [],
+    "llvmlite.binding.typeref": [],
+    "llvmlite.binding.value": [],
+    "llvmlite.ir": [],
+    "llvmlite.ir._utils": [],
+    "llvmlite.ir.builder": [],
+    "llvmlite.ir.context": [],
+    "llvmlite.ir.instructions": [],
+    "llvmlite.ir.module": [],
+    "llvmlite.ir.transforms": [],
+    "llvmlite.ir.types": [],
+    "llvmlite.ir.values": [],
+    "llvmlite.tests": [],
+    "llvmlite.tests.customize": [],
+    "llvmlite.tests.refprune_proto": [],
+    "llvmlite.tests.test_binding": [],
+    "llvmlite.tests.test_ir": [],
+    "llvmlite.tests.test_refprune": [],
+    "llvmlite.tests.test_valuerepr": [],
+    "llvmlite.utils": []
   },
   "lxml": {
     "lxml": []
