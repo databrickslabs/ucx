@@ -76,7 +76,7 @@ dependencies = [
     "mypy~=1.9.0",
     "pylint~=3.3.1",
     "pylint-pytest==2.0.0a0",
-    "databricks-labs-pylint~=0.4.0",
+    "databricks-labs-pylint~=0.5",
     "databricks-labs-pytester>=0.2.1",
     "pytest~=8.3.3",
     "pytest-cov~=4.1.0",
@@ -241,6 +241,7 @@ limit-inference-results = 100
 load-plugins = [
     "databricks.labs.pylint.mocking",
     "databricks.labs.pylint.eradicate",
+    "databricks.labs.pylint.readability",
     "pylint_pytest",
     "pylint.extensions.bad_builtin",
     "pylint.extensions.broad_try_clause",

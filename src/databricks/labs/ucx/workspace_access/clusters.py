@@ -16,11 +16,13 @@ class ClusterAccess:
         self._installation = installation
 
     def list_cluster(self):
-        clusters = [
-            clusters
-            for clusters in self._ws.clusters.list()
-            if clusters.cluster_source is not None and clusters.cluster_source.name != "JOB"
-        ]
+        clusters = []
+        for cluster_info in self._ws.clusters.list():
+            if cluster_info.cluster_source is None:
+                continue
+            if cluster_info.cluster_source.name == "JOB":
+                continue
+            clusters.append(cluster_info)
         return clusters
 
     def _get_access_mode(self, access_mode: str):

@@ -139,8 +139,11 @@ class TaskRunWarningRecorder:
             log (TextIO): The task log
             log_creation_timestamp (datetime.datetime): The log creation timestamp.
         """
-        log_records = [
-            LogRecord(
+        log_records = []
+        for partial_log_record in parse_logs(log):
+            if logging.getLevelName(partial_log_record.level) < logging.WARNING:
+                continue
+            log_record = LogRecord(
                 timestamp=int(
                     log_creation_timestamp.replace(
                         hour=partial_log_record.time.hour,
@@ -156,9 +159,7 @@ class TaskRunWarningRecorder:
                 component=partial_log_record.component,
                 message=partial_log_record.message,
             )
-            for partial_log_record in parse_logs(log)
-            if logging.getLevelName(partial_log_record.level) >= logging.WARNING
-        ]
+            log_records.append(log_record)
         return log_records
 
     def snapshot(self) -> list[LogRecord]:
