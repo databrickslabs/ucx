@@ -26,12 +26,12 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam
+from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.iam import Group
-from databricks.sdk.service.jobs import Task, SparkPythonTask
+from databricks.sdk.service.jobs import SparkPythonTask
 from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
@@ -46,6 +46,7 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePe
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
@@ -1263,7 +1264,7 @@ def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffi
         file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
         file_path = WorkspacePath(ws, installation.install_folder()) / file_name
         file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
-        task = Task(
+        task = jobs.Task(
             task_key=make_random(4),
             description=make_random(4),
             new_cluster=ClusterSpec(
