@@ -5439,8 +5439,54 @@
     "google.cloud.operation": [],
     "google.cloud.version": []
   },
+  "google-cloud-storage": {
+    "google.cloud.storage": [],
+    "google.cloud.storage._helpers": [],
+    "google.cloud.storage._http": [],
+    "google.cloud.storage._opentelemetry_tracing": [],
+    "google.cloud.storage._signing": [],
+    "google.cloud.storage.acl": [],
+    "google.cloud.storage.batch": [],
+    "google.cloud.storage.blob": [],
+    "google.cloud.storage.bucket": [],
+    "google.cloud.storage.client": [],
+    "google.cloud.storage.constants": [],
+    "google.cloud.storage.fileio": [],
+    "google.cloud.storage.hmac_key": [],
+    "google.cloud.storage.iam": [],
+    "google.cloud.storage.notification": [],
+    "google.cloud.storage.retry": [],
+    "google.cloud.storage.transfer_manager": [],
+    "google.cloud.storage.version": []
+  },
+  "google-crc32c": {
+    "google_crc32c.__config__": [],
+    "google_crc32c": [],
+    "google_crc32c._checksum": [],
+    "google_crc32c.cext": [],
+    "google_crc32c.python": []
+  },
   "google-pasta": {
     "pasta": []
+  },
+  "google-resumable-media": {
+    "google._async_resumable_media": [],
+    "google._async_resumable_media._download": [],
+    "google._async_resumable_media._helpers": [],
+    "google._async_resumable_media._upload": [],
+    "google._async_resumable_media.requests": [],
+    "google._async_resumable_media.requests._request_helpers": [],
+    "google._async_resumable_media.requests.download": [],
+    "google._async_resumable_media.requests.upload": [],
+    "google.resumable_media": [],
+    "google.resumable_media._download": [],
+    "google.resumable_media._helpers": [],
+    "google.resumable_media._upload": [],
+    "google.resumable_media.common": [],
+    "google.resumable_media.requests": [],
+    "google.resumable_media.requests._request_helpers": [],
+    "google.resumable_media.requests.download": [],
+    "google.resumable_media.requests.upload": []
   },
   "googleapis-common-protos": {
     "google.api.annotations_pb2": [],
