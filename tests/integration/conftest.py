@@ -564,7 +564,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def tables_crawler(self) -> TablesCrawler:
+    def tables_crawler(self):
         """
         Returns a TablesCrawler instance with the tables that were created in the context.
         Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
@@ -658,7 +658,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return list(created_databases)
 
     @cached_property
-    def created_groups(self) -> list[Group]:
+    def created_groups(self) -> list[str]:
         created_groups = []
         for group in self._groups:
             created_groups.append(group.display_name)

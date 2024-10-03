@@ -84,7 +84,8 @@ class RuntimeContext(GlobalContext):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def tables_crawler(self) -> FasterTableScanCrawler:
+    def tables_crawler(self):
+        # TODO: Update tables crawler inheritance to specify return type hint
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
 
     @cached_property
