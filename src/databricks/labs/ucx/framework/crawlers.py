@@ -1,14 +1,13 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
-from functools import cached_property
-from typing import ClassVar, Generic, Literal, Protocol, TypeVar, final
+from typing import ClassVar, Generic, Literal, Protocol, TypeVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.framework.utils import escape_sql_identifier, find_an_admin
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +22,6 @@ ResultFn = Callable[[], Iterable[Result]]
 
 
 class CrawlerBase(ABC, Generic[Result]):
-
-    _cached_workspace_admins: dict[int, str | RuntimeError] = {}
-    """Cached user names of workspace administrators, keyed by workspace id."""
-
     def __init__(
         self, ws: WorkspaceClient, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]
     ):
@@ -116,56 +111,6 @@ class CrawlerBase(ABC, Generic[Result]):
             Iterable[Result]: A snapshot of the data that is captured by this crawler.
         """
         return self._snapshot(self._try_fetch, self._crawl, force_refresh=force_refresh)
-
-    @final
-    def owner_of(self, result: Result) -> str:
-        """Obtain the user-name of a user that is responsible for the given record.
-
-        This is intended to be a point of contact, and is either:
-
-         - The user that originally created the resource associated with the result; or
-         - An active administrator for the current workspace.
-
-        Args:
-            result (Result): The record for which an associated user-name is sought.
-        Returns:
-            A string containing the user-name attribute of the user considered to own the resource.
-        Raises:
-            RuntimeError if there are no active administrators for the current workspace.
-        """
-        return self._result_owner(result) or self._workspace_admin
-
-    @cached_property
-    def _workspace_admin(self) -> str:
-        # Avoid repeatedly hitting the shared cache.
-        return self._find_administrator_for(self._ws)
-
-    @classmethod
-    @final
-    def _find_administrator_for(cls, ws: WorkspaceClient) -> str:
-        # Finding an administrator is quite expensive, so we ensure that for a given workspace we only
-        # do it once.
-        workspace_id = ws.get_workspace_id()
-        found_admin_or_error = cls._cached_workspace_admins.get(workspace_id, None)
-        if isinstance(found_admin_or_error, str):
-            return found_admin_or_error
-        if isinstance(found_admin_or_error, RuntimeError):
-            raise found_admin_or_error
-
-        found_admin = find_an_admin(ws)
-        if found_admin is None or not found_admin.user_name:
-            msg = f"No active workspace or account administrator can be found for workspace: {workspace_id}"
-            error = RuntimeError(msg)
-            cls._cached_workspace_admins[workspace_id] = error
-            raise error
-        user_name = found_admin.user_name
-        cls._cached_workspace_admins[workspace_id] = user_name
-        return user_name
-
-    @classmethod
-    def _result_owner(cls, result: Result) -> str | None:  # pylint: disable=unused-argument
-        """Obtain the record-specific user-name associated with the given result, if any."""
-        return None
 
     @abstractmethod
     def _try_fetch(self) -> Iterable[Result]:

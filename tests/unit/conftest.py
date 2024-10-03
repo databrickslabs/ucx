@@ -201,7 +201,7 @@ def mock_backend() -> MockBackend:
 
 
 @pytest.fixture
-def ws() -> WorkspaceClient:
+def ws():
     client = create_autospec(WorkspaceClient)
     client.api_client.do.return_value = {}
     client.permissions.get.return_value = {}
