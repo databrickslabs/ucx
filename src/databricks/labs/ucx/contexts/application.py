@@ -430,6 +430,7 @@ class GlobalContext(abc.ABC):
             self.path_lookup,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.directfs_access_crawler_for_paths,
+            self.used_tables_crawler_for_paths,
             self.config.include_job_ids,
         )
 
