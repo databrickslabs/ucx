@@ -1,11 +1,8 @@
 import dataclasses
-from datetime import timedelta
 
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
-
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 
 @retried(on=[NotFound, InvalidParameterValue])
@@ -14,7 +11,6 @@ def test_running_real_assessment_job(
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_dashboard,
-    sql_backend,
     inventory_schema,
     populate_for_linting,
 ) -> None:
@@ -51,9 +47,8 @@ def test_running_real_assessment_job(
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
 
     tables = set[str]()
-    local_crawler = TablesCrawler(sql_backend, inventory_schema, [source_schema.name])
-    for _ in local_crawler.snapshot():
-        tables.add(_.name)
+    for table in installation_ctx.tables_crawler.snapshot():
+        tables.add(table.name)
 
     expected_tables = {managed_table.name, external_table.name, tmp_table.name, view.name, non_delta.name}
     assert len(tables) == len(expected_tables)
