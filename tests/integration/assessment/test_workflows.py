@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound, InvalidParameterValue
@@ -31,10 +32,13 @@ def test_running_real_assessment_job(
     tmp_table = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 2+2 AS four")
     view = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 2+2 AS four", view=True)
     non_delta = installation_ctx.make_table(schema_name=source_schema.name, non_delta=True)
-
-    installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
+    installation_ctx = installation_ctx.replace(
+        config_transform = lambda wc: dataclasses.replace(
+            wc,
+            include_object_permissions=[f"cluster-policies:{cluster_policy.policy_id}"],
+        ),
+    )
     installation_ctx.workspace_installation.run()
-
     populate_for_linting(installation_ctx.installation)
 
     installation_ctx.deployed_workflows.run_workflow("assessment", max_wait=timedelta(minutes=25))
