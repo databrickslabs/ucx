@@ -8468,32 +8468,7 @@
     "multiprocess.shared_memory": [],
     "multiprocess.sharedctypes": [],
     "multiprocess.spawn": [],
-    "multiprocess.synchronize": [],
-    "multiprocess.tests": [],
-    "multiprocess.tests.mp_fork_bomb": [],
-    "multiprocess.tests.mp_preload": [],
-    "multiprocess.tests.test_multiprocessing_fork": [],
-    "multiprocess.tests.test_multiprocessing_fork.test_manager": [],
-    "multiprocess.tests.test_multiprocessing_fork.test_misc": [],
-    "multiprocess.tests.test_multiprocessing_fork.test_processes": [],
-    "multiprocess.tests.test_multiprocessing_fork.test_threads": [],
-    "multiprocess.tests.test_multiprocessing_forkserver": [],
-    "multiprocess.tests.test_multiprocessing_forkserver.test_manager": [],
-    "multiprocess.tests.test_multiprocessing_forkserver.test_misc": [],
-    "multiprocess.tests.test_multiprocessing_forkserver.test_processes": [],
-    "multiprocess.tests.test_multiprocessing_forkserver.test_threads": [],
-    "multiprocess.tests.test_multiprocessing_main_handling": [],
-    "multiprocess.tests.test_multiprocessing_spawn": [],
-    "multiprocess.tests.test_multiprocessing_spawn.test_manager": [],
-    "multiprocess.tests.test_multiprocessing_spawn.test_misc": [],
-    "multiprocess.tests.test_multiprocessing_spawn.test_processes": [],
-    "multiprocess.tests.test_multiprocessing_spawn.test_threads": [],
-    "multiprocess.util": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /dev/null"
-      }
-    ]
+    "multiprocess.synchronize": []
   },
   "multitasking": {
     "multitasking": []
