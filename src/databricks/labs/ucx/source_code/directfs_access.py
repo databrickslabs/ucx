@@ -31,13 +31,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(
-            backend=backend,
-            catalog="hive_metastore",
-            schema=schema,
-            table=table,
-            klass=DirectFsAccess,
-        )
+        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
 
     def dump_all(self, dfsas: Sequence[DirectFsAccess]):
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
