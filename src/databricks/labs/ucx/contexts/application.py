@@ -1,5 +1,6 @@
 import abc
 import logging
+import sys
 from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import cached_property
@@ -73,6 +74,11 @@ from databricks.labs.ucx.workspace_access.scim import ScimSupport
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 # "Service Factories" would always have a lot of public methods.
 # This is because they are responsible for creating objects that are
 # used throughout the application. That being said, we'll do best
@@ -89,7 +95,7 @@ class GlobalContext(abc.ABC):
             named_parameters = {}
         self._named_parameters = named_parameters
 
-    def replace(self, **kwargs):
+    def replace(self, **kwargs) -> Self:
         """Replace cached properties for unit testing purposes."""
         for key, value in kwargs.items():
             self.__dict__[key] = value
