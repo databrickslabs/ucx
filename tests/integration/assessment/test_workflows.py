@@ -42,8 +42,9 @@ def test_running_real_assessment_job(
     installation_ctx.workspace_installation.run()
     populate_for_linting(installation_ctx.installation)
 
-    installation_ctx.deployed_workflows.run_workflow("assessment", max_wait=timedelta(minutes=25))
-    assert installation_ctx.deployed_workflows.validate_step("assessment")
+    workflow = "assessment"
+    installation_ctx.deployed_workflows.run_workflow(workflow, max_wait=timedelta(minutes=25))
+    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
 
