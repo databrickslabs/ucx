@@ -34,7 +34,7 @@ def test_table_size_crawler(mocker) -> None:
     tsc = TableSizeCrawler(backend, "inventory_database")
     tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.return_value = 100
 
-    results = tsc.snapshot()
+    results = list(tsc.snapshot())
 
     assert "ANALYZE table `hive_metastore`.`db1`.`table1` compute STATISTICS NOSCAN" in backend.queries
     assert "ANALYZE table `hive_metastore`.`db1`.`table2` compute STATISTICS NOSCAN" in backend.queries
