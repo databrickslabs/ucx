@@ -12,7 +12,7 @@ class SparkSession:
     pass
 
 
-def test_table_size_crawler(mocker):
+def test_table_size_crawler(mocker) -> None:
     errors = {}
     rows = {
         "table_size": [],
