@@ -77,8 +77,8 @@ class Ownership(ABC, Generic[Record]):
             for group in user.groups
             if group.display == "admins" and group.value
         )
-        admin_groups = self._filter_workspace_groups(candidate_group_ids)
-        match list(admin_groups):
+        admin_groups = list(self._filter_workspace_groups(candidate_group_ids))
+        match admin_groups:
             case []:
                 return ()
             case [admin_group]:
