@@ -103,9 +103,8 @@ class SparkCallMatcher(_TableNameMatcher):
             yield used_table[1]
 
     def _collect_tables(
-            self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState,
-            node: Call
-        ) -> Iterable[tuple[str, UsedTable] | None]:
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[tuple[str, UsedTable] | None]:
         table_arg = self._get_table_arg(node)
         if table_arg is None:
             return
