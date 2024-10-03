@@ -29,11 +29,14 @@ def test_matches_dfsa_pattern(path, matches):
     "code, expected",
     [
         ('SOME_CONSTANT = "not a file system path"', 0),
-        ('SOME_CONSTANT = ("/dbfs/mnt", "dbfs:/", "/mnt/")', 3),
+        ('SOME_CONSTANT = ("/dbfs/mnt", "dbfs:/", "/mnt/")', 0),
         ('# "/dbfs/mnt"', 0),
-        ('SOME_CONSTANT = "/dbfs/mnt"', 1),
-        ('SOME_CONSTANT = "/dbfs/mnt"; load_data(SOME_CONSTANT)', 1),
+        ('SOME_CONSTANT = "/dbfs/mnt"', 0),
+        ('SOME_CONSTANT = "/dbfs/mnt"; load_data(SOME_CONSTANT)', 0),
+        ('SOME_CONSTANT = "/dbfs/mnt"; spark.table(SOME_CONSTANT)', 1),
+        ('SOME_CONSTANT = ("/dbfs/mnt", "dbfs:/", "/mnt/"); [dbutils.fs(path) for path in SOME_CONSTANT]', 3),
         ('SOME_CONSTANT = 42; load_data(SOME_CONSTANT)', 0),
+        ('SOME_CONSTANT = "/dbfs/mnt"; dbutils.fs(SOME_CONSTANT)', 1),
     ],
 )
 def test_detects_dfsa_paths(code, expected):
@@ -47,9 +50,14 @@ def test_detects_dfsa_paths(code, expected):
 @pytest.mark.parametrize(
     "code, expected",
     [
-        ("load_data('/dbfs/mnt/data')", 1),
-        ("load_data('/data')", 1),
-        ("load_data('/dbfs/mnt/data', '/data')", 2),
+        ("load_data('/dbfs/mnt/data')", 0),
+        (
+            """with open('/dbfs/mnt/data') as f:
+  f.read()""",
+            1,
+        ),
+        ("dbutils.fs('/data')", 1),
+        ("dbutils.fs('/dbfs/mnt/data', '/data')", 2),
         ("# load_data('/dbfs/mnt/data', '/data')", 0),
         ('spark.read.parquet("/mnt/foo/bar")', 1),
         ('spark.read.parquet("dbfs:/mnt/foo/bar")', 1),

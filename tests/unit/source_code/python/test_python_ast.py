@@ -235,6 +235,35 @@ def test_counts_lines(source: str, line_count: int):
     assert tree.line_count() == line_count
 
 
+@pytest.mark.parametrize(
+    "source, name, is_builtin",
+    [
+        ("x = open()", "open", True),
+        ("import datetime; x = datetime.datetime.now()", "now", True),
+        ("import stuff; x = stuff()", "stuff", False),
+        (
+            """def stuff():
+  pass
+x = stuff()""",
+            "stuff",
+            False,
+        ),
+    ],
+)
+def test_is_builtin(source, name, is_builtin):
+    tree = Tree.normalize_and_parse(source)
+    nodes = list(tree.node.get_children())
+    for node in nodes:
+        if isinstance(node, Assign):
+            call = node.value
+            assert isinstance(call, Call)
+            func_name = TreeHelper.get_call_name(call)
+            assert func_name == name
+            assert Tree(call).is_builtin() == is_builtin
+            return
+    assert False  # could not locate call
+
+
 def test_first_statement_is_none():
     node = Const("xyz")
     assert not Tree(node).first_statement()
