@@ -825,7 +825,8 @@ class AccountInstaller(AccountContext):
             # This code is run if joining collection after installation or through cli
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
             for workspace in accessible_workspaces:
-                ids_to_workspace[workspace.workspace_id] = workspace
+                if workspace.workspace_id is not None:
+                    ids_to_workspace[workspace.workspace_id] = workspace
             if join_on_install:
                 # if run as part of ucx installation allow user to select from the list to join
                 target_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
