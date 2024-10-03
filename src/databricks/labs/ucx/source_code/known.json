@@ -3712,6 +3712,14 @@
   "dill": {
     "dill": []
   },
+  "diskcache": {
+    "diskcache": [],
+    "diskcache.cli": [],
+    "diskcache.core": [],
+    "diskcache.djangocache": [],
+    "diskcache.persistent": [],
+    "diskcache.recipes": []
+  },
   "distlib": {
     "distlib": [],
     "distlib.compat": [],
