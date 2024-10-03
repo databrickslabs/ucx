@@ -5750,6 +5750,9 @@
     "gymnasium.wrappers.transform_reward": [],
     "gymnasium.wrappers.vector_list_info": []
   },
+  "gviz-api": {
+    "gviz_api": []
+  },
   "h11": {
     "h11": [],
     "h11._abnf": [],
