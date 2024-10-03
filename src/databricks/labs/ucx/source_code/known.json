@@ -3731,6 +3731,11 @@
     "distro": [],
     "distro.distro": []
   },
+  "dm-tree": {
+    "tree": [],
+    "tree.sequence": [],
+    "tree.tree_benchmark": []
+  },
   "docker": {
     "docker": []
   },
