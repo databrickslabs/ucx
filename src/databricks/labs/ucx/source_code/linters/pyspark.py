@@ -119,7 +119,7 @@ class SparkCallMatcher(_TableNameMatcher):
     def lint(
         self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterable[Advice]:
-        for used_table in self._collect_tables(from_table, index, session_state):
+        for used_table in self._collect_tables(from_table, index, session_state, node):
             if not used_table:
                 yield Advisory.from_node(
                     code='cannot-autofix-table-reference',
