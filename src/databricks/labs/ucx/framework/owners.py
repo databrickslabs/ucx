@@ -25,6 +25,12 @@ class Ownership(ABC, Generic[Record]):
     _cached_workspace_admins: dict[int, str | Exception] = {}
     """Cached user names of workspace administrators, keyed by workspace id."""
 
+    @classmethod
+    def reset_cache(cls) -> None:
+        """Reset the cache of discovered administrators that we maintain at class level."""
+        # Intended for use by tests.
+        cls._cached_workspace_admins = {}
+
     def __init__(self, ws: WorkspaceClient) -> None:
         self._ws = ws
 

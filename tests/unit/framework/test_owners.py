@@ -20,6 +20,12 @@ class _OwnershipFixture(Ownership[Record]):
         return self._owner_fn(record)
 
 
+@pytest.fixture(autouse=True)
+def _clear_ownership_cache() -> None:
+    """Ensure that the class-level cache of workspace owners is cleared before each test."""
+    Ownership.reset_cache()
+
+
 def test_ownership_prefers_record_owner(ws) -> None:
     """Verify that if an owner for the record can be found, that is used."""
     ownership = _OwnershipFixture[str](ws, owner_fn=lambda _: "bob")
