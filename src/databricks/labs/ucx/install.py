@@ -820,7 +820,7 @@ class AccountInstaller(AccountContext):
 
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        try:
+        try:  # pylint: disable=too-many-try-statements
             # if user is account admin list all the available workspace the user has admin access on.
             # This code is run if joining collection after installation or through cli
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
