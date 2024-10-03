@@ -566,57 +566,56 @@ class TablesInMounts(CrawlerBase[Table]):
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
-        file_infos = self._dbutils.fs.ls(root_dir)
-        if file_infos:
-            partitioned_table_counter = 0
-            for file_info in file_infos:
-                if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
-                    logger.debug(f"Path {file_info.path} is irrelevant")
-                    continue
+        file_infos = self._dbutils.fs.ls(root_dir) or []
+        partitioned_table_counter = 0
+        for file_info in file_infos:
+            if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
+                logger.debug(f"Path {file_info.path} is irrelevant")
+                continue
 
-                root_path = os.path.dirname(root_dir)
-                parent_entry = delta_log_folders.get(root_path)
-                table_in_mount = self._assess_path(file_info)
+            root_path = os.path.dirname(root_dir)
+            parent_entry = delta_log_folders.get(root_path)
+            table_in_mount = self._assess_path(file_info)
 
-                if parent_entry:
-                    # Happens when first folder was _delta_log and next folders are partitioned folder
-                    if parent_entry.format == "DELTA" and self._is_partitioned(file_info.name):
-                        delta_log_folders[root_path] = TableInMount(format=parent_entry.format, is_partitioned=True)
-                        logger.debug(f"Added {parent_entry.format} table for {root_path} (partitioned delta)")
-                        # this can spin for hours if there is a large enough directory
-                        partitioned_table_counter += 1
-                        if partitioned_table_counter > 10:
-                            logger.debug("Exiting after 10 reps:")
-                            for file in file_infos[:10]:
-                                logger.debug("\t" + file.name)
-                            break
-                    # Happens when previous entries where partitioned folders and the current one is delta_log
-                    if parent_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
-                        delta_log_folders[root_path] = TableInMount(format=table_in_mount.format, is_partitioned=True)
-                        logger.debug(f"Added {parent_entry.format} table for {root_path} (delta in partitioned)")
+            if parent_entry:
+                # Happens when first folder was _delta_log and next folders are partitioned folder
+                if parent_entry.format == "DELTA" and self._is_partitioned(file_info.name):
+                    delta_log_folders[root_path] = TableInMount(format=parent_entry.format, is_partitioned=True)
+                    logger.debug(f"Added {parent_entry.format} table for {root_path} (partitioned delta)")
+                    # this can spin for hours if there is a large enough directory
+                    partitioned_table_counter += 1
+                    if partitioned_table_counter > 10:
+                        logger.debug("Exiting after 10 reps:")
+                        for file in file_infos[:10]:
+                            logger.debug("\t" + file.name)
+                        break
+                # Happens when previous entries where partitioned folders and the current one is delta_log
+                if parent_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
+                    delta_log_folders[root_path] = TableInMount(format=table_in_mount.format, is_partitioned=True)
+                    logger.debug(f"Added {parent_entry.format} table for {root_path} (delta in partitioned)")
 
-                    if self._is_recursible_dir(file_info):
-                        self._find_delta_log_folders(file_info.path, delta_log_folders)
+                if self._is_recursible_dir(file_info):
+                    self._find_delta_log_folders(file_info.path, delta_log_folders)
 
-                elif self._is_partitioned(file_info.name):
-                    partition_format = self._find_partition_file_format(file_info.path)
-                    if partition_format:
-                        delta_log_folders[root_path] = partition_format
-                        logger.debug(f"Added {partition_format.format} table for {root_path} (partitioned)")
+            elif self._is_partitioned(file_info.name):
+                partition_format = self._find_partition_file_format(file_info.path)
+                if partition_format:
+                    delta_log_folders[root_path] = partition_format
+                    logger.debug(f"Added {partition_format.format} table for {root_path} (partitioned)")
 
-                elif not table_in_mount:
-                    if self._is_recursible_dir(file_info):
-                        self._find_delta_log_folders(file_info.path, delta_log_folders)
+            elif not table_in_mount:
+                if self._is_recursible_dir(file_info):
+                    self._find_delta_log_folders(file_info.path, delta_log_folders)
 
-                elif table_in_mount.format == "DELTA" and file_info.name == "_delta_log/":
-                    delta_log_folders[root_path] = table_in_mount
-                    logger.debug(f"Added {table_in_mount.format} table for {root_path} (normal delta)")
+            elif table_in_mount.format == "DELTA" and file_info.name == "_delta_log/":
+                delta_log_folders[root_path] = table_in_mount
+                logger.debug(f"Added {table_in_mount.format} table for {root_path} (normal delta)")
 
-                else:
-                    delta_log_folders[root_path] = table_in_mount
-                    logger.debug(f"Added {table_in_mount.format} table for {root_path} (general)")
-                    if self._is_recursible_dir(file_info):
-                        self._find_delta_log_folders(file_info.path, delta_log_folders)
+            else:
+                delta_log_folders[root_path] = table_in_mount
+                logger.debug(f"Added {table_in_mount.format} table for {root_path} (general)")
+                if self._is_recursible_dir(file_info):
+                    self._find_delta_log_folders(file_info.path, delta_log_folders)
 
         return delta_log_folders
 
