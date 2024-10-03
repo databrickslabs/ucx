@@ -397,7 +397,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         return f"WorkspaceListing(start_path={self._start_path})"
 
 
-def models_listing(ws: WorkspaceClient, num_threads: int):
+def models_listing(ws: WorkspaceClient, num_threads: int | None) -> Callable[[], Iterator[ml.ModelDatabricks]]:
     def inner() -> Iterator[ml.ModelDatabricks]:
         tasks = []
         for model in ws.model_registry.list_models():

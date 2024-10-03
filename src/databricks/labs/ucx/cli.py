@@ -593,11 +593,19 @@ def assign_metastore(
     ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
+    if workspace_id is None:
+        logger.error("--workspace-id is a required parameter.")
+        return
+    try:
+        workspace_id_casted = int(workspace_id)
+    except ValueError:
+        logger.error("--workspace-id should be an integer.")
+        return
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = ctx or AccountContext(a)
     ctx.account_metastores.assign_metastore(
         ctx.prompts,
-        workspace_id,
+        workspace_id_casted,
         metastore_id=metastore_id,
         default_catalog=default_catalog,
     )
@@ -635,7 +643,7 @@ def migrate_tables(
         deployed_workflows = workspace_context.deployed_workflows
         deployed_workflows.run_workflow("migrate-tables")
 
-        tables = workspace_context.tables_crawler.snapshot()
+        tables = list(workspace_context.tables_crawler.snapshot())
         hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
         if len(hiveserde_tables) > 0:
             percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
