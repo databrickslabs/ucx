@@ -17,6 +17,7 @@ from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -484,6 +485,14 @@ class GlobalContext(abc.ABC):
             self.data_comparator,
             self.config.recon_tolerance_percent,
         )
+
+    @cached_property
+    def used_tables_crawler_for_paths(self) -> UsedTablesCrawler:
+        return UsedTablesCrawler.for_paths(self.sql_backend, self.config.ucx_catalog)
+
+    @cached_property
+    def used_tables_crawler_for_queries(self) -> UsedTablesCrawler:
+        return UsedTablesCrawler.for_paths(self.sql_backend, self.config.ucx_catalog)
 
 
 class CliContext(GlobalContext, abc.ABC):
