@@ -11,7 +11,6 @@ def test_running_real_assessment_job(
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_dashboard,
-    inventory_schema,
     populate_for_linting,
 ) -> None:
     ws_group, _ = installation_ctx.make_ucx_group()
