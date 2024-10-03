@@ -885,7 +885,7 @@ class MockInstallationContext(MockRuntimeContext):
         return ws_group, acc_group
 
     @cached_property
-    def running_clusters(self) -> tuple[int, int, int]:
+    def running_clusters(self) -> tuple[str, str, str]:
         logger.debug("Waiting for clusters to start...")
         default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
