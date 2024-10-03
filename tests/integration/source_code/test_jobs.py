@@ -76,8 +76,13 @@ def test_job_linter_no_problems(simple_ctx, make_job):
 
 
 def test_job_task_linter_library_not_installed_cluster(
-    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
-):
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
+) -> None:
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
 
@@ -98,8 +103,14 @@ def test_job_task_linter_library_not_installed_cluster(
 
 
 def test_job_task_linter_library_installed_cluster(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
-):
+    simple_ctx,
+    ws,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
+) -> None:
     created_cluster = make_cluster(single_node=True)
     libraries_api = ws.libraries
     libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("greenlet"))])
@@ -185,7 +196,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_notebook,
     make_random,
     watchdog_purge_suffix,
-):
+) -> None:
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
     entrypoint.mkdir()
 
@@ -289,7 +300,7 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     make_job,
     make_notebook,
     make_directory,
-):
+) -> None:
     # A requirement that can definitely not be found.
     requirements = "a_package_that_does_not_exist\n"
 
@@ -322,7 +333,7 @@ def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     make_notebook,
     make_directory,
     make_dbfs_directory,
-):
+) -> None:
     # A requirement that can definitely not be found.
     requirements = "a_package_that_does_not_exist\n"
 
@@ -354,7 +365,7 @@ def test_workflow_linter_lints_job_with_workspace_egg_dependency(
     make_job,
     make_notebook,
     make_directory,
-):
+) -> None:
     expected_problem_message = "Could not locate import: thingy"
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
 
@@ -442,7 +453,7 @@ def test_job_spark_python_task_linter_happy_path(
     make_cluster,
     make_notebook,
     make_directory,
-):
+) -> None:
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
@@ -463,8 +474,13 @@ def test_job_spark_python_task_linter_happy_path(
 
 
 def test_job_spark_python_task_linter_unhappy_path(
-    simple_ctx, make_job, make_random, make_cluster, make_notebook, make_directory
-):
+    simple_ctx,
+    make_job,
+    make_random,
+    make_cluster,
+    make_notebook,
+    make_directory,
+) -> None:
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
