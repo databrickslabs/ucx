@@ -299,11 +299,11 @@ def test_skip_missing_table(caplog):
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 
 
-def test_extract_database_skip_property(ws):
+def test_extract_database_skip_property():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "ucx")
+    table_crawler = TablesCrawler(backend, "ucx")
     assert "databricks.labs.ucx.skip" in table_crawler.parse_database_props("(databricks.labs.ucx.skip,true)")
 
 

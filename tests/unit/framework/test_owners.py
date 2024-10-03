@@ -35,12 +35,14 @@ def _setup_accounts(
 
     # Stub for the groups.
     groups_by_id = {group.id: group for group in groups}
+
     def stub_groups_get(group_id: str) -> iam.Group:
         try:
             return groups_by_id[group_id]
         except KeyError as e:
             msg = f"Group not found: {group_id}"
             raise NotFound(msg) from e
+
     ws.groups.get.side_effect = stub_groups_get
     ws.groups.list.return_value = groups
 
@@ -50,6 +52,7 @@ def _setup_accounts(
             return {"Resources": [user.as_dict() for user in account_users]}
         msg = f"Call not mocked: {method} {path}"
         raise NotImplementedError(msg)
+
     ws.api_client.do.side_effect = stub_rest_call
 
 

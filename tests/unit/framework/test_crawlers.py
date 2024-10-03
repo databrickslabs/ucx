@@ -5,7 +5,6 @@ from unittest.mock import Mock
 import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result, ResultFn
@@ -33,7 +32,6 @@ class Bar:
 class _CrawlerFixture(CrawlerBase[Result]):
     def __init__(
         self,
-        ws: WorkspaceClient,
         backend: MockBackend,
         catalog: str,
         schema: str,
@@ -43,7 +41,7 @@ class _CrawlerFixture(CrawlerBase[Result]):
         fetcher: ResultFn = lambda: [],
         loader: ResultFn = lambda: [],
     ):
-        super().__init__(ws, backend, catalog, schema, table, klass)
+        super().__init__(backend, catalog, schema, table, klass)
         self._fetcher = fetcher
         self._loader = loader
 
@@ -54,22 +52,22 @@ class _CrawlerFixture(CrawlerBase[Result]):
         return self._loader()
 
 
-def test_invalid(ws):
+def test_invalid():
     with pytest.raises(ValueError):
-        _CrawlerFixture(ws, MockBackend(), "a.a.a", "b", "c", Bar)
+        _CrawlerFixture(MockBackend(), "a.a.a", "b", "c", Bar)
 
 
-def test_full_name(ws):
-    cb = _CrawlerFixture(ws, MockBackend(), "a", "b", "c", Bar)
+def test_full_name():
+    cb = _CrawlerFixture(MockBackend(), "a", "b", "c", Bar)
     assert cb.full_name == "a.b.c"
 
 
-def test_snapshot_crawls_when_no_prior_crawl(ws) -> None:
+def test_snapshot_crawls_when_no_prior_crawl() -> None:
     """Check that the crawler is invoked when the fetcher reports that the inventory doesn't exist."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(side_effect=NotFound(".. TABLE_OR_VIEW_NOT_FOUND .."))
     mock_loader = Mock(return_value=[Baz(first="first")])
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
 
     result = cb.snapshot()
 
@@ -83,7 +81,7 @@ def test_snapshot_crawls_when_prior_crawl_yielded_no_data(ws) -> None:
     mock_backend = MockBackend()
     mock_fetcher = Mock(return_value=[])
     mock_loader = Mock(return_value=[Baz(first="first")])
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
 
     result = cb.snapshot()
 
@@ -92,12 +90,12 @@ def test_snapshot_crawls_when_prior_crawl_yielded_no_data(ws) -> None:
     assert [Baz(first="first")] == result
 
 
-def test_snapshot_doesnt_crawl_if_previous_crawl_yielded_data(ws) -> None:
+def test_snapshot_doesnt_crawl_if_previous_crawl_yielded_data() -> None:
     """Check that existing data is used (with no crawl) if the fetcher can load the snapshot data."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(return_value=[Baz(first="first")])
     mock_loader = Mock(return_value=[Baz(first="second")])
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
 
     result = cb.snapshot()
 
@@ -106,12 +104,12 @@ def test_snapshot_doesnt_crawl_if_previous_crawl_yielded_data(ws) -> None:
     assert [Baz(first="first")] == result
 
 
-def test_snapshot_crawls_if_refresh_forced(ws) -> None:
+def test_snapshot_crawls_if_refresh_forced() -> None:
     """Check that a crawl happens (without even checking existing data) if a refresh is forced."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(return_value=[Baz(first="first")])
     mock_loader = Mock(return_value=[Baz(first="second")])
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
 
     result = cb.snapshot(force_refresh=True)
 
@@ -120,12 +118,12 @@ def test_snapshot_crawls_if_refresh_forced(ws) -> None:
     assert [Baz(first="second")] == result
 
 
-def test_snapshot_force_refresh_replaces_prior_data(ws) -> None:
+def test_snapshot_force_refresh_replaces_prior_data() -> None:
     """Check that when refreshing the new data replaces (via overwrite) any existing data."""
     mock_backend = MockBackend()
     mock_fetcher = Mock(side_effect=RuntimeError("never called"))
     mock_loader = Mock(return_value=[Baz(first="second")])
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, fetcher=mock_fetcher, loader=mock_loader)
 
     cb.snapshot(force_refresh=True)
 
@@ -134,9 +132,9 @@ def test_snapshot_force_refresh_replaces_prior_data(ws) -> None:
     assert [Row(first="second", second=None)] == mock_backend.rows_written_for("a.b.c", mode="overwrite")
 
 
-def test_snapshot_updates_existing_table(ws) -> None:
+def test_snapshot_updates_existing_table() -> None:
     mock_backend = MockBackend()
-    cb = _CrawlerFixture[Baz](ws, mock_backend, "a", "b", "c", Baz, loader=lambda: [Baz(first="first")])
+    cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, loader=lambda: [Baz(first="first")])
 
     result = cb.snapshot()
 
@@ -144,7 +142,7 @@ def test_snapshot_updates_existing_table(ws) -> None:
     assert [Row(first="first", second=None)] == mock_backend.rows_written_for("a.b.c", "overwrite")
 
 
-def test_snapshot_updates_new_table(ws) -> None:
+def test_snapshot_updates_new_table() -> None:
     mock_backend = MockBackend()
 
     def fetcher():
@@ -152,7 +150,7 @@ def test_snapshot_updates_new_table(ws) -> None:
         raise NotFound(msg)
 
     cb = _CrawlerFixture[Foo](
-        ws, mock_backend, "a", "b", "c", Foo, fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)]
+        mock_backend, "a", "b", "c", Foo, fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)]
     )
 
     result = cb.snapshot()
@@ -161,14 +159,14 @@ def test_snapshot_updates_new_table(ws) -> None:
     assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "overwrite")
 
 
-def test_snapshot_wrong_error(ws) -> None:
+def test_snapshot_wrong_error() -> None:
     sql_backend = MockBackend()
 
     def fetcher():
         msg = "always fails"
         raise ValueError(msg)
 
-    cb = _CrawlerFixture[Bar](ws, sql_backend, "a", "b", "c", Bar, fetcher=fetcher)
+    cb = _CrawlerFixture[Bar](sql_backend, "a", "b", "c", Bar, fetcher=fetcher)
 
     with pytest.raises(ValueError):
         cb.snapshot()

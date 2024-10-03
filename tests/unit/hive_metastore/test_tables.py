@@ -174,18 +174,18 @@ def test_tables_returning_error_when_describing(ws):
         ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tables_crawler = TablesCrawler(ws, backend, "default")
+    tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()
     assert len(results) == 1
     first = results[0]
     assert first.upgraded_to == 'fake_cat.fake_ext.fake_delta'
 
 
-def test_tables_returning_error_when_show_tables(ws, caplog):
+def test_tables_returning_error_when_show_tables(caplog):
     errors = {"SHOW TABLES FROM `hive_metastore`.`database`": "SCHEMA_NOT_FOUND"}
     rows = {"SHOW DATABASES": [("database",)]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    tables_crawler = TablesCrawler(ws, backend, "default")
+    tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()
     assert len(results) == 0
     assert "Schema hive_metastore.database no longer exists" in caplog.text
@@ -285,13 +285,13 @@ def test_table_what(table, what):
     assert table.what == what
 
 
-def test_tables_crawler_should_filter_by_database(ws):
+def test_tables_crawler_should_filter_by_database():
     rows = {
         "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
         "SHOW TABLES FROM `hive_metastore`.`database_2`": [("", "table1", "")],
     }
     backend = MockBackend(rows=rows)
-    tables_crawler = TablesCrawler(ws, backend, "default", ["database"])
+    tables_crawler = TablesCrawler(backend, "default", ["database"])
     results = tables_crawler.snapshot()
     assert len(results) == 2
     assert sorted(backend.queries) == sorted(
@@ -304,7 +304,7 @@ def test_tables_crawler_should_filter_by_database(ws):
     )
 
 
-def test_is_partitioned_flag(ws):
+def test_is_partitioned_flag():
     rows = {
         "SHOW DATABASES": [("database",)],
         "SHOW TABLES FROM `hive_metastore`.`database`": [("", "table1", ""), ("", "table2", "")],
@@ -325,7 +325,7 @@ def test_is_partitioned_flag(ws):
         ],
     }
     backend = MockBackend(rows=rows)
-    tables_crawler = TablesCrawler(ws, backend, "default")
+    tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()
     assert len(results) == 2
     assert (
@@ -531,7 +531,7 @@ def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_lo
     assert expected_log in caplog.text
 
 
-def test_fast_table_scan_crawler_already_crawled(ws, mocker):
+def test_fast_table_scan_crawler_already_crawled(mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -544,12 +544,12 @@ def test_fast_table_scan_crawler_already_crawled(ws, mocker):
         ],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    ftsc = FasterTableScanCrawler(ws, sql_backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
     results = ftsc.snapshot()
     assert len(results) == 3
 
 
-def test_fast_table_scan_crawler_crawl_new(ws, caplog, mocker, spark_table_crawl_mocker):
+def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -558,7 +558,7 @@ def test_fast_table_scan_crawler_crawl_new(ws, caplog, mocker, spark_table_crawl
         "hive_metastore.inventory_database.tables": [],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    ftsc = FasterTableScanCrawler(ws, sql_backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
     mock_list_databases_iterator, mock_list_tables_iterator, get_table_mock = spark_table_crawl_mocker
 
     # pylint: disable=protected-access
@@ -580,7 +580,7 @@ def test_fast_table_scan_crawler_crawl_new(ws, caplog, mocker, spark_table_crawl
     )
 
 
-def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(ws, caplog, mocker, spark_table_crawl_mocker):
+def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mocker, spark_table_crawl_mocker):
 
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -590,7 +590,7 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(ws, caplog, 
         "hive_metastore.inventory_database.tables": [],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    ftsc = FasterTableScanCrawler(ws, sql_backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     # pylint: disable=protected-access
     ftsc._spark._jsparkSession.sharedState().externalCatalog().listDatabases.side_effect = Exception(
@@ -602,7 +602,7 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(ws, caplog, 
     assert "Test listDatabases warning" in caplog.text
 
 
-def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(ws, caplog, mocker, spark_table_crawl_mocker):
+def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker, spark_table_crawl_mocker):
 
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -612,7 +612,7 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(ws, caplog, moc
         "hive_metastore.inventory_database.tables": [],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    ftsc = FasterTableScanCrawler(ws, sql_backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     mock_list_databases_iterator, _, _ = spark_table_crawl_mocker
 
@@ -627,7 +627,7 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(ws, caplog, moc
     assert "Test listTables warning" in caplog.text
 
 
-def test_fast_table_scan_crawler_crawl_test_warnings_get_table(ws, caplog, mocker, spark_table_crawl_mocker):
+def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, spark_table_crawl_mocker):
 
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -637,7 +637,7 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(ws, caplog, mocke
         "hive_metastore.inventory_database.tables": [],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    ftsc = FasterTableScanCrawler(ws, sql_backend, "inventory_database")
+    ftsc = FasterTableScanCrawler(sql_backend, "inventory_database")
 
     mock_list_databases_iterator, mock_list_tables_iterator, _ = spark_table_crawl_mocker
 

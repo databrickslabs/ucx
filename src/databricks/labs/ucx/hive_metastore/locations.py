@@ -117,7 +117,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
-        super().__init__(ws, sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
+        super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
+        self._ws = ws
 
     def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
         min_slash = 2
@@ -300,7 +301,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
 
 class Mounts(CrawlerBase[Mount]):
     def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
-        super().__init__(ws, backend, "hive_metastore", inventory_database, "mounts", Mount)
+        super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
+        self._dbutils = ws.dbutils
 
     @staticmethod
     def _deduplicate_mounts(mounts: list) -> list:
@@ -318,7 +320,7 @@ class Mounts(CrawlerBase[Mount]):
 
     def _crawl(self) -> Iterable[Mount]:
         mounts = []
-        for mount_point, source, _ in self._ws.dbutils.fs.mounts():
+        for mount_point, source, _ in self._dbutils.fs.mounts():
             mounts.append(Mount(mount_point, source))
         return self._deduplicate_mounts(mounts)
 
@@ -354,10 +356,11 @@ class TablesInMounts(CrawlerBase[Table]):
         exclude_paths_in_mount: list[str] | None = None,
         include_paths_in_mount: list[str] | None = None,
     ):
-        super().__init__(ws, backend, "hive_metastore", inventory_database, "tables", Table)
+        super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
         self._mounts_crawler = mc
         self._include_mounts = include_mounts
+        self._ws = ws
         self._include_paths_in_mount = include_paths_in_mount
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}

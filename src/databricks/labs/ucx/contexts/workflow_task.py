@@ -85,7 +85,7 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def tables_crawler(self):
-        return FasterTableScanCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+        return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
 
     @cached_property
     def tables_in_mounts(self):

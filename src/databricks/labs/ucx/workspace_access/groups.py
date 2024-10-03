@@ -418,10 +418,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         *,
         external_id_match: bool = False,
     ):
-        super().__init__(ws, sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
+        super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         if not renamed_group_prefix:
             renamed_group_prefix = "db-temp-"
 
+        self._ws = ws
         self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
         self._workspace_group_regex = workspace_group_regex

@@ -22,7 +22,7 @@ SHOW_GRANTS = MockBackend.rows("principal", "action_type", "object_type", "ignor
 SHOW_TABLES = MockBackend.rows("databaseName", "tableName", "isTmp")
 
 
-def test_tacl_crawler(ws):
+def test_tacl_crawler():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -30,8 +30,8 @@ def test_tacl_crawler(ws):
             ]
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -43,7 +43,7 @@ def test_tacl_crawler(ws):
     assert obj.object_id == "catalog_a.database_b.table_c"
 
 
-def test_tacl_udf_crawler(ws):
+def test_tacl_udf_crawler():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -51,8 +51,8 @@ def test_tacl_udf_crawler(ws):
             ]
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -64,7 +64,7 @@ def test_tacl_udf_crawler(ws):
     assert obj.object_id == "catalog_a.database_b.function_c"
 
 
-def test_tacl_crawler_multiple_permissions(ws):
+def test_tacl_crawler_multiple_permissions():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -92,8 +92,8 @@ def test_tacl_crawler_multiple_permissions(ws):
             ]
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -244,7 +244,7 @@ def test_tacl_crawler_multiple_permissions(ws):
     ) == Grant(**json.loads(permissions.raw))
 
 
-def test_tacl_applier(ws):
+def test_tacl_applier():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -255,8 +255,8 @@ def test_tacl_applier(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -296,10 +296,10 @@ def test_tacl_applier(ws):
     assert validation_res
 
 
-def test_tacl_applier_not_applied(ws):
+def test_tacl_applier_not_applied():
     sql_backend = MockBackend(rows={"SELECT \\* FROM `hive_metastore`.`test`.`grants`": []})
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -339,7 +339,7 @@ def test_tacl_applier_not_applied(ws):
     assert not validation_res
 
 
-def test_tacl_udf_applier(ws):
+def test_tacl_udf_applier():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -350,8 +350,8 @@ def test_tacl_udf_applier(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -391,7 +391,7 @@ def test_tacl_udf_applier(ws):
     assert validation_res
 
 
-def test_tacl_applier_multiple_actions(ws):
+def test_tacl_applier_multiple_actions():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -403,8 +403,8 @@ def test_tacl_applier_multiple_actions(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -444,7 +444,7 @@ def test_tacl_applier_multiple_actions(ws):
     assert validation_res
 
 
-def test_tacl_applier_deny_and_grant(ws):
+def test_tacl_applier_deny_and_grant():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -457,8 +457,8 @@ def test_tacl_applier_deny_and_grant(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -535,7 +535,7 @@ def test_tacl_applier_no_target_principal(mocker):
     assert not sql_backend.queries
 
 
-def test_verify_task_should_return_true_if_permissions_applied(ws):
+def test_verify_task_should_return_true_if_permissions_applied():
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE `catalog_a`.`database_b`.`table_c`": SHOW_GRANTS[
@@ -543,8 +543,8 @@ def test_verify_task_should_return_true_if_permissions_applied(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -567,7 +567,7 @@ def test_verify_task_should_return_true_if_permissions_applied(ws):
     assert result
 
 
-def test_verify_task_should_fail_if_permissions_not_applied(ws):
+def test_verify_task_should_fail_if_permissions_not_applied():
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE `catalog_a`.`database_b`.`table_c`": SHOW_GRANTS[
@@ -575,8 +575,8 @@ def test_verify_task_should_fail_if_permissions_not_applied(ws):
             ],
         }
     )
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
@@ -599,10 +599,10 @@ def test_verify_task_should_fail_if_permissions_not_applied(ws):
         task()
 
 
-def test_verify_task_should_return_false_if_not_grants_present(ws):
+def test_verify_task_should_return_false_if_not_grants_present():
     sql_backend = MockBackend()
-    tables_crawler = TablesCrawler(ws, sql_backend, "test")
-    udf_crawler = UdfsCrawler(ws, sql_backend, "test")
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
     grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 

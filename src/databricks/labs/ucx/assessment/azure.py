@@ -42,7 +42,8 @@ class ServicePrincipalClusterMapping:
 
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin, SecretsMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(ws, sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
+        super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
+        self._ws = ws
 
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):

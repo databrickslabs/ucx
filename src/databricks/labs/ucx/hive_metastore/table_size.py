@@ -34,7 +34,6 @@ class TableSizeCrawler(CrawlerBase[TableSize]):
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         super().__init__(
-            tables_crawler._ws,
             tables_crawler._backend,
             "hive_metastore",
             tables_crawler._schema,

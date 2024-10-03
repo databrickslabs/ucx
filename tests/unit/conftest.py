@@ -134,11 +134,7 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
             if 'config' not in replace:
                 replace['config'] = mock_installation.load(WorkspaceConfig)
             if 'tables_crawler' not in replace:
-                replace['tables_crawler'] = TablesCrawler(
-                    replace['workspace_client'],
-                    replace['sql_backend'],
-                    replace['config'].inventory_database,
-                )
+                replace['tables_crawler'] = TablesCrawler(replace['sql_backend'], replace['config'].inventory_database)
 
             module = __import__(cb.__module__, fromlist=[cb.__name__])
             klass, method = cb.__qualname__.split('.', 1)

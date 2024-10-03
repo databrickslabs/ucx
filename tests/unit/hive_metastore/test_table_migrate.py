@@ -42,7 +42,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -93,7 +93,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
         ]
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["dbfs_parquet"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -129,7 +129,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, crawler_backend, "inventory_database")
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -151,7 +151,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, crawler_backend, "inventory_database")
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     table_mapping = mock_table_mapping(["external_src"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -182,7 +182,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("LOCATION_OVERLAP", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, crawler_backend, "inventory_database")
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     table_mapping = mock_table_mapping(["external_src"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -287,7 +287,7 @@ def test_migrate_external_hiveserde_table_in_place(
         },
         fails_on_first=errors,
     )
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["external_hiveserde"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     mount_crawler = create_autospec(Mounts)
@@ -339,7 +339,7 @@ def test_migrate_external_hiveserde_table_in_place(
 )
 def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, test_table, expected_query):
     backend = MockBackend()
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping([test_table])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     mounts_crawler = create_autospec(Mounts)
@@ -364,7 +364,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, crawler_backend, "inventory_database")
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     ws.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     ws.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="test_schema1"),
@@ -407,7 +407,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, crawler_backend, "inventory_database")
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     table_mapping = mock_table_mapping(["external_src_unsupported"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
@@ -432,7 +432,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     )
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": original_view}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -480,7 +480,7 @@ def test_migrate_view_with_columns(ws):
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": create}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -1048,7 +1048,7 @@ def test_table_in_mount_mapping_with_table_owner(ws):
             Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
         )
     ]
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
     table_migrate = TablesMigrator(
@@ -1091,7 +1091,7 @@ def test_table_in_mount_mapping_with_partition_information(ws):
             Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
         )
     ]
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
     table_migrate = TablesMigrator(
@@ -1115,7 +1115,7 @@ def test_migrate_view_failed(ws, caplog):
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": create}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -1148,7 +1148,7 @@ def test_migrate_view_failed(ws, caplog):
 def test_migrate_dbfs_root_tables_failed(ws, caplog):
     errors = {"CREATE TABLE IF NOT EXISTS": "error"}
     backend = MockBackend(fails_on_first=errors, rows={})
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)

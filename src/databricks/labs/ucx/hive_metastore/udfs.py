@@ -5,7 +5,6 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -37,7 +36,6 @@ class Udf:  # pylint: disable=too-many-instance-attributes
 class UdfsCrawler(CrawlerBase[Udf]):
     def __init__(
         self,
-        ws: WorkspaceClient,
         backend: SqlBackend,
         schema: str,
         include_databases: list[str] | None = None,
@@ -46,11 +44,10 @@ class UdfsCrawler(CrawlerBase[Udf]):
         Initializes a UdfsCrawler instance.
 
         Args:
-            ws (WorkspaceClient): The client for the current workspace.
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(ws, backend, "hive_metastore", schema, "udfs", Udf)
+        super().__init__(backend, "hive_metastore", schema, "udfs", Udf)
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:

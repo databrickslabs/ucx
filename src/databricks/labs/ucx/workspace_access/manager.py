@@ -4,7 +4,6 @@ from itertools import groupby
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -24,8 +23,8 @@ class PermissionManager(CrawlerBase[Permissions]):
 
     ERRORS_TO_IGNORE = ["FEATURE_DISABLED"]
 
-    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
-        super().__init__(ws, backend, "hive_metastore", inventory_database, "permissions", Permissions)
+    def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
+        super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
 
     def _crawl(self) -> Iterable[Permissions]:

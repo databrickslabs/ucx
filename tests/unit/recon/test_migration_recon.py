@@ -62,12 +62,11 @@ def test_migrate_recon_should_produce_proper_queries(
         "WITH compare_results": data_comp_row_factory[(102, 100, 2),],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(ws, backend, "inventory_database")
+    table_crawler = TablesCrawler(backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     metadata_retriever = DatabricksTableMetadataRetriever(backend)
     data_profiler = StandardDataProfiler(backend, metadata_retriever)
     migration_recon = MigrationRecon(
-        ws,
         backend,
         "inventory_database",
         migration_status_refresher,

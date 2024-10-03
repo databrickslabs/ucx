@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import ClassVar, Generic, Literal, Protocol, TypeVar
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -22,21 +21,17 @@ ResultFn = Callable[[], Iterable[Result]]
 
 
 class CrawlerBase(ABC, Generic[Result]):
-    def __init__(
-        self, ws: WorkspaceClient, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]
-    ):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]) -> None:
         """
         Initializes a CrawlerBase instance.
 
         Args:
-            ws (WorkspaceClient): A client for the current workspace.
             backend (SqlBackend): The backend that executes SQL queries:
                 Statement Execution API or Databricks Runtime.
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
             table: The table name for the inventory persistence.
         """
-        self._ws = ws
         self._catalog = self._valid(catalog)
         self._schema = self._valid(schema)
         self._table = self._valid(table)

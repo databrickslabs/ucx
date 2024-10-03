@@ -24,7 +24,8 @@ class PipelineInfo:
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(ws, sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
+        super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
+        self._ws = ws
 
     def _crawl(self) -> Iterable[PipelineInfo]:
         all_pipelines = list(self._ws.pipelines.list_pipelines())
