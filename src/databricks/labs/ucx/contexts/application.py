@@ -55,6 +55,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.redash import Redash
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -429,6 +430,7 @@ class GlobalContext(abc.ABC):
             self.path_lookup,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.directfs_access_crawler_for_paths,
+            self.used_tables_crawler_for_paths,
             self.config.include_job_ids,
         )
 
@@ -448,6 +450,14 @@ class GlobalContext(abc.ABC):
     @cached_property
     def directfs_access_crawler_for_queries(self):
         return DirectFsAccessCrawler.for_queries(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def used_tables_crawler_for_paths(self):
+        return UsedTablesCrawler.for_paths(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def used_tables_crawler_for_queries(self):
+        return UsedTablesCrawler.for_queries(self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self):
