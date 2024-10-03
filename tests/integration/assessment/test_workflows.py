@@ -47,10 +47,14 @@ def test_running_real_assessment_job(
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
 
     tables = set[str]()
-    local_crawler = TablesCrawler(sql_backend, inventory_schema, [source_schema.name])
-    for _ in local_crawler.snapshot():
+    tables_crawler = TablesCrawler(sql_backend, inventory_schema, [source_schema.name])
+    for _ in tables_crawler.snapshot():
         tables.add(_.name)
 
     expected_tables = {managed_table.name, external_table.name, tmp_table.name, view.name, non_delta.name}
     assert len(tables) == len(expected_tables)
     assert set(tables) == expected_tables
+
+    query = f"SELECT * FROM {inventory_schema}.workflow_problems"
+    for row in sql_backend.fetch(query):
+        assert row['path'] != 'UNKNOWN'

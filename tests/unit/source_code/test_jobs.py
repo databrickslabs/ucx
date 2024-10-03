@@ -23,7 +23,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, LintingWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
@@ -521,3 +521,12 @@ def test_xxx(graph):
     assert workflow_task_container.spark_conf == {"spark.databricks.cluster.profile": "singleNode"}
 
     ws.assert_not_called()
+
+
+def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, migration_index):
+    path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
+    root = Dependency(NotebookLoader(), path)
+    graph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
+    walker = LintingWalker(graph, set(), mock_path_lookup, "key", CurrentSessionState(), migration_index)
+    for advice in walker:
+        assert "UNKNOWN" not in advice.path.as_posix()
