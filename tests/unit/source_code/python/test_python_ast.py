@@ -233,3 +233,55 @@ df.write.format("delta").saveAsTable("old.things")
 def test_counts_lines(source: str, line_count: int):
     tree = Tree.normalize_and_parse(source)
     assert tree.line_count() == line_count
+
+
+def test_first_statement_is_none():
+    node = Const("xyz")
+    assert not Tree(node).first_statement()
+
+
+def test_repr_is_truncated():
+    assert len(repr(Tree(Const("xyz")))) <= (32 + len("...") + len("<Tree: >"))
+
+
+def test_append_tree_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).append_tree(Tree(Const("xyz")))
+
+
+def test_append_node_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).append_nodes([])
+
+
+def test_nodes_between_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).nodes_between(0, 100)
+
+
+def test_has_global_fails():
+    assert not Tree.new_module().has_global("xyz")
+
+
+def test_append_globals_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).append_globals({})
+
+
+def test_globals_between_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).line_count()
+
+
+def test_line_count_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).globals_between(0, 100)
+
+
+def test_renumber_fails():
+    with pytest.raises(NotImplementedError):
+        Tree(Const("xyz")).renumber(100)
+
+
+def test_const_is_not_from_module():
+    assert not Tree(Const("xyz")).is_from_module("spark")
