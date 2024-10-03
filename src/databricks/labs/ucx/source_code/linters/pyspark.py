@@ -97,13 +97,13 @@ class SparkCallMatcher(_TableNameMatcher):
     def collect_tables(
         self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterable[UsedTable]:
-        for used_table in self._collect_tables(from_table, index, session_state, node):
+        for used_table in self._collect_tables(from_table, session_state, node):
             if not used_table:
                 continue
             yield used_table[1]
 
     def _collect_tables(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self, from_table: FromTableSqlLinter, session_state: CurrentSessionState, node: Call
     ) -> Iterable[tuple[str, UsedTable] | None]:
         table_arg = self._get_table_arg(node)
         if table_arg is None:
@@ -119,7 +119,7 @@ class SparkCallMatcher(_TableNameMatcher):
     def lint(
         self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterable[Advice]:
-        for used_table in self._collect_tables(from_table, index, session_state, node):
+        for used_table in self._collect_tables(from_table, session_state, node):
             if not used_table:
                 yield Advisory.from_node(
                     code='cannot-autofix-table-reference',
