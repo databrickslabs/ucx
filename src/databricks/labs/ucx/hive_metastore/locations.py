@@ -57,7 +57,7 @@ class LocationTrie:
     def _path(self) -> list[str]:
         """The path to traverse to get to the current node."""
         parts = []
-        current = self
+        current: LocationTrie | None = self
         while current:
             parts.append(current.key)
             current = current.parent
