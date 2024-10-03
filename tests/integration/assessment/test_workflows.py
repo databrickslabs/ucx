@@ -7,7 +7,6 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 
-# pylint: disable=too-many-locals
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     installation_ctx,
