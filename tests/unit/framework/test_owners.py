@@ -173,12 +173,25 @@ def test_ownership_error_when_no_owner_can_be_located(ws) -> None:
 
 def test_ownership_fallback_instance_cache(ws) -> None:
     """Verify that the fallback owner is cached on each instance to avoid many REST calls."""
-    pytest.xfail("Not yet implemented")
+    _setup_accounts(ws, account_users=[_create_account_admin("jane")])
+
+    ownership = _OwnershipFixture[str](ws)
+    owner1 = ownership.owner_of("school")
+    owner2 = ownership.owner_of("school")
+
+    assert owner1 is owner2
+    ws.get_workspace_id.assert_called_once()
 
 
 def test_ownership_fallback_class_cache(ws) -> None:
     """Verify that the fallback owner for a workspace is cached at class level to avoid many REST calls."""
-    pytest.xfail("Not yet implemented")
+    _setup_accounts(ws, account_users=[_create_account_admin("jane")])
+
+    owner1 = _OwnershipFixture[str](ws).owner_of("school")
+    owner2 = _OwnershipFixture[str](ws).owner_of("school")
+
+    assert owner1 is owner2
+    ws.users.list.assert_called_once()
 
 
 def test_ownership_fallback_class_cache_multiple_workspaces(ws) -> None:
@@ -187,5 +200,5 @@ def test_ownership_fallback_class_cache_multiple_workspaces(ws) -> None:
 
 
 def test_ownership_fallback_error_handling(ws) -> None:
-    """Verify that the class-level owner-cache and tracks errors to avoid many REST calls."""
+    """Verify that the class-level administrator-cache and tracks errors to avoid many REST calls."""
     pytest.xfail("Not yet implemented")
