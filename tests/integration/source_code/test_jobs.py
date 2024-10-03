@@ -70,7 +70,7 @@ def test_linter_from_context(simple_ctx, make_job, make_notebook):
 def test_job_linter_no_problems(simple_ctx, make_job):
     j = make_job()
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     assert len(problems) == 0
 
@@ -98,7 +98,8 @@ def test_job_task_linter_library_not_installed_cluster(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
@@ -128,7 +129,8 @@ def test_job_task_linter_library_installed_cluster(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
@@ -208,7 +210,8 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     make_notebook(path=notebook, content=b"import greenlet")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
+
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
 
@@ -315,7 +318,8 @@ def test_workflow_linter_lints_job_with_workspace_requirements_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+
     messages = tuple(problem.message for problem in problems)
     expected_messages = (
         "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
@@ -348,7 +352,8 @@ def test_workflow_linter_lints_job_with_dbfs_requirements_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=python_code.encode("utf-8"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+
     messages = tuple(problem.message for problem in problems)
     expected_messages = (
         "ERROR: Could not find a version that satisfies the requirement a_package_that_does_not_exist",
@@ -378,7 +383,7 @@ def test_workflow_linter_lints_job_with_workspace_egg_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
@@ -469,7 +474,8 @@ def test_job_spark_python_task_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
@@ -495,7 +501,8 @@ def test_job_spark_python_task_linter_unhappy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
