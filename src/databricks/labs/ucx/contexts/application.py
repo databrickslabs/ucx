@@ -422,7 +422,7 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def workflow_linter(self):
+    def workflow_linter(self) -> WorkflowLinter:
         return WorkflowLinter(
             self.workspace_client,
             self.dependency_resolver,
