@@ -142,7 +142,7 @@ def test_job_linter_some_notebook_graph_with_problems(
     make_random,
     caplog,
     watchdog_purge_suffix,
-):
+) -> None:
     expected_messages = {
         'some_file.py:0 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/foo/bar',
         'second_notebook:3 [direct-filesystem-access] The use of direct filesystem references is deprecated: /mnt/something',
@@ -166,7 +166,7 @@ display(spark.read.parquet("/mnt/something"))
     (entrypoint / 'some_file.py').write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
-        problems, dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+        problems, dfsas, _ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     root = Path(entrypoint.as_posix())
     messages = {replace(p, path=Path(p.path).relative_to(root)).as_message() for p in problems}
@@ -394,7 +394,7 @@ def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
     make_notebook,
     make_directory,
     make_dbfs_directory,
-):
+) -> None:
     expected_problem_message = "Could not locate import: thingy"
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
 
@@ -407,12 +407,12 @@ def test_workflow_linter_lints_job_with_dbfs_egg_dependency(
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy\n")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert not [problem for problem in problems if problem.message == expected_problem_message]
 
 
-def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, make_notebook, make_directory):
+def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, make_notebook, make_directory) -> None:
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
     allow_list = create_autospec(KnownList)  # databricks is in default list
     allow_list.module_compatibility.return_value = UNKNOWN
@@ -425,13 +425,13 @@ def test_workflow_linter_lints_job_with_missing_library(simple_ctx, make_job, ma
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
     job_without_ucx_library = make_job(notebook_path=notebook)
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) > 0
     allow_list.module_compatibility.assert_called_once_with("databricks.labs.ucx")
 
 
-def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, make_notebook, make_directory):
+def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, make_notebook, make_directory) -> None:
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
 
     simple_ctx = simple_ctx.replace(
@@ -446,7 +446,7 @@ def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, m
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
     job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
 
@@ -506,7 +506,7 @@ def test_job_spark_python_task_linter_unhappy_path(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
-def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random):
+def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random) -> None:
     allow_list = create_autospec(KnownList)  # databricks is in default list
     allow_list.module_compatibility.return_value = UNKNOWN
     allow_list.distribution_compatibility.return_value = UNKNOWN
@@ -534,7 +534,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     )
     job_with_ucx_library = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
     assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
@@ -560,7 +560,8 @@ def test_job_spark_python_task_workspace_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
 
@@ -583,7 +584,8 @@ def test_job_spark_python_task_dbfs_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
 
@@ -611,7 +613,8 @@ def test_job_spark_python_task_linter_notebook_handling(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     # The notebook being linted has 'import greenlet' in a cell that should be ignored, but will trigger this problem if processed.
     assert not [problem for problem in problems if problem.message == "Could not locate import: greenlet"]
 
@@ -623,7 +626,7 @@ def test_job_dlt_task_linter_unhappy_path(
     make_notebook,
     make_directory,
     make_pipeline,
-):
+) -> None:
     entrypoint = make_directory()
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
     dlt_pipeline = make_pipeline(
@@ -636,7 +639,8 @@ def test_job_dlt_task_linter_unhappy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
 
 
@@ -647,7 +651,7 @@ def test_job_dlt_task_linter_happy_path(
     make_notebook,
     make_directory,
     make_pipeline,
-):
+) -> None:
     entrypoint = make_directory()
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
     dlt_pipeline = make_pipeline(
@@ -661,11 +665,12 @@ def test_job_dlt_task_linter_happy_path(
     )
     j = make_job(tasks=[task])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, simple_ctx, ws):
+def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, simple_ctx, ws) -> None:
     egg_file = Path(__file__).parent / "../../unit/source_code/samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     entrypoint = make_directory()
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
@@ -675,7 +680,7 @@ def test_job_dependency_problem_egg_dbr14plus(make_job, make_directory, simple_c
 
     j = make_job(libraries=[library])
 
-    problems, _dfsas = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert (
         len(
             [
