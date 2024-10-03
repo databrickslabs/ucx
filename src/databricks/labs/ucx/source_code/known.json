@@ -1557,15 +1557,6 @@
     "cloudpickle.cloudpickle": [],
     "cloudpickle.cloudpickle_fast": []
   },
-  "colorful": {
-    "colorful": [],
-    "colorful.ansi": [],
-    "colorful.colors": [],
-    "colorful.core": [],
-    "colorful.styles": [],
-    "colorful.terminal": [],
-    "colorful.utils": []
-  },
   "cmdstanpy": {
     "cmdstanpy": [],
     "cmdstanpy._version": [],
@@ -1584,6 +1575,15 @@
     "cmdstanpy.utils.json": [],
     "cmdstanpy.utils.logging": [],
     "cmdstanpy.utils.stancsv": []
+  },
+  "colorful": {
+    "colorful": [],
+    "colorful.ansi": [],
+    "colorful.colors": [],
+    "colorful.core": [],
+    "colorful.styles": [],
+    "colorful.terminal": [],
+    "colorful.utils": []
   },
   "comm": {
     "comm": [],
@@ -8119,6 +8119,12 @@
     "lightgbm.libpath": [],
     "lightgbm.plotting": [],
     "lightgbm.sklearn": []
+  },
+  "linkify-it-py": {
+    "linkify_it": [],
+    "linkify_it.main": [],
+    "linkify_it.tlds": [],
+    "linkify_it.ucre": []
   },
   "livereload": {
     "livereload": [],
@@ -29317,6 +29323,21 @@
   },
   "tzdata": {
     "tzdata": []
+  },
+  "uc-micro-py": {
+    "uc_micro": [],
+    "uc_micro.categories.Cc": [],
+    "uc_micro.categories.Cc.regex": [],
+    "uc_micro.categories.Cf": [],
+    "uc_micro.categories.Cf.regex": [],
+    "uc_micro.categories.P": [],
+    "uc_micro.categories.P.regex": [],
+    "uc_micro.categories.Z": [],
+    "uc_micro.categories.Z.regex": [],
+    "uc_micro.categories": [],
+    "uc_micro.properties.Any": [],
+    "uc_micro.properties.Any.regex": [],
+    "uc_micro.properties": []
   },
   "ujson": {},
   "umap": {
