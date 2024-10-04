@@ -53,7 +53,7 @@ def _change_cluster_owner(ws, cluster_id: str, owner_user_name: str) -> None:
     ws.api_client.do('POST', '/api/2.1/clusters/change-owner', body=body, headers=headers)
 
 
-def test_cluster_ownership(ws, installation_ctx, make_cluster, make_user, inventory_schema, sql_backend) -> None:
+def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled clusters."""
 
     # Set up two clusters: one with an owner (us) and another without.
@@ -75,7 +75,7 @@ def test_cluster_ownership(ws, installation_ctx, make_cluster, make_user, invent
     )
 
     # Verify ownership is as expected.
-    ownership = ClusterOwnership(ws, installation_ctx.administrator_locator)
+    ownership = ClusterOwnership(ws, runtime_ctx.administrator_locator)
     assert ownership.owner_of(cluster_record_with_owner) == ws.current_user.me().user_name
     assert "@" in ownership.owner_of(cluster_record_without_owner)
 
@@ -131,7 +131,7 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, 
 
 # TODO: Investigate whether this is a bug or something wrong with this fixture.
 @pytest.mark.xfail("Cluster policy creators always seem to be null.")
-def test_cluster_policy_ownership(ws, installation_ctx, make_cluster_policy, inventory_schema, sql_backend) -> None:
+def test_cluster_policy_ownership(ws, runtime_ctx, make_cluster_policy, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled cluster policies."""
 
     # Set up a cluster policy.
@@ -147,5 +147,5 @@ def test_cluster_policy_ownership(ws, installation_ctx, make_cluster_policy, inv
     policy_record = next(record for record in records if record.policy_id == policy.policy_id)
 
     # Verify ownership is as expected.
-    ownership = ClusterPolicyOwnership(ws, installation_ctx.administrator_locator)
+    ownership = ClusterPolicyOwnership(ws, runtime_ctx.administrator_locator)
     assert ownership.owner_of(policy_record) == ws.current_user.me().user_name
