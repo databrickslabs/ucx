@@ -187,7 +187,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 class ClusterOwnership(Ownership[ClusterInfo]):
     """Determine ownership of clusters in the inventory.
 
-    This is based on the cluster creator (if known), or otherwise an administrator.
+    This is the cluster creator (if known), or otherwise an administrator.
     """
 
     def _get_owner(self, record: ClusterInfo) -> str | None:
