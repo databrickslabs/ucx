@@ -1,5 +1,4 @@
 from collections.abc import Callable, Iterable
-from dataclasses import asdict
 
 from databricks.labs.ucx.workspace_access.base import Permissions, AclSupport
 from databricks.labs.ucx.workspace_access.groups import MigrationState
