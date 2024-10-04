@@ -67,7 +67,7 @@ def test_sql_managed_non_delta():
                 catalog="catalog",
                 database="db",
                 name="managed_table",
-                object_type="EXTERNAL",
+                object_type="MANAGED",
                 table_format="DELTA",
                 location="dbfs:/mnt/location/table",
             ),
@@ -97,18 +97,6 @@ def test_sql_managed_non_delta():
             ),
             "new_catalog.db.external_table",
             "SYNC TABLE `new_catalog`.`db`.`external_table` FROM `catalog`.`db`.`external_table`;",
-        ),
-        (
-            Table(
-                catalog="catalog",
-                database="db",
-                name="external_managed_table",
-                object_type="MANAGED",
-                table_format="DELTA",
-                location="s3a://foo/bar",
-            ),
-            "new_catalog.db.external_managed_table",
-            "SYNC TABLE `new_catalog`.`db`.`external_managed_table` AS EXTERNAL FROM `catalog`.`db`.`external_managed_table`;",
         ),
     ],
 )

@@ -178,8 +178,6 @@ class Table:
         return What.UNKNOWN
 
     def sql_migrate_external(self, target_table_key):
-        if self.object_type == "MANAGED":
-            return f"SYNC TABLE {escape_sql_identifier(target_table_key)} AS EXTERNAL FROM {escape_sql_identifier(self.key)};"
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
 
     def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
