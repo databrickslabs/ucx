@@ -837,7 +837,15 @@ def test_mount_dont_list_partitions():
     assert results[0].is_partitioned
 
 
-def test_mount_infinite_loop():
+@pytest.fixture
+def set_recursion_limit():
+    original_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(150)
+    yield
+    sys.setrecursionlimit(original_limit)
+
+
+def test_mount_infinite_loop(set_recursion_limit):
 
     client = create_autospec(WorkspaceClient)
 
@@ -864,20 +872,16 @@ def test_mount_infinite_loop():
         }
     )
 
-    original_limit = sys.getrecursionlimit()
-    sys.setrecursionlimit(150)  # Temporarily lower recursion limit to catch errors early
     try:
         mounts = Mounts(backend, client, "test")
         results = TablesInMounts(backend, client, "test", mounts).snapshot()
     except RecursionError:
         pytest.fail("Recursion depth exceeded, possible infinite loop.")
-    finally:
-        sys.setrecursionlimit(original_limit)  # Restore the original limit after test
 
     assert len(results) == 0
 
 
-def test_mount_exclude_checkpoint_dir():
+def test_mount_exclude_streaming_checkpoint():
     client = create_autospec(WorkspaceClient)
 
     first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", 0, "")
