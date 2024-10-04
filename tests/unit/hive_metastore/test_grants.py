@@ -1,10 +1,11 @@
 import logging
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, PropertyMock
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants
+from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -527,3 +528,15 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
         in caplog.text
     )
     group_manager.assert_not_called()
+
+def test_grant_owner(ws) -> None:
+    """Verify that the owner of a crawled grant is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
+    mock_workspace_administrator = PropertyMock(return_value="an_admin")
+    type(admin_locator).workspace_administrator = mock_workspace_administrator
+
+    ownership = GrantOwnership(ws, admin_locator)
+    owner = ownership.owner_of(Grant(principal="someone", action_type="SELECT"))
+
+    assert owner == "an_admin"
+    mock_workspace_administrator.assert_called_once()
