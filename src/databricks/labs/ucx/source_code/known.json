@@ -4649,6 +4649,9 @@
     "faker.utils.loading": [],
     "faker.utils.text": []
   },
+  "farama-notifications": {
+    "farama_notifications": []
+  },
   "fastapi": {
     "fastapi": [],
     "fastapi._compat": [],
