@@ -180,11 +180,13 @@ def test_unsupported_clusters():
 
 def test_cluster_owner_creator(ws) -> None:
     admin_locator = create_autospec(AdministratorLocator)
+    type(admin_locator).workspace_administrator = PropertyMock()
 
     ownership = ClusterOwnership(ws, admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator="bob", cluster_id="1", success=1, failures="[]"))
 
     assert owner == "bob"
+    admin_locator.workspace_administrator.assert_not_called()
 
 
 def test_cluster_owner_creator_unknown(ws) -> None:
@@ -195,6 +197,7 @@ def test_cluster_owner_creator_unknown(ws) -> None:
     owner = ownership.owner_of(ClusterInfo(creator=None, cluster_id="1", success=1, failures="[]"))
 
     assert owner == "an_admin"
+    admin_locator.workspace_administrator.assert_called_once()
 
 
 def test_policy_crawler():
