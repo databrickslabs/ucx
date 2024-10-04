@@ -16,6 +16,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -626,3 +627,13 @@ class FasterTableScanCrawler(CrawlerBase[Table]):
         for table in table_names:
             tasks.append(partial(self._describe, catalog, database, table))
         return tasks
+
+
+class TableOwnership(Ownership[Table]):
+    """Determine ownership of tables in the inventory.
+
+    At the present we don't determine a specific owner for tables: we always report an administrator.
+    """
+
+    def _get_owner(self, record: Table) -> None:
+        return None

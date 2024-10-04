@@ -1,11 +1,20 @@
 import logging
 import sys
+from unittest.mock import create_autospec, PropertyMock
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
+from databricks.labs.ucx.hive_metastore.tables import (
+    FasterTableScanCrawler,
+    HiveSerdeType,
+    Table,
+    TableOwnership,
+    TablesCrawler,
+    What,
+)
 
 
 def test_is_delta_true():
@@ -649,3 +658,17 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     with caplog.at_level(logging.WARNING):
         ftsc.snapshot()
     assert "Test getTable warning" in caplog.text
+
+
+def test_table_owner(ws) -> None:
+    """Verify that the owner of a crawled table is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
+    mock_workspace_administrator = PropertyMock(return_value="an_admin")
+    type(admin_locator).workspace_administrator = mock_workspace_administrator
+
+    ownership = TableOwnership(ws, admin_locator)
+    table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
+    owner = ownership.owner_of(table)
+
+    assert owner == "an_admin"
+    mock_workspace_administrator.assert_called_once()
