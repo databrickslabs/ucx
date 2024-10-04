@@ -203,6 +203,7 @@ class PolicyInfo:
     spark_version: str | None = None
     policy_description: str | None = None
     creator: str | None = None
+    """User-name of the creator of the cluster policy, if known."""
 
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
@@ -225,7 +226,7 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
             except KeyError:
                 spark_version = None
             policy_name = policy.name
-            creator_name = policy.creator_user_name
+            creator_name = policy.creator_user_name or None
 
             policy_info = PolicyInfo(
                 policy_id=policy.policy_id,
@@ -244,3 +245,13 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[PolicyInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PolicyInfo(*row)
+
+
+class ClusterPolicyOwnership(Ownership[PolicyInfo]):
+    """Determine ownership of cluster policies in the inventory.
+
+    This is the creator of the cluster policy (if known), or otherwise an administrator.
+    """
+
+    def _get_owner(self, record: PolicyInfo) -> str | None:
+        return record.creator

@@ -1,11 +1,17 @@
 import json
 from datetime import timedelta
 
+import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode
 
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler, ClusterOwnership
+from databricks.labs.ucx.assessment.clusters import (
+    ClustersCrawler,
+    PoliciesCrawler,
+    ClusterOwnership,
+    ClusterPolicyOwnership,
+)
 
 from .test_assessment import _SPARK_CONF
 
@@ -121,3 +127,25 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, 
     assert results[1].policy_name == policy_2
     assert results[1].success == 0
     assert results[1].failures == '["Uses azure service principal credentials config in policy."]'
+
+
+# TODO: Investigate whether this is a bug or something wrong with this fixture.
+@pytest.mark.xfail("Cluster policy creators always seem to be null.")
+def test_cluster_policy_ownership(ws, installation_ctx, make_cluster_policy, inventory_schema, sql_backend) -> None:
+    """Verify the ownership can be determined for crawled cluster policies."""
+
+    # Set up a cluster policy.
+    # Note: there doesn't seem to be a way to change the owner of a cluster policy, so we can't test policies without
+    # an owner.
+    policy = make_cluster_policy()
+
+    # Produce the crawled records.
+    crawler = PoliciesCrawler(ws, sql_backend, inventory_schema)
+    records = crawler.snapshot(force_refresh=True)
+
+    # Find the crawled record for our cluster policy.
+    policy_record = next(record for record in records if record.policy_id == policy.policy_id)
+
+    # Verify ownership is as expected.
+    ownership = ClusterPolicyOwnership(ws, installation_ctx.administrator_locator)
+    assert ownership.owner_of(policy_record) == ws.current_user.me().user_name

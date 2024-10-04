@@ -4,10 +4,17 @@ from unittest.mock import MagicMock, PropertyMock, create_autospec, mock_open, p
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, Policy
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler, ClusterOwnership, ClusterInfo
+from databricks.labs.ucx.assessment.clusters import (
+    ClustersCrawler,
+    PoliciesCrawler,
+    ClusterOwnership,
+    ClusterInfo,
+    ClusterPolicyOwnership,
+    PolicyInfo,
+)
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 
@@ -214,6 +221,22 @@ def test_policy_crawler():
     assert "Uses azure service principal credentials config in policy." in failures
 
 
+def test_policy_crawler_creator():
+    ws = mock_workspace_client()
+    ws.cluster_policies.list.return_value = (
+        Policy(policy_id="1", definition="{}", name="foo", creator_user_name=None),
+        Policy(policy_id="2", definition="{}", name="bar", creator_user_name=""),
+        Policy(policy_id="3", definition="{}", name="baz", creator_user_name="bob"),
+    )
+    mockbackend = MockBackend()
+    result = PoliciesCrawler(ws, mockbackend, "ucx").snapshot()
+
+    expected_creators = [None, None, "bob"]
+    crawled_creators = [record.creator for record in result]
+    assert len(expected_creators) == len(crawled_creators)
+    assert set(expected_creators) == set(crawled_creators)
+
+
 def test_policy_try_fetch():
     ws = mock_workspace_client(policy_ids=['single-user-with-spn-policyid'])
     mock_backend = MockBackend(
@@ -250,3 +273,27 @@ def test_policy_without_failure():
     crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
     assert result_set[0].failures == '[]'
+
+
+def test_cluster_policy_owner_creator(ws) -> None:
+    admin_locator = create_autospec(AdministratorLocator)  # pylint disable=mock-no-usage
+    mock_workspace_administrator = PropertyMock(return_value="an_admin")
+    type(admin_locator).workspace_administrator = mock_workspace_administrator
+
+    ownership = ClusterPolicyOwnership(ws, admin_locator)
+    owner = ownership.owner_of(PolicyInfo(creator="bob", policy_id="1", policy_name="foo", success=1, failures="[]"))
+
+    assert owner == "bob"
+    mock_workspace_administrator.assert_not_called()
+
+
+def test_cluster_policy_owner_creator_unknown(ws) -> None:
+    admin_locator = create_autospec(AdministratorLocator)  # pylint disable=mock-no-usage
+    mock_workspace_administrator = PropertyMock(return_value="an_admin")
+    type(admin_locator).workspace_administrator = mock_workspace_administrator
+
+    ownership = ClusterPolicyOwnership(ws, admin_locator)
+    owner = ownership.owner_of(PolicyInfo(creator=None, policy_id="1", policy_name="foo", success=1, failures="[]"))
+
+    assert owner == "an_admin"
+    mock_workspace_administrator.assert_called_once()
