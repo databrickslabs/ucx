@@ -4,7 +4,7 @@ import typing
 from collections.abc import Iterable, Iterator, Collection
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import partial, cached_property
+from functools import cached_property, partial
 
 import sqlglot
 from sqlglot import expressions

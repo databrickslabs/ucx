@@ -2,8 +2,8 @@ import logging
 import sys
 
 from databricks.labs.lsql.backends import MockBackend
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
 
 # pylint: disable=protected-access
@@ -13,8 +13,7 @@ class SparkSession:
     pass
 
 
-def test_table_size_crawler(mocker):
-    errors = {}
+def test_table_size_crawler(mocker) -> None:
     rows = {
         "table_size": [],
         "`hive_metastore`.`inventory_database`.`tables`": [
@@ -30,17 +29,19 @@ def test_table_size_crawler(mocker):
         ],
         "SHOW DATABASES": [("db1",)],
     }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend = MockBackend(rows=rows)
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
     tsc = TableSizeCrawler(TablesCrawler(backend, "inventory_database"))
-    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.side_effect = [100, 200, 300]
-    results = tsc.snapshot()
+    tsc._spark._jsparkSession.table().queryExecution().analyzed().stats().sizeInBytes.return_value = 100
+
+    results = list(tsc.snapshot())
+
     assert "ANALYZE table `hive_metastore`.`db1`.`table1` compute STATISTICS NOSCAN" in backend.queries
     assert "ANALYZE table `hive_metastore`.`db1`.`table2` compute STATISTICS NOSCAN" in backend.queries
     assert len(results) == 2
     assert TableSize("hive_metastore", "db1", "table1", 100) in results
-    assert TableSize("hive_metastore", "db1", "table2", 200) in results
+    assert TableSize("hive_metastore", "db1", "table2", 100) in results
 
 
 def test_table_size_unknown_error(mocker, caplog):

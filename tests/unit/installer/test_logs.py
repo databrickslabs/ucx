@@ -63,12 +63,10 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
 
     The time attribute are not tested as these are set differently on each test run.
     """
-    expected_partial_log_records = [
-        getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
-    ]
+    expected = [getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS]
     with log_path.open("r") as f:
         partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs.parse_logs(f))
-    assert partial_log_records == expected_partial_log_records
+    assert partial_log_records == expected
 
 
 def test_parse_logs_time(log_path: Path) -> None:
@@ -91,9 +89,7 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute: str):
     """Verify the rows created by the snapshot"""
-    excpected_log_records = [
-        log_record for log_record in PARTIAL_LOG_RECORDS if logging.getLevelName(log_record.level) >= logging.WARNING
-    ]
+    e = [log_record for log_record in PARTIAL_LOG_RECORDS if logging.getLevelName(log_record.level) >= logging.WARNING]
     backend = MockBackend()
     log_processor = TaskRunWarningRecorder(
         tmp_path,
@@ -106,10 +102,7 @@ def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute:
     with pytest.raises(InternalError):
         log_processor.snapshot()
     rows = backend.rows_written_for(log_processor.full_name, "append")
-    assert all(
-        getattr(row, attribute) == getattr(log_record, attribute)
-        for row, log_record in zip(rows, excpected_log_records)
-    )
+    assert all(getattr(row, attribute) == getattr(log_record, attribute) for row, log_record in zip(rows, e))
 
 
 def test_logs_processor_snapshot_error(tmp_path: Path, log_path: Path):

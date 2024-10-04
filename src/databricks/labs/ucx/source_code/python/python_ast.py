@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+import sys
 from abc import ABC
 import logging
 import re
@@ -25,7 +27,6 @@ from astroid import (  # type: ignore
 )
 
 logger = logging.getLogger(__name__)
-
 missing_handlers: set[str] = set()
 
 
@@ -289,6 +290,16 @@ class Tree:
             start = start + num_lines if start > 0 else start - num_lines
         return self
 
+    def is_builtin(self) -> bool:
+        if isinstance(self._node, Name):
+            name = self._node.name
+            return name in dir(builtins) or name in sys.stdlib_module_names or name in sys.builtin_module_names
+        if isinstance(self._node, Call):
+            return Tree(self._node.func).is_builtin()
+        if isinstance(self._node, Attribute):
+            return Tree(self._node.expr).is_builtin()
+        return False  # not supported yet
+
 
 class _LocalTree(Tree):
 
@@ -297,6 +308,17 @@ class _LocalTree(Tree):
 
 
 class TreeHelper(ABC):
+
+    @classmethod
+    def get_call_name(cls, call: Call) -> str:
+        if not isinstance(call, Call):
+            return ""
+        func = call.func
+        if isinstance(func, Name):
+            return func.name
+        if isinstance(func, Attribute):
+            return func.attrname
+        return ""  # not supported yet
 
     @classmethod
     def extract_call_by_name(cls, call: Call, name: str) -> Call | None:

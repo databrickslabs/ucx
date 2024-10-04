@@ -91,17 +91,12 @@ class DependencyGraph:
         if not container:
             problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
             return MaybeGraph(child_graph, [problem])
-        problems = container.build_dependency_graph(child_graph)
-        return MaybeGraph(
-            child_graph,
-            [
-                dataclasses.replace(
-                    problem,
-                    source_path=dependency.path if problem.is_path_missing() else problem.source_path,
-                )
-                for problem in problems
-            ],
-        )
+        problems = []
+        for problem in container.build_dependency_graph(child_graph):
+            if problem.is_path_missing():
+                problem = dataclasses.replace(problem, source_path=dependency.path)
+            problems.append(problem)
+        return MaybeGraph(child_graph, problems)
 
     def locate_dependency(self, path: Path) -> MaybeGraph:
         # need a list since unlike JS, Python won't let you assign closure variables

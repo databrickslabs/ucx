@@ -77,14 +77,16 @@ def test_create_storage_credentials(credential_manager):
 def instance_profile_migration(installation, credential_manager):
     def generate_instance_profiles(num_instance_profiles: int):
         arp = create_autospec(AWSResourcePermissions)
-        arp.get_roles_to_migrate.return_value = [
-            AWSCredentialCandidate(
-                role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
-                privilege=Privilege.WRITE_FILES.value,
-                paths={f"s3://example-bucket-{i}/*"},
+        roles = []
+        for i in range(num_instance_profiles):
+            roles.append(
+                AWSCredentialCandidate(
+                    role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
+                    privilege=Privilege.WRITE_FILES.value,
+                    paths={f"s3://example-bucket-{i}/*"},
+                )
             )
-            for i in range(num_instance_profiles)
-        ]
+        arp.get_roles_to_migrate.return_value = roles
         return IamRoleMigration(installation, arp, credential_manager)
 
     return generate_instance_profiles

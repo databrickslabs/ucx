@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from collections.abc import Callable
 from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
@@ -42,11 +43,11 @@ class WorkspaceContext(CliContext):
         return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
 
     @cached_property
-    def cluster_access(self):
+    def cluster_access(self) -> ClusterAccess:
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
     @cached_property
-    def azure_cli_authenticated(self):
+    def azure_cli_authenticated(self) -> bool:
         if not self.is_azure:
             raise NotImplementedError("Azure only")
         if self.connect_config.auth_type != "azure-cli":
@@ -54,7 +55,7 @@ class WorkspaceContext(CliContext):
         return True
 
     @cached_property
-    def azure_management_client(self):
+    def azure_management_client(self) -> AzureAPIClient:
         if not self.azure_cli_authenticated:
             raise NotImplementedError
         return AzureAPIClient(
@@ -63,7 +64,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def microsoft_graph_client(self):
+    def microsoft_graph_client(self) -> AzureAPIClient:
         if not self.azure_cli_authenticated:
             raise NotImplementedError
         return AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
@@ -76,7 +77,7 @@ class WorkspaceContext(CliContext):
         return subscription_ids.split(",")
 
     @cached_property
-    def azure_resources(self):
+    def azure_resources(self) -> AzureResources:
         return AzureResources(
             self.azure_management_client,
             self.microsoft_graph_client,
@@ -84,7 +85,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def azure_resource_permissions(self):
+    def azure_resource_permissions(self) -> AzureResourcePermissions:
         return AzureResourcePermissions(
             self.installation,
             self.workspace_client,
@@ -93,11 +94,11 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def azure_credential_manager(self):
+    def azure_credential_manager(self) -> StorageCredentialManager:
         return StorageCredentialManager(self.workspace_client)
 
     @cached_property
-    def service_principal_migration(self):
+    def service_principal_migration(self) -> ServicePrincipalMigration:
         return ServicePrincipalMigration(
             self.installation,
             self.workspace_client,
@@ -107,7 +108,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def external_locations_migration(self):
+    def external_locations_migration(self) -> AWSExternalLocationsMigration | ExternalLocationsMigration:
         if self.is_aws:
             return AWSExternalLocationsMigration(
                 self.workspace_client,
@@ -126,7 +127,7 @@ class WorkspaceContext(CliContext):
         raise NotImplementedError
 
     @cached_property
-    def aws_cli_run_command(self):
+    def aws_cli_run_command(self) -> Callable[[str | list[str]], tuple[int, str, str]]:
         # this is a convenience method for unit testing
         if not shutil.which("aws"):
             raise ValueError("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
@@ -145,13 +146,13 @@ class WorkspaceContext(CliContext):
         return aws_profile
 
     @cached_property
-    def aws_resources(self):
+    def aws_resources(self) -> AWSResources:
         if not self.is_aws:
             raise NotImplementedError("AWS only")
         return AWSResources(self.aws_profile, self.aws_cli_run_command)
 
     @cached_property
-    def aws_resource_permissions(self):
+    def aws_resource_permissions(self) -> AWSResourcePermissions:
         return AWSResourcePermissions(
             self.installation,
             self.workspace_client,
@@ -161,7 +162,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def iam_role_migration(self):
+    def iam_role_migration(self) -> IamRoleMigration:
         return IamRoleMigration(
             self.installation,
             self.aws_resource_permissions,
@@ -169,7 +170,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def iam_role_creation(self):
+    def iam_role_creation(self) -> IamRoleCreation:
         return IamRoleCreation(
             self.installation,
             self.workspace_client,
@@ -200,11 +201,11 @@ class LocalCheckoutContext(WorkspaceContext):
         return LinterContext(index, session_state)
 
     @cached_property
-    def local_file_migrator(self):
+    def local_file_migrator(self) -> LocalFileMigrator:
         return LocalFileMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
 
     @cached_property
-    def local_code_linter(self):
+    def local_code_linter(self) -> LocalCodeLinter:
         session_state = CurrentSessionState()
         return LocalCodeLinter(
             self.notebook_loader,
