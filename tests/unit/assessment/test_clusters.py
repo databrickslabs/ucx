@@ -228,8 +228,7 @@ def test_policy_crawler_creator():
         Policy(policy_id="2", definition="{}", name="bar", creator_user_name=""),
         Policy(policy_id="3", definition="{}", name="baz", creator_user_name="bob"),
     )
-    mockbackend = MockBackend()
-    result = PoliciesCrawler(ws, mockbackend, "ucx").snapshot()
+    result = PoliciesCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
 
     expected_creators = [None, None, "bob"]
     crawled_creators = [record.creator for record in result]
