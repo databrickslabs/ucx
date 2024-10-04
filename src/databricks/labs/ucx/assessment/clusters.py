@@ -29,6 +29,7 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class ClusterInfo:
     policy_id: str | None = None
     cluster_name: str | None = None
     creator: str | None = None
+    """User-name of the creator of the cluster, if known."""
 
 
 class CheckClusterMixin(CheckInitScriptMixin):
@@ -154,17 +156,20 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            if not cluster.creator_user_name:
+            creator = cluster.creator_user_name
+            if not creator:
                 logger.warning(
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
+                # Normalize empty creator.
+                creator = None
             cluster_info = ClusterInfo(
                 cluster_id=cluster.cluster_id if cluster.cluster_id else "",
                 cluster_name=cluster.cluster_name,
                 policy_id=cluster.policy_id,
                 spark_version=cluster.spark_version,
-                creator=cluster.creator_user_name,
+                creator=creator,
                 success=1,
                 failures="[]",
             )
@@ -177,6 +182,12 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[ClusterInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ClusterInfo(*row)
+
+
+class ClusterOwnership(Ownership[ClusterInfo]):
+
+    def _get_owner(self, record: ClusterInfo) -> str | None:
+        return record.creator
 
 
 @dataclass
