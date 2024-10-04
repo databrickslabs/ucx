@@ -197,7 +197,7 @@ def test_cluster_owner_creator(ws) -> None:
 
 
 def test_cluster_owner_creator_unknown(ws) -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint disable=mock-no-usage
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
@@ -276,7 +276,7 @@ def test_policy_without_failure():
 
 
 def test_cluster_policy_owner_creator(ws) -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint disable=mock-no-usage
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
@@ -288,7 +288,7 @@ def test_cluster_policy_owner_creator(ws) -> None:
 
 
 def test_cluster_policy_owner_creator_unknown(ws) -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint disable=mock-no-usage
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
