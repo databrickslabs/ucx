@@ -69,7 +69,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         in backend.queries
     )
     assert (
-        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;"
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` AS EXTERNAL FROM `hive_metastore`.`db1_src`.`managed_mnt`;"
         in backend.queries
     )
     assert (
@@ -82,7 +82,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
     assert (
-        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` AS EXTERNAL FROM `hive_metastore`.`db1_src`.`managed_other`;"
         in backend.queries
     )
     migrate_grants.apply.assert_called()
