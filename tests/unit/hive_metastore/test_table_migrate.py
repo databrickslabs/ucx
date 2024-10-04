@@ -70,7 +70,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     )
     assert (
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;"
-        in backend.queries
+        not in backend.queries
     )
     assert (
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
@@ -83,7 +83,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     ) in backend.queries
     assert (
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
-        in backend.queries
+        not in backend.queries
     )
     migrate_grants.apply.assert_called()
 
