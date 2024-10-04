@@ -120,8 +120,8 @@ def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None
     # This currently isn't very useful: we can't locate specific owners for grants.
 
     schema = runtime_ctx.make_schema()
-    me = ws.current_user.me()
-    sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{me.user_name}`")
+    this_user = ws.current_user.me()
+    sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`")
     table_crawler = TablesCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
     udf_crawler = UdfsCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
 
