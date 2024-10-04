@@ -677,7 +677,7 @@ class TablesInMounts(CrawlerBase[Table]):
         # - should not be the _delta_log directory
         # - file should not be partitioned
         # - file name should not start with part-
-        # - brackets are not allowed in dbutils.fa.ls
+        # - brackets are not allowed in dbutils.fs.ls
         # - is not a streaming checkpoint dir
         return (
             file_info.size == 0
