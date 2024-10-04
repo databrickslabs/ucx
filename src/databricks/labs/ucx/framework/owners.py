@@ -42,6 +42,10 @@ class WorkspaceAdministratorFinder(AdministratorFinder):
         """Determine whether a user belongs to a group with the given identifier or not."""
         return user.groups is not None and any(g.value == group_id for g in user.groups)
 
+    def _is_active_admin(self, user: User) -> bool:
+        """Determine if a user is an active administrator."""
+        return bool(user.active) and self._member_of_group_named(user, "admins")
+
     def _filter_workspace_groups(self, identifiers: Iterable[str]) -> Iterable[str]:
         """Limit a set of identifiers to those that are workspace groups."""
         seen = set()
@@ -66,17 +70,15 @@ class WorkspaceAdministratorFinder(AdministratorFinder):
         all_users = self._ws.users.list(attributes="id,active,userName,groups")
         # The groups attribute is a flattened list of groups a user belongs to; hunt for the 'admins' workspace group.
         # Reference: https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/groups#account-vs-workspace-group
-        admin_users = [
-            user for user in all_users if user.active and user.user_name and self._member_of_group_named(user, "admins")
-        ]
+        admin_users = [user for user in all_users if user.user_name and self._is_active_admin(user)]
         logger.debug(f"Verifying membership of the 'admins' workspace group for users: {admin_users}")
-        candidate_group_ids = (
-            group.value
-            for user in admin_users
-            if user.groups
-            for group in user.groups
-            if group.display == "admins" and group.value
-        )
+        candidate_group_ids = set()
+        for user in admin_users:
+            if not user.groups:
+                continue
+            for group in user.groups:
+                if group.display == "admins" and group.value:
+                    candidate_group_ids.add(group.value)
         admin_groups = list(self._filter_workspace_groups(candidate_group_ids))
         match admin_groups:
             case []:
