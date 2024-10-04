@@ -5420,6 +5420,14 @@
     "google.auth": [],
     "google.oauth2": []
   },
+  "google-auth-oauthlib": {
+    "docs.conf": [],
+    "google_auth_oauthlib": [],
+    "google_auth_oauthlib.flow": [],
+    "google_auth_oauthlib.helpers": [],
+    "google_auth_oauthlib.interactive": [],
+    "google_auth_oauthlib.tool": []
+  },
   "google-pasta": {
     "pasta": []
   },
@@ -25398,6 +25406,23 @@
   },
   "requests": {
     "requests": []
+  },
+  "requests-oauthlib": {
+    "requests_oauthlib": [],
+    "requests_oauthlib.compliance_fixes": [],
+    "requests_oauthlib.compliance_fixes.douban": [],
+    "requests_oauthlib.compliance_fixes.ebay": [],
+    "requests_oauthlib.compliance_fixes.facebook": [],
+    "requests_oauthlib.compliance_fixes.fitbit": [],
+    "requests_oauthlib.compliance_fixes.instagram": [],
+    "requests_oauthlib.compliance_fixes.mailchimp": [],
+    "requests_oauthlib.compliance_fixes.plentymarkets": [],
+    "requests_oauthlib.compliance_fixes.slack": [],
+    "requests_oauthlib.compliance_fixes.weibo": [],
+    "requests_oauthlib.oauth1_auth": [],
+    "requests_oauthlib.oauth1_session": [],
+    "requests_oauthlib.oauth2_auth": [],
+    "requests_oauthlib.oauth2_session": []
   },
   "rfc3339-validator": {
     "rfc3339_validator": []
