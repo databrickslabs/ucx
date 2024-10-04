@@ -41,10 +41,10 @@ def test_crawlers():
         )
     ]
 
-    ws.dbsql_permissions.get.side_effect = [
-        sql.GetResponse(object_type=ot, object_id="test", access_control_list=sample_acl)
-        for ot in (sql.ObjectType.ALERT, sql.ObjectType.QUERY, sql.ObjectType.DASHBOARD)
-    ]
+    resp = []
+    for object_type in (sql.ObjectType.ALERT, sql.ObjectType.QUERY, sql.ObjectType.DASHBOARD):
+        resp.append(sql.GetResponse(object_type=object_type, object_id="test", access_control_list=sample_acl))
+    ws.dbsql_permissions.get.side_effect = resp
 
     sup = RedashPermissionsSupport(
         ws=ws,

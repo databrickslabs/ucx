@@ -334,19 +334,20 @@ def get_azure_spark_conf():
 class StaticTablesCrawler(TablesCrawler):
     def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
         super().__init__(sb, schema)
-        self._tables = [
-            Table(
-                catalog=_.catalog_name,
-                database=_.schema_name,
-                name=_.name,
-                object_type=f"{_.table_type.value}",
-                view_text=_.view_definition,
-                location=_.storage_location,
-                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else "",
-                # type: ignore[arg-type]
+        self._tables = []
+        for _ in tables:
+            self._tables.append(
+                Table(
+                    catalog=_.catalog_name,
+                    database=_.schema_name,
+                    name=_.name,
+                    object_type=f"{_.table_type.value}",
+                    view_text=_.view_definition,
+                    location=_.storage_location,
+                    table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else "",
+                    # type: ignore[arg-type]
+                )
             )
-            for _ in tables
-        ]
 
     def snapshot(self, *, force_refresh: bool = False) -> list[Table]:
         return self._tables

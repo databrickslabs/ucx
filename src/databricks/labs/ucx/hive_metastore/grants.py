@@ -623,9 +623,12 @@ class PrincipalACL:
 
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
         databases = {table.database for table in tables}
-        return [
-            Grant(principal, "USAGE", "hive_metastore", database) for database in databases for principal in principals
-        ]
+        grants = []
+        for database in databases:
+            for principal in principals:
+                grant = Grant(principal, "USAGE", "hive_metastore", database)
+                grants.append(grant)
+        return grants
 
     def _get_grants(
         self, locations: dict[str, str], principals: list[str], tables: list[Table], mounts: list[Mount]
@@ -635,33 +638,21 @@ class PrincipalACL:
         for table in tables:
             privilege = self._get_privilege(table, locations, mounts)
             if privilege == "READ_FILES":
-                grants.extend(
-                    [Grant(principal, "SELECT", table.catalog, table.database, table.name) for principal in principals]
-                )
+                for principal in principals:
+                    grants.append(Grant(principal, "SELECT", table.catalog, table.database, table.name))
                 filtered_tables.append(table)
                 continue
             if privilege == "WRITE_FILES":
-                grants.extend(
-                    [
-                        Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, table.name)
-                        for principal in principals
-                    ]
-                )
+                for principal in principals:
+                    grants.append(Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, table.name))
                 filtered_tables.append(table)
                 continue
             if table.view_text is not None:
-                grants.extend(
-                    [
-                        Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, view=table.name)
-                        for principal in principals
-                    ]
-                )
+                for principal in principals:
+                    grants.append(Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, view=table.name))
                 filtered_tables.append(table)
-
         database_grants = self._get_database_grants(filtered_tables, principals)
-
         grants.extend(database_grants)
-
         return grants
 
     def _get_cluster_principal_mapping(self, cluster_id: str, object_type: str) -> list[str]:

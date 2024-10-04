@@ -550,11 +550,14 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Reverting Re-mapping of  clusters from UC"""
     logger.info("Reverting the Remapping of the Clusters from UC")
     ctx = WorkspaceContext(w)
-    cluster_ids = [
-        cluster_files.path.split("/")[-1].split(".")[0]
-        for cluster_files in ctx.installation.files()
-        if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
-    ]
+    cluster_ids = []
+    for cluster_files in ctx.installation.files():
+        if cluster_files.path is None:
+            continue
+        if cluster_files.path.find("backup/clusters") == 0:
+            continue
+        cluster_id = cluster_files.path.split("/")[-1].split(".")[0]
+        cluster_ids.append(cluster_id)
     if not cluster_ids:
         logger.info("There is no cluster files in the backup folder. Skipping the reverting process")
         return

@@ -27,13 +27,12 @@ def test_permissions_snapshot(ws, sql_backend, inventory_schema):
     ]
     assert snapshot == expected
 
-    saved = [
-        Permissions(*row)
-        for row in sql_backend.fetch(
-            f"SELECT object_id, object_type, raw\n"
-            f"FROM {inventory_schema}.permissions\n"
-            f"ORDER BY object_id\n"
-            f"LIMIT {len(expected)+1}"
-        )
-    ]
+    saved = []
+    for row in sql_backend.fetch(
+        f"SELECT object_id, object_type, raw\n"
+        f"FROM {inventory_schema}.permissions\n"
+        f"ORDER BY object_id\n"
+        f"LIMIT {len(expected)+1}"
+    ):
+        saved.append(Permissions(**row))
     assert saved == expected

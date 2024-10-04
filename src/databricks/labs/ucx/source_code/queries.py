@@ -78,13 +78,15 @@ class QueryLinter:
         )
         # dump dfsas
         assessment_end = datetime.now(timezone.utc)
-        all_dfsas = [
-            dataclasses.replace(
-                dfsa, assessment_start_timestamp=assessment_start, assessment_end_timestamp=assessment_end
+        processed = []
+        for dfsa in all_dfsas:
+            dfsa = dataclasses.replace(
+                dfsa,
+                assessment_start_timestamp=assessment_start,
+                assessment_end_timestamp=assessment_end,
             )
-            for dfsa in all_dfsas
-        ]
-        self._directfs_crawler.dump_all(all_dfsas)
+            processed.append(dfsa)
+        self._directfs_crawler.dump_all(processed)
 
     def _dashboard_ids_in_scope(self) -> list[str]:
         if self._include_dashboard_ids is not None:  # an empty list is accepted

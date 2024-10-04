@@ -18,11 +18,10 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     to_catalog = make_catalog()
     table_move = TableMove(ws, sql_backend)
     table_move.move(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, del_table=False)
-    rec_results = [
-        rec.message
-        for rec in caplog.records
-        if f"schema {from_schema} not found in catalog {from_catalog.name}" in rec.message
-    ]
+    rec_results = []
+    for rec in caplog.records:
+        if f"schema {from_schema} not found in catalog {from_catalog.name}" in rec.message:
+            rec_results.append(rec.message)
     assert len(rec_results) == 1
 
 

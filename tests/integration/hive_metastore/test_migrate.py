@@ -457,9 +457,9 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
     )
 
     dst_catalog = make_catalog()
-    dst_schemas = [
-        runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name) for src_schema in src_schemas
-    ]
+    dst_schemas = []
+    for src_schema in src_schemas:
+        dst_schemas.append(runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name))
 
     rules = [
         Rule.from_src_dst(src_tables[0], dst_schemas[0]),
