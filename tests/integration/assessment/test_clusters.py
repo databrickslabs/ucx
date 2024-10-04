@@ -130,7 +130,7 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, 
 
 
 # TODO: Investigate whether this is a bug or something wrong with this fixture.
-@pytest.mark.xfail("Cluster policy creators always seem to be null.")
+@pytest.mark.xfail(reason="Cluster policy creators always seem to be null.")
 def test_cluster_policy_ownership(ws, runtime_ctx, make_cluster_policy, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled cluster policies."""
 
