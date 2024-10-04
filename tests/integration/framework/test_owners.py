@@ -1,14 +1,8 @@
-from databricks.labs.ucx.framework.owners import Ownership, Record
+from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
 
-class _OwnershipFixture(Ownership[Record]):
-    def _get_owner(self, record: Record) -> str | None:
-        return None
-
-
-def test_fallback_workspace_admin(installation_ctx, ws) -> None:
+def test_fallback_workspace_admin(installation_ctx: RuntimeContext) -> None:
     """Verify that a workspace administrator can be found for our integration environment."""
-    ownership = _OwnershipFixture[str](ws, installation_ctx.administrator_locator)
-    owner = ownership.owner_of("anything")
+    an_admin = installation_ctx.administrator_locator.workspace_administrator
 
-    assert owner
+    assert "@" in an_admin
