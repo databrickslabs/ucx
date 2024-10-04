@@ -12,6 +12,7 @@ from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict, Databr
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -95,7 +96,7 @@ class TableMapping:
         self._sql_backend = sql_backend
         self._recon_tolerance_percent = recon_tolerance_percent
 
-    def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
+    def current_tables(self, tables: CrawlerBase[Table], workspace_name: str, catalog_name: str):
         tables_snapshot = list(tables.snapshot())
         if not tables_snapshot:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
@@ -103,7 +104,7 @@ class TableMapping:
         for table in tables_snapshot:
             yield Rule.initial(workspace_name, catalog_name, table, self._recon_tolerance_percent)
 
-    def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
+    def save(self, tables: CrawlerBase[Table], workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
         current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
@@ -185,7 +186,7 @@ class TableMapping:
         except (NotFound, BadRequest) as e:
             logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
 
-    def get_tables_to_migrate(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
+    def get_tables_to_migrate(self, tables_crawler: CrawlerBase[Table]) -> Collection[TableToMigrate]:
         rules = self.load()
         # Getting all the source tables from the rules
         databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})

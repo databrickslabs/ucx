@@ -39,7 +39,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
@@ -198,7 +198,7 @@ CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this clus
 class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
+    def __init__(self, tc: CrawlerBase[Table], udf: UdfsCrawler, include_databases: list[str] | None = None):
         assert tc._backend == udf._backend
         assert tc._catalog == udf._catalog
         assert tc._schema == udf._schema
@@ -577,7 +577,7 @@ class PrincipalACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         installation: Installation,
-        tables_crawler: TablesCrawler,
+        tables_crawler: CrawlerBase[Table],
         mounts_crawler: Mounts,
         cluster_locations: Callable[[], list[ComputeLocations]],
     ):
@@ -777,7 +777,7 @@ class MigrateGrants:
 class ACLMigrator:
     def __init__(
         self,
-        tables_crawler: TablesCrawler,
+        tables_crawler: CrawlerBase[Table],
         workspace_info: WorkspaceInfo,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
