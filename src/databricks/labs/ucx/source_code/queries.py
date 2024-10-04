@@ -208,7 +208,7 @@ class QueryLinter:
         source_timestamp = self._read_timestamp(query.updated_at)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
         for dfsa in collector.collect_dfsas(query.query):
-            yield DirectFsAccess(**asdict(dfsa)).replace_source(
+            yield dfsa.replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
             )
 
@@ -222,7 +222,7 @@ class QueryLinter:
         source_timestamp = self._read_timestamp(query.updated_at)
         source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
         for table in collector.collect_tables(query.query):
-            yield UsedTable(**asdict(table)).replace_source(
+            yield table.replace_source(
                 source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
             )
 
