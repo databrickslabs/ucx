@@ -529,6 +529,7 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     )
     group_manager.assert_not_called()
 
+
 def test_grant_owner(ws) -> None:
     """Verify that the owner of a crawled grant is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
