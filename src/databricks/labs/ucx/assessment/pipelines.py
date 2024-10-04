@@ -8,6 +8,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class PipelineInfo:
     failures: str
     pipeline_name: str | None = None
     creator_name: str | None = None
+    """User-name of the creator of the pipeline, if known."""
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
@@ -33,15 +35,18 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
 
     def _assess_pipelines(self, all_pipelines) -> Iterable[PipelineInfo]:
         for pipeline in all_pipelines:
-            if not pipeline.creator_user_name:
+            creator_name = pipeline.creator_user_name
+            if not creator_name:
                 logger.warning(
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
+                # Normalization.
+                creator_name = None
             pipeline_info = PipelineInfo(
                 pipeline_id=pipeline.pipeline_id,
                 pipeline_name=pipeline.name,
-                creator_name=pipeline.creator_user_name,
+                creator_name=creator_name,
                 success=1,
                 failures="[]",
             )
@@ -73,3 +78,13 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[PipelineInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PipelineInfo(*row)
+
+
+class PipelineOwnership(Ownership[PipelineInfo]):
+    """Determine ownership of pipelines in the inventory.
+
+    This is the pipeline creator (if known), or otherwise an administrator.
+    """
+
+    def _get_owner(self, record: PipelineInfo) -> str | None:
+        return record.creator_name
