@@ -111,8 +111,9 @@ def test_raises_advice_when_parsing_unsupported_sql(migration_index):
     [
         ("SELECT * FROM hive_metastore.old.things", [("hive_metastore", "old", "things")]),
         ("SELECT * FROM old.things", [("hive_metastore", "old", "things")]),
-        ("SELECT * FROM brand.new.things", []),
         ("SELECT * FROM new.things", [("hive_metastore", "new", "things")]),
+        ("SELECT * FROM brand.new.things", []),
+        ("SELECT * FROM parquet.`dbfs://mnt/foo2/bar2`", []),
     ],
 )
 def test_collects_tables(query, expected, migration_index):

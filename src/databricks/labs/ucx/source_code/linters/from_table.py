@@ -12,6 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     UsedTable,
     TableSqlCollector,
 )
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlExpression, SqlParser
 
 logger = logging.getLogger(__name__)
@@ -68,9 +69,12 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
-            yield from SqlParser.walk_expressions(
+            for info in SqlParser.walk_expressions(
                 source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
-            )
+            ):
+                if any(pattern.matches(info.table_name) for pattern in DIRECT_FS_ACCESS_PATTERNS):
+                    continue
+                yield info
         except SqlParseError as _:
             pass  # TODO establish a strategy
 
