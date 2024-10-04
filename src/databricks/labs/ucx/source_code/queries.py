@@ -60,7 +60,8 @@ class QueryLinter:
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         assessment_start = datetime.now(timezone.utc)
         context = _ReportingContext()
-        self._lint_dashboards_and_queries(context)
+        self._lint_dashboards(context)
+        self._lint_queries(context)
         assessment_end = datetime.now(timezone.utc)
         self._dump_problems(context, sql_backend, inventory_database)
         self._dump_dfsas(context, assessment_start, assessment_end)
@@ -97,7 +98,7 @@ class QueryLinter:
             processed_tables.append(table)
         self._used_tables_crawler.dump_all(processed_tables)
 
-    def _lint_dashboards_and_queries(self, context: _ReportingContext):
+    def _lint_dashboards(self, context: _ReportingContext):
         dashboard_ids = self._dashboard_ids_in_scope()
         logger.info(f"Running {len(dashboard_ids)} linting tasks...")
         for dashboard_id in dashboard_ids:
@@ -106,6 +107,8 @@ class QueryLinter:
             context.all_problems.extend(problems)
             context.all_dfsas.extend(dfsas)
             context.all_tables.extend(tables)
+
+    def _lint_queries(self, context: _ReportingContext):
         for query in self._queries_in_scope():
             if query.id in context.linted_queries:
                 continue
