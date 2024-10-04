@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterable
+from dataclasses import asdict
 
 from databricks.labs.ucx.workspace_access.base import Permissions, AclSupport
 from databricks.labs.ucx.workspace_access.groups import MigrationState
@@ -34,5 +35,5 @@ def test_permissions_snapshot(ws, sql_backend, inventory_schema):
         f"ORDER BY object_id\n"
         f"LIMIT {len(expected)+1}"
     ):
-        saved.append(Permissions(**row))
+        saved.append(Permissions(*row))
     assert saved == expected
