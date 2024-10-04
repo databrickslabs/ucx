@@ -19,7 +19,7 @@ class DataclassInstance(Protocol):
 Record = TypeVar("Record")
 
 
-class _AdministratorFinder(ABC):
+class AdministratorFinder(ABC):
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
@@ -29,7 +29,7 @@ class _AdministratorFinder(ABC):
         raise NotImplementedError()
 
 
-class WorkspaceAdministratorFinder(_AdministratorFinder):
+class WorkspaceAdministratorFinder(AdministratorFinder):
     """Locate the users that are in the 'admin' workspace group for a given workspace."""
 
     @staticmethod
@@ -88,7 +88,7 @@ class WorkspaceAdministratorFinder(_AdministratorFinder):
                 raise RuntimeError(msg)
 
 
-class AccountAdministratorFinder(_AdministratorFinder):
+class AccountAdministratorFinder(AdministratorFinder):
     """Locate the users that are account administrators for this workspace."""
 
     @staticmethod
@@ -124,7 +124,7 @@ class AdministratorLocator:
         self,
         ws: WorkspaceClient,
         *,
-        finders: Sequence[Callable[[WorkspaceClient], _AdministratorFinder]] = (
+        finders: Sequence[Callable[[WorkspaceClient], AdministratorFinder]] = (
             WorkspaceAdministratorFinder,
             AccountAdministratorFinder,
         ),
