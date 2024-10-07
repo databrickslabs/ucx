@@ -79,14 +79,14 @@ class WorkspaceAdministratorFinder(AdministratorFinder):
             for group in user.groups:
                 if group.display == "admins" and group.value:
                     candidate_group_ids.add(group.value)
-        admin_groups = list(self._filter_workspace_groups(candidate_group_ids))
-        match admin_groups:
+        admin_group_ids = list(self._filter_workspace_groups(candidate_group_ids))
+        match admin_group_ids:
             case []:
                 return ()
             case [admin_group]:
                 return (user for user in admin_users if self._member_of_group(user, admin_group))
             case _:
-                msg = f"Multiple 'admins' workspace groups found; something is wrong: {admin_groups}"
+                msg = f"Multiple 'admins' workspace groups found; something is wrong: {admin_group_ids}"
                 raise RuntimeError(msg)
 
 
