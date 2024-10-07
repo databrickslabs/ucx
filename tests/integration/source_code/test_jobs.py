@@ -88,7 +88,7 @@ def test_job_task_linter_library_not_installed_cluster(
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import greenlet")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
 
     task = jobs.Task(
         task_key=make_random(4),
@@ -119,7 +119,7 @@ def test_job_task_linter_library_installed_cluster(
     libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("greenlet"))])
     entrypoint = make_directory()
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import doesnotexist;import greenlet")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.py", content=b"import doesnotexist;import greenlet")
 
     task = jobs.Task(
         task_key=make_random(4),
@@ -208,7 +208,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
-    notebook = entrypoint / "notebook.ipynb"
+    notebook = entrypoint / "notebook.py"
     make_notebook(path=notebook, content=b"import greenlet")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
