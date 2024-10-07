@@ -147,7 +147,8 @@ class MigrationProgress(Workflow):
             assess_pipelines,
             crawl_cluster_policies,
             refresh_table_migration_status,
-        ]
+        ],
+        job_cluster="table_migration",
     )
     def record_workflow_run(self, ctx: RuntimeContext) -> None:
         """Record the workflow run of this workflow."""
