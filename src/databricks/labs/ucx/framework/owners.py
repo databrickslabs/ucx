@@ -20,7 +20,7 @@ Record = TypeVar("Record")
 
 
 class AdministratorFinder(ABC):
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient) -> None:
         self._ws = ws
 
     @abstractmethod
