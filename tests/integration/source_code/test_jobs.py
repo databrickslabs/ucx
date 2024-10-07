@@ -195,7 +195,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job
     simple_ctx = simple_ctx.replace(
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the project locally
     )
-    content = b"import pytest_asyncio"
+    content = "import pytest_asyncio"
     problem_message = "Could not locate import: pytest-asyncio"
     job_without_library = make_job(content=content)
 
