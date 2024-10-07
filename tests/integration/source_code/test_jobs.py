@@ -192,18 +192,15 @@ display(spark.read.parquet("/mnt/something"))
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job) -> None:
-    simple_ctx = simple_ctx.replace(
-        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the project locally
-    )
-    content = "import pytest_asyncio"
-    problem_message = "Could not locate import: pytest-asyncio"
+    content = "import dbt"
+    problem_message = "Could not locate import: dbt"
     job_without_library = make_job(content=content)
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_library.job_id)
 
     assert len([problem for problem in problems if problem.message == problem_message]) == 1
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest-asyncio"))
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core"))
     job_with_library = make_job(content=content, libraries=[library])
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_library.job_id)
