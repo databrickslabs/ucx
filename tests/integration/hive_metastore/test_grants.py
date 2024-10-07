@@ -133,5 +133,5 @@ def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None
     grant_record = next(record for record in records if record.this_type_and_key() == ("DATABASE", schema.full_name))
 
     # Verify ownership can be made.
-    ownership = GrantOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = GrantOwnership(runtime_ctx.administrator_locator)
     assert "@" in ownership.owner_of(grant_record)

@@ -75,7 +75,7 @@ def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_s
     )
 
     # Verify ownership is as expected.
-    ownership = ClusterOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = ClusterOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(cluster_record_with_owner) == ws.current_user.me().user_name
     assert "@" in ownership.owner_of(cluster_record_without_owner)
 
@@ -147,5 +147,5 @@ def test_cluster_policy_ownership(ws, runtime_ctx, make_cluster_policy, inventor
     policy_record = next(record for record in records if record.policy_id == policy.policy_id)
 
     # Verify ownership is as expected.
-    ownership = ClusterPolicyOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = ClusterPolicyOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(policy_record) == ws.current_user.me().user_name

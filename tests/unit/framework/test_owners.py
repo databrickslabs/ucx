@@ -3,7 +3,6 @@ from collections.abc import Callable, Sequence
 from unittest.mock import create_autospec, Mock, PropertyMock
 
 import pytest
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 
@@ -20,12 +19,11 @@ from databricks.labs.ucx.framework.owners import (
 class _OwnershipFixture(Ownership[Record]):
     def __init__(
         self,
-        ws: WorkspaceClient,
         *,
         owner_fn: Callable[[Record], str | None] = lambda _: None,
     ):
         mock_admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-        super().__init__(ws, mock_admin_locator)
+        super().__init__(mock_admin_locator)
         self._owner_fn = owner_fn
         self.mock_admin_locator = mock_admin_locator
 
@@ -319,18 +317,18 @@ def test_admin_locator_caches_negative_result(ws) -> None:
     mock_finder.find_admin_users.assert_called_once()
 
 
-def test_ownership_prefers_record_owner(ws) -> None:
+def test_ownership_prefers_record_owner() -> None:
     """Verify that if an owner for the record can be found, that is used."""
-    ownership = _OwnershipFixture[str](ws, owner_fn=lambda _: "bob")
+    ownership = _OwnershipFixture[str](owner_fn=lambda _: "bob")
     owner = ownership.owner_of("school")
 
     assert owner == "bob"
     ownership.mock_admin_locator.workspace_administrator.assert_not_called()
 
 
-def test_ownership_admin_user_fallback(ws) -> None:
+def test_ownership_admin_user_fallback() -> None:
     """Verify that if no owner for the record can be found, an admin user is returned instead."""
-    ownership = _OwnershipFixture[str](ws)
+    ownership = _OwnershipFixture[str]()
     type(ownership.mock_admin_locator).workspace_administrator = PropertyMock(return_value="jane")
 
     owner = ownership.owner_of("school")
@@ -338,9 +336,9 @@ def test_ownership_admin_user_fallback(ws) -> None:
     assert owner == "jane"
 
 
-def test_ownership_no_fallback_admin_user_error(ws) -> None:
+def test_ownership_no_fallback_admin_user_error() -> None:
     """Verify that if no owner can be determined, an error is raised."""
-    ownership = _OwnershipFixture[str](ws)
+    ownership = _OwnershipFixture[str]()
     type(ownership.mock_admin_locator).workspace_administrator = PropertyMock(
         side_effect=RuntimeError("Mocked admin lookup failure.")
     )

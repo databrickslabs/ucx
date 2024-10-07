@@ -26,7 +26,7 @@ def test_describe_all_udfs_in_databases(ws, sql_backend, inventory_schema, make_
     assert [udf.failures for udf in udfs if udf.key == hive_udf.full_name] == ["Only SCALAR functions are supported"]
 
 
-def test_udf_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
+def test_udf_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled UDFs."""
     # This currently isn't very useful: we don't currently locate specific owners for UDFs.
 
@@ -41,5 +41,5 @@ def test_udf_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
     udf_record = next(r for r in records if f"{r.catalog}.{r.database}.{r.name}" == udf.full_name)
 
     # Verify ownership can be made.
-    ownership = UdfOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = UdfOwnership(runtime_ctx.administrator_locator)
     assert "@" in ownership.owner_of(udf_record)

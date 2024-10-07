@@ -88,7 +88,7 @@ def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
     assert all_tables[f"{schema.full_name}.non_partitioned_parquet"].is_partitioned is False
 
 
-def test_table_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
+def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled tables."""
     # This currently isn't very useful: we don't currently locate specific owners for tables.
 
@@ -103,5 +103,5 @@ def test_table_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None
     table_record = next(record for record in records if record.full_name == table.full_name)
 
     # Verify ownership can be made.
-    ownership = TableOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = TableOwnership(runtime_ctx.administrator_locator)
     assert "@" in ownership.owner_of(table_record)

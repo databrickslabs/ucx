@@ -530,13 +530,13 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     group_manager.assert_not_called()
 
 
-def test_grant_owner(ws) -> None:
+def test_grant_owner() -> None:
     """Verify that the owner of a crawled grant is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = GrantOwnership(ws, admin_locator)
+    ownership = GrantOwnership(admin_locator)
     owner = ownership.owner_of(Grant(principal="someone", action_type="SELECT"))
 
     assert owner == "an_admin"

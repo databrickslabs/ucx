@@ -80,5 +80,5 @@ def test_job_ownership(ws, runtime_ctx, make_job, inventory_schema, sql_backend)
     pipeline_record = next(record for record in records if record.job_id == job.job_id)
 
     # Verify ownership is as expected.
-    ownership = JobOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = JobOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(pipeline_record) == ws.current_user.me().user_name

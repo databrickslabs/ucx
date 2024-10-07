@@ -660,13 +660,13 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     assert "Test getTable warning" in caplog.text
 
 
-def test_table_owner(ws) -> None:
+def test_table_owner() -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = TableOwnership(ws, admin_locator)
+    ownership = TableOwnership(admin_locator)
     table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
     owner = ownership.owner_of(table)
 

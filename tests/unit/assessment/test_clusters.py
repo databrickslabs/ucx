@@ -185,23 +185,23 @@ def test_unsupported_clusters():
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
 
 
-def test_cluster_owner_creator(ws) -> None:
+def test_cluster_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     type(admin_locator).workspace_administrator = PropertyMock()
 
-    ownership = ClusterOwnership(ws, admin_locator)
+    ownership = ClusterOwnership(admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator="bob", cluster_id="1", success=1, failures="[]"))
 
     assert owner == "bob"
     admin_locator.workspace_administrator.assert_not_called()
 
 
-def test_cluster_owner_creator_unknown(ws) -> None:
+def test_cluster_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = ClusterOwnership(ws, admin_locator)
+    ownership = ClusterOwnership(admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator=None, cluster_id="1", success=1, failures="[]"))
 
     assert owner == "an_admin"
@@ -274,24 +274,24 @@ def test_policy_without_failure():
     assert result_set[0].failures == '[]'
 
 
-def test_cluster_policy_owner_creator(ws) -> None:
+def test_cluster_policy_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = ClusterPolicyOwnership(ws, admin_locator)
+    ownership = ClusterPolicyOwnership(admin_locator)
     owner = ownership.owner_of(PolicyInfo(creator="bob", policy_id="1", policy_name="foo", success=1, failures="[]"))
 
     assert owner == "bob"
     mock_workspace_administrator.assert_not_called()
 
 
-def test_cluster_policy_owner_creator_unknown(ws) -> None:
+def test_cluster_policy_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = ClusterPolicyOwnership(ws, admin_locator)
+    ownership = ClusterPolicyOwnership(admin_locator)
     owner = ownership.owner_of(PolicyInfo(creator=None, policy_id="1", policy_name="foo", success=1, failures="[]"))
 
     assert owner == "an_admin"

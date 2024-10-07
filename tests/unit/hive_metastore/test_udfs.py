@@ -48,13 +48,13 @@ def test_tables_crawler_should_filter_by_database():
     assert len(results) == 1
 
 
-def test_udf_owner(ws) -> None:
+def test_udf_owner() -> None:
     """Verify that the owner of a crawled UDF is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
     mock_workspace_administrator = PropertyMock(return_value="an_admin")
     type(admin_locator).workspace_administrator = mock_workspace_administrator
 
-    ownership = UdfOwnership(ws, admin_locator)
+    ownership = UdfOwnership(admin_locator)
     udf = Udf(
         catalog="main",
         database="foo",

@@ -172,9 +172,13 @@ class AdministratorLocator:
 class Ownership(ABC, Generic[Record]):
     """Determine an owner for a given type of object."""
 
-    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator) -> None:
-        self._ws = ws
-        self._admin_locator = admin_locator
+    def __init__(self, administrator_locator: AdministratorLocator) -> None:
+        self._administrator_locator = administrator_locator
+
+    @final
+    @property
+    def administrator_locator(self):
+        return self._administrator_locator
 
     @final
     def owner_of(self, record: Record) -> str:
@@ -192,7 +196,7 @@ class Ownership(ABC, Generic[Record]):
         Raises:
             RuntimeError if there are no active administrators for the current workspace.
         """
-        return self._get_owner(record) or self._admin_locator.workspace_administrator
+        return self._get_owner(record) or self.administrator_locator.workspace_administrator
 
     @abstractmethod
     def _get_owner(self, record: Record) -> str | None:

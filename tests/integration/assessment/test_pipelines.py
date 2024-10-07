@@ -60,5 +60,5 @@ def test_pipeline_ownership(ws, runtime_ctx, make_pipeline, inventory_schema, sq
     pipeline_record = next(record for record in records if record.pipeline_id == pipeline.pipeline_id)
 
     # Verify ownership is as expected.
-    ownership = PipelineOwnership(ws, runtime_ctx.administrator_locator)
+    ownership = PipelineOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(pipeline_record) == ws.current_user.me().user_name
