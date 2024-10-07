@@ -48,7 +48,7 @@ class MigrationProgress(Workflow):
     def setup_tacl(self, ctx: RuntimeContext) -> None:
         """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
-    @job_task(job_cluster="tacl")
+    @job_task(depends_on=[setup_tacl], job_cluster="tacl")
     def verify_prerequisites_tacl(self, ctx: RuntimeContext) -> None:
         """Verify the prerequisites for running this job on the tacl cluster are fulfilled:
         - UC metastore exists
@@ -122,7 +122,7 @@ class MigrationProgress(Workflow):
     def setup_table_migration(self, ctx: RuntimeContext) -> None:
         """(Optimization) Starts `table_migration` job cluster in parallel to crawling tables."""
 
-    @job_task(job_cluster="table_migration")
+    @job_task(depends_on=[setup_table_migration], job_cluster="table_migration")
     def verify_prerequisites_table_migration(self, ctx: RuntimeContext) -> None:
         """Verify the prerequisites for running this job on the table migration cluster are fulfilled:
         - UC metastore exists
