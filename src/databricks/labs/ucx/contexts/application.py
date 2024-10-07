@@ -47,7 +47,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
+from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
@@ -386,6 +386,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def verify_has_metastore(self) -> VerifyHasMetastore:
         return VerifyHasMetastore(self.workspace_client)
+
+    @cached_property
+    def verify_has_ucx_catalog(self) -> VerifyHasCatalog:
+        return VerifyHasCatalog(self.workspace_client, self.config.ucx_catalog)
 
     @cached_property
     def pip_resolver(self) -> PythonLibraryResolver:
