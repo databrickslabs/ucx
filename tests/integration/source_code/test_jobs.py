@@ -88,7 +88,7 @@ def test_job_task_linter_library_not_installed_cluster(
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.py", content=b"import does_not_exist")
 
     task = jobs.Task(
         task_key=make_random(4),
@@ -102,7 +102,7 @@ def test_job_task_linter_library_not_installed_cluster(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
 
 
 def test_job_task_linter_library_installed_cluster(
@@ -208,21 +208,24 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
+    # Notebook needs to use an actual library that:
+    #  - is obscure enough to not be in the known.json list.
+    #  - is actually available on PyPi for installation.
     notebook = entrypoint / "notebook.py"
-    make_notebook(path=notebook, content=b"import greenlet")
+    make_notebook(path=notebook, content=b"import humbug")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: humbug"]) > 0
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="humbug==0.3.2"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: humbug"]) == 0
 
 
 def test_lint_local_code(simple_ctx):
@@ -491,7 +494,7 @@ def test_job_spark_python_task_linter_unhappy_path(
 ) -> None:
     entrypoint = make_directory()
 
-    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import does_not_exist")
 
     new_cluster = make_cluster(single_node=True)
     task = jobs.Task(
@@ -505,7 +508,7 @@ def test_job_spark_python_task_linter_unhappy_path(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
 
 
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random) -> None:
@@ -630,7 +633,7 @@ def test_job_dlt_task_linter_unhappy_path(
     make_pipeline,
 ) -> None:
     entrypoint = make_directory()
-    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import does_not_exist")
     dlt_pipeline = make_pipeline(
         libraries=[pipelines.PipelineLibrary(notebook=NotebookLibrary(path=f"{entrypoint}/notebook.py"))]
     )
@@ -643,7 +646,7 @@ def test_job_dlt_task_linter_unhappy_path(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
 
 
 def test_job_dlt_task_linter_happy_path(
