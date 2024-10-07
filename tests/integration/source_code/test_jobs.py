@@ -487,6 +487,7 @@ def test_job_spark_python_task_linter_unhappy_path(
     make_notebook,
     make_directory,
 ) -> None:
+    """The imported dependency is not defined."""
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
