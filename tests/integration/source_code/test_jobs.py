@@ -191,36 +191,24 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.source_lineage[1].object_id in task_keys
 
 
-def test_workflow_linter_lints_job_with_import_pypi_library(
-    simple_ctx,
-    ws,
-    make_job,
-    make_notebook,
-    make_random,
-    watchdog_purge_suffix,
-) -> None:
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
-    entrypoint.mkdir()
-
+def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job) -> None:
     simple_ctx = simple_ctx.replace(
-        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the project locally
     )
+    content = b"import pytest_asyncio"
+    problem_message = "Could not locate import: pytest-asyncio"
+    job_without_library = make_job(content=content)
 
-    notebook = entrypoint / "notebook.ipynb"
-    make_notebook(path=notebook, content=b"import greenlet")
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_library.job_id)
 
-    job_without_pytest_library = make_job(notebook_path=notebook)
+    assert len([problem for problem in problems if problem.message == problem_message]) == 1
 
-    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest-asyncio"))
+    job_with_library = make_job(content=content, libraries=[library])
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_library.job_id)
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
-    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
-
-    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
-
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
+    assert len([problem for problem in problems if problem.message == problem_message]) == 0
 
 
 def test_lint_local_code(simple_ctx):
