@@ -110,8 +110,11 @@ class MigrationProgress(Workflow):
         - UC metastore exists
         - UCX catalog exists.
         """
-        ctx.verify_has_metastore.verify_metastore()
-        ctx.verify_has_ucx_catalog.verify()
+        if not (
+            ctx.verify_has_metastore.verify_metastore()
+            and ctx.verify_has_ucx_catalog.verify()
+        ):
+            raise RuntimeError("Workflow prerequisites not met.")
 
     @job_task(depends_on=[crawl_tables, verify_prerequisites_table_migration], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
