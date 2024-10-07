@@ -8,8 +8,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table, TableOwnership
 
 logger = logging.getLogger(__name__)
 
@@ -151,3 +153,29 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             except NotFound:
                 logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
                 continue
+
+
+class TableMigrationOwnership(Ownership[TableMigrationStatus]):
+    """Determine ownership of table migration records in the inventory.
+
+    This is the owner of the source table, if it is present in the inventory, otherwise an administrator.
+    """
+
+    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
+        super().__init__(table_ownership.administrator_locator)
+        self._tables_crawler = tables_crawler
+        self._table_ownership = table_ownership
+        self._indexed_tables: dict[tuple[str, str], Table] | None = None
+
+    def _tables_snapshot_index(self, reindex: bool = False) -> dict[tuple[str, str], Table]:
+        index = self._indexed_tables
+        if index is None or reindex:
+            snapshot = self._tables_crawler.snapshot()
+            index = {(table.database, table.name): table for table in snapshot}
+            self._indexed_tables = index
+        return index
+
+    def _get_owner(self, record: TableMigrationStatus) -> str | None:
+        index = self._tables_snapshot_index()
+        source_table = index.get((record.src_schema, record.src_table), None)
+        return self._table_ownership.owner_of(source_table) if source_table is not None else None
