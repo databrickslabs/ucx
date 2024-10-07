@@ -490,7 +490,7 @@ def test_job_spark_python_task_linter_unhappy_path(
     """The imported dependency is not defined."""
     entrypoint = make_directory()
 
-    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import foobar")
 
     new_cluster = make_cluster(single_node=True)
     task = jobs.Task(
@@ -504,7 +504,7 @@ def test_job_spark_python_task_linter_unhappy_path(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: foobar"]) == 1
 
 
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random) -> None:
