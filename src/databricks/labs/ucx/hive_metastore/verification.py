@@ -52,6 +52,7 @@ class VerifyHasCatalog:
             catalog = self._ws.catalogs.get(self._catalog_name)
             if catalog:
                 return True
+            logger.critical("Create the UCX catalog with the `create-ucx-catalog` cli command")
             return False
         except (NotFound, PermissionDenied) as e:
             logger.error(f"Cannot access catalog: {self._catalog_name}", exc_info=e)
