@@ -25,6 +25,7 @@ from databricks.sdk.service.jobs import (
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class JobInfo:
     failures: str
     job_name: str | None = None
     creator: str | None = None
+    """User-name of the creator of the pipeline, if known."""
 
 
 class JobsMixin:
@@ -106,11 +108,14 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             if not job.job_id:
                 continue
             job_assessment[job.job_id] = set()
-            if not job.creator_user_name:
+            creator_user_name = job.creator_user_name
+            if not creator_user_name:
                 logger.warning(
                     f"Job {job.job_id} have Unknown creator, it means that the original creator has been deleted "
                     f"and should be re-created"
                 )
+                # Normalization.
+                creator_user_name = None
 
             job_settings = job.settings
             if not job_settings:
@@ -122,7 +127,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_details[job.job_id] = JobInfo(
                 job_id=str(job.job_id),
                 job_name=job_name,
-                creator=job.creator_user_name,
+                creator=creator_user_name,
                 success=1,
                 failures="[]",
             )
@@ -138,6 +143,16 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             if task.spark_jar_task:
                 task_failures.append(f"task {task.task_key} is a jar task")
         return task_failures
+
+
+class JobOwnership(Ownership[JobInfo]):
+    """Determine ownership of jobs (workflows) in the inventory.
+
+    This is the pipeline creator (if known), or otherwise an administrator.
+    """
+
+    def _get_owner(self, record: JobInfo) -> str | None:
+        return record.creator
 
 
 @dataclass
