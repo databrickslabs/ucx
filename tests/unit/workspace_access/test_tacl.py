@@ -339,7 +339,7 @@ def test_tacl_applier_not_applied():
     assert not validation_res
 
 
-def test_tacl_udf_applier():
+def test_tacl_udf_applier(mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
