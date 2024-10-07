@@ -12,6 +12,14 @@ def test_running_real_assessment_job_ext_hms(
     make_cluster_policy_permissions,
 ) -> None:
     cluster_id = env_or_skip('TEST_EXT_HMS_CLUSTER_ID')
+    ws_group, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
+    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group.display_name,
+    )
     ext_hms_ctx = installation_ctx.replace(
         sql_backend=CommandExecutionBackend(ws, cluster_id),
         config_transform=lambda wc: dataclasses.replace(
@@ -25,14 +33,6 @@ def test_running_real_assessment_job_ext_hms(
             r".*connect to the external metastore?.*": "yes",
             r"Choose a cluster policy": "0",
         },
-    )
-    ws_group, _ = ext_hms_ctx.make_ucx_group(wait_for_provisioning=True)
-    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=PermissionLevel.CAN_USE,
-        group_name=ws_group.display_name,
     )
     ext_hms_ctx.make_linting_resources()
     source_schema = ext_hms_ctx.make_schema(catalog_name="hive_metastore")
