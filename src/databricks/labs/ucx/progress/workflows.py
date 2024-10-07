@@ -21,15 +21,6 @@ class MigrationProgress(Workflow):
         super().__init__('migration-progress-experimental')
 
     @job_task
-    def verify_prerequisites_main(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the main cluster are fulfilled:
-        - UC metastore exists
-        - UCX catalog exists.
-        """
-        ctx.verify_has_metastore.verify_metastore()
-        ctx.verify_has_ucx_catalog.verify()
-
-    @job_task(depends_on=[verify_prerequisites_main])
     def crawl_tables(self, ctx: RuntimeContext) -> None:
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
@@ -37,7 +28,7 @@ class MigrationProgress(Workflow):
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
         ctx.tables_crawler.snapshot(force_refresh=True)
 
-    @job_task(depends_on=[verify_prerequisites_main])
+    @job_task
     def crawl_udfs(self, ctx: RuntimeContext) -> None:
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
         table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
@@ -48,16 +39,7 @@ class MigrationProgress(Workflow):
     def setup_tacl(self, ctx: RuntimeContext) -> None:
         """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
-    @job_task(depends_on=[setup_tacl], job_cluster="tacl")
-    def verify_prerequisites_tacl(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the tacl cluster are fulfilled:
-        - UC metastore exists
-        - UCX catalog exists.
-        """
-        ctx.verify_has_metastore.verify_metastore()
-        ctx.verify_has_ucx_catalog.verify()
-
-    @job_task(depends_on=[crawl_tables, crawl_udfs, verify_prerequisites_tacl], job_cluster="tacl")
+    @job_task(depends_on=[crawl_tables, crawl_udfs], job_cluster="tacl")
     def crawl_grants(self, ctx: RuntimeContext) -> None:
         """Scans all securable objects for permissions that have been assigned: this include database-level permissions,
         as well permissions directly configured on objects in the (already gathered) table and UDF inventories. The
