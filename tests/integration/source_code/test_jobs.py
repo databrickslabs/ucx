@@ -34,10 +34,10 @@ from tests.unit.source_code.test_graph import _TestDependencyGraph
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
+def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job) -> None:
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
-    notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)
+    notebook = make_notebook(path=f"{make_directory()}/notebook.py", content=lint_problem)
     job = make_job(notebook_path=notebook)
     ctx = installation_ctx.replace(config_transform=lambda wc: replace(wc, include_job_ids=[job.job_id]))
     ctx.workspace_installation.run()
@@ -48,6 +48,8 @@ def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_
     if result['count'] == 0:
         installation_ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
         assert False, "No workflow problems found"
+    dfsa_records = installation_ctx.directfs_access_crawler_for_paths.snapshot()
+    assert dfsa_records
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
