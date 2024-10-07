@@ -109,10 +109,12 @@ class MigrationProgress(Workflow):
         """Verify the prerequisites for running this job on the table migration cluster are fulfilled:
         - UC metastore exists
         - UCX catalog exists.
+        - Assessment workflow ran.
         """
         if not (
             ctx.verify_has_metastore.verify_metastore()
             and ctx.verify_has_ucx_catalog.verify()
+            and ctx.deployed_workflows.validate_step("assessment")
         ):
             raise RuntimeError("Workflow prerequisites not met.")
 
