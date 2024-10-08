@@ -100,7 +100,9 @@ def test_job_task_linter_library_not_installed_cluster(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
+    assert (
+        len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
+    )
 
 
 def test_job_task_linter_library_installed_cluster(
