@@ -171,11 +171,10 @@ def test_migrate_external_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=1))
-def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip):
+def test_migrate_external_table_failed_sync(caplog, runtime_ctx, env_or_skip) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=existing_mounted_location)
-
     # create a mapping that will fail the SYNC because the target catalog and schema does not exist
     rules = [
         Rule(
@@ -189,8 +188,9 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
-    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.table_migrate"):
+        runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
 
 
