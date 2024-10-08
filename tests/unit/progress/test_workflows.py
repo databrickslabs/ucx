@@ -1,6 +1,10 @@
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
+from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -35,3 +39,55 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler
     crawler_name = crawler.attrname
     run_workflow(task, **{crawler_name: mock_crawler})
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
+
+
+def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.return_value = MetastoreAssignment(metastore_id="test", workspace_id=123456789)
+    ws.catalogs.get.return_value = CatalogInfo()
+    ws.jobs.list_runs.return_value = [BaseRun(state=RunState(result_state=RunResultState.SUCCESS))]
+    task = MigrationProgress.verify_prerequisites
+    try:
+        run_workflow(task, workspace_client=ws)
+    except RuntimeError as e:
+        assert False, f"{task} raise error: {e}"
+    else:
+        assert True, "Valid prerequisites found"
+
+
+def test_migration_progress_raises_runtime_error_if_metastore_not_attached_to_workflow(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.return_value = None
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_metastore(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.side_effect = PermissionDenied
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_ucx_catalog(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.catalogs.get.return_value = None
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_ucx_catalog(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.catalogs.get.side_effect = PermissionDenied
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_assessment_workflow_did_not_run(run_workflow) -> None:
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="Assessment workflow not completed successfully"):
+        run_workflow(task)
