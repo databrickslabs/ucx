@@ -111,11 +111,12 @@ def test_raises_advice_when_parsing_unsupported_sql(migration_index):
     [
         ("SELECT * FROM hive_metastore.old.things", [("hive_metastore", "old", "things")]),
         ("SELECT * FROM old.things", [("hive_metastore", "old", "things")]),
-        ("SELECT * FROM brand.new.things", []),
         ("SELECT * FROM new.things", [("hive_metastore", "new", "things")]),
+        ("SELECT * FROM brand.new.things", []),
+        ("SELECT * FROM parquet.`dbfs://mnt/foo2/bar2`", []),
     ],
 )
-def test_collects_tables(query, expected, migration_index):
+def test_linter_collects_tables(query, expected, migration_index):
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
     tuples = list((info.catalog_name, info.schema_name, info.table_name) for info in ftf.collect_tables(query))

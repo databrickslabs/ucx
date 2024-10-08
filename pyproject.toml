@@ -77,7 +77,7 @@ dependencies = [
     "pylint~=3.3.1",
     "pylint-pytest==2.0.0a0",
     "databricks-labs-pylint~=0.5",
-    "databricks-labs-pytester>=0.2.1",
+    "databricks-labs-pytester>=0.3.0",
     "pytest~=8.3.3",
     "pytest-cov~=4.1.0",
     "pytest-mock~=3.14.0",

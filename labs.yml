@@ -330,3 +330,6 @@ commands:
         description: The file to download
       - name: run-as-collection
         description: Run the command for the collection of workspaces with ucx installed. Default is False.
+
+  - name: export-assessment
+    description: Export UCX results to a specified location

@@ -76,7 +76,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     assert (
         f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     ) in backend.queries
     assert (
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
@@ -124,7 +124,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     assert (
         f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     ) in backend.queries
 
 
@@ -176,7 +176,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         (
             f"ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
             f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , "
-            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
         ),
     ]
 
@@ -464,7 +464,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     assert create in backend.queries
     src = "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     assert src in backend.queries
-    dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+    dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     assert dst in backend.queries
     migrate_grants.apply.assert_called()
 
@@ -957,7 +957,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
         "COMMENT ON TABLE `hive_metastore`.`db1_src`.`managed_dbfs` IS 'This table is deprecated. Please use `ucx_default.db1_dst.managed_dbfs` instead of `hive_metastore.db1_src.managed_dbfs`.';",
-        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
+        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '123');",
     ]
 
 

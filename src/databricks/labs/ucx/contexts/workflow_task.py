@@ -86,7 +86,7 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def tables_crawler(self):
         # TODO: Update tables crawler inheritance to specify return type hint
-        return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
+        return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
     def tables_in_mounts(self) -> TablesInMounts:

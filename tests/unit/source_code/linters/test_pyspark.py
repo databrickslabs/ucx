@@ -638,3 +638,20 @@ def test_apply_table_name_matcher_with_existing_constant(migration_index):
     table_constant = node.value.args[0]
     assert isinstance(table_constant, Const)
     assert table_constant.value == 'brand.new.stuff'
+
+
+@pytest.mark.parametrize(
+    "source_code, expected",
+    [
+        ("spark.table('my_schema.my_table')", [('hive_metastore', 'my_schema', 'my_table')]),
+        ("spark.read.parquet('dbfs://mnt/foo2/bar2')", []),
+    ],
+)
+def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_index):
+    session_state = CurrentSessionState('old')
+    from_table = FromTableSqlLinter(migration_index, session_state)
+    linter = SparkTableNamePyLinter(from_table, migration_index, session_state)
+    used_tables = list(linter.collect_tables(source_code))
+    for used_table in used_tables:
+        actual = (used_table.catalog_name, used_table.schema_name, used_table.table_name)
+        assert actual in expected

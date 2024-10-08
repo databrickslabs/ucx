@@ -12,11 +12,13 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import AccountClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+
+from . import mock_workspace_client
 
 pytest.register_assert_rewrite('databricks.labs.blueprint.installation')
 
@@ -46,7 +48,7 @@ def mock_installation() -> MockInstallation:
                     'workspace_name': 'workspace',
                 },
             ],
-            'state.json': {'resources': {'jobs': {'test': '123'}}},
+            'state.json': {'resources': {'jobs': {'test': '123', 'assessment': '456'}}},
         }
     )
 
@@ -198,8 +200,4 @@ def mock_backend() -> MockBackend:
 
 @pytest.fixture
 def ws():
-    client = create_autospec(WorkspaceClient)
-    client.api_client.do.return_value = {}
-    client.permissions.get.return_value = {}
-    client.get_workspace_id.return_value = 12345
-    return client
+    return mock_workspace_client()

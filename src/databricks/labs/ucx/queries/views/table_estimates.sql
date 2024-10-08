@@ -23,6 +23,16 @@ SELECT
     THEN 2 /* Can vary depending of view complexity and number of tables used in the view */
     ELSE NULL
   END AS estimated_hours
-FROM $inventory.tables
+FROM
+  (
+    SELECT
+      catalog,
+      database,
+      name,
+      UPPER(object_type) AS object_type,
+      UPPER(table_format) AS table_format,
+      location
+    FROM $inventory.tables
+  )
 WHERE
   NOT STARTSWITH(name, '__apply_changes')

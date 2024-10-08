@@ -204,6 +204,7 @@ def test_tables_returning_error_when_show_tables(caplog):
     'table,dbfs_root,what',
     [
         (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
+        (Table("a", "b", "c", "MANAGED", "delta", location="dbfs:/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
         (
             Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename"),
             True,
@@ -234,7 +235,7 @@ def test_tables_returning_error_when_show_tables(caplog):
         (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
-def test_is_dbfs_root(table, dbfs_root, what):
+def test_is_dbfs_root(table, dbfs_root, what) -> None:
     assert table.is_dbfs_root == dbfs_root
     assert table.what == what
 

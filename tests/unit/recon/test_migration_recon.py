@@ -10,6 +10,7 @@ from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from tests.unit import mock_table_mapping
 
+
 MIGRATION_STATUS = MockBackend.rows(
     "src_schema",
     "src_table",
