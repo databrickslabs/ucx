@@ -9,6 +9,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: CrawlerBase[Table]):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
         super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
         self._table_crawler = table_crawler
