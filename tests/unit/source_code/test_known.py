@@ -44,6 +44,22 @@ def test_checks_library_compatibility():
     assert not other.problems
 
 
+@pytest.mark.parametrize(
+    "library", ["pytest", "pytest_cov", "pytest_mock", "_pytest", "_pytest.mark", "_pytest.mark.expression"]
+)
+def test_known_compatibility(library) -> None:
+    known = KnownList()
+    compatibility = known.module_compatibility(library)
+    assert compatibility.known
+
+
+@pytest.mark.parametrize("library", ["pytest_asyncio"])
+def test_unknown_compatibility(library: str) -> None:
+    known = KnownList()
+    compatibility = known.module_compatibility(library)
+    assert not compatibility.known
+
+
 def test_loads_known_json():
     known_json = KnownList._get_known()  # pylint: disable=protected-access
     assert known_json is not None and len(known_json) > 0

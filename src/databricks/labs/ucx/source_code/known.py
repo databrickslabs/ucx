@@ -92,7 +92,9 @@ class KnownList:
         if not name:
             return UNKNOWN
         for module, problems in self._module_problems.items():
-            if not name.startswith(module):
+            # Find exact matches OR parent module matches
+            # Note sorting when constructing module problems from known.json
+            if not (name == module or name.startswith(module + ".")):
                 continue
             return Compatibility(True, problems)
         return UNKNOWN
