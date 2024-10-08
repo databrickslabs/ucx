@@ -185,7 +185,7 @@ class Ownership(ABC, Generic[Record]):
         Raises:
             RuntimeError if there are no active administrators for the current workspace.
         """
-        return self._maybe_direct_owner(record) or self.administrator_locator.get_workspace_administrator()
+        return self._maybe_direct_owner(record) or self._administrator_locator.get_workspace_administrator()
 
     @abstractmethod
     def _maybe_direct_owner(self, record: Record) -> str | None:
