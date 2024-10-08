@@ -1,9 +1,7 @@
 import logging
-from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk import AccountClient, Workspace, WorkspaceClient
-from databricks.sdk.service import iam
+from databricks.sdk import AccountClient, Workspace
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.account.aggregate import AccountAggregate
@@ -17,19 +15,8 @@ UCX_TABLES = MockBackend.rows("catalog", "database", "table", "object_type", "ta
 
 
 @pytest.fixture
-def ws() -> WorkspaceClient:
-    workspace_client = create_autospec(WorkspaceClient)
-    workspace_client.current_user.me.return_value = iam.User(
-        user_name="user",
-        groups=[iam.ComplexValue(display="admins")],
-    )
-    workspace_client.get_workspace_id.return_value = 123
-    return workspace_client
-
-
-@pytest.fixture
 def account_client(ws, acc_client) -> AccountClient:
-    workspace = Workspace(workspace_name="test", workspace_id=123)
+    workspace = Workspace(workspace_name="test", workspace_id=ws.get_workspace_id())
     acc_client.workspaces.list.return_value = [workspace]
     acc_client.get_workspace_client.return_value = ws
     return acc_client

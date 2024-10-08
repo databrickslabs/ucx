@@ -394,7 +394,8 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             if matcher is None:
                 continue
             assert isinstance(node, Call)
-            yield from matcher.collect_tables(self._from_table, self._index, self._session_state, node)
+            for used_table in matcher.collect_tables(self._from_table, self._index, self._session_state, node):
+                yield TableInfoNode(used_table, node)
 
 
 class _SparkSqlAnalyzer:
