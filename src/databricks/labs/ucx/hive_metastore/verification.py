@@ -1,7 +1,7 @@
 import logging
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied
 
 logger = logging.getLogger(__name__)
 
@@ -37,3 +37,22 @@ class MetastoreNotFoundError(Exception):
     def __init__(self, message="Metastore not found in the workspace"):
         self.message = message
         super().__init__(self.message)
+
+
+class VerifyHasCatalog:
+    """Verify a UC catalog exists."""
+
+    def __init__(self, ws: WorkspaceClient, catalog_name: str) -> None:
+        self._ws = ws
+        self._catalog_name = catalog_name
+
+    def verify(self) -> bool:
+        """Verifies if the UC catalog exists."""
+        try:
+            catalog = self._ws.catalogs.get(self._catalog_name)
+            if catalog:
+                return True
+            return False
+        except (NotFound, PermissionDenied) as e:
+            logger.error(f"Cannot access catalog: {self._catalog_name}", exc_info=e)
+            return False
