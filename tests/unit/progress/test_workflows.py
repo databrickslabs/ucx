@@ -53,3 +53,19 @@ def test_migration_progress_raises_runtime_error_if_missing_permissions_to_acces
     task = MigrationProgress.verify_prerequisites_table_migration
     with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
         run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_ucx_catalog(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.catalogs.get.return_value = None
+    task = MigrationProgress.verify_prerequisites_table_migration
+    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_ucx_catalog(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.catalogs.get.side_effect = PermissionDenied
+    task = MigrationProgress.verify_prerequisites_table_migration
+    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
+        run_workflow(task, workspace_client=ws)
