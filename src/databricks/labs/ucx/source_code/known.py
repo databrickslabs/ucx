@@ -91,14 +91,9 @@ class KnownList:
     def module_compatibility(self, name: str) -> Compatibility:
         if not name:
             return UNKNOWN
-        # Find exact matches.
         for module, problems in self._module_problems.items():
-            if name != module:
-                continue
-            return Compatibility(True, problems)
-        # Find parent module matches.
-        for module, problems in self._module_problems.items():
-            if not name.startswith(module + "."):
+            # Find exact matches OR parent module matches
+            if not (name == module or name.startswith(module + ".")):
                 continue
             return Compatibility(True, problems)
         return UNKNOWN
