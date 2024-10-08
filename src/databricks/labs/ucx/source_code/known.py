@@ -93,6 +93,7 @@ class KnownList:
             return UNKNOWN
         for module, problems in self._module_problems.items():
             # Find exact matches OR parent module matches
+            # Note sorting when constructing module problems from known.json
             if not (name == module or name.startswith(module + ".")):
                 continue
             return Compatibility(True, problems)
