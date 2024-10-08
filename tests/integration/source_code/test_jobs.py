@@ -595,7 +595,7 @@ def test_job_dlt_task_linter_unhappy_path(
     make_pipeline,
 ) -> None:
     entrypoint = make_directory()
-    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import library_not_found")
     dlt_pipeline = make_pipeline(
         libraries=[pipelines.PipelineLibrary(notebook=NotebookLibrary(path=f"{entrypoint}/notebook.py"))]
     )
@@ -608,7 +608,9 @@ def test_job_dlt_task_linter_unhappy_path(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert (
+        len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
+    )
 
 
 def test_job_dlt_task_linter_happy_path(
