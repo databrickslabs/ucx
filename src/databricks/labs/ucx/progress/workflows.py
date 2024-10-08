@@ -108,10 +108,20 @@ class MigrationProgress(Workflow):
 
     @job_task(depends_on=[setup_table_migration], job_cluster="table_migration")
     def verify_prerequisites_table_migration(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled:
-        - UC metastore exists
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
+
+        Prerequisites:
+        - UC metastore exists.
         - UCX catalog exists.
-        - Assessment workflow ran.
+        - A job run corresponding to the "assessment" job:
+            - Finished successfully.
+            - OR if pending or running, we will wait up to 1 hour for the assessment run to finish. If did still not
+              finish successfully, we fail.
+
+        Otherwise, we consider the prerequisites to be NOT matched.
+
+        Raises :
+            RuntimeWarning : Signalling the prerequisites are not met.
         """
         if not ctx.verify_has_metastore.verify_metastore():
             raise RuntimeWarning("Metastore not attached to workspace")
