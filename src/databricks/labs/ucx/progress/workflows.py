@@ -1,3 +1,5 @@
+import datetime as dt
+
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
 
@@ -115,7 +117,7 @@ class MigrationProgress(Workflow):
             raise RuntimeWarning("Metastore not attached to workspace")
         if not ctx.verify_has_ucx_catalog.verify():
             raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
-        if not ctx.deployed_workflows.validate_step("assessment"):
+        if not ctx.deployed_workflows.validate_step("assessment", timeout=dt.timedelta(hours=1)):
             raise RuntimeWarning("Assessment workflow not completed successfully")
 
     @job_task(depends_on=[crawl_tables, verify_prerequisites_table_migration], job_cluster="table_migration")
