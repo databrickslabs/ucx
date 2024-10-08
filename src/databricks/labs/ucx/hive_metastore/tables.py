@@ -166,7 +166,7 @@ class Table:
             return What.DB_DATASET
         if self.is_table_in_mount:
             return What.TABLE_IN_MOUNT
-        if self.is_dbfs_root and self.table_format == "DELTA":
+        if self.is_dbfs_root and self.is_delta:
             return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
             return What.DBFS_ROOT_NON_DELTA
