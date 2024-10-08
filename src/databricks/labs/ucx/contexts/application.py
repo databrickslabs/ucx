@@ -12,8 +12,6 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -248,7 +246,7 @@ class GlobalContext(abc.ABC):
         return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def tables_crawler(self) -> CrawlerBase[Table]:
+    def tables_crawler(self) -> TablesCrawler:
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
