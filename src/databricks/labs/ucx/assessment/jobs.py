@@ -108,14 +108,12 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             if not job.job_id:
                 continue
             job_assessment[job.job_id] = set()
-            creator_user_name = job.creator_user_name
+            creator_user_name = job.creator_user_name or None
             if not creator_user_name:
                 logger.warning(
                     f"Job {job.job_id} have Unknown creator, it means that the original creator has been deleted "
                     f"and should be re-created"
                 )
-                # Normalization.
-                creator_user_name = None
 
             job_settings = job.settings
             if not job_settings:

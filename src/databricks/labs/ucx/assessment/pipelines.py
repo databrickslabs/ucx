@@ -35,14 +35,12 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
 
     def _assess_pipelines(self, all_pipelines) -> Iterable[PipelineInfo]:
         for pipeline in all_pipelines:
-            creator_name = pipeline.creator_user_name
+            creator_name = pipeline.creator_user_name or None
             if not creator_name:
                 logger.warning(
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-                # Normalization.
-                creator_name = None
             pipeline_info = PipelineInfo(
                 pipeline_id=pipeline.pipeline_id,
                 pipeline_name=pipeline.name,

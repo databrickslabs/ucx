@@ -156,14 +156,12 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            creator = cluster.creator_user_name
+            creator = cluster.creator_user_name or None
             if not creator:
                 logger.warning(
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-                # Normalize empty creator.
-                creator = None
             cluster_info = ClusterInfo(
                 cluster_id=cluster.cluster_id if cluster.cluster_id else "",
                 cluster_name=cluster.cluster_name,
