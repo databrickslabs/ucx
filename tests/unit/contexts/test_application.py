@@ -22,6 +22,7 @@ from tests.unit import mock_workspace_client
         "workflow_linter",
         "used_tables_crawler_for_paths",
         "used_tables_crawler_for_queries",
+        "verify_has_ucx_catalog",
     ],
 )
 def test_global_context_attributes_not_none(attribute: str) -> None:
