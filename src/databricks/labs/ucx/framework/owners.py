@@ -46,19 +46,13 @@ class WorkspaceAdministratorFinder(AdministratorFinder):
         """Determine if a user is an active administrator."""
         return bool(user.active) and self._member_of_group_named(user, "admins")
 
-    def _filter_workspace_groups(self, identifiers: Iterable[str]) -> Iterable[str]:
-        """Limit a set of identifiers to those that are workspace groups."""
-        seen = set()
-        for group_id in identifiers:
-            if group_id in seen:
-                continue
-            seen.add(group_id)
-            try:
-                group = self._ws.groups.get(group_id)
-            except NotFound:
-                continue
-            if group.meta and group.meta.resource_type == "WorkspaceGroup":
-                yield group_id
+    def _is_workspace_group(self, group_id: str) -> bool:
+        """Determine whether a group_id corresponds to a workspace group or not."""
+        try:
+            group = self._ws.groups.get(group_id)
+        except NotFound:
+            return False
+        return bool(group.meta and group.meta.resource_type == "WorkspaceGroup")
 
     def find_admin_users(self) -> Iterable[User]:
         """Enumerate the active workspace administrators in a given workspace.
@@ -72,22 +66,18 @@ class WorkspaceAdministratorFinder(AdministratorFinder):
         # Reference: https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/groups#account-vs-workspace-group
         admin_users = [user for user in all_users if user.user_name and self._is_active_admin(user)]
         logger.debug(f"Verifying membership of the 'admins' workspace group for users: {admin_users}")
-        candidate_group_ids = set()
+        maybe_admins_id = set()
         for user in admin_users:
             if not user.groups:
                 continue
             for group in user.groups:
                 if group.display == "admins" and group.value:
-                    candidate_group_ids.add(group.value)
-        admin_group_ids = list(self._filter_workspace_groups(candidate_group_ids))
-        match admin_group_ids:
-            case []:
-                return ()
-            case [admin_group]:
-                return (user for user in admin_users if self._member_of_group(user, admin_group))
-            case _:
-                msg = f"Multiple 'admins' workspace groups found; something is wrong: {admin_group_ids}"
-                raise RuntimeError(msg)
+                    maybe_admins_id.add(group.value)
+        # There can only be a single 'admins' workspace group.
+        for group_id in maybe_admins_id:
+            if self._is_workspace_group(group_id):
+                return (user for user in admin_users if self._member_of_group(user, group_id))
+        return ()
 
 
 class AccountAdministratorFinder(AdministratorFinder):
