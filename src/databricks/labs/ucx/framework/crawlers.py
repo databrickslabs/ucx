@@ -126,14 +126,6 @@ class CrawlerBase(ABC, Generic[Result]):
             Iterable[Result]: Records that capture the results of crawling the environment.
         """
 
-    def load_one(self, schema_name: str, table_name: str) -> Result | None:
-        """
-        Placeholder method to using super class for type hints of TableCrawler
-        :param schema_name:
-        :param table_name:
-        :return:
-        """
-
     def _snapshot(self, fetcher: ResultFn, loader: ResultFn, *, force_refresh: bool) -> list[Result]:
         """
         Tries to load dataset of records with `fetcher` function, otherwise automatically creates
