@@ -700,7 +700,6 @@ def test_migrate_table_in_mount(
     env_or_skip,
     make_random,
     runtime_ctx,
-    make_acc_group,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
