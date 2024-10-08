@@ -69,3 +69,9 @@ def test_migration_progress_raises_runtime_error_if_missing_permissions_to_acces
     task = MigrationProgress.verify_prerequisites
     with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
         run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_assessment_workflow_did_not_run(run_workflow) -> None:
+    task = MigrationProgress.verify_prerequisites
+    with pytest.raises(RuntimeWarning, match="Assessment workflow not completed successfully"):
+        run_workflow(task)

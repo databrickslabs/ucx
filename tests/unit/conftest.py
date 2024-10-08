@@ -48,7 +48,7 @@ def mock_installation() -> MockInstallation:
                     'workspace_name': 'workspace',
                 },
             ],
-            'state.json': {'resources': {'jobs': {'test': '123'}}},
+            'state.json': {'resources': {'jobs': {'test': '123', 'assessment': '456'}}},
         }
     )
 
