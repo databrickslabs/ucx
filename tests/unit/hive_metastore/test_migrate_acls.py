@@ -2,7 +2,6 @@ import logging
 from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants, ACLMigrator, Grant
@@ -14,13 +13,6 @@ from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, Table
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-def ws():
-    client = create_autospec(WorkspaceClient)
-    client.get_workspace_id.return_value = "12345"
-    return client
 
 
 @pytest.fixture

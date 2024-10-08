@@ -65,7 +65,6 @@ def test_join_collection_join_collection_account_admin():
 
 def test_join_collection_join_collection_account_admin_workspace_id_not_collection_workspace_admin():
     ws = mock_workspace_client()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com")
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_client.workspaces.list.side_effect = [
@@ -139,7 +138,7 @@ def test_join_collection_join_existing_collection():
 
 def test_get_workspaces_context_not_collection_admin(caplog):
     ws = mock_workspace_client()
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com")
+    ws.current_user.me.side_effect = lambda: iam.User(user_name="not-admin@example.com")
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
