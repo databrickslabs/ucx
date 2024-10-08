@@ -1,6 +1,7 @@
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -35,3 +36,11 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler
     crawler_name = crawler.attrname
     run_workflow(task, **{crawler_name: mock_crawler})
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
+
+
+def test_migration_progress_raises_runtime_error_if_metastore_not_attached_to_workflow(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.return_value = None
+    task = MigrationProgress.verify_prerequisites_table_migration
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+        run_workflow(task, workspace_client=ws)

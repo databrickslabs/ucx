@@ -2,6 +2,7 @@ import datetime as dt
 
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
+from databricks.labs.ucx.hive_metastore.verification import MetastoreNotFoundError
 
 
 class MigrationProgress(Workflow):
@@ -123,7 +124,11 @@ class MigrationProgress(Workflow):
         Raises :
             RuntimeWarning : Signalling the prerequisites are not met.
         """
-        if not ctx.verify_has_metastore.verify_metastore():
+        try:
+            has_metastore = ctx.verify_has_metastore.verify_metastore()
+        except MetastoreNotFoundError as e:
+            raise RuntimeWarning("Metastore not attached to workspace") from e
+        if not has_metastore:
             raise RuntimeWarning("Metastore not attached to workspace")
         if not ctx.verify_has_ucx_catalog.verify():
             raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
