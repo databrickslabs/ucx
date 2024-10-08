@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 from collections.abc import Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from databricks.sdk import WorkspaceClient
