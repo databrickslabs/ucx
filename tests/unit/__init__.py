@@ -165,6 +165,8 @@ def mock_workspace_client(
     ws.current_user.me.side_effect = lambda: iam.User(
         user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
     )
+    ws.api_client.do.return_value = {}
+    ws.permissions.get.return_value = {}
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
