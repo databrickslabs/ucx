@@ -44,14 +44,14 @@ def test_checks_library_compatibility():
     assert not other.problems
 
 
-@pytest.mark.parametrize("library", ["pytest", "pytest-cov", "pytest-mock"])
+@pytest.mark.parametrize("library", ["pytest", "pytest_cov", "pytest_mock"])
 def test_known_compatibility(library) -> None:
     known = KnownList()
     compatibility = known.module_compatibility(library)
     assert compatibility.known
 
 
-@pytest.mark.parametrize("library", ["pytest-asyncio"])
+@pytest.mark.parametrize("library", ["pytest_asyncio"])
 def test_unknown_compatibility(library: str) -> None:
     known = KnownList()
     compatibility = known.module_compatibility(library)
