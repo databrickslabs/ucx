@@ -30,7 +30,8 @@ FROM
       database,
       name,
       UPPER(object_type) AS object_type,
-      UPPER(table_format) AS table_format
+      UPPER(table_format) AS table_format,
+      location
     FROM $inventory.tables
   )
 WHERE
