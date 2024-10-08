@@ -1,4 +1,3 @@
-import io
 import json
 from collections.abc import Callable, Generator
 import functools
@@ -10,15 +9,12 @@ from datetime import timedelta
 from functools import cached_property
 import shutil
 import subprocess
-from pathlib import Path
 
 import pytest  # pylint: disable=wrong-import-order
-import yaml
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
@@ -26,12 +22,11 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, jobs
+from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
-from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.iam import Group
-from databricks.sdk.service.jobs import SparkPythonTask
+from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
@@ -454,14 +449,20 @@ class CommonUtils:
         return self._ws
 
 
-class MockRuntimeContext(CommonUtils, RuntimeContext):
-    def __init__(
+class MockRuntimeContext(
+    CommonUtils, RuntimeContext
+):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         make_catalog_fixture,
         make_schema_fixture,
         make_table_fixture,
         make_udf_fixture,
         make_group_fixture,
+        make_job_fixture,
+        make_notebook_fixture,
+        make_query_fixture,
+        make_dashboard_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
@@ -478,12 +479,18 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
         self._make_group = make_group_fixture
+        self._make_job = make_job_fixture
+        self._make_notebook = make_notebook_fixture
+        self._make_query = make_query_fixture
+        self._make_dashboard = make_dashboard_fixture
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
         self._groups: list[Group] = []
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
+        self._jobs: list[Job] = []
+        self._dashboards: list[Dashboard] = []
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
@@ -550,6 +557,15 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         self._grants.append(grant)
         return grant
 
+    def make_linting_resources(self) -> None:
+        """Make resources to lint."""
+        notebook_job = self._make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
+        file_job = self._make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
+        query = self._make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
+        dashboard = self._make_dashboard(query=query)
+        self._jobs.extend([notebook_job, file_job])
+        self._dashboards.append(dashboard)
+
     def add_table(self, table: TableInfo):
         self._tables.append(table)
 
@@ -563,6 +579,8 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
+            include_job_ids=self.created_jobs,
+            include_dashboard_ids=self.created_dashboards,
         )
 
     @cached_property
@@ -668,6 +686,22 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
         return created_groups
 
     @cached_property
+    def created_jobs(self) -> list[int]:
+        created_jobs = []
+        for job in self._jobs:
+            if job.job_id is not None:
+                created_jobs.append(job.job_id)
+        return created_jobs
+
+    @cached_property
+    def created_dashboards(self) -> list[str]:
+        created_dashboards = []
+        for dashboard in self._dashboards:
+            if dashboard.id is not None:
+                created_dashboards.append(dashboard.id)
+        return created_dashboards
+
+    @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
         return StaticServicePrincipalCrawler(
             self._spn_infos,
@@ -704,7 +738,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(
+def runtime_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
     make_catalog,
@@ -712,6 +746,10 @@ def runtime_ctx(
     make_table,
     make_udf,
     make_group,
+    make_job,
+    make_notebook,
+    make_query,
+    make_dashboard,
     env_or_skip,
     make_random,
 ) -> MockRuntimeContext:
@@ -721,6 +759,10 @@ def runtime_ctx(
         make_table,
         make_udf,
         make_group,
+        make_job,
+        make_notebook,
+        make_query,
+        make_dashboard,
         env_or_skip,
         ws,
         make_random,
@@ -852,6 +894,10 @@ class MockInstallationContext(MockRuntimeContext):
         make_random_fixture,
         make_acc_group_fixture,
         make_user_fixture,
+        make_job_fixture,
+        make_notebook_fixture,
+        make_query_fixture,
+        make_dashboard_fixture,
         ws_fixture,
         watchdog_purge_suffix,
     ):
@@ -861,6 +907,10 @@ class MockInstallationContext(MockRuntimeContext):
             make_table_fixture,
             make_udf_fixture,
             make_group_fixture,
+            make_job_fixture,
+            make_notebook_fixture,
+            make_query_fixture,
+            make_dashboard_fixture,
             env_or_skip_fixture,
             ws_fixture,
             make_random_fixture,
@@ -951,6 +1001,8 @@ class MockInstallationContext(MockRuntimeContext):
             renamed_group_prefix=self.renamed_group_prefix,
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
+            include_job_ids=self.created_jobs,
+            include_dashboard_ids=self.created_dashboards,
             include_object_permissions=self.include_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             ucx_catalog=self.ucx_catalog,
@@ -1034,6 +1086,10 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_random,
     make_acc_group,
     make_user,
+    make_job,
+    make_notebook,
+    make_query,
+    make_dashboard,
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
@@ -1046,6 +1102,10 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_random,
         make_acc_group,
         make_user,
+        make_job,
+        make_notebook,
+        make_query,
+        make_dashboard,
         ws,
         watchdog_purge_suffix,
     )
@@ -1254,71 +1314,3 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
-
-
-@pytest.fixture
-def create_file_job(ws, make_random, watchdog_remove_after, watchdog_purge_suffix, log_workspace_link):
-
-    def create(installation, **_kwargs):
-        # create args
-        data = {"name": f"dummy-{make_random(4)}"}
-        # create file to run
-        file_name = f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
-        file_path = WorkspacePath(ws, installation.install_folder()) / file_name
-        file_path.write_text("spark.read.parquet('dbfs://mnt/foo/bar')")
-        task = jobs.Task(
-            task_key=make_random(4),
-            description=make_random(4),
-            new_cluster=ClusterSpec(
-                num_workers=1,
-                node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                spark_version=ws.clusters.select_spark_version(latest=True),
-            ),
-            spark_python_task=SparkPythonTask(python_file=str(file_path)),
-            timeout_seconds=0,
-        )
-        data["tasks"] = [task]
-        # add RemoveAfter tag for job cleanup
-        data["tags"] = [{"key": "RemoveAfter", "value": watchdog_remove_after}]
-        job = ws.jobs.create(**data)
-        log_workspace_link(data["name"], f'job/{job.job_id}', anchor=False)
-        return job
-
-    yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
-
-
-@pytest.fixture
-def populate_for_linting(
-    ws,
-    make_random,
-    make_job,
-    make_notebook,
-    make_query,
-    make_dashboard,
-    create_file_job,
-    watchdog_purge_suffix,
-):
-
-    def create_notebook_job(installation):
-        path = Path(installation.install_folder()) / f"dummy_{make_random(4)}_{watchdog_purge_suffix}"
-        notebook_text = "spark.read.parquet('dbfs://mnt/foo1/bar1')"
-        notebook_path = make_notebook(path=path, content=io.BytesIO(notebook_text.encode("utf-8")))
-        return make_job(notebook_path=notebook_path)
-
-    def populate_workspace(installation):
-        # keep linting scope to minimum to avoid test timeouts
-        file_job = create_file_job(installation=installation)
-        notebook_job = create_notebook_job(installation=installation)
-        query = make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
-        dashboard = make_dashboard(query=query)
-        # can't use installation.load(WorkspaceConfig)/installation.save() because they populate empty credentials
-        config_path = WorkspacePath(ws, installation.install_folder()) / "config.yml"
-        text = config_path.read_text()
-        config = yaml.safe_load(text)
-        config["include_job_ids"] = [file_job.job_id, notebook_job.job_id]
-        config["include_dashboard_ids"] = [dashboard.id]
-        text = yaml.dump(config)
-        config_path.unlink()
-        config_path.write_text(text)
-
-    return populate_workspace
