@@ -193,39 +193,21 @@ display(spark.read.parquet("/mnt/something"))
         assert dfsa.source_lineage[1].object_id in task_keys
 
 
-def test_workflow_linter_lints_job_with_import_pypi_library(
-    simple_ctx,
-    ws,
-    make_job,
-    make_notebook,
-    make_random,
-    watchdog_purge_suffix,
-) -> None:
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}-{watchdog_purge_suffix}").expanduser()
-    entrypoint.mkdir()
+def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job) -> None:
+    content = "import dbt"
+    problem_message = "Could not locate import: dbt"
+    job_without_library = make_job(content=content)
 
-    simple_ctx = simple_ctx.replace(
-        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
-    )
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_library.job_id)
 
-    # Notebook needs to use an actual library that:
-    #  - is obscure enough to not be in the known.json list.
-    #  - is actually available on PyPi for installation.
-    notebook = entrypoint / "notebook.py"
-    make_notebook(path=notebook, content=b"import humbug")
+    assert len([problem for problem in problems if problem.message == problem_message]) == 1
 
-    job_without_pytest_library = make_job(notebook_path=notebook)
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core"))
+    job_with_library = make_job(content=content, libraries=[library])
 
-    problems, *_ = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: humbug"]) > 0
-
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="humbug==0.3.2"))
-    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
-
-    problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
-
-    assert len([problem for problem in problems if problem.message == "Could not locate import: humbug"]) == 0
+    assert len([problem for problem in problems if problem.message == problem_message]) == 0
 
 
 def test_lint_local_code(simple_ctx):
@@ -484,31 +466,13 @@ def test_job_spark_python_task_linter_happy_path(
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
-def test_job_spark_python_task_linter_unhappy_path(
-    simple_ctx,
-    make_job,
-    make_random,
-    make_cluster,
-    make_notebook,
-    make_directory,
-) -> None:
-    entrypoint = make_directory()
+def test_job_spark_python_task_linter_unhappy_path(simple_ctx, make_job) -> None:
+    """The imported dependency is not defined."""
+    job = make_job(content="import foobar", task_type=jobs.SparkPythonTask)
 
-    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import does_not_exist")
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job.job_id)
 
-    new_cluster = make_cluster(single_node=True)
-    task = jobs.Task(
-        task_key=make_random(4),
-        spark_python_task=jobs.SparkPythonTask(
-            python_file=f"{entrypoint}/notebook.py",
-        ),
-        existing_cluster_id=new_cluster.cluster_id,
-    )
-    j = make_job(tasks=[task])
-
-    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
-
-    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: foobar"]) == 1
 
 
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random) -> None:
