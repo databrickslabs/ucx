@@ -44,7 +44,9 @@ def test_checks_library_compatibility():
     assert not other.problems
 
 
-@pytest.mark.parametrize("library", ["pytest", "pytest_cov", "pytest_mock", "_pytest", "_pytest.mark", "_pytest.mark.expression"])
+@pytest.mark.parametrize(
+    "library", ["pytest", "pytest_cov", "pytest_mock", "_pytest", "_pytest.mark", "_pytest.mark.expression"]
+)
 def test_known_compatibility(library) -> None:
     known = KnownList()
     compatibility = known.module_compatibility(library)
