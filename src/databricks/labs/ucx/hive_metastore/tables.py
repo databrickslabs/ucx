@@ -90,6 +90,12 @@ class Table:
         return self.table_format.upper() == "DELTA"
 
     @property
+    def is_hive(self) -> bool:
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() == "HIVE"
+
+    @property
     def key(self) -> str:
         if self.is_table_in_mount:
             return f"{self.catalog}.{self.database}.{self.location}".lower()
@@ -172,7 +178,7 @@ class Table:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
-        if self.kind == "TABLE" and self.table_format.upper() == "HIVE":
+        if self.kind == "TABLE" and self.is_hive:
             return What.EXTERNAL_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC
@@ -197,7 +203,7 @@ class Table:
         )
 
     def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
-        if self.table_format != "HIVE":
+        if not self.is_hive:
             return HiveSerdeType.NOT_HIVESERDE
         # Extract hive serde info, ideally this should be done by table crawler.
         # But doing here to avoid breaking change to the `tables` table in the inventory schema.
