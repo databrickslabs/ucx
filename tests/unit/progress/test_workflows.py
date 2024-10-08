@@ -2,6 +2,7 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import PermissionDenied
 
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -41,6 +42,14 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler
 def test_migration_progress_raises_runtime_error_if_metastore_not_attached_to_workflow(run_workflow) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.metastores.current.return_value = None
+    task = MigrationProgress.verify_prerequisites_table_migration
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+        run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_metastore(run_workflow) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.metastores.current.side_effect = PermissionDenied
     task = MigrationProgress.verify_prerequisites_table_migration
     with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
         run_workflow(task, workspace_client=ws)
