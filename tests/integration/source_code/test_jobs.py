@@ -86,7 +86,7 @@ def test_job_task_linter_library_not_installed_cluster(
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import greenlet")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import library_not_found")
 
     task = jobs.Task(
         task_key=make_random(4),
@@ -100,7 +100,7 @@ def test_job_task_linter_library_not_installed_cluster(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
 
 
 def test_job_task_linter_library_installed_cluster(
