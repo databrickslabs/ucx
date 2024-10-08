@@ -32,6 +32,7 @@ from databricks.labs.ucx.azure.access import (
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
     Mount,
@@ -198,7 +199,7 @@ CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this clus
 class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
-    def __init__(self, tc: CrawlerBase[Table], udf: UdfsCrawler, include_databases: list[str] | None = None):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
         assert tc._backend == udf._backend
         assert tc._catalog == udf._catalog
         assert tc._schema == udf._schema
@@ -577,7 +578,7 @@ class PrincipalACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         installation: Installation,
-        tables_crawler: CrawlerBase[Table],
+        tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
         cluster_locations: Callable[[], list[ComputeLocations]],
     ):
@@ -777,7 +778,7 @@ class MigrateGrants:
 class ACLMigrator:
     def __init__(
         self,
-        tables_crawler: CrawlerBase[Table],
+        tables_crawler: TablesCrawler,
         workspace_info: WorkspaceInfo,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
