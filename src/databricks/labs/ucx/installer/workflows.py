@@ -227,8 +227,21 @@ class DeployedWorkflows:
             )
         return latest_status
 
-    def validate_step(self, step: str) -> bool:
     def validate_step(self, step: str, *, timeout: dt.timedelta = dt.timedelta(minutes=20)) -> bool:
+        """Validate a workflow has completed successfully.
+
+        If none of the job runs belonging to the workflow did not finish successfully (yet) and at least one job run is
+        running or pending, we wait for the given timeout for that job run to finish. Thereafter, if none of the running
+        or pending job runs, finished within the timeout, we consider the step to be invalid, i.e. we return `False`.
+
+        Args :
+            step (str) : The workflow name; step in the migration process.
+            timeout (datetime.timedelta, optional) : The timeout to wait for a running or pending job to finish.
+                Defaults to 20 minutes.
+
+        Returns :
+            bool : True if step is validate. False otherwise.
+        """
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
