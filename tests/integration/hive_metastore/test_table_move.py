@@ -201,20 +201,22 @@ def test_alias_tables(
 
 
 def test_move_tables_table_properties_mismatch_preserves_original(
-    ws, sql_backend, make_catalog, make_schema, make_table, make_acc_group, make_random, env_or_skip
-):
+    ws, sql_backend, make_catalog, make_schema, make_table, make_random
+) -> None:
     table_move = TableMove(ws, sql_backend)
     from_catalog = make_catalog()
     from_schema = make_schema(catalog_name=from_catalog.name)
+    a_dir = make_random(4).lower()
+    b_dir = make_random(4).lower()
     tbl_path = make_random(4).lower()
     tbl_properties = {"delta.enableDeletionVectors": "true"}
     from_table_1 = make_table(
         catalog_name=from_catalog.name,
         schema_name=from_schema.name,
-        external_delta=f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}",
+        external_delta=f"abfss://things@labsazurethings.dfs.core.windows.net/{a_dir}/{b_dir}/{tbl_path}",
         tbl_properties=tbl_properties,
     )
-    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
+    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/{a_dir}/{b_dir}/{tbl_path}"
     from_table_1.storage_location = table_in_mount_location
 
     to_catalog = make_catalog()
