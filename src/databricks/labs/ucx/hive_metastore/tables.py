@@ -81,7 +81,8 @@ class Table:
     UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
     def __post_init__(self) -> None:
-        self.table_format = self.table_format.upper()
+        if isinstance(self.table_format, str):  # Should not happen according to type hint, still safer
+            self.table_format = self.table_format.upper()
 
     @property
     def is_delta(self) -> bool:

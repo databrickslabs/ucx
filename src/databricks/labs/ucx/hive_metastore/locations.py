@@ -335,7 +335,8 @@ class TableInMount:
     is_partitioned: bool
 
     def __post_init__(self) -> None:
-        self.format = self.format.upper()
+        if isinstance(self.format, str):  # Should not happen according to type hint, still safer
+            self.format = self.format.upper()
 
 
 class TablesInMounts(CrawlerBase[Table]):
