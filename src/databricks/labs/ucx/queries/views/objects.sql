@@ -39,7 +39,7 @@ FROM (
     TO_JSON(
       FILTER(
         ARRAY(
-          IF(NOT STARTSWITH(t.table_format, 'DELTA') AND t.object_type <> 'VIEW', CONCAT('Non-DELTA format: ', t.table_format), NULL),
+          IF(NOT STARTSWITH(UPPER(t.table_format), 'DELTA') AND t.object_type <> 'VIEW', CONCAT('Non-DELTA format: ', UPPER(t.table_format)), NULL),
           IF(STARTSWITH(t.location, 'wasb'), 'Unsupported Storage Type: wasb://', NULL),
           IF(STARTSWITH(t.location, 'adl'), 'Unsupported Storage Type: adl://', NULL),
           CASE
