@@ -857,11 +857,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     ) -> None:
         attributes = "id,displayName"
         expected_deletions = {group.id_in_workspace for group in deleted_workspace_groups}
-        pending_deletions = [
-            GroupDeletionIncompleteError(group.id, group.display_name)
-            for group in self._list_workspace_groups("WorkspaceGroup", attributes)
-            if group.id in expected_deletions
-        ]
+        pending_deletions = []
+        for group in self._list_workspace_groups("WorkspaceGroup", attributes):
+            if group.id in expected_deletions:
+                pending_deletions.append(GroupDeletionIncompleteError(group.id, group.display_name))
         if pending_deletions:
             if logger.isEnabledFor(still_present_log_level):
                 logger.log(

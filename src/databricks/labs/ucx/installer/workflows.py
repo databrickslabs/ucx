@@ -55,9 +55,11 @@ logger = logging.getLogger(__name__)
 
 TEST_RESOURCE_PURGE_TIMEOUT = timedelta(hours=1)
 TEST_NIGHTLY_CI_RESOURCES_PURGE_TIMEOUT = timedelta(hours=3)  # Buffer for debugging nightly integration test runs
+# See https://docs.databricks.com/en/jobs/parameter-value-references.html#supported-value-references
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
+    "start_time": "{{job.start_time.iso_datetime}}",
     "attempt": "{{job.repair_count}}",
     "parent_run_id": "{{parent_run_id}}",
 }
@@ -108,6 +110,7 @@ main(f'--config=/Workspace{config_file}',
      f'--task=' + dbutils.widgets.get('task'),
      f'--job_id=' + dbutils.widgets.get('job_id'),
      f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--start_time=' + dbutils.widgets.get('start_time'),
      f'--attempt=' + dbutils.widgets.get('attempt'),
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """

@@ -5,7 +5,7 @@ from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 
-def test_permissions_snapshot(ws, sql_backend, inventory_schema):
+def test_permissions_snapshot(sql_backend, inventory_schema):
     class StubbedCrawler(AclSupport):
         def get_crawler_tasks(self) -> Iterable[Callable[..., Permissions | None]]:
             yield lambda: Permissions(object_id="abc", object_type="bcd", raw="def")
@@ -27,13 +27,12 @@ def test_permissions_snapshot(ws, sql_backend, inventory_schema):
     ]
     assert snapshot == expected
 
-    saved = [
-        Permissions(*row)
-        for row in sql_backend.fetch(
-            f"SELECT object_id, object_type, raw\n"
-            f"FROM {inventory_schema}.permissions\n"
-            f"ORDER BY object_id\n"
-            f"LIMIT {len(expected)+1}"
-        )
-    ]
+    saved = []
+    for row in sql_backend.fetch(
+        f"SELECT object_id, object_type, raw\n"
+        f"FROM {inventory_schema}.permissions\n"
+        f"ORDER BY object_id\n"
+        f"LIMIT {len(expected)+1}"
+    ):
+        saved.append(Permissions(*row))
     assert saved == expected

@@ -75,6 +75,7 @@ from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.source_code.queries import QueryProblem
@@ -124,6 +125,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "recon_results", ReconResult),
             functools.partial(table, "directfs_in_paths", DirectFsAccess),
             functools.partial(table, "directfs_in_queries", DirectFsAccess),
+            functools.partial(table, "used_tables_in_paths", UsedTable),
+            functools.partial(table, "used_tables_in_queries", UsedTable),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -133,6 +136,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
     deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
     deployer.deploy_view("directfs", "queries/views/directfs.sql")
+    deployer.deploy_view("used_tables", "queries/views/used_tables.sql")
 
 
 def extract_major_minor(version_string):
@@ -161,15 +165,15 @@ class WorkspaceInstaller(WorkspaceContext):
         self._tasks = tasks if tasks else Workflows.all().tasks()
 
     @cached_property
-    def upgrades(self):
+    def upgrades(self) -> Upgrades:
         return Upgrades(self.product_info, self.installation)
 
     @cached_property
-    def policy_installer(self):
+    def policy_installer(self) -> ClusterPolicyInstaller:
         return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         try:
             return self.product_info.current_installation(self.workspace_client)
         except NotFound:
@@ -816,12 +820,13 @@ class AccountInstaller(AccountContext):
 
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        try:
+        try:  # pylint: disable=too-many-try-statements
             # if user is account admin list all the available workspace the user has admin access on.
             # This code is run if joining collection after installation or through cli
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
             for workspace in accessible_workspaces:
-                ids_to_workspace[workspace.workspace_id] = workspace
+                if workspace.workspace_id is not None:
+                    ids_to_workspace[workspace.workspace_id] = workspace
             if join_on_install:
                 # if run as part of ucx installation allow user to select from the list to join
                 target_workspace = self._get_collection_workspace(accessible_workspaces, account_client)

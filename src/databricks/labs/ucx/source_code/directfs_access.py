@@ -1,80 +1,16 @@
 from __future__ import annotations
 
-import dataclasses
 import logging
-import sys
 from collections.abc import Sequence, Iterable
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
+from databricks.labs.ucx.source_code.base import DirectFsAccess
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class LineageAtom:
-
-    object_type: str
-    object_id: str
-    other: dict[str, str] | None = None
-
-
-@dataclass
-class DirectFsAccess:
-    """A record describing a Direct File System Access"""
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        source_lineage = data.get("source_lineage", None)
-        if isinstance(source_lineage, list) and len(source_lineage) > 0 and isinstance(source_lineage[0], dict):
-            lineage_atoms = [LineageAtom(**lineage) for lineage in source_lineage]
-            data["source_lineage"] = lineage_atoms
-        return cls(**data)
-
-    UNKNOWN = "unknown"
-
-    path: str
-    is_read: bool
-    is_write: bool
-    source_id: str = UNKNOWN
-    source_timestamp: datetime = datetime.fromtimestamp(0)
-    source_lineage: list[LineageAtom] = field(default_factory=list)
-    assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
-    assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
-
-    def replace_source(
-        self,
-        source_id: str | None = None,
-        source_lineage: list[LineageAtom] | None = None,
-        source_timestamp: datetime | None = None,
-    ):
-        return dataclasses.replace(
-            self,
-            source_id=source_id or self.source_id,
-            source_timestamp=source_timestamp or self.source_timestamp,
-            source_lineage=source_lineage or self.source_lineage,
-        )
-
-    def replace_assessment_infos(
-        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
-    ):
-        return dataclasses.replace(
-            self,
-            assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
-            assessment_end_timestamp=assessment_end or self.assessment_end_timestamp,
-        )
 
 
 class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):

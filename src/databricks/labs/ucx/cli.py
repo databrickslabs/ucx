@@ -551,11 +551,14 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Reverting Re-mapping of  clusters from UC"""
     logger.info("Reverting the Remapping of the Clusters from UC")
     ctx = WorkspaceContext(w)
-    cluster_ids = [
-        cluster_files.path.split("/")[-1].split(".")[0]
-        for cluster_files in ctx.installation.files()
-        if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
-    ]
+    cluster_ids = []
+    for cluster_files in ctx.installation.files():
+        if cluster_files.path is None:
+            continue
+        if cluster_files.path.find("backup/clusters") == 0:
+            continue
+        cluster_id = cluster_files.path.split("/")[-1].split(".")[0]
+        cluster_ids.append(cluster_id)
     if not cluster_ids:
         logger.info("There is no cluster files in the backup folder. Skipping the reverting process")
         return
@@ -594,11 +597,19 @@ def assign_metastore(
     ctx: AccountContext | None = None,
 ):
     """Assign metastore to a workspace"""
+    if workspace_id is None:
+        logger.error("--workspace-id is a required parameter.")
+        return
+    try:
+        workspace_id_casted = int(workspace_id)
+    except ValueError:
+        logger.error("--workspace-id should be an integer.")
+        return
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = ctx or AccountContext(a)
     ctx.account_metastores.assign_metastore(
         ctx.prompts,
-        workspace_id,
+        workspace_id_casted,
         metastore_id=metastore_id,
         default_catalog=default_catalog,
     )
@@ -612,6 +623,7 @@ def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceConte
     """
     workspace_context = ctx or WorkspaceContext(w)
     workspace_context.catalog_schema.create_ucx_catalog(prompts)
+    workspace_context.progress_tracking_installation.run()
 
 
 @ucx.command
@@ -635,7 +647,7 @@ def migrate_tables(
         deployed_workflows = workspace_context.deployed_workflows
         deployed_workflows.run_workflow("migrate-tables")
 
-        tables = workspace_context.tables_crawler.snapshot()
+        tables = list(workspace_context.tables_crawler.snapshot())
         hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
         if len(hiveserde_tables) > 0:
             percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100

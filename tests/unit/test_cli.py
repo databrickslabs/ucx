@@ -33,6 +33,7 @@ from databricks.labs.ucx.cli import (
     create_missing_principals,
     create_table_mapping,
     create_uber_principal,
+    create_ucx_catalog,
     download,
     ensure_assessment_run,
     installations,
@@ -889,9 +890,18 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
 def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
-    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
+    create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
     ws.catalogs.create.assert_called_once()
+
+
+def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
+
+    assert len(mock_backend.queries) > 0, "No queries executed on backend"
+    assert "CREATE SCHEMA" in mock_backend.queries[0]
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])

@@ -103,16 +103,17 @@ class PythonCell(Cell):
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         context = parent.new_dependency_graph_context()
         analyzer = PythonCodeAnalyzer(context, self._original_code)
-        python_dependency_problems = analyzer.build_graph()
-        # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
-        return [
-            dataclasses.replace(
+        # Position information for the Python code is within the code and needs to be mapped to the location within
+        # the parent nodebook.
+        problems = []
+        for problem in analyzer.build_graph():
+            problem = dataclasses.replace(
                 problem,
                 start_line=self.original_offset + problem.start_line,
                 end_line=self.original_offset + problem.end_line,
             )
-            for problem in python_dependency_problems
-        ]
+            problems.append(problem)
+        return problems
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         context = graph.new_dependency_graph_context()
@@ -178,11 +179,17 @@ class RunCell(Cell):
         path, idx, line = self._read_notebook_path()
         if path is not None:
             start_line = self._original_offset + idx
-            problems = parent.register_notebook(path, True)
-            return [
-                dataclasses.replace(problem, start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
-                for problem in problems
-            ]
+            problems = []
+            for problem in parent.register_notebook(path, True):
+                problem = dataclasses.replace(
+                    problem,
+                    start_line=start_line,
+                    start_col=0,
+                    end_line=start_line,
+                    end_col=len(line),
+                )
+                problems.append(problem)
+            return problems
         start_line = self._original_offset
         problem = DependencyProblem(
             'invalid-run-cell',

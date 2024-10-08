@@ -2,7 +2,7 @@
 SELECT
   CONCAT(tables.`database`, '.', tables.name) AS name,
   object_type AS type,
-  table_format AS format,
+  UPPER(table_format) AS format,
   CASE
     WHEN STARTSWITH(location, 'dbfs:/mnt')
     THEN 'DBFS MOUNT'
@@ -22,7 +22,7 @@ SELECT
     THEN 'UNSUPPORTED'
     ELSE 'EXTERNAL'
   END AS storage,
-  IF(table_format = 'DELTA', 'Yes', 'No') AS is_delta,
+  IF(UPPER(table_format) = 'DELTA', 'Yes', 'No') AS is_delta,
   location,
   CASE
     WHEN size_in_bytes IS NULL
