@@ -179,6 +179,12 @@ class TablesMigrator:
         return src_view.sql_migrate_view(self.index())
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):
+        if src_table.object_type == "MANAGED":
+            logger.warning(
+                f"failed-to-migrate: Detected MANAGED table {src_table.name} on external storage, not currently "
+                f"supported by UCX"
+            )
+            return False
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
