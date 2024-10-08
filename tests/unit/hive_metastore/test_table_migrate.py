@@ -1,7 +1,7 @@
 import datetime
 import logging
 from itertools import cycle
-from unittest.mock import create_autospec, PropertyMock
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
@@ -1241,9 +1241,7 @@ def test_refresh_migration_status_published_remained_tables(caplog):
 
 
 def test_table_migration_status_owner() -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
 
     tables_crawler = create_autospec(TablesCrawler)
     the_table = Table(
@@ -1273,14 +1271,12 @@ def test_table_migration_status_owner() -> None:
     assert owner == "bob"
     tables_crawler.snapshot.assert_called_once()
     table_ownership.owner_of.assert_called_once_with(the_table)
-    mock_workspace_administrator.assert_not_called()
+    admin_locator.get_workspace_administrator.assert_not_called()
 
 
 def test_table_migration_status_owner_caches_tables_snapshot() -> None:
     """Verify that the tables inventory isn't loaded until needed, and after that isn't loaded repeatedly."""
     admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
 
     tables_crawler = create_autospec(TablesCrawler)
     a_table = Table(
@@ -1321,9 +1317,8 @@ def test_table_migration_status_owner_caches_tables_snapshot() -> None:
 
 
 def test_table_migration_status_source_table_unknown() -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []

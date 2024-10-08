@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import create_autospec, PropertyMock
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
@@ -532,12 +532,11 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
 
 def test_grant_owner() -> None:
     """Verify that the owner of a crawled grant is an administrator."""
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     ownership = GrantOwnership(admin_locator)
     owner = ownership.owner_of(Grant(principal="someone", action_type="SELECT"))
 
     assert owner == "an_admin"
-    mock_workspace_administrator.assert_called_once()
+    admin_locator.get_workspace_administrator.assert_called_once()

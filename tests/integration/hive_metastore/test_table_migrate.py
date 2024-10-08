@@ -37,5 +37,5 @@ def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backen
     assert table_migration_ownership.owner_of(table_migration_record) == table_ownership.owner_of(table_record)
 
     # Verify the owner of the migration record that corresponds to an unknown table.
-    workspace_administrator = runtime_ctx.administrator_locator.workspace_administrator
+    workspace_administrator = runtime_ctx.administrator_locator.get_workspace_administrator()
     assert table_migration_ownership.owner_of(synthetic_record) == workspace_administrator

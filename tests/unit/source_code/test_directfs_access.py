@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import create_autospec, PropertyMock
+from unittest.mock import create_autospec
 
 from databricks.labs.lsql.backends import MockBackend
 
@@ -37,13 +37,12 @@ def test_crawler_appends_dfsas():
 
 def test_directfs_access_ownership() -> None:
     """Verify that the owner for a direct-fs access record is an administrator."""
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     ownership = DirectFsAccessOwnership(admin_locator)
     dfsa = DirectFsAccess()
     owner = ownership.owner_of(dfsa)
 
     assert owner == "an_admin"
-    mock_workspace_administrator.assert_called_once()
+    admin_locator.get_workspace_administrator.assert_called_once()

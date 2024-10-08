@@ -1,4 +1,4 @@
-from unittest.mock import create_autospec, PropertyMock
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
@@ -136,24 +136,21 @@ def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
 
 
 def test_pipeline_owner_creator() -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
 
     ownership = JobOwnership(admin_locator)
     owner = ownership.owner_of(JobInfo(creator="bob", job_id="1", success=1, failures="[]"))
 
     assert owner == "bob"
-    mock_workspace_administrator.assert_not_called()
+    admin_locator.get_workspace_administrator.assert_not_called()
 
 
 def test_pipeline_owner_creator_unknown() -> None:
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     ownership = JobOwnership(admin_locator)
     owner = ownership.owner_of(JobInfo(creator=None, job_id="1", success=1, failures="[]"))
 
     assert owner == "an_admin"
-    mock_workspace_administrator.assert_called_once()
+    admin_locator.get_workspace_administrator.assert_called_once()

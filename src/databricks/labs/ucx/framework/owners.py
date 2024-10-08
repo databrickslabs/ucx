@@ -145,8 +145,7 @@ class AdministratorLocator:
         found_admin_users: Iterable[User | None] = (first_user(finder.find_admin_users()) for finder in finders)
         return next((user.user_name for user in found_admin_users if user), None)
 
-    @property
-    def workspace_administrator(self) -> str:
+    def get_workspace_administrator(self) -> str:
         """The user-name of an admin user for the workspace.
 
         Raises:
@@ -186,7 +185,7 @@ class Ownership(ABC, Generic[Record]):
         Raises:
             RuntimeError if there are no active administrators for the current workspace.
         """
-        return self._maybe_direct_owner(record) or self.administrator_locator.workspace_administrator
+        return self._maybe_direct_owner(record) or self.administrator_locator.get_workspace_administrator()
 
     @abstractmethod
     def _maybe_direct_owner(self, record: Record) -> str | None:

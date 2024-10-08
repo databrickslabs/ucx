@@ -1,4 +1,4 @@
-from unittest.mock import create_autospec, PropertyMock
+from unittest.mock import create_autospec
 
 from databricks.labs.lsql.backends import MockBackend
 
@@ -50,9 +50,8 @@ def test_tables_crawler_should_filter_by_database():
 
 def test_udf_owner() -> None:
     """Verify that the owner of a crawled UDF is an administrator."""
-    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-    mock_workspace_administrator = PropertyMock(return_value="an_admin")
-    type(admin_locator).workspace_administrator = mock_workspace_administrator
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     ownership = UdfOwnership(admin_locator)
     udf = Udf(
@@ -70,4 +69,4 @@ def test_udf_owner() -> None:
     owner = ownership.owner_of(udf)
 
     assert owner == "an_admin"
-    mock_workspace_administrator.assert_called_once()
+    admin_locator.get_workspace_administrator.assert_called_once()

@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable, Sequence
-from unittest.mock import create_autospec, Mock, PropertyMock
+from unittest.mock import create_autospec, Mock
 
 import pytest
 from databricks.sdk.errors import NotFound
@@ -217,7 +217,7 @@ def test_admin_locator_prefers_workspace_admin_over_account_admin(ws) -> None:
     _setup_accounts(ws, account_users=account_users, workspace_users=workspace_users, groups=[admins_group])
 
     locator = AdministratorLocator(ws)
-    the_admin = locator.workspace_administrator
+    the_admin = locator.get_workspace_administrator()
 
     assert the_admin == "bob"
     # Also verify that we didn't attempt to look up account admins.
@@ -236,7 +236,7 @@ def test_admin_locator_prefer_first_workspace_admin_alphabetically(ws) -> None:
     _setup_accounts(ws, workspace_users=workspace_users, groups=[admins_group])
 
     locator = AdministratorLocator(ws)
-    the_admin = locator.workspace_administrator
+    the_admin = locator.get_workspace_administrator()
 
     assert the_admin == "andrew"
 
@@ -251,7 +251,7 @@ def test_admin_locator_prefer_first_account_admin_alphabetically(ws) -> None:
     _setup_accounts(ws, account_users=account_users)
 
     locator = AdministratorLocator(ws)
-    the_admin = locator.workspace_administrator
+    the_admin = locator.get_workspace_administrator()
 
     assert the_admin == "andrew"
 
@@ -265,7 +265,7 @@ def test_admin_locator_error_when_no_admin(ws) -> None:
     workspace_id = ws.get_workspace_id()
     expected_message = f"No active workspace or account administrator can be found for workspace: {workspace_id}"
     with pytest.raises(RuntimeError, match=re.escape(expected_message)):
-        _ = locator.workspace_administrator
+        _ = locator.get_workspace_administrator()
 
 
 def test_admin_locator_is_lazy(ws) -> None:
@@ -279,7 +279,7 @@ def test_admin_locator_is_lazy(ws) -> None:
     mock_finder_factory.assert_not_called()
     mock_finder.assert_not_called()
 
-    _ = locator.workspace_administrator
+    _ = locator.get_workspace_administrator()
 
     mock_finder_factory.assert_called_once_with(ws)
     mock_finder.find_admin_users.assert_called_once()
@@ -293,8 +293,8 @@ def test_admin_locator_caches_result(ws) -> None:
     mock_finder_factory.return_value = mock_finder
 
     locator = AdministratorLocator(ws, finders=[mock_finder_factory])
-    _ = locator.workspace_administrator
-    _ = locator.workspace_administrator
+    _ = locator.get_workspace_administrator()
+    _ = locator.get_workspace_administrator()
 
     mock_finder_factory.assert_called_once_with(ws)
     mock_finder.find_admin_users.assert_called_once()
@@ -309,9 +309,9 @@ def test_admin_locator_caches_negative_result(ws) -> None:
 
     locator = AdministratorLocator(ws, finders=[mock_finder_factory])
     with pytest.raises(RuntimeError):
-        _ = locator.workspace_administrator
+        _ = locator.get_workspace_administrator()
     with pytest.raises(RuntimeError):
-        _ = locator.workspace_administrator
+        _ = locator.get_workspace_administrator()
 
     mock_finder_factory.assert_called_once_with(ws)
     mock_finder.find_admin_users.assert_called_once()
@@ -323,13 +323,13 @@ def test_ownership_prefers_record_owner() -> None:
     owner = ownership.owner_of("school")
 
     assert owner == "bob"
-    ownership.mock_admin_locator.workspace_administrator.assert_not_called()
+    ownership.mock_admin_locator.get_workspace_administrator.assert_not_called()
 
 
 def test_ownership_admin_user_fallback() -> None:
     """Verify that if no owner for the record can be found, an admin user is returned instead."""
     ownership = _OwnershipFixture[str]()
-    type(ownership.mock_admin_locator).workspace_administrator = PropertyMock(return_value="jane")
+    ownership.mock_admin_locator.get_workspace_administrator.return_value = "jane"
 
     owner = ownership.owner_of("school")
 
@@ -339,9 +339,7 @@ def test_ownership_admin_user_fallback() -> None:
 def test_ownership_no_fallback_admin_user_error() -> None:
     """Verify that if no owner can be determined, an error is raised."""
     ownership = _OwnershipFixture[str]()
-    type(ownership.mock_admin_locator).workspace_administrator = PropertyMock(
-        side_effect=RuntimeError("Mocked admin lookup failure.")
-    )
+    ownership.mock_admin_locator.get_workspace_administrator.side_effect = RuntimeError("Mocked admin lookup failure.")
 
     with pytest.raises(RuntimeError, match="Mocked admin lookup failure."):
         _ = ownership.owner_of("school")
