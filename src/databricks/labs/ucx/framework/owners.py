@@ -1,4 +1,3 @@
-import functools
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
@@ -138,12 +137,21 @@ class AdministratorLocator:
 
     @cached_property
     def _found_admin(self) -> str | None:
+
+        # Ordering helper: User.user_name is typed as optional but we can't sort by None.
+        # (The finders already filter out users without a user-name.)
+        def _by_username(user: User) -> str:
+            assert user.user_name
+            return user.user_name
+
         # Lazily instantiate and query the finders in an attempt to locate an admin user.
-        finders = (finder(self._ws) for finder in self._finders)
-        # If a finder returns multiple admin users, use the first (alphabetically by user-name).
-        first_user = functools.partial(min, default=None, key=lambda user: user.user_name)
-        found_admin_users: Iterable[User | None] = (first_user(finder.find_admin_users()) for finder in finders)
-        return next((user.user_name for user in found_admin_users if user), None)
+        for factory in self._finders:
+            finder = factory(self._ws)
+            # First alphabetically by name.
+            admin_user = min(finder.find_admin_users(), default=None, key=_by_username)
+            if admin_user:
+                return admin_user.user_name
+        return None
 
     def get_workspace_administrator(self) -> str:
         """The user-name of an admin user for the workspace.
