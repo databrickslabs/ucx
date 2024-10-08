@@ -6,11 +6,10 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.hive_metastore import Mounts
+from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 class TablesMigrator:
     def __init__(
         self,
-        table_crawler: CrawlerBase[Table],
+        table_crawler: TablesCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
