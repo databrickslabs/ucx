@@ -108,7 +108,7 @@ class MigrationProgress(Workflow):
         """(Optimization) Starts `table_migration` job cluster in parallel to crawling tables."""
 
     @job_task(depends_on=[setup_table_migration], job_cluster="table_migration")
-    def verify_prerequisites_table_migration(self, ctx: RuntimeContext) -> None:
+    def verify_prerequisites(self, ctx: RuntimeContext) -> None:
         """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
 
         Prerequisites:
@@ -135,7 +135,7 @@ class MigrationProgress(Workflow):
         if not ctx.deployed_workflows.validate_step("assessment", timeout=dt.timedelta(hours=1)):
             raise RuntimeWarning("Assessment workflow not completed successfully")
 
-    @job_task(depends_on=[crawl_tables, verify_prerequisites_table_migration], job_cluster="table_migration")
+    @job_task(depends_on=[crawl_tables, verify_prerequisites], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not.
 
