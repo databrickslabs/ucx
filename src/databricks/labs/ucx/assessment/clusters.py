@@ -188,7 +188,7 @@ class ClusterOwnership(Ownership[ClusterInfo]):
     This is the cluster creator (if known), or otherwise an administrator.
     """
 
-    def _get_owner(self, record: ClusterInfo) -> str | None:
+    def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
         return record.creator
 
 
@@ -251,5 +251,5 @@ class ClusterPolicyOwnership(Ownership[PolicyInfo]):
     This is the creator of the cluster policy (if known), or otherwise an administrator.
     """
 
-    def _get_owner(self, record: PolicyInfo) -> str | None:
+    def _maybe_direct_owner(self, record: PolicyInfo) -> str | None:
         return record.creator

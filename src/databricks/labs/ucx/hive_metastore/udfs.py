@@ -144,5 +144,5 @@ class UdfOwnership(Ownership[Udf]):
     At the present we don't determine a specific owner for UDFs: we always report an administrator.
     """
 
-    def _get_owner(self, record: Udf) -> None:
+    def _maybe_direct_owner(self, record: Udf) -> None:
         return None

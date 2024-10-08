@@ -27,7 +27,7 @@ class _OwnershipFixture(Ownership[Record]):
         self._owner_fn = owner_fn
         self.mock_admin_locator = mock_admin_locator
 
-    def _get_owner(self, record: Record) -> str | None:
+    def _maybe_direct_owner(self, record: Record) -> str | None:
         return self._owner_fn(record)
 
 

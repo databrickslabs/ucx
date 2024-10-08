@@ -84,5 +84,5 @@ class PipelineOwnership(Ownership[PipelineInfo]):
     This is the pipeline creator (if known), or otherwise an administrator.
     """
 
-    def _get_owner(self, record: PipelineInfo) -> str | None:
+    def _maybe_direct_owner(self, record: PipelineInfo) -> str | None:
         return record.creator_name

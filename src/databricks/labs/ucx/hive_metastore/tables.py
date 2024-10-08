@@ -645,5 +645,5 @@ class TableOwnership(Ownership[Table]):
     At the present we don't determine a specific owner for tables: we always report an administrator.
     """
 
-    def _get_owner(self, record: Table) -> None:
+    def _maybe_direct_owner(self, record: Table) -> None:
         return None

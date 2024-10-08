@@ -175,7 +175,7 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
             self._indexed_tables = index
         return index
 
-    def _get_owner(self, record: TableMigrationStatus) -> str | None:
+    def _maybe_direct_owner(self, record: TableMigrationStatus) -> str | None:
         index = self._tables_snapshot_index()
         source_table = index.get((record.src_schema, record.src_table), None)
         return self._table_ownership.owner_of(source_table) if source_table is not None else None

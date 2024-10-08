@@ -149,7 +149,7 @@ class JobOwnership(Ownership[JobInfo]):
     This is the pipeline creator (if known), or otherwise an administrator.
     """
 
-    def _get_owner(self, record: JobInfo) -> str | None:
+    def _maybe_direct_owner(self, record: JobInfo) -> str | None:
         return record.creator
 
 

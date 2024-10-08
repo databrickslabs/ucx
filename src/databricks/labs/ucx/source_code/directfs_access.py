@@ -67,6 +67,6 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
     an administrator is currently always reported as the owner.
     """
 
-    def _get_owner(self, record: DirectFsAccess) -> None:
+    def _maybe_direct_owner(self, record: DirectFsAccess) -> None:
         # TODO: Implement this once the creator/ownership information is exposed during crawling.
         return None

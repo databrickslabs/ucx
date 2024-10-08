@@ -388,7 +388,7 @@ class GrantOwnership(Ownership[Grant]):
     At the present we can't determine a specific owner for grants: we always report an administrator.
     """
 
-    def _get_owner(self, record: Grant) -> None:
+    def _maybe_direct_owner(self, record: Grant) -> None:
         return None
 
 
