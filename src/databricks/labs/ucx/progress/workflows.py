@@ -111,12 +111,12 @@ class MigrationProgress(Workflow):
         - UCX catalog exists.
         - Assessment workflow ran.
         """
-        if not (
-            ctx.verify_has_metastore.verify_metastore()
-            and ctx.verify_has_ucx_catalog.verify()
-            and ctx.deployed_workflows.validate_step("assessment")
-        ):
-            raise RuntimeError("Workflow prerequisites not met.")
+        if not ctx.verify_has_metastore.verify_metastore():
+            raise RuntimeWarning("Metastore not attached to workspace")
+        if not ctx.verify_has_ucx_catalog.verify():
+            raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
+        if not ctx.deployed_workflows.validate_step("assessment"):
+            raise RuntimeWarning("Assessment workflow not completed successfully")
 
     @job_task(depends_on=[crawl_tables, verify_prerequisites_table_migration], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
