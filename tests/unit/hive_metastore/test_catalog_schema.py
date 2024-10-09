@@ -17,13 +17,23 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
 
+    def get_catalog(catalog_name: str) -> CatalogInfo:
+        if catalog_name == "catalog1":
+            return CatalogInfo(name="catalog1")
+        raise NotFound(f"Catalog: {catalog_name}")
+
+    ws.catalogs.get.side_effect = get_catalog
+
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "catalog1":
             raise BadRequest("Catalog 'catalog1' already exists")
 
     ws.catalogs.create.side_effect = raise_catalog_exists
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
+    ws.external_locations.list.return_value = [
+        ExternalLocationInfo(url="s3://foo/bar"),
+        ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
+    ]
     if backend is None:
         backend = MockBackend()
     installation = MockInstallation(
@@ -133,8 +143,8 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({"Please provide storage location url for catalog: ucx": "metastore"})
     catalog_schema = prepare_test(ws)
+    ws.catalogs.get.side_effect = lambda catalog_name: CatalogInfo(name=catalog_name)
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
@@ -143,12 +153,20 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws.catalogs.create.side_effect = raise_catalog_exists
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
-        catalog_schema.create_ucx_catalog(mock_prompts)
-    assert "Catalog 'ucx' already exists. Skipping." in caplog.text
+        catalog_schema.create_ucx_catalog(MockPrompts({}))
+    assert "Skipping already existing catalog: ucx" in caplog.text
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
-def test_create_all_catalogs_schemas_creates_catalogs(location: str):
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://foo/bar",
+        "s3://foo/bar/test",
+        "s3://foo/bar/test/baz",
+        "abfss://container@storageaccount.dfs.core.windows.net",
+    ],
+)
+def test_create_all_catalogs_schemas_creates_catalogs(location: str) -> None:
     """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": location})
@@ -160,6 +178,28 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str):
         call("catalog2", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog3", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog4", storage_root=location, comment="Created by UCX", properties=None),
+    ]
+    ws.catalogs.create.assert_has_calls(calls, any_order=True)
+
+
+def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations() -> None:
+    """Catalog 2-4 should be created; catalog 1 already exists."""
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts(
+        {
+            "Please provide storage location url for catalog: catalog2": "s3://foo/bar",
+            "Please provide storage location url for catalog: catalog3": "s3://foo/bar/test",
+            "Please provide storage location url for catalog: catalog4": "s3://foo/bar/test/baz",
+        }
+    )
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    calls = [
+        call("catalog2", storage_root="s3://foo/bar", comment="Created by UCX", properties=None),
+        call("catalog3", storage_root="s3://foo/bar/test", comment="Created by UCX", properties=None),
+        call("catalog4", storage_root="s3://foo/bar/test/baz", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
