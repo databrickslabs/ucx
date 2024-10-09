@@ -20,9 +20,6 @@ class HistoricalRecord:
     job_run_id: int
     """The identifier of the job run that generated this record."""
 
-    snapshot_id: int
-    """An identifier that is unique to the records produced for a given snapshot."""
-
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
 
@@ -40,6 +37,9 @@ class HistoricalRecord:
 
     ucx_version: str = __version__
     """The UCX semantic version."""
+
+    snapshot_id: int | None = None
+    """An identifier that is unique to the records produced for a given snapshot."""
 
     object_type_version: int = 0
     """Versioning of inventory table, for forward compatibility."""
