@@ -29,7 +29,7 @@ class HistoricalRecord:
     object_id: list[str]
     """The type-specific identifier for this inventory record."""
 
-    object_data: str
+    data: dict[str, str]
     """Type-specific JSON-encoded data of the inventory record."""
 
     owner: str
