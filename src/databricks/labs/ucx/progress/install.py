@@ -1,4 +1,3 @@
-import datetime as dt
 import logging
 from dataclasses import dataclass
 
@@ -13,18 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
-class HistoricalRecord:
+class Historical:
     workspace_id: int
-    """The identifier of the workspace where this record was generated."""
+    """The identifier of the workspace where this historical record was generated."""
 
     job_run_id: int
-    """The identifier of the job run that generated this record."""
+    """The identifier of the job run that generated this historical record."""
 
     object_type: str
-    """The inventory table for which this record was generated."""
+    """The inventory table for which this historical record was generated."""
 
     object_id: list[str]
-    """The type-specific identifier for this inventory record."""
+    """The type-specific identifier for the corresponding inventory record."""
 
     data: dict[str, str]
     """Type-specific JSON-encoded data of the inventory record."""
@@ -39,7 +38,7 @@ class HistoricalRecord:
     """The UCX semantic version."""
 
     snapshot_id: str | None = None
-    """An identifier that is unique to the records produced for a given snapshot."""
+    """An identifier that is unique to the historical records produced for a given snapshot."""
 
     object_type_version: int = 0
     """Versioning of inventory table, for forward compatibility."""
@@ -57,5 +56,5 @@ class ProgressTrackingInstallation:
     def run(self) -> None:
         self._schema_deployer.deploy_schema()
         self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
-        self._schema_deployer.deploy_table("historical_records", HistoricalRecord)
+        self._schema_deployer.deploy_table("historical", Historical)
         logger.info("Installation completed successfully!")

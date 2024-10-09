@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.mark.parametrize("table_name", ["workflow_runs", "historical_records"])
+@pytest.mark.parametrize("table_name", ["workflow_runs", "historical"])
 def test_progress_tracking_installer_creates_table(az_cli_ctx, table_name) -> None:
     az_cli_ctx.progress_tracking_installation.run()
     query = (
