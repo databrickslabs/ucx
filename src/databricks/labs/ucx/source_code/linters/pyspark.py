@@ -395,7 +395,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
                 continue
             assert isinstance(node, Call)
             for used_table in matcher.collect_tables(self._from_table, self._index, self._session_state, node):
-                yield TableInfoNode(used_table, node)
+                yield TableInfoNode(used_table, node)  # B
 
 
 class _SparkSqlAnalyzer:
@@ -475,4 +475,4 @@ class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
                 if not value.is_inferred():
                     continue  # TODO error handling strategy
                 for table in self._sql_collector.collect_tables(value.as_string()):
-                    yield TableInfoNode(table, call_node)
+                    yield TableInfoNode(table, call_node)  # A

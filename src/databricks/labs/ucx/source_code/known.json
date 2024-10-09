@@ -6113,6 +6113,16 @@
     "hailtop.uvloopx": [],
     "hailtop.yamlx": []
   },
+  "hjson": {
+    "hjson": [],
+    "hjson.compat": [],
+    "hjson.decoder": [],
+    "hjson.encoder": [],
+    "hjson.encoderH": [],
+    "hjson.ordered_dict": [],
+    "hjson.scanner": [],
+    "hjson.tool": []
+  },
   "html5lib": {
     "html5lib": []
   },

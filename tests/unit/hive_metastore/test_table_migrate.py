@@ -1095,7 +1095,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     table_keys = [task.args[0].src.key for task in tasks]
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
-    assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
+    assert not any(key for key in table_keys if key == "hive_metastore.db1_src.t1_src")
 
 
 def test_table_in_mount_mapping_with_table_owner():

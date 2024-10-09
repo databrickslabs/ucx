@@ -804,8 +804,8 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
-    assert "Catalog 'test' already exists. Skipping." in caplog.messages
-    assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
+    assert "Skipping already existing catalog: test" in caplog.messages
+    assert "Skipping already existing schema: test.test" in caplog.messages
 
 
 def test_cluster_remap(ws, caplog):
@@ -887,12 +887,12 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
     acc_client.metastore_assignments.create.assert_called_once()
 
 
-def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
+def test_create_ucx_catalog_calls_get_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
-    ws.catalogs.create.assert_called_once()
+    ws.catalogs.get.assert_called_once()
 
 
 def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:

@@ -87,9 +87,6 @@ class PathLookup:
             and any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
         )
 
-    def has_path(self, path: Path):
-        return next(p for p in self._sys_paths if path == p) is not None
-
     def prepend_path(self, path: Path):
         self._sys_paths.insert(0, path)
 
