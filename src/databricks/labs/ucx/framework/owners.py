@@ -183,13 +183,13 @@ class Ownership(ABC, Generic[Record]):
 
         This is intended to be a point of contact, and is either:
 
-         - The user that originally created the resource associated with the result; or
+         - A user directly associated with the resource, such as the original creator; or
          - An active administrator for the current workspace.
 
         Args:
             record (Record): The record for which an associated user-name is sought.
         Returns:
-            A string containing the user-name attribute of the user considered to own the resource.
+            A string containing the user-name attribute of a user considered to be responsible for the resource.
         Raises:
             RuntimeError if there are no active administrators for the current workspace.
         """
