@@ -17,8 +17,8 @@ class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
     workspace_id: int
     """The identifier of the workspace where this record was generated."""
 
-    run_id: int
-    """An identifier of the workflow run that generated this record."""
+    job_run_id: int
+    """The identifier of the job run that generated this record."""
 
     run_as: str
     """The identity of the account that ran the workflow that generated this record."""
