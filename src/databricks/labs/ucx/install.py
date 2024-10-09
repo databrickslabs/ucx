@@ -351,7 +351,9 @@ class WorkspaceInstaller(WorkspaceContext):
         )
 
         # Save configurable values for table migration cluster
-        min_workers, max_workers, spark_conf_dict, managed_to_external = self._config_table_migration(spark_conf_dict)
+        min_workers, max_workers, spark_conf_dict, managed_table_migration_choice = self._config_table_migration(
+            spark_conf_dict
+        )
 
         config = dataclasses.replace(
             default_config,
@@ -362,7 +364,7 @@ class WorkspaceInstaller(WorkspaceContext):
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
-            managed_to_external=managed_to_external,
+            managed_table_migration_option=managed_table_migration_choice,
         )
         self.installation.save(config)
         if self._is_account_install:
@@ -372,24 +374,21 @@ class WorkspaceInstaller(WorkspaceContext):
             webbrowser.open(ws_file_url)
         return config
 
-    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, bool]:
+    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, int]:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
-        managed_to_external_choices = {
-            "[Create managed hive_metastore table as external UC table. This option will "
-            "also convert hive_metastore managed table to external, please consider any "
-            "implication of this action as dropping hive_metastore table will not drop the "
-            "data]": True,
-            "[Create managed hive_metastore table as managed UC table using CTAS. This option"
-            "will result in duplication of data]": False,
+        managed_table_migration_choices = {
+            "[Convert MANAGED table to EXTERNAL table and migrate as EXTERNAL UC table": 0,
+            "[Migrate MANAGED table as EXTERNAL UC table and migrate as EXTERNAL UC table": 1,
+            "[Migrate MANAGED table as MANAGED UC table]": 2,
         }
-        managed_to_external = self.prompts.choice_from_dict(
+        managed_table_migration_choice = self.prompts.choice_from_dict(
             "If hive_metastore contains managed table with external"
             " location paths (not dbfs root), please select which migration "
             "option to choose from",
-            managed_to_external_choices,
+            managed_table_migration_choices,
         )
         if self._is_account_install:
-            return 1, 10, spark_conf_dict, managed_to_external
+            return 1, 10, spark_conf_dict, managed_table_migration_choice
         parallelism = self.prompts.question(
             "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
         )
@@ -407,7 +406,7 @@ class WorkspaceInstaller(WorkspaceContext):
             )
         )
 
-        return min_workers, max_workers, spark_conf_dict, managed_to_external
+        return min_workers, max_workers, spark_conf_dict, managed_table_migration_choice
 
     def _select_databases(self):
         selected_databases = self.prompts.question(

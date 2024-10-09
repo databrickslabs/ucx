@@ -75,7 +75,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_dashboard_ids: list[str] | None = None
 
     # [INTERNAL ONLY] Whether managed table should be created as external UC table.
-    managed_to_external: bool = True
+    managed_table_migration_option: int = 0
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
