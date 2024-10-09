@@ -30,7 +30,7 @@ class CatalogSchema:
     ):
         self._ws = ws
         self._table_mapping = table_mapping
-        self._external_locations = self._ws.external_locations.list()
+        self._external_locations = list(self._ws.external_locations.list())
         self._principal_grants = principal_grants
         self._backend = sql_backend
         self._hive_grants_crawler = grants_crawler
