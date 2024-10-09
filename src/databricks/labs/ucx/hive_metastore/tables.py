@@ -365,7 +365,14 @@ class TablesCrawler(CrawlerBase[Table]):
 
     def _all_databases(self) -> list[str]:
         if not self._include_database:
-            return [row[0] for row in self._fetch("SHOW DATABASES")]
+            databases = []
+            for row in self._fetch("SHOW DATABASES"):
+                database = row[0]
+                if database == self._schema:
+                    logger.debug(f"Skipping UCX inventory schema: {database}")
+                    continue
+                databases.append(database)
+            return databases
         return self._include_database
 
     def load_one(self, schema_name: str, table_name: str) -> Table | None:
@@ -603,6 +610,9 @@ class FasterTableScanCrawler(TablesCrawler):
         catalog = "hive_metastore"
         databases = self._all_databases()
         for database in databases:
+            if database == self._schema:
+                logger.debug(f"Skipping UCX inventory schema: {database}")
+                continue
             logger.info(f"Scanning {database}")
             table_names = self._get_table_names(database)
             tasks.extend(self._create_describe_tasks(catalog, database, table_names))
@@ -619,6 +629,7 @@ class FasterTableScanCrawler(TablesCrawler):
         :param database:
         :return: list of table names
         """
+        # TODO: this method is redundant and can be removed in favor of using _list_tables directly
         table_names = []
         table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
         for table_batch in table_names_batches:
