@@ -487,7 +487,7 @@ class TablesCrawler(CrawlerBase[Table]):
             return None
 
 
-class FasterTableScanCrawler(CrawlerBase[Table]):
+class FasterTableScanCrawler(TablesCrawler):
     """
     FasterTableScanCrawler is a specialized version of TablesCrawler that uses spark._jsparkSession to utilize
     faster scanning with Scala APIs.
@@ -504,7 +504,7 @@ class FasterTableScanCrawler(CrawlerBase[Table]):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        super().__init__(backend, schema, include_databases)
         self._spark = SparkSession.builder.getOrCreate()
 
     @cached_property
