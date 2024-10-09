@@ -17,10 +17,10 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
 
-    def get_catalog(catalog_name: str) -> CatalogInfo | None:
+    def get_catalog(catalog_name: str) -> CatalogInfo:
         if catalog_name == "catalog1":
             return CatalogInfo(name="catalog1")
-        return None
+        raise NotFound(f"Catalog: {catalog_name}")
 
     ws.catalogs.get.side_effect = get_catalog
 
@@ -144,7 +144,7 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
     catalog_schema = prepare_test(ws)
-    ws.catalogs.get.side_effect = lambda catalog_name: CatalogInfo(name="ucx")
+    ws.catalogs.get.side_effect = lambda catalog_name: CatalogInfo(name=catalog_name)
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
