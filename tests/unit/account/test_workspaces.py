@@ -549,3 +549,17 @@ def test_account_workspaces_can_administer_handles_permission_denied_error_for_c
         can_administer = account_workspaces.can_administer(workspace)
     assert not can_administer
     assert "User cannot access workspace: test" in caplog.messages
+
+
+def test_account_workspaces_workspace_clients_handles_permission_denied() -> None:
+    acc = create_autospec(AccountClient)
+    acc.get_workspace_client.side_effect = PermissionDenied
+    account_workspaces = AccountWorkspaces(acc)
+
+    try:
+        clients = account_workspaces.workspace_clients([Workspace()])
+    except PermissionDenied:
+        assert False, "Workspace clients does not handle `PermissionDenied`"
+    else:
+        assert len(clients) == 0
+
