@@ -141,7 +141,7 @@ class CatalogSchema:
         except NotFound:
             catalog = None
         if catalog:
-            logger.warning(f"Skipping already existing catalog: {catalog}")
+            logger.warning(f"Skipping already existing catalog: {catalog_name}")
             return
         logger.info(f"Validating UC catalog: {catalog_name}")
         attempts = 3

@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
+    ws.catalogs.get.return_value = CatalogInfo(name="catalog1")
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "catalog1":
@@ -134,6 +135,7 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
     catalog_schema = prepare_test(ws)
+    ws.catalogs.get.return_value = CatalogInfo(name="catalog1")
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
@@ -143,7 +145,7 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_ucx_catalog(MockPrompts({}))
-    assert "Catalog 'ucx' already exists. Skipping." in caplog.text
+    assert "Skipping already existing catalog: ucx" in caplog.text
 
 
 @pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
