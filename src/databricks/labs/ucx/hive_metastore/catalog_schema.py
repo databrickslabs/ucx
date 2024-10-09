@@ -50,12 +50,7 @@ class CatalogSchema:
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
-            try:
-                self._create_catalog_validate(candidate_catalog, prompts, properties=None)
-            except BadRequest as e:
-                if "already exists" in str(e):
-                    logger.warning(f"Catalog '{candidate_catalog}' already exists. Skipping.")
-                    continue
+            self._create_catalog_validate(candidate_catalog, prompts, properties=None)
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 try:
