@@ -53,7 +53,7 @@ def test_running_real_workflow_linter_job(installation_ctx, make_job) -> None:
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_linter_from_context(simple_ctx, make_job):
+def test_linter_from_context(simple_ctx, make_job) -> None:
     # This code is similar to test_running_real_workflow_linter_job, but it's executed on the caller side and is easier
     # to debug.
     # Ensure we have at least 1 job that fails
