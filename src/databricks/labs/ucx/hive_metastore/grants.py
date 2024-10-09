@@ -32,6 +32,7 @@ from databricks.labs.ucx.azure.access import (
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
     Mount,
@@ -39,7 +40,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
