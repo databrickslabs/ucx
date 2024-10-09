@@ -415,26 +415,11 @@ def test_workflow_linter_lints_job_with_wheel_dependency(simple_ctx, make_job, m
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
 
 
-def test_job_spark_python_task_linter_happy_path(
-    simple_ctx,
-    make_job,
-    make_random,
-    make_cluster,
-    make_directory,
-) -> None:
-    pyspark_job_path = make_directory() / "spark_job.py"
-    pyspark_job_path.write_text("import dbt\n")
+def test_job_spark_python_task_linter_happy_path(simple_ctx, make_job) -> None:
+    extra_library_for_module = compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core==1.8.7"))
+    job = make_job(content="import dbt\n", task_type=jobs.SparkPythonTask, libraries=[extra_library_for_module])
 
-    new_cluster = make_cluster(single_node=True)
-    task = jobs.Task(
-        task_key=make_random(4),
-        spark_python_task=jobs.SparkPythonTask(str(pyspark_job_path)),
-        existing_cluster_id=new_cluster.cluster_id,
-        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core==1.8.7"))],
-    )
-    j = make_job(tasks=[task])
-
-    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: dbt"]) == 0
 
@@ -483,26 +468,11 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     allow_list.distribution_compatibility.assert_called_once()
 
 
-def test_job_spark_python_task_workspace_linter_happy_path(
-    simple_ctx,
-    make_job,
-    make_random,
-    make_cluster,
-    make_directory,
-) -> None:
-    pyspark_job_path = make_directory() / "spark_job.py"
-    pyspark_job_path.write_text("import dbt\n")
+def test_job_spark_python_task_workspace_linter_happy_path(simple_ctx, make_job) -> None:
+    extra_library_for_module = compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core==1.8.7"))
+    job = make_job(content="import dbt\n", libraries=[extra_library_for_module])
 
-    new_cluster = make_cluster(single_node=True)
-    task = jobs.Task(
-        task_key=make_random(4),
-        spark_python_task=jobs.SparkPythonTask(python_file=str(pyspark_job_path)),
-        existing_cluster_id=new_cluster.cluster_id,
-        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="dbt-core==1.8.7"))],
-    )
-    j = make_job(tasks=[task])
-
-    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+    problems, *_ = simple_ctx.workflow_linter.lint_job(job.job_id)
 
     assert not [problem for problem in problems if problem.message == "Could not locate import: dbt"]
 
