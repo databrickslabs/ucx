@@ -173,11 +173,6 @@ class Ownership(ABC, Generic[Record]):
         self._administrator_locator = administrator_locator
 
     @final
-    @property
-    def administrator_locator(self):
-        return self._administrator_locator
-
-    @final
     def owner_of(self, record: Record) -> str:
         """Obtain the user-name of a user that is responsible for the given record.
 
