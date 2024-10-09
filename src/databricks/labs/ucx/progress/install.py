@@ -37,12 +37,6 @@ class Historical:
     ucx_version: str = __version__
     """The UCX semantic version."""
 
-    snapshot_id: str | None = None
-    """An identifier that is unique to the historical records produced for a given snapshot."""
-
-    object_type_version: int = 0
-    """Versioning of inventory table, for forward compatibility."""
-
 
 class ProgressTrackingInstallation:
     """Install resources for UCX's progress tracking."""
