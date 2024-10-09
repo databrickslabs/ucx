@@ -104,4 +104,4 @@ def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
 
     # Verify ownership can be made.
     ownership = TableOwnership(runtime_ctx.administrator_locator)
-    assert "@" in ownership.owner_of(table_record)
+    assert ownership.owner_of(table_record) == runtime_ctx.administrator_locator.get_workspace_administrator()
