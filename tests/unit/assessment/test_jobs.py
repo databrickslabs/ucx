@@ -1,8 +1,11 @@
-import pytest
-from databricks.labs.lsql import Row
-from databricks.labs.lsql.backends import MockBackend
+from unittest.mock import create_autospec
 
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
+import pytest
+from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk.service.jobs import BaseJob, JobSettings
+
+from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership, JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 
 from .. import mock_workspace_client
 
@@ -59,12 +62,19 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks():
     assert result_set[0].success == 1
 
 
-def test_job_crawler_with_no_owner_should_have_empty_creator_name():
-    ws = mock_workspace_client(job_ids=['no-tasks'])
-    sql_backend = MockBackend()
-    JobsCrawler(ws, sql_backend, "ucx").snapshot()
-    result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "overwrite")
-    assert result == [Row(job_id='9001', success=1, failures='[]', job_name='No Tasks', creator=None)]
+def test_pipeline_crawler_creator():
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = (
+        BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+        BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+        BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+    )
+    result = JobsCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
+
+    expected_creators = [None, None, "bob"]
+    crawled_creators = [record.creator for record in result]
+    assert len(expected_creators) == len(crawled_creators)
+    assert set(expected_creators) == set(crawled_creators)
 
 
 @pytest.mark.parametrize(
@@ -123,3 +133,24 @@ def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
     assert len(result) == 1
     assert result[0].run_ids == run_ids
     assert result[0].failures == failures
+
+
+def test_pipeline_owner_creator() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+
+    ownership = JobOwnership(admin_locator)
+    owner = ownership.owner_of(JobInfo(creator="bob", job_id="1", success=1, failures="[]"))
+
+    assert owner == "bob"
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_pipeline_owner_creator_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = JobOwnership(admin_locator)
+    owner = ownership.owner_of(JobInfo(creator=None, job_id="1", success=1, failures="[]"))
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()

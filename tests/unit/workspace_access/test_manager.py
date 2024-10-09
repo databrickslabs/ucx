@@ -4,7 +4,6 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 
@@ -286,8 +285,7 @@ def test_manager_verify_no_tasks():
     assert result
 
 
-def test_manager_apply_experimental_no_tasks(caplog):
-    ws = create_autospec(WorkspaceClient)
+def test_manager_apply_experimental_no_tasks(ws, caplog):
     group_migration_state = MigrationState([])
 
     with caplog.at_level("INFO"):

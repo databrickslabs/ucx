@@ -2,13 +2,21 @@ import json
 from unittest.mock import MagicMock, create_autospec, mock_open, patch
 
 import pytest
-from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
+from databricks.sdk.service.compute import ClusterDetails, Policy
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
+from databricks.labs.ucx.assessment.clusters import (
+    ClustersCrawler,
+    PoliciesCrawler,
+    ClusterOwnership,
+    ClusterInfo,
+    ClusterPolicyOwnership,
+    PolicyInfo,
+)
 from databricks.labs.ucx.framework.crawlers import SqlBackend
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 
 from .. import mock_workspace_client
 
@@ -90,21 +98,27 @@ def test_cluster_init_script_check_dbfs():
 
 
 def test_cluster_without_owner_should_have_empty_creator_name():
-    ws = mock_workspace_client(cluster_ids=['simplest-autoscale'])
+    ws = mock_workspace_client()
+    ws.clusters.list.return_value = (
+        ClusterDetails(
+            creator_user_name=None,
+            cluster_id="simplest-autoscale",
+            policy_id="single-user-with-spn",
+            cluster_name="Simplest Shard Autoscale",
+            spark_version="13.3.x-cpu-ml-scala2.12",
+        ),
+        ClusterDetails(
+            creator_user_name="",
+            cluster_id="another-simple-autoscale",
+            policy_id="single-user-with-spn",
+            cluster_name="Another Simple Shard Autoscale",
+            spark_version="13.3.x-cpu-ml-scala2.12",
+        ),
+    )
     mockbackend = MockBackend()
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "overwrite")
-    assert result == [
-        Row(
-            cluster_id="simplest-autoscale",
-            policy_id="single-user-with-spn",
-            cluster_name="Simplest Shared Autoscale",
-            creator=None,
-            spark_version="13.3.x-cpu-ml-scala2.12",
-            success=1,
-            failures='[]',
-        )
-    ]
+    assert [row["creator"] for row in result] == [None, None]
 
 
 def test_cluster_with_multiple_failures():
@@ -171,6 +185,27 @@ def test_unsupported_clusters():
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
 
 
+def test_cluster_owner_creator() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+
+    ownership = ClusterOwnership(admin_locator)
+    owner = ownership.owner_of(ClusterInfo(creator="bob", cluster_id="1", success=1, failures="[]"))
+
+    assert owner == "bob"
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_cluster_owner_creator_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = ClusterOwnership(admin_locator)
+    owner = ownership.owner_of(ClusterInfo(creator=None, cluster_id="1", success=1, failures="[]"))
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()
+
+
 def test_policy_crawler():
     ws = mock_workspace_client(
         policy_ids=['single-user-with-spn', 'single-user-with-spn-policyid', 'single-user-with-spn-no-sparkversion'],
@@ -182,6 +217,21 @@ def test_policy_crawler():
     failures = json.loads(result_set[0].failures)
     assert len(result_set) == 2
     assert "Uses azure service principal credentials config in policy." in failures
+
+
+def test_policy_crawler_creator():
+    ws = mock_workspace_client()
+    ws.cluster_policies.list.return_value = (
+        Policy(policy_id="1", definition="{}", name="foo", creator_user_name=None),
+        Policy(policy_id="2", definition="{}", name="bar", creator_user_name=""),
+        Policy(policy_id="3", definition="{}", name="baz", creator_user_name="bob"),
+    )
+    result = PoliciesCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
+
+    expected_creators = [None, None, "bob"]
+    crawled_creators = [record.creator for record in result]
+    assert len(expected_creators) == len(crawled_creators)
+    assert set(expected_creators) == set(crawled_creators)
 
 
 def test_policy_try_fetch():
@@ -220,3 +270,25 @@ def test_policy_without_failure():
     crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
     assert result_set[0].failures == '[]'
+
+
+def test_cluster_policy_owner_creator() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = ClusterPolicyOwnership(admin_locator)
+    owner = ownership.owner_of(PolicyInfo(creator="bob", policy_id="1", policy_name="foo", success=1, failures="[]"))
+
+    assert owner == "bob"
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_cluster_policy_owner_creator_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = ClusterPolicyOwnership(admin_locator)
+    owner = ownership.owner_of(PolicyInfo(creator=None, policy_id="1", policy_name="foo", success=1, failures="[]"))
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()

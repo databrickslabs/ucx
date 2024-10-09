@@ -5,7 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.hive_metastore.tables import What, TableOwnership
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +86,22 @@ def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
     assert all_tables[f"{schema.full_name}.non_partitioned_delta"].is_partitioned is False
     assert all_tables[f"{schema.full_name}.partitioned_parquet"].is_partitioned is True
     assert all_tables[f"{schema.full_name}.non_partitioned_parquet"].is_partitioned is False
+
+
+def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
+    """Verify the ownership can be determined for crawled tables."""
+    # This currently isn't very useful: we don't currently locate specific owners for tables.
+
+    # A table for which we'll determine the owner.
+    table = runtime_ctx.make_table()
+
+    # Produce the crawled records
+    crawler = TablesCrawler(sql_backend, schema=inventory_schema, include_databases=[table.schema_name])
+    records = crawler.snapshot(force_refresh=True)
+
+    # Find the crawled record for the table we made.
+    table_record = next(record for record in records if record.full_name == table.full_name)
+
+    # Verify ownership can be made.
+    ownership = TableOwnership(runtime_ctx.administrator_locator)
+    assert ownership.owner_of(table_record) == runtime_ctx.administrator_locator.get_workspace_administrator()

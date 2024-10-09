@@ -7,6 +7,7 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError
 
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
 
@@ -52,3 +53,19 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
     def _crawl(self) -> Iterable[DirectFsAccess]:
         return []
         # TODO raise NotImplementedError() once CrawlerBase supports empty snapshots
+
+
+class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
+    """Determine ownership of records reporting direct filesystem access.
+
+    This is intended to be:
+
+     - For queries, the creator of the query (if known).
+     - For jobs, the owner of the path for the notebook or source (if known).
+
+    At present this information is not gathered during the crawling process, so it can't be reported here.
+    """
+
+    def _maybe_direct_owner(self, record: DirectFsAccess) -> None:
+        # TODO: Implement this once the creator/ownership information is exposed during crawling.
+        return None

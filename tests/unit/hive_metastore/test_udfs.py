@@ -1,6 +1,9 @@
+from unittest.mock import create_autospec
+
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
+from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler, UdfOwnership
 
 
 def test_key():
@@ -43,3 +46,27 @@ def test_tables_crawler_should_filter_by_database():
     udf_crawler = UdfsCrawler(backend, "default", ["database"])
     results = udf_crawler.snapshot()
     assert len(results) == 1
+
+
+def test_udf_owner() -> None:
+    """Verify that the owner of a crawled UDF is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = UdfOwnership(admin_locator)
+    udf = Udf(
+        catalog="main",
+        database="foo",
+        name="bar",
+        func_type="UNKNOWN",
+        func_input="UNKNOWN",
+        func_returns="UNKNOWN",
+        deterministic=True,
+        data_access="UNKNOWN",
+        body="UNKNOWN",
+        comment="UNKNOWN",
+    )
+    owner = ownership.owner_of(udf)
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()

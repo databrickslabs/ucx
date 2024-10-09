@@ -73,7 +73,7 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def table_size_crawler(self) -> TableSizeCrawler:
-        return TableSizeCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return TableSizeCrawler(self.tables_crawler)
 
     @cached_property
     def policies_crawler(self) -> PoliciesCrawler:

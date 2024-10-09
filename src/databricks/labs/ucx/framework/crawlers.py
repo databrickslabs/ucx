@@ -21,7 +21,7 @@ ResultFn = Callable[[], Iterable[Result]]
 
 
 class CrawlerBase(ABC, Generic[Result]):
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]):
+    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]) -> None:
         """
         Initializes a CrawlerBase instance.
 

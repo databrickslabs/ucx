@@ -2,12 +2,14 @@ import datetime
 import logging
 from itertools import cycle
 from unittest.mock import create_autospec
+
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount
@@ -22,11 +24,13 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatusRefresher,
     TableMigrationIndex,
+    TableMigrationOwnership,
     TableMigrationStatus,
     TableView,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     Table,
+    TableOwnership,
     TablesCrawler,
     What,
 )
@@ -1234,3 +1238,103 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
         assert len(tables) == 1 and tables[0].key == "hive_metastore.schema1.table3"
     migrate_grants.assert_not_called()
+
+
+def test_table_migration_status_owner() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+
+    tables_crawler = create_autospec(TablesCrawler)
+    the_table = Table(
+        catalog="hive_metastore",
+        database="foo",
+        name="bar",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    tables_crawler.snapshot.return_value = [the_table]
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+    table_ownership.owner_of.return_value = "bob"
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+    owner = ownership.owner_of(
+        TableMigrationStatus(
+            src_schema="foo",
+            src_table="bar",
+            dst_catalog="main",
+            dst_schema="foo",
+            dst_table="bar",
+        )
+    )
+
+    assert owner == "bob"
+    tables_crawler.snapshot.assert_called_once()
+    table_ownership.owner_of.assert_called_once_with(the_table)
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_table_migration_status_owner_caches_tables_snapshot() -> None:
+    """Verify that the tables inventory isn't loaded until needed, and after that isn't loaded repeatedly."""
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
+
+    tables_crawler = create_autospec(TablesCrawler)
+    a_table = Table(
+        catalog="hive_metastore",
+        database="foo",
+        name="bar",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    b_table = Table(
+        catalog="hive_metastore",
+        database="baz",
+        name="daz",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    tables_crawler.snapshot.return_value = [a_table, b_table]
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+    table_ownership.owner_of.return_value = "bob"
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+
+    # Verify the snapshot() hasn't been loaded yet: it isn't needed.
+    tables_crawler.snapshot.assert_not_called()
+
+    _ = ownership.owner_of(
+        TableMigrationStatus(src_schema="foo", src_table="bar", dst_catalog="main", dst_schema="foo", dst_table="bar"),
+    )
+    _ = ownership.owner_of(
+        TableMigrationStatus(src_schema="baz", src_table="daz", dst_catalog="main", dst_schema="foo", dst_table="bar"),
+    )
+
+    # Verify the snapshot() wasn't reloaded for the second .owner_of() call.
+    tables_crawler.snapshot.assert_called_once()
+
+
+def test_table_migration_status_source_table_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+
+    unknown_table = TableMigrationStatus(
+        src_schema="foo",
+        src_table="bar",
+        dst_catalog="main",
+        dst_schema="foo",
+        dst_table="bar",
+    )
+    owner = ownership.owner_of(unknown_table)
+
+    assert owner == "an_admin"
+    table_ownership.owner_of.assert_not_called()

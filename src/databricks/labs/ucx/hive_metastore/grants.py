@@ -31,6 +31,7 @@ from databricks.labs.ucx.azure.access import (
     StoragePermissionMapping,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -380,6 +381,16 @@ class GrantsCrawler(CrawlerBase[Grant]):
             log_fn = logger.warning if CLUSTER_WITHOUT_ACL_FRAGMENT in repr(e) else logger.error
             log_fn(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []
+
+
+class GrantOwnership(Ownership[Grant]):
+    """Determine ownership of grants in the inventory.
+
+    At the present we can't determine a specific owner for grants.
+    """
+
+    def _maybe_direct_owner(self, record: Grant) -> None:
+        return None
 
 
 class AwsACL:

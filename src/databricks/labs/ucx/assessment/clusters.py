@@ -29,6 +29,7 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class ClusterInfo:
     policy_id: str | None = None
     cluster_name: str | None = None
     creator: str | None = None
+    """User-name of the creator of the cluster, if known."""
 
 
 class CheckClusterMixin(CheckInitScriptMixin):
@@ -154,7 +156,8 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
-            if not cluster.creator_user_name:
+            creator = cluster.creator_user_name or None
+            if not creator:
                 logger.warning(
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
@@ -164,7 +167,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                 cluster_name=cluster.cluster_name,
                 policy_id=cluster.policy_id,
                 spark_version=cluster.spark_version,
-                creator=cluster.creator_user_name,
+                creator=creator,
                 success=1,
                 failures="[]",
             )
@@ -179,6 +182,16 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
             yield ClusterInfo(*row)
 
 
+class ClusterOwnership(Ownership[ClusterInfo]):
+    """Determine ownership of clusters in the inventory.
+
+    This is the cluster creator (if known).
+    """
+
+    def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
+        return record.creator
+
+
 @dataclass
 class PolicyInfo:
     policy_id: str
@@ -188,6 +201,7 @@ class PolicyInfo:
     spark_version: str | None = None
     policy_description: str | None = None
     creator: str | None = None
+    """User-name of the creator of the cluster policy, if known."""
 
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
@@ -210,7 +224,7 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
             except KeyError:
                 spark_version = None
             policy_name = policy.name
-            creator_name = policy.creator_user_name
+            creator_name = policy.creator_user_name or None
 
             policy_info = PolicyInfo(
                 policy_id=policy.policy_id,
@@ -229,3 +243,13 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
     def _try_fetch(self) -> Iterable[PolicyInfo]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield PolicyInfo(*row)
+
+
+class ClusterPolicyOwnership(Ownership[PolicyInfo]):
+    """Determine ownership of cluster policies in the inventory.
+
+    This is the creator of the cluster policy (if known).
+    """
+
+    def _maybe_direct_owner(self, record: PolicyInfo) -> str | None:
+        return record.creator

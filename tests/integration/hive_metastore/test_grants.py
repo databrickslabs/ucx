@@ -6,6 +6,11 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, GrantOwnership
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from ..conftest import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -108,3 +113,25 @@ def test_all_grants_for_other_objects(
     assert {"DENIED_SELECT"} == found_any_file_grants[group_b.display_name]
     assert {"SELECT"} == found_anonymous_function_grants[group_c.display_name]
     assert {"DENIED_SELECT"} == found_anonymous_function_grants[group_d.display_name]
+
+
+def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
+    """Verify the ownership can be determined for crawled grants."""
+    # This currently isn't very useful: we can't locate specific owners for grants.
+
+    schema = runtime_ctx.make_schema()
+    this_user = ws.current_user.me()
+    sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`")
+    table_crawler = TablesCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
+    udf_crawler = UdfsCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
+
+    # Produce the crawled records.
+    crawler = GrantsCrawler(table_crawler, udf_crawler, include_databases=[schema.name])
+    records = crawler.snapshot(force_refresh=True)
+
+    # Find the crawled record for the grant we made.
+    grant_record = next(record for record in records if record.this_type_and_key() == ("DATABASE", schema.full_name))
+
+    # Verify ownership can be made.
+    ownership = GrantOwnership(runtime_ctx.administrator_locator)
+    assert ownership.owner_of(grant_record) == runtime_ctx.administrator_locator.get_workspace_administrator()
