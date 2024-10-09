@@ -26,7 +26,7 @@ from databricks.labs.ucx.assessment.azure import (
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL, ComputeLocations
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.grants import (
     AwsACL,
@@ -482,10 +482,11 @@ def test_get_eligible_locations_principals_aws(ws, installation):
     )
     locations = aws_acl(ws, installation)
     eligible_locations = locations.get_eligible_locations_principals()
-    assert len(eligible_locations) == 3
-    assert eligible_locations[0].locations == {'s3://storage5/folder5': 'WRITE_FILES'}
-    assert eligible_locations[1].locations == {'s3://storage3/folder3': 'WRITE_FILES'}
-    assert eligible_locations[1].locations == {'s3://storage3/folder3': 'WRITE_FILES'}
+    assert eligible_locations == [
+        ComputeLocations("cluster1", {'s3://storage5/folder5': 'WRITE_FILES'}, "clusters"),
+        ComputeLocations("cluster2", {'s3://storage3/folder3': 'WRITE_FILES'}, "clusters"),
+        ComputeLocations("warehouse1", {'s3://storage3/folder3': 'WRITE_FILES'}, "warehouses"),
+    ]
 
 
 def test_interactive_cluster_aws_no_acl(ws, installation):

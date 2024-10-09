@@ -542,7 +542,7 @@ def test_filter_irrelevant_mounts():
     client.dbutils.fs.ls.assert_has_calls([call('/mnt/test_mount'), call('/mnt/test_mount/table1/')])
 
 
-def test_historical_data_should_be_overwritten():
+def test_historical_data_should_be_overwritten() -> None:
     client = create_autospec(WorkspaceClient)
 
     first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
@@ -590,7 +590,7 @@ def test_historical_data_should_be_overwritten():
             database='database',
             name='name',
             object_type='object_type',
-            table_format='table_format',
+            table_format='TABLE_FORMAT',
             location='location',
             view_text=None,
             upgraded_to=None,

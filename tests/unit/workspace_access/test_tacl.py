@@ -22,7 +22,7 @@ SHOW_GRANTS = MockBackend.rows("principal", "action_type", "object_type", "ignor
 SHOW_TABLES = MockBackend.rows("databaseName", "tableName", "isTmp")
 
 
-def test_tacl_crawler():
+def test_tacl_crawler() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -39,11 +39,12 @@ def test_tacl_crawler():
     first_task = next(crawler_tasks)
     obj = first_task()
 
+    assert obj
     assert obj.object_type == "TABLE"
     assert obj.object_id == "catalog_a.database_b.table_c"
 
 
-def test_tacl_udf_crawler():
+def test_tacl_udf_crawler() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -60,11 +61,12 @@ def test_tacl_udf_crawler():
     first_task = next(crawler_tasks)
     obj = first_task()
 
+    assert obj
     assert obj.object_type == "FUNCTION"
     assert obj.object_id == "catalog_a.database_b.function_c"
 
 
-def test_tacl_crawler_multiple_permissions():
+def test_tacl_crawler_multiple_permissions() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -92,15 +94,14 @@ def test_tacl_crawler_multiple_permissions():
             ]
         }
     )
-    tables_crawler = TablesCrawler(sql_backend, "test")
-    udf_crawler = UdfsCrawler(sql_backend, "test")
-    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    grants_crawler = GrantsCrawler(TablesCrawler(sql_backend, "test"), UdfsCrawler(sql_backend, "test"))
     table_acl_support = TableAclSupport(grants_crawler, sql_backend)
 
     crawler_tasks = table_acl_support.get_crawler_tasks()
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "TABLE"
     assert permissions.object_id == "catalog_a.database_b.table_c"
     assert Grant(
@@ -117,6 +118,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "TABLE"
     assert permissions.object_id == "catalog_a.database_b.table_d"
     assert Grant(
@@ -133,6 +135,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "TABLE"
     assert permissions.object_id == "catalog_a.database_b.table_c"
     assert Grant(
@@ -149,6 +152,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "VIEW"
     assert permissions.object_id == "catalog_a.database_b.view_c"
     assert Grant(
@@ -165,6 +169,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "DATABASE"
     assert permissions.object_id == "catalog_a.database_b"
     assert Grant(
@@ -181,6 +186,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "CATALOG"
     assert permissions.object_id == "catalog_a"
     assert Grant(
@@ -197,6 +203,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "ANY FILE"
     assert permissions.object_id == ""
     assert Grant(
@@ -213,6 +220,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "ANONYMOUS FUNCTION"
     assert permissions.object_id == ""
     assert Grant(
@@ -229,6 +237,7 @@ def test_tacl_crawler_multiple_permissions():
 
     permissions = next(crawler_tasks)()
 
+    assert permissions
     assert permissions.object_type == "FUNCTION"
     assert permissions.object_id == "catalog_a.database_b.function_c"
     assert Grant(
@@ -244,7 +253,7 @@ def test_tacl_crawler_multiple_permissions():
     ) == Grant(**json.loads(permissions.raw))
 
 
-def test_tacl_applier():
+def test_tacl_applier() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -275,7 +284,7 @@ def test_tacl_applier():
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -296,7 +305,7 @@ def test_tacl_applier():
     assert validation_res
 
 
-def test_tacl_applier_not_applied():
+def test_tacl_applier_not_applied() -> None:
     sql_backend = MockBackend(rows={"SELECT \\* FROM `hive_metastore`.`test`.`grants`": []})
     tables_crawler = TablesCrawler(sql_backend, "test")
     udf_crawler = UdfsCrawler(sql_backend, "test")
@@ -318,7 +327,7 @@ def test_tacl_applier_not_applied():
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -339,7 +348,7 @@ def test_tacl_applier_not_applied():
     assert not validation_res
 
 
-def test_tacl_udf_applier(mocker):
+def test_tacl_udf_applier() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -370,7 +379,7 @@ def test_tacl_udf_applier(mocker):
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -391,7 +400,7 @@ def test_tacl_udf_applier(mocker):
     assert validation_res
 
 
-def test_tacl_applier_multiple_actions():
+def test_tacl_applier_multiple_actions() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -423,7 +432,7 @@ def test_tacl_applier_multiple_actions():
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -444,7 +453,7 @@ def test_tacl_applier_multiple_actions():
     assert validation_res
 
 
-def test_tacl_applier_deny_and_grant():
+def test_tacl_applier_deny_and_grant() -> None:
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM `hive_metastore`.`test`.`grants`": UCX_GRANTS[
@@ -477,7 +486,7 @@ def test_tacl_applier_deny_and_grant():
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -499,7 +508,7 @@ def test_tacl_applier_deny_and_grant():
     assert validation_res
 
 
-def test_tacl_applier_no_target_principal(mocker):
+def test_tacl_applier_no_target_principal(mocker) -> None:
     sql_backend = MockBackend()
     table_acl_support = TableAclSupport(mocker.Mock(), sql_backend)
 
@@ -518,7 +527,7 @@ def test_tacl_applier_no_target_principal(mocker):
     )
     grp = [
         MigratedGroup(
-            id_in_workspace=None,
+            id_in_workspace="arbitrary-id",
             name_in_workspace="abc",
             name_in_account="account-abc",
             temporary_name="tmp-backup-abc",
@@ -535,7 +544,7 @@ def test_tacl_applier_no_target_principal(mocker):
     assert not sql_backend.queries
 
 
-def test_verify_task_should_return_true_if_permissions_applied():
+def test_verify_task_should_return_true_if_permissions_applied() -> None:
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE `catalog_a`.`database_b`.`table_c`": SHOW_GRANTS[
@@ -567,7 +576,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     assert result
 
 
-def test_verify_task_should_fail_if_permissions_not_applied():
+def test_verify_task_should_fail_if_permissions_not_applied() -> None:
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE `catalog_a`.`database_b`.`table_c`": SHOW_GRANTS[
@@ -599,7 +608,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
         task()
 
 
-def test_verify_task_should_return_false_if_not_grants_present():
+def test_verify_task_should_return_false_if_not_grants_present() -> None:
     sql_backend = MockBackend()
     tables_crawler = TablesCrawler(sql_backend, "test")
     udf_crawler = UdfsCrawler(sql_backend, "test")

@@ -12,11 +12,13 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import AccountClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+
+from . import mock_workspace_client
 
 pytest.register_assert_rewrite('databricks.labs.blueprint.installation')
 
@@ -46,7 +48,7 @@ def mock_installation() -> MockInstallation:
                     'workspace_name': 'workspace',
                 },
             ],
-            'state.json': {'resources': {'jobs': {'test': '123'}}},
+            'state.json': {'resources': {'jobs': {'test': '123', 'assessment': '456'}}},
         }
     )
 
@@ -120,7 +122,7 @@ def spark_table_crawl_mocker(mocker):
 
 
 @pytest.fixture
-def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
+def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
     def inner(cb, **replace) -> RuntimeContext:
         with _lock, patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
             pyspark_sql_session = mocker.Mock()
@@ -128,9 +130,6 @@ def run_workflow(mocker, mock_installation, spark_table_crawl_mocker):
             if 'installation' not in replace:
                 replace['installation'] = mock_installation
             if 'workspace_client' not in replace:
-                ws = create_autospec(WorkspaceClient)
-                ws.api_client.do.return_value = {}
-                ws.permissions.get.return_value = {}
                 replace['workspace_client'] = ws
             if 'sql_backend' not in replace:
                 replace['sql_backend'] = MockBackend()
@@ -197,3 +196,8 @@ def mock_notebook_resolver():
 @pytest.fixture
 def mock_backend() -> MockBackend:
     return MockBackend()
+
+
+@pytest.fixture
+def ws():
+    return mock_workspace_client()

@@ -25,6 +25,7 @@ from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
@@ -47,7 +48,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
+from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
@@ -260,7 +261,11 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def acl_migrator(self) -> ACLMigrator:
+    def assessment_exporter(self):
+        return AssessmentExporter(self.sql_backend, self.config)
+
+    @cached_property
+    def acl_migrator(self):
         return ACLMigrator(
             self.tables_crawler,
             self.workspace_info,
@@ -388,6 +393,10 @@ class GlobalContext(abc.ABC):
         return VerifyHasMetastore(self.workspace_client)
 
     @cached_property
+    def verify_has_ucx_catalog(self) -> VerifyHasCatalog:
+        return VerifyHasCatalog(self.workspace_client, self.config.ucx_catalog)
+
+    @cached_property
     def pip_resolver(self) -> PythonLibraryResolver:
         return PythonLibraryResolver(self.allow_list)
 
@@ -449,6 +458,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.directfs_access_crawler_for_queries,
+            self.used_tables_crawler_for_queries,
             self.config.include_dashboard_ids,
         )
 

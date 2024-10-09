@@ -10,7 +10,9 @@ so that you'll be able to [scope the migration](docs/assessment.md) and execute 
 The [README notebook](#readme-notebook), which can be found in the installation folder contains further instructions and explanations of the different ucx workflows & dashboards.
 Once the migration is scoped, you can start with the [table migration process](#Table-Migration).
 
+
 More workflows, like notebook code migration are coming in future releases.
+
 
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
@@ -90,6 +92,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
   * [`report-account-compatibility` command](#report-account-compatibility-command)
+  * [`export-assessment` command](#export-assessment-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -1166,6 +1169,42 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 12:56:21  INFO [d.l.u.account.aggregate] Data is in DBFS Root: 23 objects
 12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
 ```
+
+[[back to top](#databricks-labs-ucx)]
+## `export-assessment` command
+
+```commandline
+databricks labs ucx export-assessment
+```
+The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: export_{query_choice}_results.zip
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+- **Choose which assessment results to export:**
+    - **Description:** Select the type of results to export. Options include:
+        - `azure`
+        - `estimates`
+        - `interactive`
+        - `main`
+    - **Default:** `main`
+
+[[back to top](#databricks-labs-ucx)]
+
+## `export-assessment` command
+
+```commandline
+databricks labs ucx export-assessment
+```
+The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: export_{query_choice}_results.zip
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+- **Choose which assessment results to export:**
+    - **Description:** Select the type of results to export. Options include:
+        - `azure`
+        - `estimates`
+        - `interactive`
+        - `main`
 
 [[back to top](#databricks-labs-ucx)]
 
