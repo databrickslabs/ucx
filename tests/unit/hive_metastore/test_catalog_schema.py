@@ -16,10 +16,12 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
+
     def get_catalog(catalog_name: str) -> CatalogInfo | None:
         if catalog_name == "catalog1":
             return CatalogInfo(name="catalog1")
         return None
+
     ws.catalogs.get.side_effect = get_catalog
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
@@ -155,7 +157,15 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     assert "Skipping already existing catalog: ucx" in caplog.text
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz", "abfss://container@storageaccount.dfs.core.windows.net"])
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://foo/bar",
+        "s3://foo/bar/test",
+        "s3://foo/bar/test/baz",
+        "abfss://container@storageaccount.dfs.core.windows.net",
+    ],
+)
 def test_create_all_catalogs_schemas_creates_catalogs(location: str) -> None:
     """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
@@ -175,11 +185,13 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str) -> None:
 def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations() -> None:
     """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({
-        "Please provide storage location url for catalog: catalog2": "s3://foo/bar",
-        "Please provide storage location url for catalog: catalog3": "s3://foo/bar/test",
-        "Please provide storage location url for catalog: catalog4": "s3://foo/bar/test/baz",
-    })
+    mock_prompts = MockPrompts(
+        {
+            "Please provide storage location url for catalog: catalog2": "s3://foo/bar",
+            "Please provide storage location url for catalog: catalog3": "s3://foo/bar/test",
+            "Please provide storage location url for catalog: catalog4": "s3://foo/bar/test/baz",
+        }
+    )
 
     catalog_schema = prepare_test(ws)
     catalog_schema.create_all_catalogs_schemas(mock_prompts)

@@ -129,7 +129,9 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog_name: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
+    def _create_catalog_validate(
+        self, catalog_name: str, prompts: Prompts, *, properties: dict[str, str] | None
+    ) -> None:
         try:
             catalog = self._ws.catalogs.get(catalog_name)
         except NotFound:
