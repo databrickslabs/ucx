@@ -804,12 +804,12 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
         )
 
-    def save_locations(self, make_random) -> None:
+    def save_locations(self) -> None:
         locations: list[ExternalLocation] = []
         if self.workspace_client.config.is_azure:
-            locations = [ExternalLocation(f"abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
+            locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
         if self.workspace_client.config.is_aws:
-            locations = [ExternalLocation(f"s3://labs-things/a", 1)]
+            locations = [ExternalLocation("s3://labs-things/a", 1)]
         self.sql_backend.save_table(
             f"{self.inventory_database}.external_locations",
             locations,
