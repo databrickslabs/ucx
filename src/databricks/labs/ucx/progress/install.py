@@ -20,9 +20,6 @@ class HistoricalRecord:
     job_run_id: int
     """The identifier of the job run that generated this record."""
 
-    failures: list[str]
-    """The list of problems associated with the object that this inventory record covers."""
-
     object_type: str
     """The inventory table for which this record was generated."""
 
@@ -31,6 +28,9 @@ class HistoricalRecord:
 
     data: dict[str, str]
     """Type-specific JSON-encoded data of the inventory record."""
+
+    failures: list[str]
+    """The list of problems associated with the object that this inventory record covers."""
 
     owner: str
     """The identity that has ownership of the object."""
