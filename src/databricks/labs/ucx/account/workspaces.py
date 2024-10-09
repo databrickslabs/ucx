@@ -51,8 +51,12 @@ class AccountWorkspaces:
             workspaces = self.get_accessible_workspaces()
         clients = []
         for workspace in workspaces:
-            ws = self.client_for(workspace)
-            clients.append(ws)
+            try:
+                ws = self.client_for(workspace)
+            except PermissionDenied as e:
+                logger.warning(f"Cannot get a workspace client for: {workspace.deployment_name}", exc_info=e)
+            else:
+                clients.append(ws)
         return clients
 
     def sync_workspace_info(self, workspaces: list[Workspace] | None = None):
