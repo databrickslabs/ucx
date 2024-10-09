@@ -35,7 +35,7 @@ from tests.unit.source_code.test_graph import _TestDependencyGraph
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_workflow_linter_job(installation_ctx, make_job) -> None:
     # Deprecated file system path in call to: /mnt/things/e/f/g
-    job = make_job(content=b"spark.read.table('a_table').write.csv('/mnt/things/e/f/g')")
+    job = make_job(content="spark.read.table('a_table').write.csv('/mnt/things/e/f/g')\n")
     ctx = installation_ctx.replace(config_transform=lambda wc: replace(wc, include_job_ids=[job.job_id]))
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
@@ -57,7 +57,7 @@ def test_linter_from_context(simple_ctx, make_job) -> None:
     # This code is similar to test_running_real_workflow_linter_job, but it's executed on the caller side and is easier
     # to debug.
     # Ensure we have at least 1 job that fails
-    job = make_job(content=b"import xyz")
+    job = make_job(content="import xyz")
     simple_ctx.config.include_job_ids = [job.job_id]
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
@@ -77,7 +77,7 @@ def test_job_linter_no_problems(simple_ctx, make_job) -> None:
 
 
 def test_job_task_linter_library_not_installed_cluster(simple_ctx, make_job) -> None:
-    job = make_job(content=b"import library_not_found")
+    job = make_job(content="import library_not_found\n")
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job.job_id)
 
