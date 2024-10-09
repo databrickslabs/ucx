@@ -139,7 +139,7 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
     catalog_schema = prepare_test(ws)
-    ws.catalogs.get.return_value = CatalogInfo(name="catalog1")
+    ws.catalogs.get.side_effect = lambda catalog_name: CatalogInfo(name="ucx")
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
