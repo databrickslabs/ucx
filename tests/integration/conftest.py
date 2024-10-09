@@ -806,11 +806,10 @@ class MockWorkspaceContext(CommonUtils, WorkspaceContext):
 
     def save_locations(self, make_random) -> None:
         locations: list[ExternalLocation] = []
-        a_dir = make_random(4).lower()
         if self.workspace_client.config.is_azure:
-            locations = [ExternalLocation(f"abfss://things@labsazurethings.dfs.core.windows.net/{a_dir}", 1)]
+            locations = [ExternalLocation(f"abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
         if self.workspace_client.config.is_aws:
-            locations = [ExternalLocation(f"s3://labs-things/{a_dir}", 1)]
+            locations = [ExternalLocation(f"s3://labs-things/a", 1)]
         self.sql_backend.save_table(
             f"{self.inventory_database}.external_locations",
             locations,
