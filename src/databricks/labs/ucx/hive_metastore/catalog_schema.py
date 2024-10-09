@@ -56,9 +56,7 @@ class CatalogSchema:
                     self._create_schema(candidate_catalog, candidate_schema)
                 except BadRequest as e:
                     if "already exists" in str(e):
-                        logger.warning(
-                            f"Schema '{candidate_schema}' in catalog '{candidate_catalog}' already exists. Skipping."
-                        )
+                        logger.warning(f"Skipping already existing schema: {candidate_catalog}.{candidate_schema}")
                         continue
         self._apply_from_legacy_table_acls()
         self._update_principal_acl()

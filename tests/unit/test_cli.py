@@ -804,8 +804,8 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
-    assert "Catalog 'test' already exists. Skipping." in caplog.messages
-    assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
+    assert "Skipping already existing catalog: test" in caplog.messages
+    assert "Skipping already existing schema: test.test" in caplog.messages
 
 
 def test_cluster_remap(ws, caplog):
