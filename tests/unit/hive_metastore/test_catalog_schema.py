@@ -28,7 +28,10 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
 
     ws.catalogs.create.side_effect = raise_catalog_exists
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
+    ws.external_locations.list.return_value = [
+        ExternalLocationInfo(url="s3://foo/bar"),
+        ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
+    ]
     if backend is None:
         backend = MockBackend()
     installation = MockInstallation(
@@ -152,8 +155,8 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     assert "Skipping already existing catalog: ucx" in caplog.text
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
-def test_create_all_catalogs_schemas_creates_catalogs(location: str):
+@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz", "abfss://container@storageaccount.dfs.core.windows.net"])
+def test_create_all_catalogs_schemas_creates_catalogs(location: str) -> None:
     """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": location})
