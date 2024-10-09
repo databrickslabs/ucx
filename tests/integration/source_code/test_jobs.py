@@ -40,15 +40,16 @@ def test_running_real_workflow_linter_job(installation_ctx, make_job) -> None:
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
     ctx.deployed_workflows.validate_step("experimental-workflow-linter")
+
+    # This test merely tests that the workflows produces records of the expected types; record content is not checked.
     cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
     result = next(cursor)
     if result['count'] == 0:
         installation_ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
         assert False, "No workflow problems found"
     dfsa_records = installation_ctx.directfs_access_crawler_for_paths.snapshot()
-    assert dfsa_records
     used_table_records = installation_ctx.used_tables_crawler_for_paths.snapshot()
-    assert used_table_records
+    assert dfsa_records and used_table_records
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
