@@ -27,7 +27,7 @@ class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
     """An identifier that is unique to the records produced for a given snapshot."""
 
     ucx_version: str
-    "The UCX semantic version"
+    """The UCX semantic version."""
 
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
