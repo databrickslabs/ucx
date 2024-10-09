@@ -8,6 +8,7 @@ import pkgutil
 import re
 import sys
 from dataclasses import dataclass
+from email.message import Message
 from functools import cached_property
 from pathlib import Path
 
@@ -91,7 +92,9 @@ class KnownList:
         if not name:
             return UNKNOWN
         for module, problems in self._module_problems.items():
-            if not name.startswith(module):
+            # Find exact matches OR parent module matches
+            # Note sorting when constructing module problems from known.json
+            if not (name == module or name.startswith(module + ".")):
                 continue
             return Compatibility(True, problems)
         return UNKNOWN
@@ -208,7 +211,7 @@ class DistInfo:
         return files
 
     @cached_property
-    def _metadata(self):
+    def _metadata(self) -> Message:
         with Path(self._path, "METADATA").open(encoding=_DEFAULT_ENCODING) as f:
             return email.message_from_file(f)
 

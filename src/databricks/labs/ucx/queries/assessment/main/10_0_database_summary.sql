@@ -3,7 +3,7 @@ WITH table_stats AS (
   SELECT
     `database`,
     object_type,
-    table_format AS `format`,
+    UPPER(table_format) AS `format`,
     `location`,
     IF(object_type IN ('MANAGED', 'EXTERNAL'), 1, 0) AS is_table,
     IF(object_type = 'VIEW', 1, 0) AS is_view,
@@ -15,7 +15,7 @@ WITH table_stats AS (
       ELSE 0
     END AS is_dbfs_root,
     CASE WHEN STARTSWITH(location, 'wasb') THEN 1 WHEN STARTSWITH(location, 'adl') THEN 1 ELSE 0 END AS is_unsupported,
-    IF(table_format = 'DELTA', 1, 0) AS is_delta
+    IF(UPPER(table_format) = 'DELTA', 1, 0) AS is_delta
   FROM inventory.tables
 ), database_stats AS (
   SELECT

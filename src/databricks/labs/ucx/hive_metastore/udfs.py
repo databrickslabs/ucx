@@ -8,6 +8,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -135,3 +136,13 @@ class UdfsCrawler(CrawlerBase[Udf]):
                 yield replace(udf, success=0, failures="Only SCALAR functions are supported")
             else:
                 yield replace(udf, success=1)
+
+
+class UdfOwnership(Ownership[Udf]):
+    """Determine ownership of UDFs in the inventory.
+
+    At the present we don't determine a specific owner for UDFs.
+    """
+
+    def _maybe_direct_owner(self, record: Udf) -> None:
+        return None

@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 
 class RuntimeContext(GlobalContext):
@@ -45,16 +46,16 @@ class RuntimeContext(GlobalContext):
         return RuntimeBackend(debug_truncate_bytes=self.connect_config.debug_truncate_bytes)
 
     @cached_property
-    def installation(self):
+    def installation(self) -> Installation:
         install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
         return Installation(self.workspace_client, "ucx", install_folder=install_folder)
 
     @cached_property
-    def jobs_crawler(self):
+    def jobs_crawler(self) -> JobsCrawler:
         return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def submit_runs_crawler(self):
+    def submit_runs_crawler(self) -> SubmitRunsCrawler:
         return SubmitRunsCrawler(
             self.workspace_client,
             self.sql_backend,
@@ -63,31 +64,31 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def clusters_crawler(self):
+    def clusters_crawler(self) -> ClustersCrawler:
         return ClustersCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def pipelines_crawler(self):
+    def pipelines_crawler(self) -> PipelinesCrawler:
         return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def table_size_crawler(self):
-        return TableSizeCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+    def table_size_crawler(self) -> TableSizeCrawler:
+        return TableSizeCrawler(self.tables_crawler)
 
     @cached_property
-    def policies_crawler(self):
+    def policies_crawler(self) -> PoliciesCrawler:
         return PoliciesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def global_init_scripts_crawler(self):
+    def global_init_scripts_crawler(self) -> GlobalInitScriptCrawler:
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def tables_crawler(self):
-        return FasterTableScanCrawler(self.sql_backend, self.inventory_database)
+    def tables_crawler(self) -> FasterTableScanCrawler:
+        return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def tables_in_mounts(self):
+    def tables_in_mounts(self) -> TablesInMounts:
         return TablesInMounts(
             self.sql_backend,
             self.workspace_client,
@@ -99,7 +100,7 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def task_run_warning_recorder(self):
+    def task_run_warning_recorder(self) -> TaskRunWarningRecorder:
         return TaskRunWarningRecorder(
             self._config_path.parent,
             self.named_parameters["workflow"],
@@ -108,4 +109,17 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.inventory_database,
             int(self.named_parameters.get("attempt", "0")),
+        )
+
+    @cached_property
+    def workflow_run_recorder(self) -> WorkflowRunRecorder:
+        return WorkflowRunRecorder(
+            self.sql_backend,
+            self.config.ucx_catalog,
+            workspace_id=self.workspace_client.get_workspace_id(),
+            workflow_name=self.named_parameters["workflow"],
+            workflow_id=int(self.named_parameters["job_id"]),
+            workflow_run_id=int(self.named_parameters["parent_run_id"]),
+            workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
+            workflow_start_time=self.named_parameters["start_time"],
         )

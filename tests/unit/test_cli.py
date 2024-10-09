@@ -33,6 +33,7 @@ from databricks.labs.ucx.cli import (
     create_missing_principals,
     create_table_mapping,
     create_uber_principal,
+    create_ucx_catalog,
     download,
     ensure_assessment_run,
     installations,
@@ -60,6 +61,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
     delete_missing_principals,
+    export_assessment,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -888,9 +890,18 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
 def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
 
-    create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
+    create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
     ws.catalogs.create.assert_called_once()
+
+
+def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
+
+    assert len(mock_backend.queries) > 0, "No queries executed on backend"
+    assert "CREATE SCHEMA" in mock_backend.queries[0]
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])
@@ -1123,3 +1134,19 @@ def test_delete_principals(ws):
     prompts = MockPrompts({"Select the list of roles *": "0"})
     delete_missing_principals(ws, prompts, ctx)
     role_creation.delete_uc_roles.assert_called_once()
+
+
+def test_export_assessment(ws, tmp_path):
+    query_choice = {"assessment_name": "main", "option": 3}
+    mock_prompts = MockPrompts(
+        {
+            "Choose a path to save the UCX Assessment results": tmp_path.as_posix(),
+            "Choose which assessment results to export": query_choice["option"],
+        }
+    )
+
+    export_assessment(ws, mock_prompts)
+    # Construct the expected filename based on the query_choice
+    expected_filename = f"export_{query_choice['assessment_name']}_results.zip"
+    # Assert that the file exists in the temporary path
+    assert len(list(tmp_path.glob(expected_filename))) == 1

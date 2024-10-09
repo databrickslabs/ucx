@@ -32,7 +32,7 @@ class CrawlerBase(ABC, Generic[Result]):
         table: str,
         klass: type[Result],
         history_log: HistoryLog | None = None,
-    ):
+    ) -> None:
         """
         Initializes a CrawlerBase instance.
 

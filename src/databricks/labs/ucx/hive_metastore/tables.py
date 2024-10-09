@@ -4,7 +4,7 @@ import typing
 from collections.abc import Iterable, Iterator, Collection
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import partial, cached_property
+from functools import cached_property, partial
 
 import sqlglot
 from sqlglot import expressions
@@ -16,6 +16,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ class AclMigrationWhat(Enum):
 
 
 @dataclass
-class Table:
+class Table:  # pylint: disable=too-many-public-methods
     catalog: str
     database: str
     name: str
@@ -80,11 +81,21 @@ class Table:
 
     UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
+    def __post_init__(self) -> None:
+        if isinstance(self.table_format, str):  # Should not happen according to type hint, still safer
+            self.table_format = self.table_format.upper()
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
             return False
         return self.table_format.upper() == "DELTA"
+
+    @property
+    def is_hive(self) -> bool:
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() == "HIVE"
 
     @property
     def key(self) -> str:
@@ -163,13 +174,13 @@ class Table:
             return What.DB_DATASET
         if self.is_table_in_mount:
             return What.TABLE_IN_MOUNT
-        if self.is_dbfs_root and self.table_format == "DELTA":
+        if self.is_dbfs_root and self.is_delta:
             return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
-        if self.kind == "TABLE" and self.table_format.upper() == "HIVE":
+        if self.kind == "TABLE" and self.is_hive:
             return What.EXTERNAL_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC
@@ -194,7 +205,7 @@ class Table:
         )
 
     def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
-        if self.table_format != "HIVE":
+        if not self.is_hive:
             return HiveSerdeType.NOT_HIVESERDE
         # Extract hive serde info, ideally this should be done by table crawler.
         # But doing here to avoid breaking change to the `tables` table in the inventory schema.
@@ -476,7 +487,7 @@ class TablesCrawler(CrawlerBase[Table]):
             return None
 
 
-class FasterTableScanCrawler(CrawlerBase[Table]):
+class FasterTableScanCrawler(TablesCrawler):
     """
     FasterTableScanCrawler is a specialized version of TablesCrawler that uses spark._jsparkSession to utilize
     faster scanning with Scala APIs.
@@ -493,7 +504,7 @@ class FasterTableScanCrawler(CrawlerBase[Table]):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        super().__init__(backend, schema, include_databases)
         self._spark = SparkSession.builder.getOrCreate()
 
     @cached_property
@@ -626,3 +637,13 @@ class FasterTableScanCrawler(CrawlerBase[Table]):
         for table in table_names:
             tasks.append(partial(self._describe, catalog, database, table))
         return tasks
+
+
+class TableOwnership(Ownership[Table]):
+    """Determine ownership of tables in the inventory.
+
+    At the present we don't determine a specific owner for tables.
+    """
+
+    def _maybe_direct_owner(self, record: Table) -> None:
+        return None

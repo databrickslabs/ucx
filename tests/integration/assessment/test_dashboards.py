@@ -2,7 +2,8 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.base import LineageAtom, UsedTable
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.sdk.service.iam import PermissionLevel
 
@@ -54,6 +55,7 @@ def _populate_dashboard_problems(installation_ctx):
 
 
 def _populate_directfs_problems(installation_ctx):
+    assessment_start_timestamp = datetime.now(timezone.utc) - timedelta(minutes=5.0)
     dfsas = [
         DirectFsAccess(
             path="some_path",
@@ -62,16 +64,16 @@ def _populate_directfs_problems(installation_ctx):
             source_id="xyz.py",
             source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="my_workflow"),
-                LineageAtom(object_type="TASK", object_id="my_workflow/my_task"),
-                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook"),
-                LineageAtom(object_type="FILE", object_id="my file"),
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
+            assessment_start_timestamp=assessment_start_timestamp,
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas)
+    installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas, crawl_start_time=assessment_start_timestamp)
     dfsas = [
         DirectFsAccess(
             path="some_path",
@@ -80,14 +82,56 @@ def _populate_directfs_problems(installation_ctx):
             source_id="xyz.py",
             source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard"),
-                LineageAtom(object_type="QUERY", object_id="my_dashboard/my_query"),
+                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
+                LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
+            assessment_start_timestamp=assessment_start_timestamp,
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas)
+    installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas, crawl_start_time=assessment_start_timestamp)
+
+
+def _populate_used_tables(installation_ctx):
+    assessment_start_timestamp = datetime.now(timezone.utc) - timedelta(minutes=5.0)
+    tables = [
+        UsedTable(
+            catalog_name="hive_metastore",
+            schema_name="staff_db",
+            table_name="employees",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+        )
+    ]
+    installation_ctx.used_tables_crawler_for_paths.dump_all(tables, crawl_start_time=assessment_start_timestamp)
+    tables = [
+        UsedTable(
+            catalog_name="hive_metastore",
+            schema_name="customers_db",
+            table_name="customers",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
+                LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
+            ],
+            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+        )
+    ]
+    installation_ctx.used_tables_crawler_for_queries.dump_all(tables, crawl_start_time=assessment_start_timestamp)
 
 
 @pytest.mark.skip("Development tool")
@@ -102,10 +146,11 @@ def test_dashboard_with_prepopulated_data(installation_ctx, make_cluster_policy,
     )
     installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
     installation_ctx.workspace_installation.run()
+    print(f"\nInventory database is {installation_ctx.inventory_database}\n")
     # populate data
     _populate_workflow_problems(installation_ctx)
     _populate_dashboard_problems(installation_ctx)
     _populate_directfs_problems(installation_ctx)
-    print(f"\nInventory database is {installation_ctx.inventory_database}\n")
+    _populate_used_tables(installation_ctx)
     # put a breakpoint here
     print("Put a breakpoint here! Then go check the dashboard in your workspace ;-)\n")

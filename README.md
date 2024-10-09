@@ -10,7 +10,9 @@ so that you'll be able to [scope the migration](docs/assessment.md) and execute 
 The [README notebook](#readme-notebook), which can be found in the installation folder contains further instructions and explanations of the different ucx workflows & dashboards.
 Once the migration is scoped, you can start with the [table migration process](#Table-Migration).
 
+
 More workflows, like notebook code migration are coming in future releases.
+
 
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
@@ -80,6 +82,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [`table-migrated-to-uc`](#table-migrated-to-uc)
       * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
       * [`unsupported-magic-line`](#unsupported-magic-line)
+  * [[EXPERIMENTAL] Migration Progress Workflow](#experimental-migration-progress-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -89,6 +92,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
   * [`report-account-compatibility` command](#report-account-compatibility-command)
+  * [`export-assessment` command](#export-assessment-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -126,7 +130,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-cluster-remap` command](#revert-cluster-remap-command)
   * [`upload` command](#upload-command)
   * [`download` command](#download-command)
-  * [`join-collection` command](#join-collection command)
+  * [`join-collection` command](#join-collection-command)
   * [collection eligible command](#collection-eligible-command)
 * [Common Challenges and the Solutions](#common-challenges-and-the-solutions)
     * [Network Connectivity Issues](#network-connectivity-issues)
@@ -994,6 +998,19 @@ This message indicates the code that could not be analysed by UCX. User must che
 
 [[back to top](#databricks-labs-ucx)]
 
+## [EXPERIMENTAL] Migration Progress Workflow
+
+The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
+workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
+progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
+
+- `workflow_runs`: Tracks the status of the workflow runs.
+
+_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
+
+[[back to top](#databricks-labs-ucx)]
+
 # Utility commands
 
 ## `logs` command
@@ -1029,11 +1046,13 @@ listed with the [`workflows` command](#workflows-command).
 databricks labs ucx update-migration-progress
 ```
 
-This command updates a subset of the inventory tables that are used to track workspace resources that need to be migrated. It does this by triggering the `migration-process-experimental` workflow to run on a workspace and waiting for it to complete. This can be used to ensure that dashboards and associated reporting are updated to reflect the current state of the workspace.
+This command runs the [(experimental) migration progress workflow](#experimental-migration-progress-workflow) to update
+the migration status of workspace resources that need to be migrated. It does this by triggering
+the `migration-progress-experimental` workflow to run on a workspace and waiting for
+it to complete.
 
-_Note: Only a subset of the inventory is updated, *not* the complete inventory that is initially gathered by the [assessment workflow](#assessment-workflow)._
-
-Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can
+be fixed with the [`repair-run` command](#repair-run-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1150,6 +1169,42 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 12:56:21  INFO [d.l.u.account.aggregate] Data is in DBFS Root: 23 objects
 12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
 ```
+
+[[back to top](#databricks-labs-ucx)]
+## `export-assessment` command
+
+```commandline
+databricks labs ucx export-assessment
+```
+The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: export_{query_choice}_results.zip
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+- **Choose which assessment results to export:**
+    - **Description:** Select the type of results to export. Options include:
+        - `azure`
+        - `estimates`
+        - `interactive`
+        - `main`
+    - **Default:** `main`
+
+[[back to top](#databricks-labs-ucx)]
+
+## `export-assessment` command
+
+```commandline
+databricks labs ucx export-assessment
+```
+The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: export_{query_choice}_results.zip
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+- **Choose which assessment results to export:**
+    - **Description:** Select the type of results to export. Options include:
+        - `azure`
+        - `estimates`
+        - `interactive`
+        - `main`
 
 [[back to top](#databricks-labs-ucx)]
 

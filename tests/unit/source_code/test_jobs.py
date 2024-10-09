@@ -23,8 +23,9 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, LintingWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 def test_job_problem_as_message():
@@ -238,8 +239,11 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
-    crawler = create_autospec(DirectFsAccessCrawler)
-    linter = WorkflowLinter(ws, dependency_resolver, mock_path_lookup, empty_index, crawler)
+    directfs_crawler = create_autospec(DirectFsAccessCrawler)
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    linter = WorkflowLinter(
+        ws, dependency_resolver, mock_path_lookup, empty_index, directfs_crawler, used_tables_crawler
+    )
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test-task", libraries=libraries)
@@ -250,7 +254,8 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         linter.lint_job(1234)
 
-    crawler.assert_not_called()
+    directfs_crawler.assert_not_called()
+    used_tables_crawler.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 
@@ -516,3 +521,15 @@ def test_xxx(graph):
     assert workflow_task_container.spark_conf == {"spark.databricks.cluster.profile": "singleNode"}
 
     ws.assert_not_called()
+
+
+def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, migration_index):
+    path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
+    root = Dependency(NotebookLoader(), path)
+    xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
+    walker = LintingWalker(xgraph, set(), mock_path_lookup, "key", CurrentSessionState(), migration_index)
+    advices = 0
+    for advice in walker:
+        advices += 1
+        assert "UNKNOWN" not in advice.path.as_posix()
+    assert advices

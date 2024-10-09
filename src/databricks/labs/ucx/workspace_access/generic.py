@@ -397,7 +397,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         return f"WorkspaceListing(start_path={self._start_path})"
 
 
-def models_listing(ws: WorkspaceClient, num_threads: int):
+def models_listing(ws: WorkspaceClient, num_threads: int | None) -> Callable[[], Iterator[ml.ModelDatabricks]]:
     def inner() -> Iterator[ml.ModelDatabricks]:
         tasks = []
         for model in ws.model_registry.list_models():
@@ -414,6 +414,13 @@ def models_listing(ws: WorkspaceClient, num_threads: int):
 
 
 def experiments_listing(ws: WorkspaceClient):
+    def _get_repo_nb_tag(experiment):
+        repo_nb_tag = []
+        for tag in experiment.tags:
+            if tag.key == "mlflow.experiment.sourceType" and tag.value == "REPO_NOTEBOOK":
+                repo_nb_tag.append(tag)
+        return repo_nb_tag
+
     def inner() -> Iterator[ml.Experiment]:
         for experiment in ws.experiments.list_experiments():
             # We filter-out notebook-based experiments, because they are covered by notebooks listing in
@@ -421,9 +428,7 @@ def experiments_listing(ws: WorkspaceClient):
             if experiment.tags:
                 nb_tag = [t for t in experiment.tags if t.key == "mlflow.experimentType" and t.value == "NOTEBOOK"]
                 # repo-based notebook experiment
-                repo_nb_tag = [
-                    t for t in experiment.tags if t.key == "mlflow.experiment.sourceType" and t.value == "REPO_NOTEBOOK"
-                ]
+                repo_nb_tag = _get_repo_nb_tag(experiment)
                 if nb_tag or repo_nb_tag:
                     continue
 

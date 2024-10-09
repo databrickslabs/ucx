@@ -7,7 +7,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.jobs import NotebookTask, RunTask
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobsCrawler, SubmitRunsCrawler
 
 from .test_assessment import _SPARK_CONF
 
@@ -63,3 +63,22 @@ pass
             failures = job_run.failures
             continue
     assert failures and failures == "[]"
+
+
+def test_job_ownership(ws, runtime_ctx, make_job, inventory_schema, sql_backend) -> None:
+    """Verify the ownership can be determined for crawled jobs."""
+
+    # Set up a job.
+    # Note: there doesn't seem to be a way to change the owner of a job, so we can't test jobs without an owner.
+    job = make_job()
+
+    # Produce the crawled records.
+    crawler = JobsCrawler(ws, sql_backend, inventory_schema)
+    records = crawler.snapshot(force_refresh=True)
+
+    # Find the crawled record for our pipeline.
+    job_record = next(record for record in records if record.job_id == str(job.job_id))
+
+    # Verify ownership is as expected.
+    ownership = JobOwnership(runtime_ctx.administrator_locator)
+    assert ownership.owner_of(job_record) == ws.current_user.me().user_name

@@ -14,8 +14,14 @@ from databricks.labs.ucx.source_code.base import (
     PythonLinter,
     SqlLinter,
     Fixer,
+    UsedTable,
+    TableInfoNode,
+    TablePyCollector,
+    TableSqlCollector,
+    DfsaPyCollector,
+    DfsaSqlCollector,
 )
-from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
+from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS, DirectFsAccessNode
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
@@ -46,12 +52,15 @@ class _TableNameMatcher(ABC):
     @abstractmethod
     def lint(
         self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
-    ) -> Iterator[Advice]:
-        """raises Advices by linting the code"""
+    ) -> Iterable[Advice]: ...
 
     @abstractmethod
-    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
-        """applies recommendations"""
+    def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None: ...
+
+    @abstractmethod
+    def collect_tables(
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[UsedTable]: ...
 
     def _get_table_arg(self, node: Call):
         node_argc = len(node.args)
@@ -85,27 +94,45 @@ class _TableNameMatcher(ABC):
 @dataclass
 class SparkCallMatcher(_TableNameMatcher):
 
-    def lint(
+    def collect_tables(
         self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
-    ) -> Iterator[Advice]:
+    ) -> Iterable[UsedTable]:
+        for used_table in self._collect_tables(from_table, session_state, node):
+            if not used_table:
+                continue
+            yield used_table[1]
+
+    def _collect_tables(
+        self, from_table: FromTableSqlLinter, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[tuple[str, UsedTable] | None]:
         table_arg = self._get_table_arg(node)
         if table_arg is None:
             return
-        table_name = table_arg.as_string().strip("'").strip('"')
         for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
+                yield None
+                continue
+            table_name = inferred.as_string().strip("'").strip('"')
+            info = UsedTable.parse(table_name, from_table.schema)
+            yield table_name, info
+
+    def lint(
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[Advice]:
+        for used_table in self._collect_tables(from_table, session_state, node):
+            if not used_table:
                 yield Advisory.from_node(
                     code='cannot-autofix-table-reference',
                     message=f"Can't migrate '{node.as_string()}' because its table name argument cannot be computed",
                     node=node,
                 )
                 continue
-            dst = self._find_dest(index, inferred.as_string(), from_table.schema)
+            dst = self._find_dest(index, used_table[1])
             if dst is None:
                 continue
             yield Deprecation.from_node(
                 code='table-migrated-to-uc',
-                message=f"Table {table_name} is migrated to {dst.destination()} in Unity Catalog",
+                message=f"Table {used_table[0]} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
             )
@@ -113,17 +140,17 @@ class SparkCallMatcher(_TableNameMatcher):
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, Const)
-        dst = self._find_dest(index, table_arg.value, from_table.schema)
+        # TODO locate constant when value is inferred
+        info = UsedTable.parse(table_arg.value, from_table.schema)
+        dst = self._find_dest(index, info)
         if dst is not None:
             table_arg.value = dst.destination()
 
-    @staticmethod
-    def _find_dest(index: TableMigrationIndex, value: str, schema: str):
-        parts = value.split(".")
-        # Ensure that unqualified table references use the current schema
-        if len(parts) == 1:
-            return index.get(schema, parts[0])
-        return None if len(parts) != 2 else index.get(parts[0], parts[1])
+    @classmethod
+    def _find_dest(cls, index: TableMigrationIndex, table: UsedTable):
+        if table.catalog_name != "hive_metastore":
+            return None
+        return index.get(table.schema_name, table.table_name)
 
 
 @dataclass
@@ -147,6 +174,11 @@ class ReturnValueMatcher(_TableNameMatcher):
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
+
+    def collect_tables(
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[UsedTable]:
+        return []
 
 
 T = TypeVar("T")
@@ -186,6 +218,11 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
+
+    def collect_tables(
+        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterable[UsedTable]:
+        return []  # we don't collect tables through this matcher
 
 
 class SparkTableNameMatchers:
@@ -309,7 +346,7 @@ class SparkTableNameMatchers:
         return self._matchers
 
 
-class SparkTableNamePyLinter(PythonLinter, Fixer):
+class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
 
     def __init__(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state):
         self._from_table = from_table
@@ -351,8 +388,30 @@ class SparkTableNamePyLinter(PythonLinter, Fixer):
             return None
         return matcher if matcher.matches(node) else None
 
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+        for node in tree.walk():
+            matcher = self._find_matcher(node)
+            if matcher is None:
+                continue
+            assert isinstance(node, Call)
+            for used_table in matcher.collect_tables(self._from_table, self._index, self._session_state, node):
+                yield TableInfoNode(used_table, node)
 
-class SparkSqlPyLinter(PythonLinter, Fixer):
+
+class _SparkSqlAnalyzer:
+
+    @classmethod
+    def _visit_call_nodes(cls, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
+        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
+        visitor.visit(tree.node)
+        for call_node in visitor.matched_nodes:
+            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
+            if query is None:
+                continue
+            yield call_node, query
+
+
+class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
@@ -375,15 +434,6 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
                 for advice in self._sql_linter.lint(value.as_string()):
                     yield advice.replace_from_node(call_node)
 
-    def _visit_call_nodes(self, tree: Tree) -> Iterable[tuple[Call, NodeNG]]:
-        visitor = MatchingVisitor(Call, [("sql", Attribute), ("spark", Name)])
-        visitor.visit(tree.node)
-        for call_node in visitor.matched_nodes:
-            query = TreeHelper.get_arg(call_node, arg_index=0, arg_name="sqlQuery")
-            if query is None:
-                continue
-            yield call_node, query
-
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
             return code
@@ -396,3 +446,33 @@ class SparkSqlPyLinter(PythonLinter, Fixer):
             new_query = self._sql_fixer.apply(query.value)
             query.value = new_query
         return tree.node.as_string()
+
+
+class SparkSqlDfsaPyCollector(_SparkSqlAnalyzer, DfsaPyCollector):
+
+    def __init__(self, sql_collector: DfsaSqlCollector):
+        self._sql_collector = sql_collector
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
+        assert self._sql_collector
+        for call_node, query in self._visit_call_nodes(tree):
+            for value in InferredValue.infer_from_node(query):
+                if not value.is_inferred():
+                    continue  # TODO error handling strategy
+                for dfsa in self._sql_collector.collect_dfsas(value.as_string()):
+                    yield DirectFsAccessNode(dfsa, call_node)
+
+
+class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
+
+    def __init__(self, sql_collector: TableSqlCollector):
+        self._sql_collector = sql_collector
+
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+        assert self._sql_collector
+        for call_node, query in self._visit_call_nodes(tree):
+            for value in InferredValue.infer_from_node(query):
+                if not value.is_inferred():
+                    continue  # TODO error handling strategy
+                for table in self._sql_collector.collect_tables(value.as_string()):
+                    yield TableInfoNode(table, call_node)

@@ -1,11 +1,20 @@
 import logging
 import sys
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType, FasterTableScanCrawler
+from databricks.labs.ucx.hive_metastore.tables import (
+    FasterTableScanCrawler,
+    HiveSerdeType,
+    Table,
+    TableOwnership,
+    TablesCrawler,
+    What,
+)
 
 
 def test_is_delta_true():
@@ -195,6 +204,7 @@ def test_tables_returning_error_when_show_tables(caplog):
     'table,dbfs_root,what',
     [
         (Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
+        (Table("a", "b", "c", "MANAGED", "delta", location="dbfs:/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
         (
             Table("a", "b", "c", "MANAGED", "PARQUET", location="dbfs:/somelocation/tablename"),
             True,
@@ -225,7 +235,7 @@ def test_tables_returning_error_when_show_tables(caplog):
         (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
-def test_is_dbfs_root(table, dbfs_root, what):
+def test_is_dbfs_root(table, dbfs_root, what) -> None:
     assert table.is_dbfs_root == dbfs_root
     assert table.what == what
 
@@ -325,10 +335,7 @@ def test_is_partitioned_flag():
         ],
     }
     backend = MockBackend(rows=rows)
-    tables_crawler = TablesCrawler(
-        backend,
-        "default",
-    )
+    tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()
     assert len(results) == 2
     assert (
@@ -652,3 +659,16 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     with caplog.at_level(logging.WARNING):
         ftsc.snapshot()
     assert "Test getTable warning" in caplog.text
+
+
+def test_table_owner() -> None:
+    """Verify that the owner of a crawled table is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = TableOwnership(admin_locator)
+    table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
+    owner = ownership.owner_of(table)
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()

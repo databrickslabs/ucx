@@ -4,7 +4,7 @@ import datetime as dt
 import json
 import logging
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Protocol, TypeVar
@@ -116,38 +116,42 @@ class HistoryLog:
             assert owner
             return owner
 
-        def append_snapshot(self, records: Sequence[Record], *, run_start_time: dt.datetime) -> None:
-            snapshot_id = int.from_bytes(os.urandom(7), byteorder="big")
-            historical_records = [
-                self._inventory_record_to_historical(record, snapshot_id=snapshot_id, run_start_time=run_start_time)
-                for record in records
-            ]
+        def append_snapshot(self, records: Iterable[Record], *, run_start_time: dt.datetime) -> None:
+            snapshot_id: int = int.from_bytes(os.urandom(7), byteorder="big")
+            historical_records = list(
+                self._inventory_records_to_historical(
+                    records,
+                    snapshot_id=snapshot_id,
+                    run_start_time=run_start_time,
+                )
+            )
             self._persist(self._object_type, historical_records)
 
-        def _inventory_record_to_historical(
+        def _inventory_records_to_historical(
             self,
-            record: Record,
+            records: Iterable[Record],
             *,
             snapshot_id: int,
             run_start_time: dt.datetime,
-        ) -> HistoricalRecord:
-            object_id = self._key_from(record)
-            object_as_dict = dataclasses.asdict(record)
-            flattened_object_data = {k: json.dumps(v) for k, v in object_as_dict.items()}
-            # TODO: Get failures.
-            failures: list[str] = []
-            return HistoricalRecord(
-                workspace_id=self._workspace_id,
-                run_id=self._run_id,
-                snapshot_id=snapshot_id,
-                run_start_time=run_start_time,
-                object_type=self._object_type,
-                object_type_version=self._object_type_version,
-                object_id=object_id,
-                object_data=flattened_object_data,
-                failures=failures,
-                owner=self._owner,
-            )
+        ) -> Iterable[HistoricalRecord]:
+            for record in records:
+                object_id = self._key_from(record)
+                object_as_dict = dataclasses.asdict(record)
+                flattened_object_data = {k: json.dumps(v) for k, v in object_as_dict.items()}
+                # TODO: Get failures.
+                failures: list[str] = []
+                yield HistoricalRecord(
+                    workspace_id=self._workspace_id,
+                    run_id=self._run_id,
+                    snapshot_id=snapshot_id,
+                    run_start_time=run_start_time,
+                    object_type=self._object_type,
+                    object_type_version=self._object_type_version,
+                    object_id=object_id,
+                    object_data=flattened_object_data,
+                    failures=failures,
+                    owner=self._owner,
+                )
 
     def appender(self, klass: type[Record]) -> Appender:
         key_fields = getattr(klass, "key_fields", ())

@@ -54,10 +54,10 @@ class LocationTrie:
     tables: list[Table] = dataclasses.field(default_factory=list)
 
     @cached_property
-    def _path(self):
+    def _path(self) -> list[str]:
         """The path to traverse to get to the current node."""
         parts = []
-        current = self
+        current: LocationTrie | None = self
         while current:
             parts.append(current.key)
             current = current.parent
@@ -333,6 +333,10 @@ class Mounts(CrawlerBase[Mount]):
 class TableInMount:
     format: str
     is_partitioned: bool
+
+    def __post_init__(self) -> None:
+        if isinstance(self.format, str):  # Should not happen according to type hint, still safer
+            self.format = self.format.upper()
 
 
 class TablesInMounts(CrawlerBase[Table]):

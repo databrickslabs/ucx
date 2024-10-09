@@ -2,12 +2,14 @@ import datetime
 import logging
 from itertools import cycle
 from unittest.mock import create_autospec
+
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount
@@ -22,11 +24,13 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatusRefresher,
     TableMigrationIndex,
+    TableMigrationOwnership,
     TableMigrationStatus,
     TableView,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     Table,
+    TableOwnership,
     TablesCrawler,
     What,
 )
@@ -36,13 +40,6 @@ from .. import mock_table_mapping, mock_workspace_client
 
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-def ws():
-    client = create_autospec(WorkspaceClient)
-    client.get_workspace_id.return_value = "12345"
-    return client
 
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
@@ -70,7 +67,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     )
     assert (
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;"
-        in backend.queries
+        not in backend.queries
     )
     assert (
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
@@ -79,11 +76,11 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     assert (
         f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     ) in backend.queries
     assert (
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
-        in backend.queries
+        not in backend.queries
     )
     migrate_grants.apply.assert_called()
 
@@ -127,7 +124,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     assert (
         f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
         f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     ) in backend.queries
 
 
@@ -179,7 +176,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         (
             f"ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
             f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , "
-            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
         ),
     ]
 
@@ -467,7 +464,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     assert create in backend.queries
     src = "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     assert src in backend.queries
-    dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+    dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     assert dst in backend.queries
     migrate_grants.apply.assert_called()
 
@@ -960,7 +957,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
         "COMMENT ON TABLE `hive_metastore`.`db1_src`.`managed_dbfs` IS 'This table is deprecated. Please use `ucx_default.db1_dst.managed_dbfs` instead of `hive_metastore.db1_src.managed_dbfs`.';",
-        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '12345');",
+        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , 'upgraded_from_workspace_id' = '123');",
     ]
 
 
@@ -1031,7 +1028,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     table_keys = [task.args[0].src.key for task in tasks]
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
-    assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
+    assert not any(key for key in table_keys if key == "hive_metastore.db1_src.t1_src")
 
 
 def test_table_in_mount_mapping_with_table_owner():
@@ -1241,3 +1238,103 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
         assert len(tables) == 1 and tables[0].key == "hive_metastore.schema1.table3"
     migrate_grants.assert_not_called()
+
+
+def test_table_migration_status_owner() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+
+    tables_crawler = create_autospec(TablesCrawler)
+    the_table = Table(
+        catalog="hive_metastore",
+        database="foo",
+        name="bar",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    tables_crawler.snapshot.return_value = [the_table]
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+    table_ownership.owner_of.return_value = "bob"
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+    owner = ownership.owner_of(
+        TableMigrationStatus(
+            src_schema="foo",
+            src_table="bar",
+            dst_catalog="main",
+            dst_schema="foo",
+            dst_table="bar",
+        )
+    )
+
+    assert owner == "bob"
+    tables_crawler.snapshot.assert_called_once()
+    table_ownership.owner_of.assert_called_once_with(the_table)
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_table_migration_status_owner_caches_tables_snapshot() -> None:
+    """Verify that the tables inventory isn't loaded until needed, and after that isn't loaded repeatedly."""
+    admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
+
+    tables_crawler = create_autospec(TablesCrawler)
+    a_table = Table(
+        catalog="hive_metastore",
+        database="foo",
+        name="bar",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    b_table = Table(
+        catalog="hive_metastore",
+        database="baz",
+        name="daz",
+        object_type="TABLE",
+        table_format="DELTA",
+        location="/some/path",
+    )
+    tables_crawler.snapshot.return_value = [a_table, b_table]
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+    table_ownership.owner_of.return_value = "bob"
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+
+    # Verify the snapshot() hasn't been loaded yet: it isn't needed.
+    tables_crawler.snapshot.assert_not_called()
+
+    _ = ownership.owner_of(
+        TableMigrationStatus(src_schema="foo", src_table="bar", dst_catalog="main", dst_schema="foo", dst_table="bar"),
+    )
+    _ = ownership.owner_of(
+        TableMigrationStatus(src_schema="baz", src_table="daz", dst_catalog="main", dst_schema="foo", dst_table="bar"),
+    )
+
+    # Verify the snapshot() wasn't reloaded for the second .owner_of() call.
+    tables_crawler.snapshot.assert_called_once()
+
+
+def test_table_migration_status_source_table_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
+    table_ownership = create_autospec(TableOwnership)
+    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
+
+    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+
+    unknown_table = TableMigrationStatus(
+        src_schema="foo",
+        src_table="bar",
+        dst_catalog="main",
+        dst_schema="foo",
+        dst_table="bar",
+    )
+    owner = ownership.owner_of(unknown_table)
+
+    assert owner == "an_admin"
+    table_ownership.owner_of.assert_not_called()
