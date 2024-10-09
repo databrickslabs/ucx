@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from unittest.mock import ANY, Mock, create_autospec
+from unittest.mock import Mock
 
 import pytest
 from databricks.labs.lsql import Row
@@ -8,7 +8,6 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result, ResultFn
-from databricks.labs.ucx.framework.history import HistoryLog
 
 
 @dataclass
@@ -38,12 +37,11 @@ class _CrawlerFixture(CrawlerBase[Result]):
         schema: str,
         table: str,
         klass: type[Result],
-        history_log: HistoryLog | None = None,
         *,
         fetcher: ResultFn = lambda: [],
         loader: ResultFn = lambda: [],
     ):
-        super().__init__(backend, catalog, schema, table, klass, history_log)
+        super().__init__(backend, catalog, schema, table, klass)
         self._fetcher = fetcher
         self._loader = loader
 
@@ -62,14 +60,6 @@ def test_invalid():
 def test_full_name():
     cb = _CrawlerFixture(MockBackend(), "a", "b", "c", Bar)
     assert cb.full_name == "a.b.c"
-
-
-def test_history_appender_setup() -> None:
-    """Verify that initializing the crawler also initializes the appender."""
-    mock_history = create_autospec(HistoryLog)
-    _ = _CrawlerFixture(MockBackend(), "a", "b", "c", Baz, history_log=mock_history)
-
-    mock_history.appender.assert_called_once_with(Baz)
 
 
 def test_snapshot_crawls_when_no_prior_crawl() -> None:
@@ -142,7 +132,7 @@ def test_snapshot_force_refresh_replaces_prior_data() -> None:
     assert [Row(first="second", second=None)] == mock_backend.rows_written_for("a.b.c", mode="overwrite")
 
 
-def test_snapshot_updates_existing_inventory_table() -> None:
+def test_snapshot_updates_existing_table() -> None:
     mock_backend = MockBackend()
     cb = _CrawlerFixture[Baz](mock_backend, "a", "b", "c", Baz, loader=lambda: [Baz(first="first")])
 
@@ -152,7 +142,7 @@ def test_snapshot_updates_existing_inventory_table() -> None:
     assert [Row(first="first", second=None)] == mock_backend.rows_written_for("a.b.c", "overwrite")
 
 
-def test_snapshot_updates_new_inventory_table() -> None:
+def test_snapshot_updates_new_table() -> None:
     mock_backend = MockBackend()
 
     def fetcher():
@@ -167,19 +157,6 @@ def test_snapshot_updates_new_inventory_table() -> None:
 
     assert [Foo(first="first", second=True)] == result
     assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "overwrite")
-
-
-def test_snapshot_appends_to_history() -> None:
-    """Verify that when a snapshot is saved, it's also persisted in the history."""
-    mock_history = create_autospec(HistoryLog)
-    cb = _CrawlerFixture[Baz](
-        MockBackend(), "a", "b", "c", Baz, loader=lambda: [Baz(first="first")], history_log=mock_history
-    )
-
-    result = cb.snapshot()
-
-    assert [Baz(first="first")] == result
-    mock_history.appender(Baz).append_snapshot.assert_called_once_with([Baz(first="first")], run_start_time=ANY)
 
 
 def test_snapshot_wrong_error() -> None:

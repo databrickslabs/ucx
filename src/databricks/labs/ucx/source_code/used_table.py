@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
 import logging
 from collections.abc import Sequence, Iterable
 
@@ -34,14 +33,14 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
     def for_queries(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
         return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
 
-    def dump_all(self, tables: Sequence[UsedTable], *, crawl_start_time: dt.datetime) -> None:
+    def dump_all(self, tables: Sequence[UsedTable]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 3 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR
         """
         try:
             # TODO until we historize data, we append all TableInfos
-            self._update_snapshot(tables, mode="append", crawl_start_time=crawl_start_time)
+            self._update_snapshot(tables, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 

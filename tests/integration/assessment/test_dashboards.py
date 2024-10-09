@@ -55,7 +55,6 @@ def _populate_dashboard_problems(installation_ctx):
 
 
 def _populate_directfs_problems(installation_ctx):
-    assessment_start_timestamp = datetime.now(timezone.utc) - timedelta(minutes=5.0)
     dfsas = [
         DirectFsAccess(
             path="some_path",
@@ -69,11 +68,11 @@ def _populate_directfs_problems(installation_ctx):
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas, crawl_start_time=assessment_start_timestamp)
+    installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas)
     dfsas = [
         DirectFsAccess(
             path="some_path",
@@ -85,15 +84,14 @@ def _populate_directfs_problems(installation_ctx):
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas, crawl_start_time=assessment_start_timestamp)
+    installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas)
 
 
 def _populate_used_tables(installation_ctx):
-    assessment_start_timestamp = datetime.now(timezone.utc) - timedelta(minutes=5.0)
     tables = [
         UsedTable(
             catalog_name="hive_metastore",
@@ -109,11 +107,11 @@ def _populate_used_tables(installation_ctx):
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.used_tables_crawler_for_paths.dump_all(tables, crawl_start_time=assessment_start_timestamp)
+    installation_ctx.used_tables_crawler_for_paths.dump_all(tables)
     tables = [
         UsedTable(
             catalog_name="hive_metastore",
@@ -127,11 +125,11 @@ def _populate_used_tables(installation_ctx):
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=assessment_start_timestamp,
+            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
-    installation_ctx.used_tables_crawler_for_queries.dump_all(tables, crawl_start_time=assessment_start_timestamp)
+    installation_ctx.used_tables_crawler_for_queries.dump_all(tables)
 
 
 @pytest.mark.skip("Development tool")

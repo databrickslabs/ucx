@@ -85,7 +85,7 @@ class QueryLinter:
                 assessment_end_timestamp=assessment_end,
             )
             processed_dfsas.append(dfsa)
-        self._directfs_crawler.dump_all(processed_dfsas, crawl_start_time=assessment_start)
+        self._directfs_crawler.dump_all(processed_dfsas)
 
     def _dump_used_tables(self, context: _ReportingContext, assessment_start: datetime, assessment_end: datetime):
         processed_tables = []
@@ -96,7 +96,7 @@ class QueryLinter:
                 assessment_end_timestamp=assessment_end,
             )
             processed_tables.append(table)
-        self._used_tables_crawler.dump_all(processed_tables, crawl_start_time=assessment_start)
+        self._used_tables_crawler.dump_all(processed_tables)
 
     def _lint_dashboards(self, context: _ReportingContext):
         dashboard_ids = self._dashboard_ids_in_scope()

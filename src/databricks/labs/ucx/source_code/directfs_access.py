@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
 import logging
 from collections.abc import Sequence, Iterable
 
@@ -35,14 +34,14 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         """
         super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
 
-    def dump_all(self, dfsas: Sequence[DirectFsAccess], *, crawl_start_time: dt.datetime) -> None:
+    def dump_all(self, dfsas: Sequence[DirectFsAccess]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR
         """
         try:
             # TODO until we historize data, we append all DFSAs
-            self._update_snapshot(dfsas, crawl_start_time=crawl_start_time, mode="append")
+            self._update_snapshot(dfsas, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
 
