@@ -4,7 +4,10 @@ from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
+
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +29,6 @@ class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
     snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
 
-    ucx_version: str
-    """The UCX semantic version."""
-
     failures: list[str]
     """The list of problems associated with the object that this inventory record covers."""
 
@@ -43,6 +43,9 @@ class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
 
     owner: str
     """The identity that has ownership of the object."""
+
+    ucx_version: str = __version__
+    """The UCX semantic version."""
 
     object_type_version: int = 0
     """Versioning of inventory table, for forward compatibility."""
