@@ -197,5 +197,5 @@ class Ownership(ABC, Generic[Record]):
 
     @abstractmethod
     def _maybe_direct_owner(self, record: Record) -> str | None:
-        """Obtain the record-specific user-name associated with the given result, if any."""
+        """Obtain the record-specific user-name associated with the given record, if any."""
         return None
