@@ -139,7 +139,7 @@ class DbutilsPyLinter(PythonLinter):
     def get_dbutils_notebook_run_path_arg(node: Call):
         if len(node.args) > 0:
             return node.args[0]
-        arg = next(kw for kw in node.keywords if kw.arg == "path")
+        arg = next((kw for kw in node.keywords if kw.arg == "path"), None)
         return arg.value if arg is not None else None
 
     @staticmethod
