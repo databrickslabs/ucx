@@ -81,7 +81,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
 class PipelineOwnership(Ownership[PipelineInfo]):
     """Determine ownership of pipelines in the inventory.
 
-    This is the pipeline creator (if known), or otherwise an administrator.
+    This is the pipeline creator (if known).
     """
 
     def _maybe_direct_owner(self, record: PipelineInfo) -> str | None:

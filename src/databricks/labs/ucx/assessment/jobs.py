@@ -146,7 +146,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
 class JobOwnership(Ownership[JobInfo]):
     """Determine ownership of jobs (workflows) in the inventory.
 
-    This is the pipeline creator (if known), or otherwise an administrator.
+    This is the job creator (if known).
     """
 
     def _maybe_direct_owner(self, record: JobInfo) -> str | None:

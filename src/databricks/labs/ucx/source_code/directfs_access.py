@@ -63,8 +63,7 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
      - For queries, the creator of the query (if known).
      - For jobs, the owner of the path for the notebook or source (if known).
 
-    At present this information is not gathered during the crawling process, so it can't be reported here. As such
-    an administrator is currently always reported as the owner.
+    At present this information is not gathered during the crawling process, so it can't be reported here.
     """
 
     def _maybe_direct_owner(self, record: DirectFsAccess) -> None:

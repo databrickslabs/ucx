@@ -141,7 +141,7 @@ class UdfsCrawler(CrawlerBase[Udf]):
 class UdfOwnership(Ownership[Udf]):
     """Determine ownership of UDFs in the inventory.
 
-    At the present we don't determine a specific owner for UDFs: we always report an administrator.
+    At the present we don't determine a specific owner for UDFs.
     """
 
     def _maybe_direct_owner(self, record: Udf) -> None:

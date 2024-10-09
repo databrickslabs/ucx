@@ -185,7 +185,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 class ClusterOwnership(Ownership[ClusterInfo]):
     """Determine ownership of clusters in the inventory.
 
-    This is the cluster creator (if known), or otherwise an administrator.
+    This is the cluster creator (if known).
     """
 
     def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
@@ -248,7 +248,7 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
 class ClusterPolicyOwnership(Ownership[PolicyInfo]):
     """Determine ownership of cluster policies in the inventory.
 
-    This is the creator of the cluster policy (if known), or otherwise an administrator.
+    This is the creator of the cluster policy (if known).
     """
 
     def _maybe_direct_owner(self, record: PolicyInfo) -> str | None:

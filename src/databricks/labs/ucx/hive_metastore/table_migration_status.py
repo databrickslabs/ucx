@@ -158,7 +158,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 class TableMigrationOwnership(Ownership[TableMigrationStatus]):
     """Determine ownership of table migration records in the inventory.
 
-    This is the owner of the source table, if it is present in the inventory, otherwise an administrator.
+    This is the owner of the source table, if (and only if) the source table is present in the inventory.
     """
 
     def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:

@@ -386,7 +386,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
 class GrantOwnership(Ownership[Grant]):
     """Determine ownership of grants in the inventory.
 
-    At the present we can't determine a specific owner for grants: we always report an administrator.
+    At the present we can't determine a specific owner for grants.
     """
 
     def _maybe_direct_owner(self, record: Grant) -> None:

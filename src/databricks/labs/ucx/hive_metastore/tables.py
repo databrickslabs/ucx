@@ -642,7 +642,7 @@ class FasterTableScanCrawler(TablesCrawler):
 class TableOwnership(Ownership[Table]):
     """Determine ownership of tables in the inventory.
 
-    At the present we don't determine a specific owner for tables: we always report an administrator.
+    At the present we don't determine a specific owner for tables.
     """
 
     def _maybe_direct_owner(self, record: Table) -> None:
