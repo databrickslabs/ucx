@@ -407,7 +407,7 @@ class WorkflowLinter:
     def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccess] = []
-        table_infos: list[UsedTable] = []
+        used_tables: list[UsedTable] = []
 
         assert job.job_id is not None
         assert job.settings is not None
@@ -442,13 +442,14 @@ class WorkflowLinter:
             assessment_start = datetime.now(timezone.utc)
             task_tables = self._collect_task_tables(job, task, graph, session_state)
             assessment_end = datetime.now(timezone.utc)
-            for table_info in task_tables:
-                table_info = table_info.replace_assessment_infos(
-                    assessment_start=assessment_start, assessment_end=assessment_end
+            for used_table in task_tables:
+                used_table = used_table.replace_assessment_infos(
+                    assessment_start=assessment_start,
+                    assessment_end=assessment_end,
                 )
-                table_infos.append(table_info)
+                used_tables.append(used_table)
 
-        return problems, dfsas, table_infos
+        return problems, dfsas, used_tables
 
     def _build_task_dependency_graph(
         self, task: jobs.Task, job: jobs.Job
@@ -497,17 +498,21 @@ class WorkflowLinter:
             yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
 
     def _collect_task_tables(
-        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
+        self,
+        job: jobs.Job,
+        task: jobs.Task,
+        graph: DependencyGraph,
+        session_state: CurrentSessionState,
     ) -> Iterable[UsedTable]:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for dfsa in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+        for used_table in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
             ]
-            yield dataclasses.replace(dfsa, source_lineage=atoms + dfsa.source_lineage)
+            yield dataclasses.replace(used_table, source_lineage=atoms + used_table.source_lineage)
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
