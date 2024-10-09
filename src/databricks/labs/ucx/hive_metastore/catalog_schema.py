@@ -146,7 +146,7 @@ class CatalogSchema:
                 break
             attempts -= 1
             if attempts == 0:
-                raise NotFound(f"Failed to validate location for {catalog_name} catalog")
+                raise NotFound(f"Failed to validate location for catalog: {catalog_name}")
         self._create_catalog(catalog_name, catalog_storage, properties=properties)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
