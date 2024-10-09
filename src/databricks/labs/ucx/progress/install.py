@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
-class HistoricalRecord:
+class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
     workspace_id: int
     """The identifier of the workspace where this record was generated."""
 
