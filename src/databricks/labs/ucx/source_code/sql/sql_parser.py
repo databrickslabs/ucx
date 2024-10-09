@@ -2,7 +2,8 @@ import logging
 from collections.abc import Callable, Iterable, Iterator
 from typing import TypeVar
 
-from sqlglot import parse, ParseError
+from sqlglot import parse
+from sqlglot.errors import SqlglotError
 from sqlglot.expressions import Create, Delete, Drop, Expression, Select, Table, Update, Use
 
 from databricks.labs.ucx.source_code.base import UsedTable, CurrentSessionState
@@ -72,6 +73,6 @@ class SqlParser:
                 if not expression:
                     continue
                 yield from callback(SqlExpression(expression))
-        except ParseError as e:
+        except SqlglotError as e:
             logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
             raise e
