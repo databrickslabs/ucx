@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
+from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
