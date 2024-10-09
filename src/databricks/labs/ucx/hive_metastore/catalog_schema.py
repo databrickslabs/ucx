@@ -45,13 +45,7 @@ class CatalogSchema:
             properties : (dict[str, str] | None), default None
                 The properties to pass to the catalog. If None, no properties are passed.
         """
-        try:
-            self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
-        except BadRequest as e:
-            if "already exists" in str(e):
-                logger.warning(f"Catalog '{self._ucx_catalog}' already exists. Skipping.")
-                return
-            raise
+        self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
@@ -141,19 +135,19 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
-        logger.info(f"Validating UC catalog: {catalog}")
+    def _create_catalog_validate(self, catalog_name: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
+        logger.info(f"Validating UC catalog: {catalog_name}")
         attempts = 3
         while True:
             catalog_storage = prompts.question(
-                f"Please provide storage location url for catalog: {catalog}", default="metastore"
+                f"Please provide storage location url for catalog: {catalog_name}", default="metastore"
             )
             if self._validate_location(catalog_storage):
                 break
             attempts -= 1
             if attempts == 0:
-                raise NotFound(f"Failed to validate location for {catalog} catalog")
-        self._create_catalog(catalog, catalog_storage, properties=properties)
+                raise NotFound(f"Failed to validate location for {catalog_name} catalog")
+        self._create_catalog(catalog_name, catalog_storage, properties=properties)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
         """generate a list of existing UC catalogs and schema."""
