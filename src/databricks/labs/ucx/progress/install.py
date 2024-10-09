@@ -13,18 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
-class HistoricalRecord:  # pylint: disable=too-many-instance-attributes
+class HistoricalRecord:
     workspace_id: int
     """The identifier of the workspace where this record was generated."""
 
     job_run_id: int
     """The identifier of the job run that generated this record."""
-
-    run_as: str
-    """The identity of the account that ran the workflow that generated this record."""
-
-    run_start_time: dt.datetime
-    """When this record was generated."""
 
     snapshot_id: int
     """An identifier that is unique to the records produced for a given snapshot."""
