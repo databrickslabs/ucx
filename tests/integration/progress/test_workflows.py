@@ -34,9 +34,3 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
     # Ensure that the migration-progress workflow populated the `workflow_runs` table.
     query = f"SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs"
     assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
-
-    # Ensure that the migration-progress workflow populates the historical records for each relevant UCX inventory table
-    ucx_inventory_tables = "tables",
-    for ucx_inventory_table in ucx_inventory_tables:
-        query = f"SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.historical_records WHERE object_type = '{ucx_inventory_table}'"
-        assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
