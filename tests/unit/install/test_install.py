@@ -375,7 +375,7 @@ def test_configure_sets_expected_workspace_configuration_values(
         "workspace_start_path": "/",
         "num_days_submit_runs_history": 30,
         "recon_tolerance_percent": 5,
-        "managed_table_migration_option": 1,
+        "managed_table_external_storage": "CLONE",
     }
     prompts = MockPrompts(
         {
@@ -463,7 +463,7 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'recon_tolerance_percent': 5,
-            'managed_table_migration_option': 1,
+            'managed_table_external_storage': "CLONE",
         },
     )
 
@@ -1703,7 +1703,7 @@ def test_save_config_ext_hms(ws, mock_installation) -> None:
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
             'recon_tolerance_percent': 5,
-            'managed_table_migration_option': 1,
+            'managed_table_external_storage': "CLONE",
         },
     )
 
@@ -1715,7 +1715,7 @@ def test_upload_dependencies(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "0",
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r".*Does given workspace.* block Internet access.*": "Yes",
-            r"If hive_metastore contains managed table with external.*": "0",
+            r"If hive_metastore contains managed table with external.*": "1",
         }
     )
     wheels = create_autospec(WheelsV2)

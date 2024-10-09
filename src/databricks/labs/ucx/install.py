@@ -364,7 +364,7 @@ class WorkspaceInstaller(WorkspaceContext):
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
-            managed_table_migration_option=managed_table_migration_choice,
+            managed_table_external_storage=managed_table_migration_choice,
         )
         self.installation.save(config)
         if self._is_account_install:
@@ -374,12 +374,12 @@ class WorkspaceInstaller(WorkspaceContext):
             webbrowser.open(ws_file_url)
         return config
 
-    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, int]:
+    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, str]:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
         managed_table_migration_choices = {
-            "[Convert MANAGED table to EXTERNAL table and migrate as EXTERNAL UC table": 0,
-            "[Migrate MANAGED table as EXTERNAL UC table and migrate as EXTERNAL UC table": 1,
-            "[Migrate MANAGED table as MANAGED UC table]": 2,
+            "Convert MANAGED HMS table to EXTERNAL HMS table and migrate as EXTERNAL UC table. This risks data leakage, as once the relevant HMS tables are deleted, the underlying data won't get deleted anymore.": 'CONVERT_TO_EXTERNAL',
+            "Migrate MANAGED HMS table as EXTERNAL UC table. This option would require you to convert MANAGED HMS tables to EXTERNAL HMS tables once UC migration is complete, otherwise deleting HMS MANAGED table would delete the migrated UC table": 'SYNC_AS_EXTERNAL',
+            "Copy data from MANAGED HMS to MANAGED UC table": 'CLONE',
         }
         managed_table_migration_choice = self.prompts.choice_from_dict(
             "If hive_metastore contains managed table with external"

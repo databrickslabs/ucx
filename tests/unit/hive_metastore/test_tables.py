@@ -76,7 +76,7 @@ def test_sql_managed_non_delta():
                 catalog="catalog",
                 database="db",
                 name="managed_table",
-                object_type="MANAGED",
+                object_type="EXTERNAL",
                 table_format="DELTA",
                 location="dbfs:/mnt/location/table",
             ),
@@ -212,14 +212,14 @@ def test_tables_returning_error_when_show_tables(caplog):
         ),
         (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
         (
-            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
+            Table("a", "mounted_b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
             False,
-            What.EXTERNAL_SYNC,
+            What.MANAGED_MOUNT,
         ),
         (
-            Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
+            Table("a", "mounted_b", "c", "EXTERNAL", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
             False,
-            What.EXTERNAL_SYNC,
+            What.TABLE_IN_MOUNT,
         ),
         (
             Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"),
@@ -231,8 +231,8 @@ def test_tables_returning_error_when_show_tables(caplog):
             False,
             What.DB_DATASET,
         ),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.MANAGED_EXTERNAL),
+        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
 def test_is_dbfs_root(table, dbfs_root, what) -> None:
