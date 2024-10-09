@@ -74,6 +74,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] Whether the assessment should lint only specific dashboards.
     include_dashboard_ids: list[str] | None = None
 
+    # [INTERNAL ONLY] Whether managed table should be created as external UC table.
+    managed_to_external: bool = True
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
