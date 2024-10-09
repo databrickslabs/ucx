@@ -700,7 +700,6 @@ def test_migrate_table_in_mount(
     env_or_skip,
     make_random,
     runtime_ctx,
-    make_acc_group,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -710,6 +709,7 @@ def test_migrate_table_in_mount(
         connect=ws.config,
     )
     runtime_ctx = runtime_ctx.replace(config=config)
+    b_dir = make_random(4).lower()
     table_path = make_random(4).lower()
     src_schema = make_schema(
         catalog_name="hive_metastore",
@@ -717,10 +717,10 @@ def test_migrate_table_in_mount(
     )
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
-        external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/b/{table_path}",
+        external_delta=f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}/a/{b_dir}/{table_path}",
         columns=[("1-0`.0-ugly-column", "STRING")],  # Test with column that needs escaping
     )
-    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{table_path}"
+    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/{b_dir}/{table_path}"
     # TODO: Remove this hack below
     # This is done because we have to create the external table in a mount point, but TablesInMounts() has to use the adls/ path
     # Otherwise, if we keep the dbfs:/ path, the entire logic of TablesInMounts won't work
