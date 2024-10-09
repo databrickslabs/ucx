@@ -5428,6 +5428,17 @@
     "google_auth_oauthlib.interactive": [],
     "google_auth_oauthlib.tool": []
   },
+  "google-cloud-core": {
+    "google.cloud._helpers": [],
+    "google.cloud._http": [],
+    "google.cloud._testing": [],
+    "google.cloud.client": [],
+    "google.cloud.environment_vars": [],
+    "google.cloud.exceptions": [],
+    "google.cloud.obsolete": [],
+    "google.cloud.operation": [],
+    "google.cloud.version": []
+  },
   "google-pasta": {
     "pasta": []
   },
@@ -5749,6 +5760,9 @@
     "gymnasium.wrappers.transform_observation": [],
     "gymnasium.wrappers.transform_reward": [],
     "gymnasium.wrappers.vector_list_info": []
+  },
+  "gviz-api": {
+    "gviz_api": []
   },
   "h11": {
     "h11": [],
