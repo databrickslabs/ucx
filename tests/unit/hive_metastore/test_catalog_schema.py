@@ -16,7 +16,11 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
-    ws.catalogs.get.return_value = CatalogInfo(name="catalog1")
+    def get_catalog(catalog_name: str) -> CatalogInfo | None:
+        if catalog_name == "catalog1":
+            return CatalogInfo(name="catalog1")
+        return None
+    ws.catalogs.get.side_effect = get_catalog
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "catalog1":
@@ -161,6 +165,26 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str):
         call("catalog2", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog3", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog4", storage_root=location, comment="Created by UCX", properties=None),
+    ]
+    ws.catalogs.create.assert_has_calls(calls, any_order=True)
+
+
+def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations() -> None:
+    """Catalog 2-4 should be created; catalog 1 already exists."""
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({
+        "Please provide storage location url for catalog: catalog2": "s3://foo/bar",
+        "Please provide storage location url for catalog: catalog3": "s3://foo/bar/test",
+        "Please provide storage location url for catalog: catalog4": "s3://foo/bar/test/baz",
+    })
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    calls = [
+        call("catalog2", storage_root="s3://foo/bar", comment="Created by UCX", properties=None),
+        call("catalog3", storage_root="s3://foo/bar/test", comment="Created by UCX", properties=None),
+        call("catalog4", storage_root="s3://foo/bar/test/baz", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
