@@ -56,28 +56,29 @@ def _change_cluster_owner(ws, cluster_id: str, owner_user_name: str) -> None:
 def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled clusters."""
 
-    # Set up two clusters: one with an owner (us) and another without.
+    # Set up two clusters: one with us as owner and one for a different user.
+    # TODO: Figure out how to clear the creator for a cluster.
+    # (Contrary to the documentation for the creator field, deleting the user doesn't clear it immediately and waiting
+    # for 10 min doesn't help: the UI reports no creator, but the REST API continues to report the deleted user.)
     another_user = make_user()
-    cluster_with_owner = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
-    cluster_without_owner = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
-    ws.clusters.delete_and_wait(cluster_id=cluster_without_owner.cluster_id)
-    _change_cluster_owner(ws, cluster_without_owner.cluster_id, owner_user_name=another_user.user_name)
-    ws.users.delete(another_user.id)
+    my_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
+    their_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
+    ws.clusters.delete_and_wait(cluster_id=their_cluster.cluster_id)
+    _change_cluster_owner(ws, their_cluster.cluster_id, owner_user_name=another_user.user_name)
 
     # Produce the crawled records.
     crawler = ClustersCrawler(ws, sql_backend, inventory_schema)
     records = crawler.snapshot(force_refresh=True)
 
     # Find the crawled records for our clusters.
-    cluster_record_with_owner = next(record for record in records if record.cluster_id == cluster_with_owner.cluster_id)
-    cluster_record_without_owner = next(
-        record for record in records if record.cluster_id == cluster_without_owner.cluster_id
-    )
+    my_cluster_record = next(record for record in records if record.cluster_id == my_cluster.cluster_id)
+    their_cluster_record = next(record for record in records if record.cluster_id == their_cluster.cluster_id)
 
     # Verify ownership is as expected.
-    ownership = ClusterOwnership(runtime_ctx.administrator_locator)
-    assert ownership.owner_of(cluster_record_with_owner) == ws.current_user.me().user_name
-    assert "@" in ownership.owner_of(cluster_record_without_owner)
+    administrator_locator = runtime_ctx.administrator_locator
+    ownership = ClusterOwnership(administrator_locator)
+    assert ownership.owner_of(my_cluster_record) == ws.current_user.me().user_name
+    assert ownership.owner_of(their_cluster_record) == another_user.user_name
 
 
 def test_cluster_crawler_mlr_no_isolation(ws, make_cluster, inventory_schema, sql_backend):
