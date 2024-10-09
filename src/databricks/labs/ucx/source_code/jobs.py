@@ -17,7 +17,7 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.workspace import Language
 
@@ -305,13 +305,14 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_existing_cluster_id(self, graph: DependencyGraph):
         if not self._task.existing_cluster_id:
             return
-
-        # load libraries installed on the referred cluster
-        library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
-
-        for library_full_status in library_full_status_list:
-            if library_full_status.library:
-                yield from self._register_library(graph, library_full_status.library)
+        try:
+            # load libraries installed on the referred cluster
+            library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
+            for library_full_status in library_full_status_list:
+                if library_full_status.library:
+                    yield from self._register_library(graph, library_full_status.library)
+        except ResourceDoesNotExist:
+            yield DependencyProblem('cluster-not-found', f'Could not find cluster: {self._task.existing_cluster_id}')
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
@@ -320,8 +321,12 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_cluster_info(self):
         if self._task.existing_cluster_id:
-            cluster_info = self._ws.clusters.get(self._task.existing_cluster_id)
-            return self._new_job_cluster_metadata(cluster_info)
+            try:
+                cluster_info = self._ws.clusters.get(self._task.existing_cluster_id)
+                return self._new_job_cluster_metadata(cluster_info)
+            except ResourceDoesNotExist:
+                message = f'Could not find cluster: {self._task.existing_cluster_id}'
+                yield DependencyProblem('cluster-not-found', message)
         if self._task.new_cluster:
             return self._new_job_cluster_metadata(self._task.new_cluster)
         if self._task.job_cluster_key:
