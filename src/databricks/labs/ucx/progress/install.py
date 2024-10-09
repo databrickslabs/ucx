@@ -38,7 +38,7 @@ class HistoricalRecord:
     ucx_version: str = __version__
     """The UCX semantic version."""
 
-    snapshot_id: int | None = None
+    snapshot_id: str | None = None
     """An identifier that is unique to the records produced for a given snapshot."""
 
     object_type_version: int = 0
