@@ -199,19 +199,20 @@ class CatalogSchema:
                 target_schemas[catalog] = target_schemas[catalog] - schemas
         return target_catalogs, target_schemas
 
-    def _validate_location(self, location: str):
+    def _validate_location(self, location: str) -> bool:
         if location == "metastore":
             return True
         try:
             PurePath(location)
         except ValueError:
-            logger.error(f"Invalid location path {location}")
+            logger.error(f"Invalid location path: {location}")
             return False
         for external_location in self._external_locations:
             if location == external_location.url:
                 return True
             if external_location.url is not None and fnmatch.fnmatch(location, external_location.url + '*'):
                 return True
+        logger.warning(f"No matching external location found for: {location}")
         return False
 
     def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
