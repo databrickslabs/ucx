@@ -76,11 +76,13 @@ def test_job_linter_no_problems(simple_ctx, make_job) -> None:
 
 
 def test_job_task_linter_library_not_installed_cluster(simple_ctx, make_job) -> None:
-    job = make_job(content=b"import does_not_exist")
+    job = make_job(content=b"import library_not_found")
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(job.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
+    assert (
+        len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
+    )
 
 
 def test_job_task_linter_library_installed_cluster(
@@ -567,7 +569,7 @@ def test_job_dlt_task_linter_unhappy_path(
     make_pipeline,
 ) -> None:
     notebook_path = make_directory() / "notebook.py"
-    make_notebook(path=notebook_path, content=b"import does_not_exist")
+    make_notebook(path=notebook_path, content=b"import library_not_found")
     dlt_pipeline = make_pipeline(
         libraries=[pipelines.PipelineLibrary(notebook=NotebookLibrary(path=str(notebook_path)))]
     )
@@ -580,7 +582,9 @@ def test_job_dlt_task_linter_unhappy_path(
 
     problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: does_not_exist"]) == 1
+    assert (
+        len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
+    )
 
 
 def test_job_dlt_task_linter_happy_path(
