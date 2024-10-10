@@ -12,7 +12,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
-from databricks.sdk.service import jobs, sql
+from databricks.sdk.service import sql
 from databricks.sdk.service.catalog import ExternalLocationInfo, MetastoreInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
@@ -842,8 +842,8 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws.workspace.list.assert_called_once()
 
 
-def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
+def test_relay_logs(ws, caplog) -> None:
+    ws.jobs.list_runs.return_value = [Run(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
