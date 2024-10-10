@@ -78,10 +78,13 @@ class VerifyProgressTracking:
         - UCX catalog exists.
         - A job run corresponding to the "assessment" job:
             - Finished successfully.
-            - OR if pending or running, we will wait up to 1 hour for the assessment run to finish. If did still not
-              finish successfully, we fail.
+            - OR if pending or running, we will wait up to the timeout for the assessment run to finish. If it did still
+              not finish successfully, we raise an error.
 
         Otherwise, we consider the prerequisites to be NOT matched.
+
+        Args :
+            timeout (datetime.timedelta) : Timeout to wait for pending or running assessment run.
 
         Raises :
             RuntimeWarning : Signalling the prerequisites are not met.

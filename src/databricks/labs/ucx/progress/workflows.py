@@ -1,3 +1,5 @@
+import datetime as dt
+
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
 
@@ -106,8 +108,11 @@ class MigrationProgress(Workflow):
 
     @job_task(depends_on=[setup_table_migration], job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
-        ctx.verify_progress_tracking.verify()
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
+
+        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
+        """
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(depends_on=[crawl_tables, verify_prerequisites], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
