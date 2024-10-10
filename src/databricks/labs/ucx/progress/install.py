@@ -1,3 +1,4 @@
+import datatime as dt
 import logging
 from dataclasses import dataclass
 
@@ -5,6 +6,8 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.hive_metastore.verification import MetastoreNotFoundError, VerifyHasCatalog, VerifyHasMetastore
+from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 
 
@@ -52,3 +55,26 @@ class ProgressTrackingInstallation:
         self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
         self._schema_deployer.deploy_table("historical", Historical)
         logger.info("Installation completed successfully!")
+
+
+class VerifyProgressTracking:
+    """Verify the progress tracking is ready to be used."""
+
+    def __int__(self, verify_has_metastore: VerifyHasMetastore, verify_has_ucx_catalog: VerifyHasCatalog, deployed_workflows: DeployedWorkflows, ) -> None:
+        self._verify_has_metastore = verify_has_metastore
+        self._verify_has_ucx_catalog = verify_has_ucx_catalog
+        self._deployed_workflows = deployed_workflows
+
+    def verify(self, timeout=dt.timedelta(seconds=0)) -> None:
+        """Verify the progress tracking installation is ready to be used."""
+        try:
+            has_metastore = self._verify_has_metastore.verify_metastore()
+        except MetastoreNotFoundError as e:
+            raise RuntimeWarning("Metastore not attached to workspace") from e
+        if not has_metastore:
+            raise RuntimeWarning("Metastore not attached to workspace")
+        if not self._verify_has_ucx_catalog.verify():
+            raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
+        if not self._deployed_workflows.validate_step("assessment", timeout=timeout):
+            raise RuntimeWarning("Assessment workflow not completed successfully")
+
