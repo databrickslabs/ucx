@@ -1,11 +1,10 @@
+import datetime as dt
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installer import InstallState
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import PermissionDenied
-from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
-from databricks.sdk.service.jobs import Run, RunResultState, RunState
 
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
@@ -25,22 +24,21 @@ def test_progress_tracking_installation_run_creates_tables(mock_backend) -> None
     assert sum("CREATE TABLE IF NOT EXISTS" in query for query in mock_backend.queries) == 2
 
 
-def test_verify_progress_tracking_valid_prerequisites(mock_installation) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.metastores.current.return_value = MetastoreAssignment(metastore_id="test", workspace_id=123456789)
-    ws.catalogs.get.return_value = CatalogInfo()
-    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
+def test_verify_progress_tracking_valid_prerequisites() -> None:
+    verify_has_metastore = create_autospec(VerifyHasMetastore)
+    verify_has_catalog = create_autospec(VerifyHasCatalog)
+    deployed_workflows = create_autospec(DeployedWorkflows)
+    verify_progress_tracking = VerifyProgressTracking(verify_has_metastore, verify_has_catalog, deployed_workflows)
+    timeout = dt.timedelta(hours=1)
     try:
-        verify_progress_tracking.verify()
+        verify_progress_tracking.verify(timeout=timeout)
     except RuntimeError as e:
         assert False, f"Verify progress tracking raises: {e}"
     else:
         assert True, "Valid prerequisites found"
+    verify_has_metastore.verify_metastore.assert_called_once()
+    verify_has_catalog.verify.assert_called_once()
+    deployed_workflows.validate_step.assert_called_once_with("assessment", timeout=timeout)
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workflow(mock_installation) -> None:
