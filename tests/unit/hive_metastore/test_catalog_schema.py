@@ -287,3 +287,4 @@ def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
     assert (
         "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema3')" in caplog.messages
     )
+    ws.assert_not_called()
