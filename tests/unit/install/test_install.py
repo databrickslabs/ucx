@@ -381,7 +381,7 @@ def test_configure_sets_expected_workspace_configuration_values(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
-            r"If hive_metastore contains managed table with external.*": "1",
+            r"If hive_metastore contains managed table with external.*": "0",
             r".*": "",
             prompt_question: prompt_answer,
         }
@@ -434,7 +434,7 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
             r".*We have identified one or more cluster.*": "No",
             r".*Choose a cluster policy.*": "0",
             r"Reconciliation threshold, in percentage.*": "5",
-            r"If hive_metastore contains managed table with external.*": "1",
+            r"If hive_metastore contains managed table with external.*": "0",
             r".*": "",
         }
     )
@@ -1673,7 +1673,7 @@ def test_save_config_ext_hms(ws, mock_installation) -> None:
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r"Comma-separated list of databases to migrate.*": "db1,db2",
             r"Reconciliation threshold, in percentage.*": "5",
-            r"If hive_metastore contains managed table with external.*": "1",
+            r"If hive_metastore contains managed table with external.*": "0",
             r".*": "",
         }
     )

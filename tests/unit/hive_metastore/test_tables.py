@@ -76,7 +76,7 @@ def test_sql_managed_non_delta():
                 catalog="catalog",
                 database="db",
                 name="managed_table",
-                object_type="EXTERNAL",
+                object_type="MANAGED",
                 table_format="DELTA",
                 location="dbfs:/mnt/location/table",
             ),
@@ -212,14 +212,14 @@ def test_tables_returning_error_when_show_tables(caplog):
         ),
         (Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/somelocation/tablename"), True, What.DBFS_ROOT_DELTA),
         (
-            Table("a", "mounted_b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
+            Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
             False,
-            What.TABLE_IN_MOUNT,
+            What.EXTERNAL_SYNC,
         ),
         (
-            Table("a", "mounted_b", "c", "EXTERNAL", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
+            Table("a", "b", "c", "EXTERNAL", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
             False,
-            What.TABLE_IN_MOUNT,
+            What.EXTERNAL_SYNC,
         ),
         (
             Table("a", "b", "c", "MANAGED", "DELTA", location="dbfs:/databricks-datasets/somelocation/tablename"),

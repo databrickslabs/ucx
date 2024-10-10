@@ -377,7 +377,6 @@ class WorkspaceInstaller(WorkspaceContext):
     def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, str]:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
         managed_table_migration_choices = {
-            "Convert MANAGED HMS table to EXTERNAL HMS table and migrate as EXTERNAL UC table. This risks data leakage, as once the relevant HMS tables are deleted, the underlying data won't get deleted anymore.": 'CONVERT_TO_EXTERNAL',
             "Migrate MANAGED HMS table as EXTERNAL UC table. This option would require you to convert MANAGED HMS tables to EXTERNAL HMS tables once UC migration is complete, otherwise deleting HMS MANAGED table would delete the migrated UC table": 'SYNC_AS_EXTERNAL',
             "Copy data from MANAGED HMS to MANAGED UC table": 'CLONE',
         }
