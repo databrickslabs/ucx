@@ -906,6 +906,13 @@ def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -
     assert "CREATE SCHEMA" in mock_backend.queries[0]
 
 
+def test_create_ucx_catalog_raises_runtime_error_because_progress_tracking_prerequisites_are_not_met(ws) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    with pytest.raises(RuntimeWarning):  # Specific warning is not important here
+        create_ucx_catalog(ws, prompts)
+
+
 @pytest.mark.parametrize("run_as_collection", [False, True])
 def test_migrate_tables_calls_migrate_table_job_run_now(
     run_as_collection,
