@@ -69,8 +69,8 @@ class InferredValue:
     def _safe_infer_internal(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
         try:
             yield from cls._unsafe_infer_internal(node)
-        except InferenceError as e:
-            logger.debug(f"When inferring {node}", exc_info=e)
+        except (InferenceError, KeyError) as e:
+            logger.debug(f"When inferring: {node}", exc_info=e)
             yield [Uninferable]
 
     @classmethod
