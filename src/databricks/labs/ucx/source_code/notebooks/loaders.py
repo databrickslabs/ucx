@@ -41,6 +41,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None."""
         # check current working directory first
         absolute_path = path_lookup.cwd / path
+        absolute_path = absolute_path.resolve()
         if is_a_notebook(absolute_path):
             return absolute_path
         # When exported through Git, notebooks are saved with a .py extension. So check with and without extension
