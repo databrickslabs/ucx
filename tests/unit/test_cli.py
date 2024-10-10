@@ -898,6 +898,7 @@ def test_create_ucx_catalog_calls_get_catalog(ws) -> None:
 
 def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
 
