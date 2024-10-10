@@ -108,15 +108,18 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         return seen_tables
 
     def is_migrated(self, schema: str, table: str) -> bool:
-        results = self._backend.fetch(
-            f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)} ('upgraded_to')"
-        )
-        for result in results:
-            if "does not have property" in result.value:
-                continue
-            logger.info(f"{schema}.{table} is set as migrated")
-            return True
-        logger.info(f"{schema}.{table} is set as not migrated")
+        try:
+            results = self._backend.fetch(
+                f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)} ('upgraded_to')"
+            )
+            for result in results:
+                if "does not have property" in result.value:
+                    continue
+                logger.info(f"{schema}.{table} is set as migrated")
+                return True
+            logger.info(f"{schema}.{table} is set as not migrated")
+        except NotFound:
+            logger.info(f"{schema}.{table} set as a source does no longer exist")
         return False
 
     def _crawl(self) -> Iterable[TableMigrationStatus]:
