@@ -270,3 +270,20 @@ def test_catalog_schema_acl() -> None:
     assert len(backend.queries) == len(queries)
     for query in queries:
         assert query in backend.queries
+
+
+def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    backend = MockBackend()
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+    catalog_schema = prepare_test(ws, backend)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
+        catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    assert "Skipping legacy grant that is not supported in UC: DENY on ('CATALOG', 'catalog2')" in caplog.messages
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema2')" in caplog.messages
+    )
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema3')" in caplog.messages
+    )
