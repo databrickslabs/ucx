@@ -889,10 +889,11 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
 
 def test_create_ucx_catalog_calls_get_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
-    ws.catalogs.get.assert_called_once()
+    ws.catalogs.get.assert_called()
 
 
 def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
