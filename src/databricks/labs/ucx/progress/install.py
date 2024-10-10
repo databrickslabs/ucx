@@ -99,6 +99,6 @@ class VerifyProgressTracking:
             raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog`")
         if not self._deployed_workflows.validate_step("assessment", timeout=timeout):
             raise RuntimeWarning(
-                "Assessment workflow did not complete successfully (yet). "
+                "Assessment workflow did not complete successfully yet. "
                 "Run `databricks labs ucx ensure-assessment-run` command"
             )
