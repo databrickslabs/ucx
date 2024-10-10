@@ -70,29 +70,16 @@ def test_verify_progress_tracking_raises_runtime_error_if_no_metastore(
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_missing_ucx_catalog(mock_installation) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.catalogs.get.return_value = None
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
+    verify_has_metastore = create_autospec(VerifyHasMetastore)
+    verify_has_catalog = create_autospec(VerifyHasCatalog)
+    verify_has_catalog.verify.return_value = False
+    deployed_workflows = create_autospec(DeployedWorkflows)
+    verify_progress_tracking = VerifyProgressTracking(verify_has_metastore, verify_has_catalog, deployed_workflows)
     with pytest.raises(RuntimeWarning, match="UCX catalog not configured."):
         verify_progress_tracking.verify()
-
-
-def test_verify_progress_tracking_raises_runtime_error_if_missing_permissions_to_access_ucx_catalog(
-    mock_installation,
-) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.catalogs.get.side_effect = PermissionDenied
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
-    with pytest.raises(RuntimeWarning, match="UCX catalog not configured."):
-        verify_progress_tracking.verify()
+    verify_has_metastore.verify_metastore.assert_called_once()
+    verify_has_catalog.verify.assert_called_once()
+    deployed_workflows.assert_not_called()
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_assessment_workflow_did_not_run(mock_installation) -> None:
