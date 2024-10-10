@@ -66,7 +66,21 @@ class VerifyProgressTracking:
         self._deployed_workflows = deployed_workflows
 
     def verify(self, timeout=dt.timedelta(seconds=0)) -> None:
-        """Verify the progress tracking installation is ready to be used."""
+        """Verify the progress tracking installation is ready to be used.
+
+        Prerequisites:
+        - UC metastore exists.
+        - UCX catalog exists.
+        - A job run corresponding to the "assessment" job:
+            - Finished successfully.
+            - OR if pending or running, we will wait up to 1 hour for the assessment run to finish. If did still not
+              finish successfully, we fail.
+
+        Otherwise, we consider the prerequisites to be NOT matched.
+
+        Raises :
+            RuntimeWarning : Signalling the prerequisites are not met.
+        """
         try:
             has_metastore = self._verify_has_metastore.verify_metastore()
         except MetastoreNotFoundError as e:
