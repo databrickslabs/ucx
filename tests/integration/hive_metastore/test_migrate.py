@@ -859,3 +859,35 @@ def test_migrate_external_tables_with_spn_azure(
             match = True
             break
     assert match
+
+
+def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, make_catalog, make_schema, caplog):
+    src_table = make_table()
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name)
+    # Create table in the destination schema
+    sql_backend.execute(f"CREATE TABLE {dst_schema.full_name}.fake_table (id INT)")
+
+    # Set the target table with non-existing source
+    sql_backend.execute(
+        f"ALTER TABLE {dst_schema.full_name}.fake_table SET "
+        f"TBLPROPERTIES('upgraded_from' = '{src_table.full_name}');"
+    )
+    # Get the latest migration index
+    tables = runtime_ctx.tables_crawler.snapshot()
+
+    # drop the source table
+    sql_backend.execute(f"DROP TABLE {src_table.full_name}")
+    # Assert tables contains the source table
+    assert src_table.full_name in [table.full_name for table in tables]
+
+    migration_index = runtime_ctx.tables_migrator.index(force_refresh=True)
+    assert migration_index
+    # Assert that an error message was recorded containing a line with the text "which does no longer exist"
+    assert any(
+        [
+            record.message
+            for record in caplog.records
+            if f"{src_table.schema_name}.{src_table.name} set as a source does no longer exist" in record.message
+        ]
+    )
