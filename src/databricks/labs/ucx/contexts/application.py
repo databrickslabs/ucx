@@ -12,6 +12,8 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -338,6 +340,13 @@ class GlobalContext(abc.ABC):
         return TableOwnershipGrantLoader(self.tables_crawler, self.default_securable_ownership)
 
     @cached_property
+    def pipeline_migrator(self) -> PipelinesMigrator:
+        return PipelinesMigrator(
+            self.workspace_client,
+            self.pipelines_crawler
+        )
+
+    @cached_property
     def migrate_grants(self) -> MigrateGrants:
         # owner grants have to come first
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
@@ -364,6 +373,10 @@ class GlobalContext(abc.ABC):
             self.inventory_database,
             self.config.enable_hms_federation,
         )
+
+    @cached_property
+    def pipelines_crawler(self) -> PipelinesCrawler:
+        return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def azure_service_principal_crawler(self) -> AzureServicePrincipalCrawler:
