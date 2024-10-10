@@ -93,7 +93,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`installations` command](#installations-command)
   * [`report-account-compatibility` command](#report-account-compatibility-command)
   * [`export-assessment` command](#export-assessment-command)
-  * [`export-assessment` command](#export-assessment-command-1)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
