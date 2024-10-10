@@ -181,6 +181,37 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     ]
 
 
+def test_migrate_managed_table_as_external_tables_with_conversion(ws):
+    errors = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
+    crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
+    table_mapping = mock_table_mapping(["managed_other"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CONVERT_TO_EXTERNAL")
+
+    migrate_grants.apply.assert_called()
+
+    assert backend.queries == [
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;",
+        (
+            f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_other` "
+            f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_other' , "
+            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
+        ),
+    ]
+
+
 def test_migrate_managed_table_as_external_tables_without_conversion(ws):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}

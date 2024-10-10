@@ -132,6 +132,11 @@ class TablesMigrator:
     def _migrate_managed_table(
         self, managed_table_external_storage: str, src_table: TableToMigrate, mounts: list[Mount]
     ):
+        if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
+            self._convert_hms_table_to_external(src_table.src)
+            return self._migrate_external_table(
+                src_table.src, src_table.rule
+            )  # _migrate_external_table remains unchanged
         if managed_table_external_storage == 'SYNC_AS_EXTERNAL':
             return self._migrate_managed_as_external_table(src_table.src, src_table.rule)  # new method
         if managed_table_external_storage == 'CLONE':
