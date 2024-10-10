@@ -81,12 +81,13 @@ class VerifyProgressTracking:
         Raises :
             RuntimeWarning : Signalling the prerequisites are not met.
         """
+        metastore_not_attached_message = "Metastore not attached to workspace. Run `databricks labs ucx assign-metastore`"
         try:
             has_metastore = self._verify_has_metastore.verify_metastore()
         except MetastoreNotFoundError as e:
-            raise RuntimeWarning("Metastore not attached to workspace") from e
+            raise RuntimeWarning(metastore_not_attached_message) from e
         if not has_metastore:
-            raise RuntimeWarning("Metastore not attached to workspace")
+            raise RuntimeWarning(metastore_not_attached_message)
         if not self._verify_has_ucx_catalog.verify():
             raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
         if not self._deployed_workflows.validate_step("assessment", timeout=timeout):
