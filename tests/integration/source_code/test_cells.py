@@ -36,6 +36,7 @@ def test_relative_grand_parent_path_is_supported(
     child_dir = make_directory(path=f"~/{top_dir.name}/dummy-{make_random(4)}-{watchdog_purge_suffix}")
     source = f"""
 %run ../../{grand_parent.name}
+
 """
     notebook_path = make_notebook(
         path=f"{child_dir.as_posix()}/dummy-{make_random(4)}-{watchdog_purge_suffix}", content=source.encode("utf-8")
