@@ -6362,6 +6362,17 @@
   "html5lib": {
     "html5lib": []
   },
+  "htmlmin": {
+    "htmlmin": [],
+    "htmlmin.command": [],
+    "htmlmin.decorator": [],
+    "htmlmin.escape": [],
+    "htmlmin.main": [],
+    "htmlmin.middleware": [],
+    "htmlmin.parser": [],
+    "htmlmin.python3html": [],
+    "htmlmin.python3html.parser": []
+  },
   "httpcore": {
     "httpcore": [],
     "httpcore._api": [],
