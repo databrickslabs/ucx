@@ -60,7 +60,12 @@ class ProgressTrackingInstallation:
 class VerifyProgressTracking:
     """Verify the progress tracking is ready to be used."""
 
-    def __int__(self, verify_has_metastore: VerifyHasMetastore, verify_has_ucx_catalog: VerifyHasCatalog, deployed_workflows: DeployedWorkflows, ) -> None:
+    def __int__(
+        self,
+        verify_has_metastore: VerifyHasMetastore,
+        verify_has_ucx_catalog: VerifyHasCatalog,
+        deployed_workflows: DeployedWorkflows,
+    ) -> None:
         self._verify_has_metastore = verify_has_metastore
         self._verify_has_ucx_catalog = verify_has_ucx_catalog
         self._deployed_workflows = deployed_workflows
@@ -81,7 +86,9 @@ class VerifyProgressTracking:
         Raises :
             RuntimeWarning : Signalling the prerequisites are not met.
         """
-        metastore_not_attached_message = "Metastore not attached to workspace. Run `databricks labs ucx assign-metastore`"
+        metastore_not_attached_message = (
+            "Metastore not attached to workspace. Run `databricks labs ucx assign-metastore`"
+        )
         try:
             has_metastore = self._verify_has_metastore.verify_metastore()
         except MetastoreNotFoundError as e:
@@ -91,5 +98,7 @@ class VerifyProgressTracking:
         if not self._verify_has_ucx_catalog.verify():
             raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog`")
         if not self._deployed_workflows.validate_step("assessment", timeout=timeout):
-            raise RuntimeWarning("Assessment workflow not completed successfully. Run `databricks labs ucx ensure-assessment-run` command")
-
+            raise RuntimeWarning(
+                "Assessment workflow did not complete successfully (yet). "
+                "Run `databricks labs ucx ensure-assessment-run` command"
+            )
