@@ -89,7 +89,7 @@ class VerifyProgressTracking:
         if not has_metastore:
             raise RuntimeWarning(metastore_not_attached_message)
         if not self._verify_has_ucx_catalog.verify():
-            raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog` command")
+            raise RuntimeWarning("UCX catalog not configured. Run `databricks labs ucx create-ucx-catalog`")
         if not self._deployed_workflows.validate_step("assessment", timeout=timeout):
             raise RuntimeWarning("Assessment workflow not completed successfully")
 
