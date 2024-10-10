@@ -17,6 +17,8 @@ _PIPELINE_CONF_WITH_SECRET = {
     "fs.azure.account.oauth2.client.endpoint.abcde.dfs.core.windows.net": "https://login.microsoftonline.com"
                                                                           "/dummy_application/token",
 }
+
+
 def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
                           sql_backend):
 
@@ -34,6 +36,6 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
         assert len(results) >= 1
         assert results[0].pipeline_id == created_pipeline.pipeline_id
 
-        pipelines_migrator = PipelinesMigrator(pipeline_crawler, ws)
+        pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler)
         pipelines_migrator.migrate_pipelines()
 
