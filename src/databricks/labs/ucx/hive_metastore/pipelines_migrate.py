@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,17 @@ class Rule:
     source_pipeline_name: str
     target_schema_name: str
     target_pipeline_name: str
+
+@dataclass
+class PipelineToMigrate:
+    src: PipelineInfo
+    rule: Rule
+
+    def __hash__(self):
+        return hash(self.src)
+
+    def __eq__(self, other):
+        return isinstance(other, PipelineToMigrate) and self.src == other.src
 
 
 class PipelinesMigrator:
@@ -28,4 +39,5 @@ class PipelinesMigrator:
     def migrate_pipelines(self):
         pipelines = self._pc.snapshot()
         logger.info(f"Found {len(pipelines)} pipelines to migrate")
+
 
