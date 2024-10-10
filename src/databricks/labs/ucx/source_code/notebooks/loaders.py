@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 from pathlib import Path
+from typing import TypeVar
 
 from databricks.sdk.errors import NotFound
 
@@ -19,6 +20,9 @@ from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
+
+
+PathT = TypeVar("PathT", bound=Path)
 
 
 class NotebookResolver(BaseNotebookResolver):
@@ -84,10 +88,13 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None
 
     @staticmethod
-    def _adjust_path(path: Path):
-        if path.suffix == ".py":
+    def _adjust_path(path: PathT) -> PathT:
+        existing_suffix = path.suffix
+        if existing_suffix == ".py":
             return path
-        return Path(path.as_posix() + ".py")
+        # Ensure we append instead of replacing an existing suffix.
+        new_suffix = existing_suffix + ".py"
+        return path.with_suffix(new_suffix)
 
     def __repr__(self):
         return "NotebookLoader()"
