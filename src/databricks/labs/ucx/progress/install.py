@@ -60,7 +60,7 @@ class ProgressTrackingInstallation:
 class VerifyProgressTracking:
     """Verify the progress tracking is ready to be used."""
 
-    def __int__(
+    def __init__(
         self,
         verify_has_metastore: VerifyHasMetastore,
         verify_has_ucx_catalog: VerifyHasCatalog,
