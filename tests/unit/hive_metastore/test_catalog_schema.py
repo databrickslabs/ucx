@@ -106,7 +106,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
         Grant('user1', 'SELECT', 'catalog2', 'schema3', 'table2'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema3'),
-        Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
+        Grant('user1', 'DENY', 'hive_metastore', 'schema2'),
     ]
     hive_grants = [
         Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
@@ -244,7 +244,7 @@ def test_no_catalog_storage():
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
 
-def test_catalog_schema_acl():
+def test_catalog_schema_acl() -> None:
     ws = create_autospec(WorkspaceClient)
     backend = MockBackend()
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
@@ -260,10 +260,7 @@ def test_catalog_schema_acl():
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     queries = [
         'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user1`',
         'GRANT USE CATALOG ON CATALOG `catalog1` TO `user1`',
-        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user1`',
         'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ2`',
         'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ2`',
         'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `princ5`',
