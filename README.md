@@ -2,7 +2,7 @@ Databricks Labs UCX
 ===
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
-The companion for upgrading to Unity Catalog.
+The companion for upgrading to Unity Catalog (UC).
 
 After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow),
 so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow).
@@ -563,10 +563,18 @@ Once the upgrade is completed, these principals can (and should) be deleted.
 Use the `create-uber-principal` [UCX Command](#create-uber-principal-command) to create the Uber Principal.
 
 ##### Step 2.5: Create Catalogs and Schemas
-In this step we will create the UC catalogs and schemas required for the target tables.
-The `create-catalogs-schemas` [UCX command](#create-catalogs-schemas-command) can be used to create the UC catalogs and schemas.
+In this step, we will create the UC catalogs and schemas required for the target tables using the
+[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command will create the UC catalogs and
+schemas based on the mapping file created in the previous step.
 
-The command will create the UC catalogs and schemas based on the mapping file created in the previous step.
+This step requires considering how to [physically separate data in storage](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#data-is-physically-separated-in-storage)
+within UC. As [Databricks recommends storing managed data at the catalog level](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#configure-a-unity-catalog-metastore),
+we advise to prepare the external locations for the to-be created catalogs before running the `create-catalogs-schemas`
+command. Either, reuse [previously created external locations](#step-23-create-external-locations) or create additional
+external locations outside of UCX if data separation restrictions requires that. Note that external locations can be
+reused when using subpaths, for example, a folder in a cloud storage
+(`abfss://container@storage.dfs.core.windows.net/folder`) can reuse the external location of the cloud storage
+(`abfss://container@storage.dfs.core.windows.net/`). (The previous example also holds for other clouds.)
 
 #### Step 3: Upgrade the Metastore
 Upgrading the metastore is done in steps.
