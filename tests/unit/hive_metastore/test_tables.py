@@ -217,7 +217,7 @@ def test_tables_returning_error_when_show_tables(caplog):
             What.EXTERNAL_SYNC,
         ),
         (
-            Table("a", "b", "c", "MANAGED", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
+            Table("a", "b", "c", "EXTERNAL", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
             False,
             What.EXTERNAL_SYNC,
         ),
@@ -232,7 +232,7 @@ def test_tables_returning_error_when_show_tables(caplog):
             What.DB_DATASET,
         ),
         (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
+        (Table("a", "b", "c", "EXTERNAL", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
 def test_is_dbfs_root(table, dbfs_root, what) -> None:

@@ -170,6 +170,88 @@ def test_migrate_external_table(
     assert migration_status[0].dst_table == src_external_table.name
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_managed_table_to_external_table_without_conversion(
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
+):
+    # TODO: update pytest fixture for make_schema to take location as parameter to create managed schema
+    # TODO: update azure blueprint to add spn in sql warehouse data access config
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_external_table = runtime_ctx.make_table(
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+        columns=[("`back`ticks`", "STRING")],  # Test with column that needs escaping
+    )
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(
+        what=What.EXTERNAL_SYNC, managed_table_external_storage="SYNC_AS_EXTERNAL"
+    )
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_external_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = list(runtime_ctx.migration_status_refresher.snapshot())
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_external_table.schema_name
+    assert migration_status[0].src_table == src_external_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_external_table.name
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_managed_table_to_external_table_with_clone(
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
+):
+    # TODO: update pytest fixture for make_schema to take location as parameter to create managed schema
+    # TODO: update azure blueprint to add spn in sql warehouse data access config
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_external_table = runtime_ctx.make_table(
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+        columns=[("`back`ticks`", "STRING")],  # Test with column that needs escaping
+    )
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_external_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = list(runtime_ctx.migration_status_refresher.snapshot())
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_external_table.schema_name
+    assert migration_status[0].src_table == src_external_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_external_table.name
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=1))
 def test_migrate_external_table_failed_sync(caplog, runtime_ctx, env_or_skip) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")

@@ -66,6 +66,7 @@ def new_installation(ws, env_or_skip, make_random):
                 r"Choose a cluster policy": "0",
                 r".*Inventory Database.*": inventory_schema_name,
                 r".*Backup prefix*": renamed_group_prefix,
+                r"If hive_metastore contains managed table with external.*": "1",
                 r".*": "",
             }
             | (extend_prompts or {})

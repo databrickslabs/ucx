@@ -351,7 +351,9 @@ class WorkspaceInstaller(WorkspaceContext):
         )
 
         # Save configurable values for table migration cluster
-        min_workers, max_workers, spark_conf_dict = self._config_table_migration(spark_conf_dict)
+        min_workers, max_workers, spark_conf_dict, managed_table_migration_choice = self._config_table_migration(
+            spark_conf_dict
+        )
 
         config = dataclasses.replace(
             default_config,
@@ -362,6 +364,7 @@ class WorkspaceInstaller(WorkspaceContext):
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
+            managed_table_external_storage=managed_table_migration_choice,
         )
         self.installation.save(config)
         if self._is_account_install:
@@ -371,10 +374,20 @@ class WorkspaceInstaller(WorkspaceContext):
             webbrowser.open(ws_file_url)
         return config
 
-    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict]:
+    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict, str]:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
+        managed_table_migration_choices = {
+            "Migrate MANAGED HMS table as EXTERNAL UC table. This option would require you to convert MANAGED HMS tables to EXTERNAL HMS tables once UC migration is complete, otherwise deleting HMS MANAGED table would delete the migrated UC table": 'SYNC_AS_EXTERNAL',
+            "Copy data from MANAGED HMS to MANAGED UC table": 'CLONE',
+        }
+        managed_table_migration_choice = self.prompts.choice_from_dict(
+            "If hive_metastore contains managed table with external"
+            " location paths (not dbfs root), please select which migration "
+            "option to choose from",
+            managed_table_migration_choices,
+        )
         if self._is_account_install:
-            return 1, 10, spark_conf_dict
+            return 1, 10, spark_conf_dict, managed_table_migration_choice
         parallelism = self.prompts.question(
             "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
         )
@@ -391,7 +404,8 @@ class WorkspaceInstaller(WorkspaceContext):
                 "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
             )
         )
-        return min_workers, max_workers, spark_conf_dict
+
+        return min_workers, max_workers, spark_conf_dict, managed_table_migration_choice
 
     def _select_databases(self):
         selected_databases = self.prompts.question(
