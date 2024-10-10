@@ -6,7 +6,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import PermissionDenied
 
-from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
+from databricks.labs.ucx.hive_metastore.verification import MetastoreNotFoundError, VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation, VerifyProgressTracking
 
@@ -42,15 +42,16 @@ def test_verify_progress_tracking_valid_prerequisites() -> None:
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workflow(mock_installation) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.metastores.current.return_value = None
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
+    verify_has_metastore = create_autospec(VerifyHasMetastore)
+    verify_has_metastore.verify_metastore.side_effect = MetastoreNotFoundError
+    verify_has_catalog = create_autospec(VerifyHasCatalog)
+    deployed_workflows = create_autospec(DeployedWorkflows)
+    verify_progress_tracking = VerifyProgressTracking(verify_has_metastore, verify_has_catalog, deployed_workflows)
     with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
         verify_progress_tracking.verify()
+    verify_has_metastore.verify_metastore.assert_called_once()
+    verify_has_catalog.assert_not_called()
+    deployed_workflows.assert_not_called()
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_missing_permissions_to_access_metastore(
