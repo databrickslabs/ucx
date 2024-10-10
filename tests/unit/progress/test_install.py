@@ -54,18 +54,19 @@ def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached
     deployed_workflows.assert_not_called()
 
 
-def test_verify_progress_tracking_raises_runtime_error_if_missing_permissions_to_access_metastore(
-    mock_installation,
+def test_verify_progress_tracking_raises_runtime_error_if_no_metastore(
+    mock_installation
 ) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.metastores.current.side_effect = PermissionDenied
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
+    verify_has_metastore = create_autospec(VerifyHasMetastore)
+    verify_has_metastore.verify_metastore.return_value = False
+    verify_has_catalog = create_autospec(VerifyHasCatalog)
+    deployed_workflows = create_autospec(DeployedWorkflows)
+    verify_progress_tracking = VerifyProgressTracking(verify_has_metastore, verify_has_catalog, deployed_workflows)
     with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
         verify_progress_tracking.verify()
+    verify_has_metastore.verify_metastore.assert_called_once()
+    verify_has_catalog.assert_not_called()
+    deployed_workflows.assert_not_called()
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_missing_ucx_catalog(mock_installation) -> None:
