@@ -563,10 +563,9 @@ Once the upgrade is completed, these principals can (and should) be deleted.
 Use the `create-uber-principal` [UCX Command](#create-uber-principal-command) to create the Uber Principal.
 
 ##### Step 2.5: Create Catalogs and Schemas
-In this step we will create the UC catalogs and schemas required for the target tables.
-The `create-catalogs-schemas` [UCX command](#create-catalogs-schemas-command) can be used to create the UC catalogs and schemas.
-
-The command will create the UC catalogs and schemas based on the mapping file created in the previous step.
+In this step, we will create the UC catalogs and schemas required for the target tables using the
+[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command will create the UC catalogs and
+schemas based on the mapping file created in the previous step.
 
 #### Step 3: Upgrade the Metastore
 Upgrading the metastore is done in steps.
