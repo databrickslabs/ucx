@@ -646,6 +646,17 @@ def migrate_tables(
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     for workspace_context in workspace_contexts:
         deployed_workflows = workspace_context.deployed_workflows
+
+        try:
+            workspace_context.verify_progress_tracking.verify()
+        except RuntimeWarning:
+            logger.info(
+                "We couldn't detect a successful run of the assessment workflow."
+                "The assessment workflow is a prerequisite for the migrate-tables workflow."
+                "It can be run by using the `ensure-assessment-run` command."
+            )
+            return
+
         deployed_workflows.run_workflow("migrate-tables")
 
         tables = list(workspace_context.tables_crawler.snapshot())
