@@ -41,7 +41,7 @@ def test_verify_progress_tracking_valid_prerequisites() -> None:
     deployed_workflows.validate_step.assert_called_once_with("assessment", timeout=timeout)
 
 
-def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workflow(mock_installation) -> None:
+def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workspace(mock_installation) -> None:
     verify_has_metastore = create_autospec(VerifyHasMetastore)
     verify_has_metastore.verify_metastore.side_effect = MetastoreNotFoundError
     verify_has_catalog = create_autospec(VerifyHasCatalog)
