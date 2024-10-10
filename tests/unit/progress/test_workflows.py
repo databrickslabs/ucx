@@ -2,7 +2,6 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
@@ -60,5 +59,5 @@ def test_migration_progress_with_invalid_prerequisites(run_workflow) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.metastores.current.return_value = None
     task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace."):
         run_workflow(task, workspace_client=ws)
