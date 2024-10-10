@@ -83,11 +83,13 @@ def test_verify_progress_tracking_raises_runtime_error_if_missing_ucx_catalog(mo
 
 
 def test_verify_progress_tracking_raises_runtime_error_if_assessment_workflow_did_not_run(mock_installation) -> None:
-    ws = create_autospec(WorkspaceClient)
-    verify_progress_tracking = VerifyProgressTracking(
-        VerifyHasMetastore(ws),
-        VerifyHasCatalog(ws, "ucx"),
-        DeployedWorkflows(ws, InstallState.from_installation(mock_installation)),
-    )
+    verify_has_metastore = create_autospec(VerifyHasMetastore)
+    verify_has_catalog = create_autospec(VerifyHasCatalog)
+    deployed_workflows = create_autospec(DeployedWorkflows)
+    deployed_workflows.validate_step.return_value = False
+    verify_progress_tracking = VerifyProgressTracking(verify_has_metastore, verify_has_catalog, deployed_workflows)
     with pytest.raises(RuntimeWarning, match="Assessment workflow did not complete successfully yet."):
         verify_progress_tracking.verify()
+    verify_has_metastore.verify_metastore.assert_called_once()
+    verify_has_catalog.verify.assert_called_once()
+    deployed_workflows.validate_step.assert_called_once_with("assessment", timeout=dt.timedelta(seconds=0))
