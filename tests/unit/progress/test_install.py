@@ -2,9 +2,6 @@ import datetime as dt
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.installer import InstallState
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
 
 from databricks.labs.ucx.hive_metastore.verification import MetastoreNotFoundError, VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
@@ -41,7 +38,9 @@ def test_verify_progress_tracking_valid_prerequisites() -> None:
     deployed_workflows.validate_step.assert_called_once_with("assessment", timeout=timeout)
 
 
-def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workspace(mock_installation) -> None:
+def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached_to_workspace(
+    mock_installation,
+) -> None:
     verify_has_metastore = create_autospec(VerifyHasMetastore)
     verify_has_metastore.verify_metastore.side_effect = MetastoreNotFoundError
     verify_has_catalog = create_autospec(VerifyHasCatalog)
@@ -54,9 +53,7 @@ def test_verify_progress_tracking_raises_runtime_error_if_metastore_not_attached
     deployed_workflows.assert_not_called()
 
 
-def test_verify_progress_tracking_raises_runtime_error_if_no_metastore(
-    mock_installation
-) -> None:
+def test_verify_progress_tracking_raises_runtime_error_if_no_metastore(mock_installation) -> None:
     verify_has_metastore = create_autospec(VerifyHasMetastore)
     verify_has_metastore.verify_metastore.return_value = False
     verify_has_catalog = create_autospec(VerifyHasCatalog)
