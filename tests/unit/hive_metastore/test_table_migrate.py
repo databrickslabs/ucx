@@ -181,7 +181,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     ]
 
 
-def test_migrate_managed_table_as_external_tables_should_produce_proper_queries(ws):
+def test_migrate_managed_table_as_external_tables_with_conversion(ws):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -198,7 +198,38 @@ def test_migrate_managed_table_as_external_tables_should_produce_proper_queries(
         migration_status_refresher,
         migrate_grants,
     )
-    table_migrate.migrate_tables(what=What.MANAGED_EXTERNAL, managed_table_external_storage="CONVERT_TO_EXTERNAL")
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CONVERT_TO_EXTERNAL")
+
+    migrate_grants.apply.assert_called()
+
+    assert backend.queries == [
+        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;",
+        (
+            f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_other` "
+            f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_other' , "
+            f"'{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
+        ),
+    ]
+
+
+def test_migrate_managed_table_as_external_tables_without_conversion(ws):
+    errors = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
+    crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
+    table_mapping = mock_table_mapping(["managed_other"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="SYNC_AS_EXTERNAL")
 
     migrate_grants.apply.assert_called()
 
@@ -229,7 +260,7 @@ def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(w
         migration_status_refresher,
         migrate_grants,
     )
-    table_migrate.migrate_tables(what=What.MANAGED_EXTERNAL, managed_table_external_storage="CLONE")
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CLONE")
 
     migrate_grants.apply.assert_called()
 
@@ -1135,87 +1166,6 @@ def test_table_in_mount_mapping_with_table_owner():
         "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (`col1` string, `col2` decimal)  LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
-    migrate_grants.apply.assert_called()
-
-
-def test_managed_table_in_mount_as_external_mapping_with_table_owner():
-    client = create_autospec(WorkspaceClient)
-    client.tables.get.side_effect = NotFound()
-    backend = MockBackend(
-        rows={
-            'hive_metastore.test.tables': [
-                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
-            ],
-            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
-                ("col1", "string", None),
-                ("col2", "decimal", None),
-            ],
-        }
-    )
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.get_tables_to_migrate.return_value = [
-        TableToMigrate(
-            Table("hive_metastore", "mounted_datalake", "test", "MANAGED", "DELTA", "abfss://bucket@msft/path/test"),
-            Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
-        )
-    ]
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    migrate_grants = create_autospec(MigrateGrants)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        client,
-        backend,
-        table_mapping,
-        migration_status_refresher,
-        migrate_grants,
-    )
-    table_migrate.migrate_tables(what=What.MANAGED_MOUNT, managed_table_external_storage="SYNC_AS_EXTERNAL")
-    assert (
-        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` (`col1` string, `col2` decimal)  LOCATION 'abfss://bucket@msft/path/test';"
-        in backend.queries
-    )
-    migrate_grants.apply.assert_called()
-
-
-def test_managed_table_in_mount_as_clone_mapping_with_table_owner():
-    client = create_autospec(WorkspaceClient)
-    client.tables.get.side_effect = NotFound()
-    backend = MockBackend(
-        rows={
-            'hive_metastore.test.tables': [
-                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
-            ],
-            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
-                ("col1", "string", None),
-                ("col2", "decimal", None),
-            ],
-        }
-    )
-    table_mapping = create_autospec(TableMapping)
-    table_mapping.get_tables_to_migrate.return_value = [
-        TableToMigrate(
-            Table("hive_metastore", "mounted_datalake", "test", "MANAGED", "DELTA", "abfss://bucket@msft/path/test"),
-            Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
-        )
-    ]
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    migrate_grants = create_autospec(MigrateGrants)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        client,
-        backend,
-        table_mapping,
-        migration_status_refresher,
-        migrate_grants,
-    )
-    table_migrate.migrate_tables(what=What.MANAGED_MOUNT, managed_table_external_storage="CLONE")
-    assert (
-        "CREATE TABLE IF NOT EXISTS `tgt_catalog`.`tgt_db`.`test` AS SELECT * FROM `hive_metastore`.`mounted_datalake`.`abfss://bucket@msft/path/test`"
-        in backend.queries
-    )
-
     migrate_grants.apply.assert_called()
 
 

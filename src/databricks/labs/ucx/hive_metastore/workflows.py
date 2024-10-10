@@ -29,15 +29,6 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
-    def migrate_managed_external_tables(self, ctx: RuntimeContext):
-        """This workflow task migrates the managed tables that have an external storage to the Unity Catalog depending on
-        WorkspaceConfig.managed_table_external_storage property.
-        """
-        ctx.tables_migrator.migrate_tables(
-            what=What.MANAGED_EXTERNAL, managed_table_external_storage=ctx.config.managed_table_external_storage
-        )
-
     @job_task(
         job_cluster="table_migration",
         depends_on=[
@@ -150,14 +141,6 @@ class MigrateTablesInMounts(Workflow):
     def migrate_tables_in_mounts_experimental(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] This workflow migrates `delta tables stored in mount points` to Unity Catalog using a Create Table statement."""
         ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
-
-    @job_task(job_cluster="table_migration", depends_on=[ScanTablesInMounts.scan_tables_in_mounts_experimental])
-    def migrate_managed_tables_in_mounts_experimental(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] This workflow migrates `managed delta tables stored in mount points` to Unity Catalog depending on
-        WorkspaceConfig.managed_table_external_storage property."""
-        ctx.tables_migrator.migrate_tables(
-            what=What.MANAGED_MOUNT, managed_table_external_storage=ctx.config.managed_table_external_storage
-        )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_tables_in_mounts_experimental])
     def update_migration_status(self, ctx: RuntimeContext):

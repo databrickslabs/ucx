@@ -31,8 +31,6 @@ class What(Enum):
     VIEW = auto()
     TABLE_IN_MOUNT = auto()
     DB_DATASET = auto()
-    MANAGED_EXTERNAL = auto()
-    MANAGED_MOUNT = auto()
     UNKNOWN = auto()
 
 
@@ -176,17 +174,14 @@ class Table:  # pylint: disable=too-many-public-methods
 
     @property
     def what(self) -> What:
-        dbfs_delta = {True: What.DBFS_ROOT_DELTA, False: What.DBFS_ROOT_NON_DELTA}
         if self.is_databricks_dataset:
             return What.DB_DATASET
-        if self.is_managed and self.is_table_in_mount:
-            return What.MANAGED_MOUNT
         if self.is_table_in_mount:
             return What.TABLE_IN_MOUNT
+        if self.is_dbfs_root and self.is_delta:
+            return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
-            return dbfs_delta[self.is_delta]
-        if self.kind == "TABLE" and self.is_managed:
-            return What.MANAGED_EXTERNAL
+            return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
         if self.kind == "TABLE" and self.is_hive:
@@ -198,9 +193,12 @@ class Table:  # pylint: disable=too-many-public-methods
         return What.UNKNOWN
 
     def sql_migrate_external(self, target_table_key):
-        if self.what == What.MANAGED_EXTERNAL:
-            return f"SYNC TABLE {escape_sql_identifier(target_table_key)} AS EXTERNAL FROM {escape_sql_identifier(self.key)};"
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
+
+    def sql_migrate_as_external(self, target_table_key):
+        return (
+            f"SYNC TABLE {escape_sql_identifier(target_table_key)} AS EXTERNAL FROM {escape_sql_identifier(self.key)};"
+        )
 
     def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
         return (

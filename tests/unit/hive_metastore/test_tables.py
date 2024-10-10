@@ -214,7 +214,7 @@ def test_tables_returning_error_when_show_tables(caplog):
         (
             Table("a", "mounted_b", "c", "MANAGED", "DELTA", location="dbfs:/mnt/somelocation/tablename"),
             False,
-            What.MANAGED_MOUNT,
+            What.TABLE_IN_MOUNT,
         ),
         (
             Table("a", "mounted_b", "c", "EXTERNAL", "DELTA", location="/dbfs/mnt/somelocation/tablename"),
@@ -231,7 +231,7 @@ def test_tables_returning_error_when_show_tables(caplog):
             False,
             What.DB_DATASET,
         ),
-        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.MANAGED_EXTERNAL),
+        (Table("a", "b", "c", "MANAGED", "DELTA", location="s3:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
         (Table("a", "b", "c", "EXTERNAL", "DELTA", location="adls:/somelocation/tablename"), False, What.EXTERNAL_SYNC),
     ],
 )
