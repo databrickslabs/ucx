@@ -17,8 +17,9 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.jobs import Source
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
@@ -175,29 +176,40 @@ class WorkflowTaskContainer(SourceContainer):
             problems = graph.register_library(library.pypi.package)
             if problems:
                 yield from problems
-        if library.egg:
-            yield from self._register_egg(graph, library)
-        if library.whl:
-            wheel_path = self._as_path(library.whl)
-            with self._temporary_copy(wheel_path) as local_file:
-                yield from graph.register_library(local_file.as_posix())
-        if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
-            logger.info(f"Registering libraries from {library.requirements}")
-            requirements_path = self._as_path(library.requirements)
-            with requirements_path.open() as requirements:
-                for requirement in requirements:
-                    requirement = requirement.rstrip()
-                    clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
-                    if clean_requirement.startswith("-r"):
-                        logger.warning(f"Reference to other requirements file is not supported: {requirement}")
-                        continue
-                    if clean_requirement.startswith("-c"):
-                        logger.warning(f"Reference to constraints file is not supported: {requirement}")
-                        continue
-                    yield from graph.register_library(clean_requirement)
+        try:
+            if library.egg:
+                yield from self._register_egg(graph, library)
+            if library.whl:
+                yield from self._register_whl(graph, library)
+            if library.requirements:
+                yield from self._register_requirements_txt(graph, library)
+        except BadRequest as e:
+            # see https://github.com/databrickslabs/ucx/issues/2916
+            yield DependencyProblem('library-error', f'Cannot retrieve library: {e}')
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+
+    def _register_requirements_txt(self, graph, library):
+        # https://pip.pypa.io/en/stable/reference/requirements-file-format/
+        logger.info(f"Registering libraries from {library.requirements}")
+        requirements_path = self._as_path(library.requirements)
+        with requirements_path.open() as requirements:
+            for requirement in requirements:
+                requirement = requirement.rstrip()
+                clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
+                if clean_requirement.startswith("-r"):
+                    logger.warning(f"Reference to other requirements file is not supported: {requirement}")
+                    continue
+                if clean_requirement.startswith("-c"):
+                    logger.warning(f"Reference to constraints file is not supported: {requirement}")
+                    continue
+                yield from graph.register_library(clean_requirement)
+
+    def _register_whl(self, graph, library):
+        wheel_path = self._as_path(library.whl)
+        with self._temporary_copy(wheel_path) as local_file:
+            yield from graph.register_library(local_file.as_posix())
 
     def _register_egg(self, graph, library):
         if self.runtime_version > (14, 0):
@@ -213,6 +225,10 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
             return []
+        if self._task.notebook_task.source == Source.GIT:
+            # see https://github.com/databrickslabs/ucx/issues/2888
+            message = 'Notebooks are in GIT. Use "databricks labs ucx lint-local-code" CLI command to discover problems'
+            return [DependencyProblem("not-supported", message)]
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')

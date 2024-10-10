@@ -12,7 +12,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
-from databricks.sdk.service import jobs, sql
+from databricks.sdk.service import sql
 from databricks.sdk.service.catalog import ExternalLocationInfo, MetastoreInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
@@ -842,8 +842,8 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws.workspace.list.assert_called_once()
 
 
-def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
+def test_relay_logs(ws, caplog) -> None:
+    ws.jobs.list_runs.return_value = [Run(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
@@ -889,19 +889,28 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
 
 def test_create_ucx_catalog_calls_get_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
-    ws.catalogs.get.assert_called_once()
+    ws.catalogs.get.assert_called()
 
 
 def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
 
     assert len(mock_backend.queries) > 0, "No queries executed on backend"
     assert "CREATE SCHEMA" in mock_backend.queries[0]
+
+
+def test_create_ucx_catalog_raises_runtime_error_because_progress_tracking_prerequisites_are_not_met(ws) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    with pytest.raises(RuntimeWarning):  # Specific warning is not important here
+        create_ucx_catalog(ws, prompts)
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])

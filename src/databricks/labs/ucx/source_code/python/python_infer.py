@@ -66,15 +66,15 @@ class InferredValue:
             yield from cls._safe_infer_internal(node)
 
     @classmethod
-    def _safe_infer_internal(cls, node: NodeNG):
+    def _safe_infer_internal(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
         try:
             yield from cls._unsafe_infer_internal(node)
-        except InferenceError as e:
-            logger.debug(f"When inferring {node}", exc_info=e)
+        except (InferenceError, KeyError) as e:
+            logger.debug(f"When inferring: {node}", exc_info=e)
             yield [Uninferable]
 
     @classmethod
-    def _unsafe_infer_internal(cls, node: NodeNG):
+    def _unsafe_infer_internal(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
         all_inferred = node.inferred()
         if len(all_inferred) == 0 and isinstance(node, Instance):
             yield [node]
@@ -148,7 +148,7 @@ class _DbUtilsWidgetsGetCall(NodeNG):
 class _LocalInferredValue(InferredValue):
 
     @classmethod
-    def do_infer_values(cls, node: NodeNG):
+    def do_infer_values(cls, node: NodeNG) -> Iterator[Iterable[NodeNG]]:
         yield from cls._infer_values(node)
 
 

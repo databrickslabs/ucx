@@ -2,7 +2,6 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
@@ -55,39 +54,10 @@ def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
         assert True, "Valid prerequisites found"
 
 
-def test_migration_progress_raises_runtime_error_if_metastore_not_attached_to_workflow(run_workflow) -> None:
+def test_migration_progress_with_invalid_prerequisites(run_workflow) -> None:
+    """All invalid prerequisites permutations are tested for `VerifyProgressTracking` separately."""
     ws = create_autospec(WorkspaceClient)
     ws.metastores.current.return_value = None
     task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace."):
         run_workflow(task, workspace_client=ws)
-
-
-def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_metastore(run_workflow) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.metastores.current.side_effect = PermissionDenied
-    task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace"):
-        run_workflow(task, workspace_client=ws)
-
-
-def test_migration_progress_raises_runtime_error_if_missing_ucx_catalog(run_workflow) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.catalogs.get.return_value = None
-    task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
-        run_workflow(task, workspace_client=ws)
-
-
-def test_migration_progress_raises_runtime_error_if_missing_permissions_to_access_ucx_catalog(run_workflow) -> None:
-    ws = create_autospec(WorkspaceClient)
-    ws.catalogs.get.side_effect = PermissionDenied
-    task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="UCX catalog not configured. .*"):
-        run_workflow(task, workspace_client=ws)
-
-
-def test_migration_progress_raises_runtime_error_if_assessment_workflow_did_not_run(run_workflow) -> None:
-    task = MigrationProgress.verify_prerequisites
-    with pytest.raises(RuntimeWarning, match="Assessment workflow not completed successfully"):
-        run_workflow(task)
