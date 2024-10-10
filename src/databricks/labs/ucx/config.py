@@ -74,6 +74,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] Whether the assessment should lint only specific dashboards.
     include_dashboard_ids: list[str] | None = None
 
+    managed_table_external_storage: str = 'CLONE'
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
