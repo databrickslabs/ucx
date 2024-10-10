@@ -1,8 +1,6 @@
-import datetime as dt
 
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
-from databricks.labs.ucx.hive_metastore.verification import MetastoreNotFoundError
 
 
 class MigrationProgress(Workflow):
