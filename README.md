@@ -1191,24 +1191,6 @@ The export-assessment command is used to export UCX assessment results to a spec
 
 [[back to top](#databricks-labs-ucx)]
 
-## `export-assessment` command
-
-```commandline
-databricks labs ucx export-assessment
-```
-The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: export_{query_choice}_results.zip
-- **Choose a path to save the UCX Assessment results:**
-    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
-
-- **Choose which assessment results to export:**
-    - **Description:** Select the type of results to export. Options include:
-        - `azure`
-        - `estimates`
-        - `interactive`
-        - `main`
-
-[[back to top](#databricks-labs-ucx)]
-
 # Metastore related commands
 
 These commands are used to assign a Unity Catalog metastore to a workspace. The metastore assignment is a pre-requisite
