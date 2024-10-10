@@ -19,6 +19,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.jobs import Source
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
@@ -213,6 +214,10 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
             return []
+        if self._task.notebook_task.source == Source.GIT:
+            # see https://github.com/databrickslabs/ucx/issues/2888
+            message = 'Notebooks are in GIT. Use "databricks labs ucx lint-local-code" CLI command to discover problems'
+            return [DependencyProblem("not-supported", message)]
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
