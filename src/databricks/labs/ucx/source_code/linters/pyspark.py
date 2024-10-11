@@ -113,7 +113,7 @@ class SparkCallMatcher(_TableNameMatcher):
                 yield None
                 continue
             table_name = inferred.as_string().strip("'").strip('"')
-            info = UsedTable.parse(table_name, from_table.schema)
+            info = UsedTable.parse(table_name, from_table.schema, is_read=self.is_read, is_write=self.is_write)
             yield table_name, info
 
     def lint(
@@ -283,22 +283,22 @@ class SparkTableNameMatchers:
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
         spark_catalog_matchers: list[_TableNameMatcher] = [
-            SparkCallMatcher("cacheTable", 1, 2, 0, "tableName"),
-            SparkCallMatcher("createTable", 1, 1000, 0, "tableName"),
-            SparkCallMatcher("createExternalTable", 1, 1000, 0, "tableName"),
-            SparkCallMatcher("getTable", 1, 1, 0),
-            SparkCallMatcher("isCached", 1, 1, 0),
-            SparkCallMatcher("listColumns", 1, 2, 0, "tableName"),
-            SparkCallMatcher("tableExists", 1, 2, 0, "tableName"),
-            SparkCallMatcher("recoverPartitions", 1, 1, 0),
-            SparkCallMatcher("refreshTable", 1, 1, 0),
-            SparkCallMatcher("uncacheTable", 1, 1, 0),
-            ReturnValueMatcher("listTables", 0, 2, 0),
+            SparkCallMatcher("cacheTable", 1, 2, 0, "tableName", is_read=True, is_write=False),
+            SparkCallMatcher("createTable", 1, 1000, 0, "tableName", is_read=False, is_write=True),
+            SparkCallMatcher("createExternalTable", 1, 1000, 0, "tableName", is_read=False, is_write=True),
+            SparkCallMatcher("getTable", 1, 1, 0, is_read=True, is_write=False),
+            SparkCallMatcher("isCached", 1, 1, 0, is_read=True, is_write=False),
+            SparkCallMatcher("listColumns", 1, 2, 0, "tableName", is_read=True, is_write=False),
+            SparkCallMatcher("tableExists", 1, 2, 0, "tableName", is_read=True, is_write=False),
+            SparkCallMatcher("recoverPartitions", 1, 1, 0, is_read=True, is_write=False),
+            SparkCallMatcher("refreshTable", 1, 1, 0, is_read=True, is_write=False),
+            SparkCallMatcher("uncacheTable", 1, 1, 0, is_read=True, is_write=False),
+            ReturnValueMatcher("listTables", 0, 2, 0, is_read=True, is_write=False),
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
         spark_dataframe_matchers: list[_TableNameMatcher] = [
-            SparkCallMatcher("writeTo", 1, 1, 0),
+            SparkCallMatcher("writeTo", 1, 1, 0, is_read=False, is_write=True),
         ]
 
         # nothing to migrate in Column, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Column.html
@@ -312,14 +312,16 @@ class SparkTableNameMatchers:
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
         spark_dataframereader_matchers: list[_TableNameMatcher] = [
-            SparkCallMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
+            SparkCallMatcher(
+                "table", 1, 1, 0, is_read=True, is_write=False
+            ),  # TODO good example of collision, see spark_session_calls
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
         spark_dataframewriter_matchers: list[_TableNameMatcher] = [
-            SparkCallMatcher("insertInto", 1, 2, 0, "tableName"),
+            SparkCallMatcher("insertInto", 1, 2, 0, "tableName", is_read=False, is_write=True),
             # TODO jdbc: could the url be a databricks url, raise warning ?
-            SparkCallMatcher("saveAsTable", 1, 4, 0, "name"),
+            SparkCallMatcher("saveAsTable", 1, 4, 0, "name", is_read=False, is_write=True),
         ]
 
         # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
