@@ -99,7 +99,7 @@ def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_c
 
 
 @pytest.fixture
-def clean_workspace_warehouse_config(env_or_skip, az_cli_ctx) -> Generator[None, None, None]:
+def clean_warehouse_config(env_or_skip, az_cli_ctx) -> Generator[None, None, None]:
     """Clean workspace warehouse configuration."""
     env_or_skip("IDE_PROJECT_ROOTS")  # Only run from editor
     warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
@@ -127,7 +127,7 @@ def clean_workspace_warehouse_config(env_or_skip, az_cli_ctx) -> Generator[None,
         )
 
 
-def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, clean_workspace_warehouse_config) -> None:
+def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, clean_warehouse_config) -> None:
     # We mock Azure components to keep the testing scope to Databricks components
     az_cli_ctx = az_cli_ctx.replace(azure_subscription_ids=["test"])
     storage_account_id = AzureResource(
@@ -143,10 +143,10 @@ def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, cle
 
     warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
     data_access_config = warehouse_config.data_access_config or []
-    endpoint_configuration_pairs = [(pair.key, pair.value) for pair in data_access_config]
+    configuration_pairs = [(pair.key, pair.value) for pair in data_access_config]
     tenant_id = az_cli_ctx.azure_resources.tenant_id()
     endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
-    endpoint_configuration_pairs_expected = [
+    configuration_pairs_expected = [
         (
             "spark.hadoop.fs.azure.account.oauth2.client.id.teststorageaccount.dfs.core.windows.net",
             "test-principal-id",
@@ -168,7 +168,7 @@ def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, cle
             "{{secrets/ucx/test-principal-secret}}",
         ),
     ]
-    missing_configuration_pairs = set(endpoint_configuration_pairs_expected) - set(endpoint_configuration_pairs)
+    missing_configuration_pairs = set(configuration_pairs_expected) - set(configuration_pairs)
     assert not missing_configuration_pairs, f"Missing configuration pairs: {missing_configuration_pairs}"
 
 
