@@ -262,14 +262,14 @@ class TableCollector(ABC):
 
 
 @dataclass
-class TableInfoNode:
+class UsedTableNode:
     table: UsedTable
     node: NodeNG
 
 
 class TablePyCollector(TableCollector, ABC):
 
-    def collect_tables(self, source_code: str):
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             tree = Tree.normalize_and_parse(source_code)
             for table_node in self.collect_tables_from_tree(tree):
@@ -282,7 +282,7 @@ class TablePyCollector(TableCollector, ABC):
             logger.warning('syntax-error', exc_info=e)
 
     @abstractmethod
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]: ...
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...
 
 
 class TableSqlCollector(TableCollector, ABC): ...
@@ -467,7 +467,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         except AstroidSyntaxError as e:
             logger.warning('syntax-error', exc_info=e)
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
             yield from collector.collect_tables_from_tree(tree)
 
