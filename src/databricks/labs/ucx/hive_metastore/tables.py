@@ -169,6 +169,10 @@ class Table:  # pylint: disable=too-many-public-methods
         return self.database.startswith("mounted_") and self.is_delta
 
     @property
+    def is_managed(self) -> bool:
+        return self.object_type == "MANAGED"
+
+    @property
     def what(self) -> What:
         if self.is_databricks_dataset:
             return What.DB_DATASET
@@ -190,6 +194,11 @@ class Table:  # pylint: disable=too-many-public-methods
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
+
+    def sql_migrate_as_external(self, target_table_key):
+        return (
+            f"SYNC TABLE {escape_sql_identifier(target_table_key)} AS EXTERNAL FROM {escape_sql_identifier(self.key)};"
+        )
 
     def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
         return (
