@@ -6,7 +6,7 @@ from collections.abc import Callable, ValuesView
 from dataclasses import dataclass
 from functools import partial, wraps
 from datetime import timedelta
-from typing import Any, List, Optional, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -50,18 +50,18 @@ P = ParamSpec('P')
 R = TypeVar('R')
 
 
-def set_workspace_warehouse_config_wrapper(
+def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-arguments,too-complex
     api: ApiClient,
     *,
-    channel: Optional[Channel] = None,
-    config_param: Optional[RepeatedEndpointConfPairs] = None,
-    data_access_config: Optional[List[EndpointConfPair]] = None,
-    enabled_warehouse_types: Optional[List[WarehouseTypePair]] = None,
-    global_param: Optional[RepeatedEndpointConfPairs] = None,
-    google_service_account: Optional[str] = None,
-    instance_profile_arn: Optional[str] = None,
-    security_policy: Optional[SetWorkspaceWarehouseConfigRequestSecurityPolicy] = None,
-    sql_configuration_parameters: Optional[RepeatedEndpointConfPairs] = None,
+    channel: Channel | None = None,
+    config_param: RepeatedEndpointConfPairs | None = None,
+    data_access_config: list[EndpointConfPair] | None = None,
+    enabled_warehouse_types: list[WarehouseTypePair] | None = None,
+    global_param: RepeatedEndpointConfPairs | None = None,
+    google_service_account: str | None = None,
+    instance_profile_arn: str | None = None,
+    security_policy: SetWorkspaceWarehouseConfigRequestSecurityPolicy | None = None,
+    sql_configuration_parameters: RepeatedEndpointConfPairs | None = None,
     enable_serverless_compute: bool = False,
 ):
     """Set the workspace configuration.
