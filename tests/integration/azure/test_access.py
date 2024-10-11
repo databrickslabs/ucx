@@ -60,6 +60,7 @@ def clean_up_spn(env_or_skip):
 
 
 def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy, clean_up_spn) -> None:
+    az_cli_ctx = az_cli_ctx.replace(azure_subscription_ids=[env_or_skip("TEST_AZURE_SUBSCRIPTION_ID")])
     policy = make_cluster_policy()
     az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy.policy_id))
     tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
