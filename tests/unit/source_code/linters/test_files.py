@@ -46,7 +46,8 @@ def test_file_migrator_fix_ignores_unsupported_language() -> None:
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
     path = Path('unsupported.py')
-    assert not migrator.apply(path)
+    with pytest.raises(ValueError):
+        assert not migrator.apply(path)
 
 
 def test_file_migrator_fix_reads_supported_extensions(migration_index) -> None:
