@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     SqlLinter,
     Fixer,
     UsedTable,
-    TableInfoNode,
+    UsedTableNode,
     TablePyCollector,
     TableSqlCollector,
     DfsaPyCollector,
@@ -388,14 +388,14 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             return None
         return matcher if matcher.matches(node) else None
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, Call)
             for used_table in matcher.collect_tables(self._from_table, self._index, self._session_state, node):
-                yield TableInfoNode(used_table, node)  # B
+                yield UsedTableNode(used_table, node)
 
 
 class _SparkSqlAnalyzer:
@@ -468,11 +468,11 @@ class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
     def __init__(self, sql_collector: TableSqlCollector):
         self._sql_collector = sql_collector
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         assert self._sql_collector
         for call_node, query in self._visit_call_nodes(tree):
             for value in InferredValue.infer_from_node(query):
                 if not value.is_inferred():
                     continue  # TODO error handling strategy
                 for table in self._sql_collector.collect_tables(value.as_string()):
-                    yield TableInfoNode(table, call_node)  # A
+                    yield UsedTableNode(table, call_node)

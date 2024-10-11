@@ -262,27 +262,23 @@ class TableCollector(ABC):
 
 
 @dataclass
-class TableInfoNode:
+class UsedTableNode:
     table: UsedTable
     node: NodeNG
 
 
 class TablePyCollector(TableCollector, ABC):
 
-    def collect_tables(self, source_code: str):
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             tree = Tree.normalize_and_parse(source_code)
             for table_node in self.collect_tables_from_tree(tree):
-                # see https://github.com/databrickslabs/ucx/issues/2887
-                if isinstance(table_node, UsedTable):
-                    yield table_node
-                else:
-                    yield table_node.table
+                yield table_node.table
         except AstroidSyntaxError as e:
             logger.warning('syntax-error', exc_info=e)
 
     @abstractmethod
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]: ...
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...
 
 
 class TableSqlCollector(TableCollector, ABC): ...
@@ -458,16 +454,11 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         try:
             tree = self._parse_and_append(source_code)
             for table_node in self.collect_tables_from_tree(tree):
-                # there's a bug in the code that causes this to be necessary
-                # see https://github.com/databrickslabs/ucx/issues/2887
-                if isinstance(table_node, UsedTable):
-                    yield table_node
-                else:
-                    yield table_node.table
+                yield table_node.table
         except AstroidSyntaxError as e:
             logger.warning('syntax-error', exc_info=e)
 
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[TableInfoNode]:
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
             yield from collector.collect_tables_from_tree(tree)
 
