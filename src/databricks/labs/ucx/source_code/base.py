@@ -236,7 +236,7 @@ class SourceInfo:
 class UsedTable(SourceInfo):
 
     @classmethod
-    def parse(cls, value: str, default_schema: str) -> UsedTable:
+    def parse(cls, value: str, default_schema: str, is_read=True, is_write=False) -> UsedTable:
         parts = value.split(".")
         if len(parts) >= 3:
             catalog_name = parts.pop(0)
@@ -246,7 +246,9 @@ class UsedTable(SourceInfo):
             schema_name = parts.pop(0)
         else:
             schema_name = default_schema
-        return UsedTable(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
+        return UsedTable(
+            catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0], is_read=is_read, is_write=is_write
+        )
 
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
