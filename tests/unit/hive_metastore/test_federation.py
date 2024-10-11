@@ -1,5 +1,6 @@
 from unittest.mock import create_autospec, call
 
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import AlreadyExists
 from databricks.sdk.service.catalog import (
@@ -16,8 +17,9 @@ from databricks.sdk.service.catalog import (
 from databricks.sdk.service.iam import User
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation
+from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
@@ -42,7 +44,7 @@ def test_create_federated_catalog():
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 
-    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info)
+    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
     hms_fed.register_internal_hms_as_federated_catalog()
 
     workspace_client.connections.create.assert_called_with(
@@ -94,7 +96,7 @@ def test_already_existing_connection():
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 
-    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info)
+    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
     hms_fed.register_internal_hms_as_federated_catalog()
 
     workspace_client.connections.create.assert_called_with(
@@ -107,3 +109,22 @@ def test_already_existing_connection():
         connection_name='a',
         options={"authorized_paths": 's3://b/c/d,s3://e/f/g'},
     )
+
+
+def test_hms_federation_enabler():
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx',
+                'connect': {
+                    'host': 'host',
+                    'token': 'token',
+                },
+            }
+        }
+    )
+    hmse = HiveMetastoreFederationEnabler(installation)
+    hmse.enable()
+
+    config = installation.load(WorkspaceConfig)
+    assert config.enable_hms_federation is True

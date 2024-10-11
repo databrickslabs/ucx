@@ -137,9 +137,9 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
     )
     external_locations_migration.run()
     calls = [
-        call('bucket1_folder1', 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
-        call('bucket2_folder2', 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True),
-        call('bucketx_folderx', 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True),
+        call('bucket1_folder1', 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True, fallback=False),
+        call('bucket2_folder2', 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True, fallback=False),
+        call('bucketx_folderx', 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True, fallback=False),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
     aws.get_role_policy.assert_not_called()
@@ -191,7 +191,7 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     )
     external_locations_migration.run()
     calls = [
-        call("bucket1_folder1", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
+        call("bucket1_folder1", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True, fallback=False),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
     aws.get_role_policy.assert_not_called()
