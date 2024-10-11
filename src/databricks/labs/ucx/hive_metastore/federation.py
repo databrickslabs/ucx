@@ -9,6 +9,7 @@ from databricks.sdk.service.catalog import (
     SecurableType,
     Privilege,
     PermissionsChange,
+    CatalogInfo,
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -29,11 +30,12 @@ class HiveMetastoreFederation:
         self._external_locations = external_locations
         self._workspace_info = workspace_info
 
-    def run(self):
+    def register_internal_hms_as_federated_catalog(self) -> CatalogInfo:
         name = self._workspace_info.current()
         connection_info = self._get_or_create_connection(name)
+        assert connection_info.name is not None
         try:
-            self._workspace_client.catalogs.create(
+            return self._workspace_client.catalogs.create(
                 name=connection_info.name,
                 connection_name=connection_info.name,
                 options={"authorized_paths": self._get_authorized_paths()},
@@ -50,7 +52,7 @@ class HiveMetastoreFederation:
         try:
             return self._workspace_client.connections.create(
                 name=name,
-                connection_type=ConnectionType.HIVE_METASTORE,  # needs SDK change
+                connection_type=ConnectionType.HIVE_METASTORE,
                 options={"builtin": "true"},
             )
         except AlreadyExists:
@@ -79,7 +81,7 @@ class HiveMetastoreFederation:
                 continue
             self._add_missing_permissions_if_needed(location_name, current_user.user_name)
             authorized_paths.append(location)
-        return ",".join(authorized_paths)
+        return ",".join(sorted(authorized_paths))
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
         grants = self._location_grants(location_name)
