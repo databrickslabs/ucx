@@ -71,9 +71,12 @@ class PathLookup:
     def _standardize_path(path: Path):
         resolved = path.resolve()  # eliminate ".." components
         # on MacOS "/var/..." resolves to "/private/var/.." which breaks path equality
+        # let's compare the first meaningful part
         index = 1 if path.parts[0] == path.anchor else 0
+        # if they're equal the path root was not transformed
         if path.parts[index] == resolved.parts[index]:
             return resolved
+        # if they're unequal, let's drop the added part, such that resolved == path (without '..')
         posix = resolved.as_posix()
         posix = posix[posix.index(path.as_posix()) :]
         return Path(posix)
