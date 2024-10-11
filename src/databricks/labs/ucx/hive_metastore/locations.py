@@ -346,9 +346,10 @@ class Mount:
 
 
 class MountsCrawler(CrawlerBase[Mount]):
-    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
+    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str, enable_hms_federation: bool = False,):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
+        self._enable_hms_federation = enable_hms_federation
 
     @staticmethod
     def _deduplicate_mounts(mounts: list) -> list:
@@ -364,11 +365,34 @@ class MountsCrawler(CrawlerBase[Mount]):
                 deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
+    @staticmethod
+    def _resolve_dbfs_root() -> Mount | None:
+        # pylint: disable=import-error,import-outside-toplevel,broad-exception-caught,too-many-try-statements
+        try:
+            from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+            spark = SparkSession.builder.getOrCreate()
+            # pylint: disable=protected-access
+            uri = spark._jvm.java.net.URI
+            some = spark._jvm.scala.Some
+            hms_fed_dbfs_utils = spark._jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
+            root_location_opt = hms_fed_dbfs_utils.resolveDbfsPath(some(uri("dbfs:/user/hive/warehouse")))
+            if root_location_opt.isDefined():
+                return Mount("/user/hive/warehouse", root_location_opt.get().toString())
+            return None
+        except Exception as err:
+            logger.warning(f"Failed to resolve DBFS root location: {err}")
+            return None
+
     def _crawl(self) -> Iterable[Mount]:
         mounts = []
         try:
             for mount_point, source, _ in self._dbutils.fs.mounts():
                 mounts.append(Mount(mount_point, source))
+            if self._enable_hms_federation:
+                root_mount = self._resolve_dbfs_root()
+                if root_mount:
+                    mounts.append(root_mount)
         except Exception as error:  # pylint: disable=broad-except
             if "com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted" in str(error):
                 logger.warning(
