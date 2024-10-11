@@ -884,11 +884,5 @@ def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, ma
     migration_index = runtime_ctx.tables_migrator.index(force_refresh=True)
     assert migration_index
     # Assert that an error message was recorded containing a line with the text "which does no longer exist"
-    assert any(
-        [
-            record.message
-            for record in caplog.records
-            if f"failed-to-migrate: {src_table.schema_name}.{src_table.name} set as a source does no longer exist"
-            in record.message
-        ]
-    )
+    expected_message = f"{src_table.schema_name}.{src_table.name} set as a source does no longer exist"
+    assert expected_message in caplog.records
