@@ -61,7 +61,7 @@ class CatalogSchema:
         self._apply_from_legacy_table_acls()
         self._update_principal_acl()
 
-    def _apply_from_legacy_table_acls(self):
+    def _apply_from_legacy_table_acls(self) -> None:
         grants = self._get_catalog_schema_hive_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
@@ -73,8 +73,7 @@ class CatalogSchema:
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
-    def _update_principal_acl(self):
-
+    def _update_principal_acl(self) -> None:
         grants = self._get_catalog_schema_principal_acl_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
