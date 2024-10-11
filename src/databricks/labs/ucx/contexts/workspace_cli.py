@@ -18,6 +18,7 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
+from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -27,6 +28,8 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
+
+# pylint: disable=too-many-public-methods
 
 
 class WorkspaceContext(CliContext):
@@ -184,6 +187,10 @@ class WorkspaceContext(CliContext):
     @cached_property
     def progress_tracking_installation(self) -> ProgressTrackingInstallation:
         return ProgressTrackingInstallation(self.sql_backend, self.config.ucx_catalog)
+
+    @cached_property
+    def federation(self):
+        return HiveMetastoreFederation(self.workspace_client, self.external_locations, self.workspace_info)
 
 
 class LocalCheckoutContext(WorkspaceContext):

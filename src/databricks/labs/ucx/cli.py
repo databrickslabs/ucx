@@ -801,5 +801,12 @@ def export_assessment(w: WorkspaceClient, prompts: Prompts):
     exporter.export_results(prompts)
 
 
+@ucx.command
+def create_federated_catalog(w: WorkspaceClient, _: Prompts):
+    """(Experimental) Create federated catalog from current workspace Hive Metastore."""
+    ctx = WorkspaceContext(w)
+    ctx.federation.register_internal_hms_as_federated_catalog()
+
+
 if __name__ == "__main__":
     ucx()

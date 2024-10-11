@@ -333,3 +333,6 @@ commands:
 
   - name: export-assessment
     description: Export UCX results to a specified location
+
+  - name: create-federated-catalog
+    description: (EXPERIMENTAL) Create a federated catalog in the workspace
