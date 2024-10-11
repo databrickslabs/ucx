@@ -131,7 +131,7 @@ def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, cle
     # We mock Azure components to keep the testing scope to Databricks components
     az_cli_ctx = az_cli_ctx.replace(azure_subscription_ids=["test"])
     storage_account_id = AzureResource(
-        "/subscriptions/test-subscription/resourceGroups/test-resource-gorup/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
+        "/subscriptions/test-subscription/resourceGroups/test-resource-group/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     )
     storage_account = StorageAccount(storage_account_id, "teststorageaccount", "west-europe", "Allow")
 
