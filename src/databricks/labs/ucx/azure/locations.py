@@ -20,7 +20,7 @@ class ExternalLocationsMigration:
         resource_permissions: AzureResourcePermissions,
         azurerm: AzureResources,
         principal_acl: PrincipalACL,
-        enable_hms_federation: bool
+        enable_hms_federation: bool = False,
     ):
         self._ws = ws
         self._hms_locations = hms_locations
@@ -122,8 +122,13 @@ class ExternalLocationsMigration:
     ) -> str | None:
         try:
             self._ws.external_locations.create(
-                name, url, credential, comment=comment, read_only=read_only, skip_validation=skip_validation,
-                fallback=self._enable_fallback_mode
+                name,
+                url,
+                credential,
+                comment=comment,
+                read_only=read_only,
+                skip_validation=skip_validation,
+                fallback=self._enable_fallback_mode,
             )
             return url
         except InvalidParameterValue as invalid:

@@ -21,7 +21,7 @@ class AWSExternalLocationsMigration:
         external_locations: ExternalLocations,
         aws_resource_permissions: AWSResourcePermissions,
         principal_acl: PrincipalACL,
-        enable_hms_federation: bool,
+        enable_hms_federation: bool = False,
     ):
         self._ws = ws
         self._external_locations = external_locations
@@ -56,7 +56,7 @@ class AWSExternalLocationsMigration:
                 path,
                 credential_dict[role_arn],
                 skip_validation=True,
-                fallback=self._enable_fallback_mode
+                fallback=self._enable_fallback_mode,
             )
         self._principal_acl.apply_location_acl()
 

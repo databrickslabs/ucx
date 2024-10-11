@@ -118,7 +118,7 @@ class WorkspaceContext(CliContext):
                 self.external_locations,
                 self.aws_resource_permissions,
                 self.principal_acl,
-                self.config.enable_hms_federation
+                self.config.enable_hms_federation,
             )
         if self.is_azure:
             return ExternalLocationsMigration(
@@ -127,7 +127,7 @@ class WorkspaceContext(CliContext):
                 self.azure_resource_permissions,
                 self.azure_resources,
                 self.principal_acl,
-                self.config.enable_hms_federation
+                self.config.enable_hms_federation,
             )
         raise NotImplementedError
 
@@ -191,12 +191,17 @@ class WorkspaceContext(CliContext):
         return ProgressTrackingInstallation(self.sql_backend, self.config.ucx_catalog)
 
     @cached_property
-    def federation(self):
-        return HiveMetastoreFederation(self.workspace_client, self.external_locations, self.workspace_info)
-
-    @cached_property
     def federation_enabler(self):
         return HiveMetastoreFederationEnabler(self.installation)
+
+    @cached_property
+    def federation(self):
+        return HiveMetastoreFederation(
+            self.workspace_client,
+            self.external_locations,
+            self.workspace_info,
+            self.config.enable_hms_federation,
+        )
 
 
 class LocalCheckoutContext(WorkspaceContext):

@@ -76,7 +76,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     enable_hms_federation: bool = False
 
-
     managed_table_external_storage: str = 'CLONE'
 
     def replace_inventory_variable(self, text: str) -> str:
