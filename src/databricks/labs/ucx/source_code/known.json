@@ -6560,24 +6560,7 @@
     "importlib_resources.future": [],
     "importlib_resources.future.adapters": [],
     "importlib_resources.readers": [],
-    "importlib_resources.simple": [],
-    "importlib_resources.tests": [],
-    "importlib_resources.tests._path": [],
-    "importlib_resources.tests.compat": [],
-    "importlib_resources.tests.compat.py312": [],
-    "importlib_resources.tests.compat.py39": [],
-    "importlib_resources.tests.test_compatibilty_files": [],
-    "importlib_resources.tests.test_contents": [],
-    "importlib_resources.tests.test_custom": [],
-    "importlib_resources.tests.test_files": [],
-    "importlib_resources.tests.test_functional": [],
-    "importlib_resources.tests.test_open": [],
-    "importlib_resources.tests.test_path": [],
-    "importlib_resources.tests.test_read": [],
-    "importlib_resources.tests.test_reader": [],
-    "importlib_resources.tests.test_resource": [],
-    "importlib_resources.tests.util": [],
-    "importlib_resources.tests.zip": []
+    "importlib_resources.simple": []
   },
   "iniconfig": {
     "iniconfig": []
