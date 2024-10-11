@@ -341,13 +341,14 @@ class AzureResourcePermissions:
                 "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
             )
         # TODO: Remove following try except once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed
-        except InvalidParameterValue as error:
+        except InvalidParameterValue as e:
             sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
             logger.error(
-                f'Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error "{error}". '
-                f'Please try applying the following configs manually in the worksapce admin UI:\n{sql_dac_log_msg}'
+                f"Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error. "
+                f"Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}",
+                exc_info=e,
             )
-            raise error
+            raise
 
     def _remove_service_principal_configuration_from_workspace_warehouse_config(
         self,
