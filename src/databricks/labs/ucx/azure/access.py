@@ -429,6 +429,7 @@ class AzureResourcePermissions:
                 function (Callable[P, R]) : Function to safely call.
                 error_message (str) : Message to log if error raised by the function
             """
+
             @wraps(function)
             def wrapper(*args: Any, **kwargs: Any) -> R | None:
                 try:
@@ -460,9 +461,9 @@ class AzureResourcePermissions:
                 config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
             )
         message = "Missing permissions to revert SQL warehouse config"
-        safe_call(
-            self._remove_service_principal_configuration_from_workspace_warehouse_config, error_message=message
-        )(config.uber_spn_id, secret_identifier, storage_accounts)
+        safe_call(self._remove_service_principal_configuration_from_workspace_warehouse_config, error_message=message)(
+            config.uber_spn_id, secret_identifier, storage_accounts
+        )
         message = "Missing permissions to delete secret scope"
         safe_call(self._safe_delete_scope, error_message=message)(config.inventory_database)
         message = "Missing permissions to save the configuration"
