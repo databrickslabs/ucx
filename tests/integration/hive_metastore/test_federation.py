@@ -13,12 +13,12 @@ def ws():
     return WorkspaceClient(profile='aws-sandbox')
 
 
-@pytest.mark.skip("needs to be enabled")
+@pytest.skip("hackathon")
 def test_federation(ws, sql_backend):
     schema = 'ucx'
     external_locations = ExternalLocations(ws, sql_backend, schema)
     workspace_info = create_autospec(WorkspaceInfo)
     workspace_info.current.return_value = 'some_thing'
     federation = HiveMetastoreFederation(ws, external_locations, workspace_info)
-    federation.register_internal_hms_as_federated_catalog()
+    federation.run()
     workspace_info.current.assert_called_once()
