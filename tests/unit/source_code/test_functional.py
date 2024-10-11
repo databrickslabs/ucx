@@ -110,7 +110,10 @@ class Functional:
         self.language = CellLanguage.PYTHON if path.suffix.endswith("py") else CellLanguage.SQL
 
     def verify(
-        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: TableMigrationIndex
+        self,
+        path_lookup: PathLookup,
+        dependency_resolver: DependencyResolver,
+        migration_index: TableMigrationIndex,
     ) -> None:
         expected_problems = list(self._expected_problems())
         actual_advices = list(self._lint(path_lookup, dependency_resolver, migration_index))
@@ -134,7 +137,10 @@ class Functional:
         # TODO: output annotated file with comments for quick fixing
 
     def _lint(
-        self, path_lookup: PathLookup, dependency_resolver: DependencyResolver, migration_index: TableMigrationIndex
+        self,
+        path_lookup: PathLookup,
+        dependency_resolver: DependencyResolver,
+        migration_index: TableMigrationIndex,
     ) -> Iterable[Advice]:
         session_state = self._test_session_state()
         print(str(session_state))
@@ -242,7 +248,11 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
     ],
 )
 def test_functional_with_parent(
-    child: str, parent: str, mock_path_lookup, simple_dependency_resolver, extended_test_index
+    child: str,
+    parent: str,
+    mock_path_lookup,
+    simple_dependency_resolver,
+    extended_test_index,
 ) -> None:
     sample = Functional.for_child(child, parent)
     path_lookup = mock_path_lookup.change_directory(sample.path.parent)
@@ -250,7 +260,7 @@ def test_functional_with_parent(
 
 
 @pytest.mark.skip(reason="Used for troubleshooting failing tests")
-def test_one_functional(mock_path_lookup, simple_dependency_resolver, extended_test_index):
+def test_one_functional(mock_path_lookup, simple_dependency_resolver, extended_test_index) -> None:
     path = mock_path_lookup.resolve(Path("functional/file-access/spark-sql-directfs.py"))
     path_lookup = mock_path_lookup.change_directory(path.parent)
     sample = Functional(path)

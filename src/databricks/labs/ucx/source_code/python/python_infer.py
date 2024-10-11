@@ -37,21 +37,21 @@ class InferredValue:
             yield InferredValue(inferred_atoms)
 
     @classmethod
-    def _contextualize(cls, node: NodeNG, state: CurrentSessionState | None):
+    def _contextualize(cls, node: NodeNG, state: CurrentSessionState | None) -> None:
         if state is None or state.named_parameters is None or len(state.named_parameters) == 0:
             return
         cls._contextualize_dbutils_widgets_get(node, state)
         cls._contextualize_dbutils_widgets_get_all(node, state)
 
     @classmethod
-    def _contextualize_dbutils_widgets_get(cls, node: NodeNG, state: CurrentSessionState):
+    def _contextualize_dbutils_widgets_get(cls, node: NodeNG, state: CurrentSessionState) -> None:
         root = Tree(node).root
         calls = Tree(root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
             call.func = _DbUtilsWidgetsGetCall(state, call)
 
     @classmethod
-    def _contextualize_dbutils_widgets_get_all(cls, node: NodeNG, state: CurrentSessionState):
+    def _contextualize_dbutils_widgets_get_all(cls, node: NodeNG, state: CurrentSessionState) -> None:
         root = Tree(node).root
         calls = Tree(root).locate(Call, [("getAll", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
@@ -89,13 +89,13 @@ class InferredValue:
         self._atoms = list(atoms)
 
     @property
-    def nodes(self):
+    def nodes(self) -> Iterable[NodeNG]:
         return self._atoms
 
-    def is_inferred(self):
+    def is_inferred(self) -> bool:
         return all(atom is not Uninferable for atom in self._atoms)
 
-    def as_string(self):
+    def as_string(self) -> str:
         strings = [str(const.value) for const in filter(lambda atom: isinstance(atom, Const), self._atoms)]
         return "".join(strings)
 
@@ -114,12 +114,16 @@ class _DbUtilsWidgetsGetCall(NodeNG):
 
     @decorators.raise_if_nothing_inferred
     def _infer(
-        self, context: InferenceContext | None = None, **kwargs: Any
+        self,
+        context: InferenceContext | None = None,
+        **kwargs: Any,
     ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
         yield self
         return InferenceErrorInfo(node=self, context=context)
 
-    def infer_call_result(self, context: InferenceContext | None = None, **_):  # caller needs unused kwargs
+    def infer_call_result(
+        self, context: InferenceContext | None = None, **_
+    ) -> Iterable[NodeNG]:  # caller needs unused kwargs
         call_context = getattr(context, "callcontext", None)
         if not isinstance(call_context, CallContext):
             yield Uninferable
@@ -166,12 +170,14 @@ class _DbUtilsWidgetsGetAllCall(NodeNG):
 
     @decorators.raise_if_nothing_inferred
     def _infer(
-        self, context: InferenceContext | None = None, **kwargs: Any
+        self,
+        context: InferenceContext | None = None,
+        **kwargs: Any,
     ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
         yield self
         return InferenceErrorInfo(node=self, context=context)
 
-    def infer_call_result(self, **_):  # caller needs unused kwargs
+    def infer_call_result(self, **_) -> Iterable[NodeNG]:  # caller needs unused kwargs
         named_parameters = self._session_state.named_parameters
         if not named_parameters:
             yield Uninferable
@@ -187,7 +193,7 @@ class _DbUtilsWidgetsGetAllCall(NodeNG):
         result.postinit(items)
         yield result
 
-    def _populate_items(self, values: dict[str, str]):
+    def _populate_items(self, values: dict[str, str]) -> list[tuple[InferenceResult, InferenceResult]]:
         items: list[tuple[InferenceResult, InferenceResult]] = []
         for key, value in values.items():
             item_key = Const(

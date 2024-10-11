@@ -65,7 +65,7 @@ def lint(
 
 @pytest.mark.parametrize("method_name", METHOD_NAMES)
 @pytest.mark.parametrize("assign", ASSIGN)
-def test_has_format_call(migration_index, method_name, assign):
+def test_has_format_call(migration_index, method_name, assign) -> None:
     """Tests that calling "format" doesn't yield advice"""
     old_code = get_code(assign, f'spark.foo().format("delta").bar().{method_name}("catalog.db.table").baz()')
     assert not lint(old_code)
@@ -73,7 +73,7 @@ def test_has_format_call(migration_index, method_name, assign):
 
 @pytest.mark.parametrize("method_name", METHOD_NAMES)
 @pytest.mark.parametrize("assign", ASSIGN)
-def test_no_format(migration_index, method_name, assign):
+def test_no_format(migration_index, method_name, assign) -> None:
     """Tests that not setting "format" yields advice (both in assignment or standalone callchain)"""
     old_code = get_code(assign, f'spark.foo().bar().{method_name}("catalog.db.table").baz()')
     assert [get_advice(assign, method_name, 18)] == lint(old_code)
@@ -88,35 +88,35 @@ def test_no_format(migration_index, method_name, assign):
         {"stmt": 'spark.foo().bar().table("catalog.db.table", fmt="xyz").baz()', "expected": False},
     ],
 )
-def test_no_format_args_count(migration_index, params):
+def test_no_format_args_count(migration_index, params) -> None:
     """Tests that the number of arguments to table creation call is considered in matching"""
     old_code = get_code(False, params["stmt"])
     assert (not params["expected"]) == (not lint(old_code))
 
 
 @pytest.mark.parametrize("assign", ASSIGN)
-def test_has_format_arg(migration_index, assign):
+def test_has_format_arg(migration_index, assign) -> None:
     """Tests that setting "format" positional arg doesn't yield advice"""
     old_code = get_code(assign, 'spark.foo().format("delta").bar().saveAsTable("catalog.db.table", "csv").baz()')
     assert not lint(old_code)
 
 
 @pytest.mark.parametrize("assign", ASSIGN)
-def test_has_format_kwarg(migration_index, assign):
+def test_has_format_kwarg(migration_index, assign) -> None:
     """Tests that setting "format" kwarg doesn't yield advice"""
     old_code = get_code(assign, 'spark.foo().format("delta").bar().saveAsTable("catalog.db.table", format="csv").baz()')
     assert not lint(old_code)
 
 
 @pytest.mark.parametrize("assign", ASSIGN)
-def test_has_format_arg_none(migration_index, assign):
+def test_has_format_arg_none(migration_index, assign) -> None:
     """Tests that explicitly setting "format" parameter to None yields advice"""
     old_code = get_code(assign, 'spark.foo().bar().saveAsTable("catalog.db.table", format=None).baz()')
     assert [get_advice(assign, "saveAsTable", 31)] == lint(old_code)
 
 
 @pytest.mark.parametrize("dbr_version", DBR_VERSIONS)
-def test_dbr_version_filter(migration_index, dbr_version):
+def test_dbr_version_filter(migration_index, dbr_version) -> None:
     """Tests the DBR version cutoff filter"""
     old_code = get_code(False, 'spark.foo().bar().table("catalog.db.table").baz()')
     expected = [] if dbr_version["suppress"] else [get_advice(False, 'table', 18)]

@@ -4,7 +4,7 @@ from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionStat
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 
 
-def test_not_migrated_tables_trigger_nothing(empty_index):
+def test_not_migrated_tables_trigger_nothing(empty_index) -> None:
     ftf = FromTableSqlLinter(empty_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
@@ -12,7 +12,7 @@ def test_not_migrated_tables_trigger_nothing(empty_index):
     assert not actual
 
 
-def test_migrated_tables_trigger_messages(migration_index):
+def test_migrated_tables_trigger_messages(migration_index) -> None:
     ftf = FromTableSqlLinter(migration_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
@@ -37,7 +37,7 @@ def test_migrated_tables_trigger_messages(migration_index):
     ] == list(ftf.lint(old_query))
 
 
-def test_fully_migrated_queries_match(migration_index):
+def test_fully_migrated_queries_match(migration_index) -> None:
     ftf = FromTableSqlLinter(migration_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
@@ -46,7 +46,7 @@ def test_fully_migrated_queries_match(migration_index):
     assert ftf.apply(old_query) == new_query
 
 
-def test_fully_migrated_queries_match_no_db(migration_index):
+def test_fully_migrated_queries_match_no_db(migration_index) -> None:
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
 
@@ -56,7 +56,7 @@ def test_fully_migrated_queries_match_no_db(migration_index):
     assert ftf.apply(old_query) == new_query
 
 
-def test_use_database_change(migration_index):
+def test_use_database_change(migration_index) -> None:
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
     query = """
@@ -67,7 +67,7 @@ def test_use_database_change(migration_index):
     assert ftf.schema == "newcatalog"
 
 
-def test_use_database_stops_migration(migration_index):
+def test_use_database_stops_migration(migration_index) -> None:
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
     query = "SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
@@ -81,7 +81,7 @@ def test_use_database_stops_migration(migration_index):
     assert transformed_query == new_query
 
 
-def test_parses_create_schema(migration_index):
+def test_parses_create_schema(migration_index) -> None:
     query = "CREATE SCHEMA xyz"
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
@@ -89,7 +89,7 @@ def test_parses_create_schema(migration_index):
     assert not list(advices)
 
 
-def test_parses_drop_schema(migration_index):
+def test_parses_drop_schema(migration_index) -> None:
     query = "DROP SCHEMA xyz"
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
@@ -97,7 +97,7 @@ def test_parses_drop_schema(migration_index):
     assert not list(advices)
 
 
-def test_raises_advice_when_parsing_unsupported_sql(migration_index):
+def test_raises_advice_when_parsing_unsupported_sql(migration_index) -> None:
     query = "XDESCRIBE DETAILS xyz"  # not a valid query
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
@@ -116,7 +116,7 @@ def test_raises_advice_when_parsing_unsupported_sql(migration_index):
         ("SELECT * FROM parquet.`dbfs://mnt/foo2/bar2`", []),
     ],
 )
-def test_linter_collects_tables(query, expected, migration_index):
+def test_linter_collects_tables(query, expected, migration_index) -> None:
     session_state = CurrentSessionState(schema="old")
     ftf = FromTableSqlLinter(migration_index, session_state=session_state)
     tuples = list((info.catalog_name, info.schema_name, info.table_name) for info in ftf.collect_tables(query))

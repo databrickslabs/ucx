@@ -34,7 +34,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         """
         super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
 
-    def dump_all(self, dfsas: Sequence[DirectFsAccess]):
+    def dump_all(self, dfsas: Sequence[DirectFsAccess]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
         It's not **bad** because all records are pushed at once.
         Providing a multi-entity crawler is out-of-scope of this PR

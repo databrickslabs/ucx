@@ -23,7 +23,7 @@ class Redash:
         self._ws = ws
         self._installation = installation
 
-    def migrate_dashboards(self, dashboard_id: str | None = None):
+    def migrate_dashboards(self, dashboard_id: str | None = None) -> None:
         for dashboard in self._list_dashboards(dashboard_id):
             assert dashboard.id is not None
             if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
@@ -33,7 +33,7 @@ class Redash:
                 self._fix_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
 
-    def revert_dashboards(self, dashboard_id: str | None = None):
+    def revert_dashboards(self, dashboard_id: str | None = None) -> None:
         for dashboard in self._list_dashboards(dashboard_id):
             assert dashboard.id is not None
             if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
@@ -52,7 +52,7 @@ class Redash:
             logger.error(f"Cannot list dashboards: {e}")
             return []
 
-    def _fix_query(self, query: LegacyQuery):
+    def _fix_query(self, query: LegacyQuery) -> None:
         assert query.id is not None
         assert query.query is not None
         # query already migrated
@@ -86,7 +86,7 @@ class Redash:
             session_state = replace(session_state, schema=query.options.schema)
         return session_state
 
-    def _revert_query(self, query: LegacyQuery):
+    def _revert_query(self, query: LegacyQuery) -> None:
         assert query.id is not None
         assert query.query is not None
         if query.tags is None:

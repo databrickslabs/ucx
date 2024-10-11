@@ -37,15 +37,15 @@ class DependencyGraph:
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
-    def path_lookup(self):
+    def path_lookup(self) -> PathLookup:
         return self._path_lookup
 
     @property
-    def dependency(self):
+    def dependency(self) -> Dependency:
         return self._dependency
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> dict[Dependency, DependencyGraph]:
         return self._dependencies
 
     def register_library(self, *libraries: str) -> list[DependencyProblem]:
@@ -114,11 +114,11 @@ class DependencyGraph:
         return MaybeGraph(found[0], [])
 
     @property
-    def root(self):
+    def root(self) -> DependencyGraph:
         return self if self._parent is None else self._parent.root
 
     @property
-    def parent(self):
+    def parent(self) -> DependencyGraph | None:
         return self._parent
 
     @property
@@ -204,7 +204,7 @@ class DependencyGraph:
         visitor = DependencyGraphVisitor(visit_node, visited)
         return visitor.visit(self)
 
-    def new_dependency_graph_context(self):
+    def new_dependency_graph_context(self) -> DependencyGraphContext:
         return DependencyGraphContext(
             parent=self, path_lookup=self._path_lookup, resolver=self._resolver, session_state=self._session_state
         )
@@ -314,7 +314,7 @@ class Dependency:
         return self._path
 
     @property
-    def inherits_context(self):
+    def inherits_context(self) -> bool:
         return self._inherits_context
 
     def __hash__(self):
@@ -491,7 +491,7 @@ class DependencyProblem:
     end_line: int = -1
     end_col: int = -1
 
-    def is_path_missing(self):
+    def is_path_missing(self) -> bool:
         return self.source_path == Path(MISSING_SOURCE_PATH)
 
     def as_advisory(self) -> 'Advisory':
@@ -523,7 +523,7 @@ class MaybeGraph:
     problems: list[DependencyProblem]
 
     @property
-    def failed(self):
+    def failed(self) -> bool:
         return len(self.problems) > 0
 
 
@@ -550,11 +550,11 @@ class InheritedContext:
         self._found = found
 
     @property
-    def tree(self):
+    def tree(self) -> Tree | None:
         return self._tree
 
     @property
-    def found(self):
+    def found(self) -> bool:
         return self._found
 
     def append(self, context: InheritedContext, copy_found: bool) -> InheritedContext:
@@ -567,7 +567,7 @@ class InheritedContext:
             return InheritedContext(self._tree, found)
         if self._tree is None:
             self._tree = Tree.new_module()
-        self._tree.append_tree(context.tree)
+        self._tree.append_tree(tree)
         return InheritedContext(self._tree, found)
 
     def finalize(self) -> InheritedContext:
@@ -618,12 +618,15 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
                     yield from self._iter_one(child_dependency, child_graph, root_path)
         self._lineage.pop()
 
-    def _log_walk_one(self, dependency: Dependency):
+    def _log_walk_one(self, dependency: Dependency) -> None:
         logger.debug(f'Analyzing dependency: {dependency}')
 
     @abc.abstractmethod
     def _process_dependency(
-        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+        self,
+        dependency: Dependency,
+        path_lookup: PathLookup,
+        inherited_tree: Tree | None,
     ) -> Iterable[T]: ...
 
     @property

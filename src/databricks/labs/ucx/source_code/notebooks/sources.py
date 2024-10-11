@@ -81,7 +81,7 @@ class Notebook(SourceContainer):
     def original_code(self) -> str:
         return self._source
 
-    def to_migrated_code(self):
+    def to_migrated_code(self) -> str:
         default_language = CellLanguage.of_language(self._language)
         header = f"{default_language.comment_prefix} {NOTEBOOK_HEADER}"
         sources = [header]
@@ -234,11 +234,11 @@ class NotebookLinter:
             if isinstance(command.as_magic(), RunCommand):
                 yield command
 
-    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]):
+    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]) -> Iterable[Advice]:
         for base_node in base_nodes:
             yield from self._load_children_with_base_node(nodes, base_node)
 
-    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase):
+    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Iterable[Advice]:
         while len(nodes) > 0:
             node = nodes.pop(0)
             self._python_linter.append_nodes([node])
@@ -246,7 +246,7 @@ class NotebookLinter:
                 continue
             yield from self._load_children_from_base_node(base_node)
 
-    def _load_children_from_base_node(self, base_node: NodeBase):
+    def _load_children_from_base_node(self, base_node: NodeBase) -> Iterable[Advice]:
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
             return
@@ -264,7 +264,7 @@ class NotebookLinter:
             yield from self._load_tree_from_notebook(notebook, False)
             return
 
-    def _mutate_path_lookup(self, change: SysPathChange):
+    def _mutate_path_lookup(self, change: SysPathChange) -> Iterable[Advice]:
         if isinstance(change, UnresolvedPath):
             yield Advisory.from_node(
                 code='sys-path-cannot-compute-value',
@@ -282,7 +282,7 @@ class NotebookLinter:
         if notebook is not None:
             yield from self._load_tree_from_notebook(notebook, False)
 
-    def _load_source_from_path(self, path: Path | None):
+    def _load_source_from_path(self, path: Path | None) -> Notebook | None:
         if path is None:
             return None  # already reported during dependency building
         resolved = self._path_lookup.resolve(path)
@@ -302,7 +302,7 @@ class NotebookLinter:
             return self._python_linter
         return self._context.linter(language)
 
-    def _load_source_from_run_cell(self, run_cell: RunCell):
+    def _load_source_from_run_cell(self, run_cell: RunCell) -> None:
         path = run_cell.maybe_notebook_path()
         if path is None:
             return  # malformed run cell already reported
@@ -415,14 +415,14 @@ class FileLinter:
         else:
             yield from self._lint_file()
 
-    def _is_notebook(self):
+    def _is_notebook(self) -> bool:
         # pre-check to avoid loading unsupported content
         language = file_language(self._path)
         if not language:
             return False
         return is_a_notebook(self._path, self._source_code)
 
-    def _lint_file(self):
+    def _lint_file(self) -> Iterable[Advice]:
         language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
@@ -442,9 +442,17 @@ class FileLinter:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
                 yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
-    def _lint_notebook(self):
-        notebook = Notebook.parse(self._path, self._source_code, file_language(self._path))
+    def _lint_notebook(self) -> Iterable[Advice]:
+        language = file_language(self._path)
+        if not language:
+            yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+            return
+        notebook = Notebook.parse(self._path, self._source_code, language)
         notebook_linter = NotebookLinter(
-            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
+            self._ctx,
+            self._path_lookup,
+            self._session_state,
+            notebook,
+            self._inherited_tree,
         )
         yield from notebook_linter.lint()

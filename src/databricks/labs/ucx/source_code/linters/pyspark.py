@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
@@ -41,7 +41,7 @@ class _TableNameMatcher(ABC):
     is_read: bool | None = None
     is_write: bool | None = None
 
-    def matches(self, node: NodeNG):
+    def matches(self, node: NodeNG) -> bool:
         return (
             isinstance(node, Call)
             and self._get_table_arg(node) is not None
@@ -51,7 +51,11 @@ class _TableNameMatcher(ABC):
 
     @abstractmethod
     def lint(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[Advice]: ...
 
     @abstractmethod
@@ -59,10 +63,14 @@ class _TableNameMatcher(ABC):
 
     @abstractmethod
     def collect_tables(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[UsedTable]: ...
 
-    def _get_table_arg(self, node: Call):
+    def _get_table_arg(self, node: Call) -> NodeNG | None:
         node_argc = len(node.args)
         if self.min_args <= node_argc <= self.max_args and self.table_arg_index < node_argc:
             return node.args[self.table_arg_index]
@@ -95,7 +103,11 @@ class _TableNameMatcher(ABC):
 class SparkCallMatcher(_TableNameMatcher):
 
     def collect_tables(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[UsedTable]:
         for used_table in self._collect_tables(from_table, session_state, node):
             if not used_table:
@@ -103,7 +115,10 @@ class SparkCallMatcher(_TableNameMatcher):
             yield used_table[1]
 
     def _collect_tables(
-        self, from_table: FromTableSqlLinter, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[tuple[str, UsedTable] | None]:
         table_arg = self._get_table_arg(node)
         if table_arg is None:
@@ -117,7 +132,11 @@ class SparkCallMatcher(_TableNameMatcher):
             yield table_name, info
 
     def lint(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[Advice]:
         for used_table in self._collect_tables(from_table, session_state, node):
             if not used_table:
@@ -147,7 +166,7 @@ class SparkCallMatcher(_TableNameMatcher):
             table_arg.value = dst.destination()
 
     @classmethod
-    def _find_dest(cls, index: TableMigrationIndex, table: UsedTable):
+    def _find_dest(cls, index: TableMigrationIndex, table: UsedTable) -> TableMigrationStatus | None:
         if table.catalog_name != "hive_metastore":
             return None
         return index.get(table.schema_name, table.table_name)
@@ -156,13 +175,17 @@ class SparkCallMatcher(_TableNameMatcher):
 @dataclass
 class ReturnValueMatcher(_TableNameMatcher):
 
-    def matches(self, node: NodeNG):
+    def matches(self, node: NodeNG) -> bool:
         return (
             isinstance(node, Call) and isinstance(node.func, Attribute) and Tree(node.func.expr).is_from_module("spark")
         )
 
     def lint(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
@@ -176,7 +199,11 @@ class ReturnValueMatcher(_TableNameMatcher):
         return
 
     def collect_tables(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[UsedTable]:
         return []
 
@@ -187,7 +214,7 @@ T = TypeVar("T")
 @dataclass
 class DirectFilesystemAccessMatcher(_TableNameMatcher):
 
-    def matches(self, node: NodeNG):
+    def matches(self, node: NodeNG) -> bool:
         return (
             isinstance(node, Call)
             and self._get_table_arg(node) is not None
@@ -203,6 +230,8 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
         node: NodeNG,
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
+        if table_arg is None:
+            return
         for inferred in InferredValue.infer_from_node(table_arg):
             if not inferred.is_inferred():
                 logger.debug(f"Could not infer value of {table_arg.as_string()}")
@@ -220,7 +249,11 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
         return
 
     def collect_tables(
-        self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state: CurrentSessionState, node: Call
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+        node: Call,
     ) -> Iterable[UsedTable]:
         return []  # we don't collect tables through this matcher
 
@@ -338,19 +371,24 @@ class SparkTableNameMatchers:
             + spark_dataframewriter_matchers
         )
 
-    def _make_matchers(self, matchers: list[_TableNameMatcher]):
+    def _make_matchers(self, matchers: list[_TableNameMatcher]) -> None:
         self._matchers = {}
         for matcher in matchers:
             self._matchers[matcher.method_name] = matcher
 
     @property
-    def matchers(self):
+    def matchers(self) -> dict[str, _TableNameMatcher]:
         return self._matchers
 
 
 class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
 
-    def __init__(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, session_state):
+    def __init__(
+        self,
+        from_table: FromTableSqlLinter,
+        index: TableMigrationIndex,
+        session_state: CurrentSessionState,
+    ):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
@@ -380,7 +418,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             matcher.apply(self._from_table, self._index, node)
         return tree.node.as_string()
 
-    def _find_matcher(self, node: NodeNG):
+    def _find_matcher(self, node: NodeNG) -> _TableNameMatcher | None:
         if not isinstance(node, Call):
             return None
         if not isinstance(node.func, Attribute):

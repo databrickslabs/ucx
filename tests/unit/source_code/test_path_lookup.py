@@ -3,7 +3,7 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-def test_lookup_is_initialized_with_syspath():
+def test_lookup_is_initialized_with_syspath() -> None:
     provider = PathLookup.from_sys_path(Path.cwd())
     assert provider is not None
     paths = list(provider.library_roots)[1:]
@@ -11,7 +11,7 @@ def test_lookup_is_initialized_with_syspath():
     assert len(filtered) > 0
 
 
-def test_lookup_is_initialized_with_handmade_string(tmp_path):
+def test_lookup_is_initialized_with_handmade_string(tmp_path) -> None:
     directories, sys_paths = ("what", "on", "earth"), []
     for directory in directories:
         path = tmp_path / directory
@@ -24,7 +24,7 @@ def test_lookup_is_initialized_with_handmade_string(tmp_path):
     assert provider.library_roots[1:] == sys_paths
 
 
-def test_lookup_inserts_path(tmp_path):
+def test_lookup_inserts_path(tmp_path) -> None:
     directories, sys_paths = ("what", "on", "earth"), []
     for directory in directories:
         path = tmp_path / directory
@@ -40,7 +40,7 @@ def test_lookup_inserts_path(tmp_path):
     assert provider.library_roots[1:] == [sys_paths[0]] + [new_sys_path] + sys_paths[1:]
 
 
-def test_lookup_removes_path(tmp_path):
+def test_lookup_removes_path(tmp_path) -> None:
     directories, sys_paths = ("what", "is", "on", "earth"), []
     for directory in directories:
         path = tmp_path / directory

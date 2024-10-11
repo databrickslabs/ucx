@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TypeVar
 
@@ -26,7 +26,9 @@ class MagicLine(NodeBase):
 
     @classmethod
     def extract_from_tree(
-        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], T]
+        cls,
+        tree: Tree,
+        problem_factory: Callable[[str, str, NodeNG], T],
     ) -> tuple[list[MagicLine], list[T]]:
         problems: list[T] = []
         commands: list[MagicLine] = []
@@ -41,7 +43,7 @@ class MagicLine(NodeBase):
         return commands, problems
 
     @classmethod
-    def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]):
+    def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]) -> Iterable[MagicLine]:
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
