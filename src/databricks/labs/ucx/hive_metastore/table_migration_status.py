@@ -120,7 +120,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             logger.info(f"{schema}.{table} is set as not migrated")
         except NotFound:
             # If the source table doesn't exist, it will not be shown as migrated
-            logger.info(f"{schema}.{table} set as a source does no longer exist")
+            logger.warning(f"failed-to-migrate: {schema}.{table} set as a source does no longer exist")
+            return True
         return False
 
     def _crawl(self) -> Iterable[TableMigrationStatus]:
