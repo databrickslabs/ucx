@@ -378,9 +378,6 @@ class AzureResourcePermissions:
         config = self._installation.load(WorkspaceConfig)
         inventory_database = config.inventory_database
         display_name = f"unity-catalog-migration-{inventory_database}-{self._ws.get_workspace_id()}"
-        uber_principal_name = prompts.question(
-            "Enter a name for the uber service principal to be created", default=display_name
-        )
         policy_id = config.policy_id
         if policy_id is None:
             msg = "UCX cluster policy not found in config. Please run latest UCX installation to set cluster policy"
@@ -396,6 +393,9 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
+        uber_principal_name = prompts.question(
+            "Enter a name for the uber service principal to be created", default=display_name
+        )
         logger.info("Creating service principal")
 
         secret_identifier = f"secrets/{inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
