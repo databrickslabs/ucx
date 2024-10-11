@@ -1,7 +1,8 @@
-import dataclasses
 import logging
 from dataclasses import dataclass
+from functools import partial
 
+from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.marketplace import Installation
@@ -11,7 +12,7 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineI
 logger = logging.getLogger(__name__)
 
 @dataclass
-class Rule:
+class PipelineRule:
     workspace_name: str
     source_pipeline_id: str
     source_pipeline_name: str
@@ -21,7 +22,7 @@ class Rule:
 @dataclass
 class PipelineToMigrate:
     src: PipelineInfo
-    rule: Rule
+    rule: PipelineRule
 
     def __hash__(self):
         return hash(self.src)
@@ -50,18 +51,22 @@ class PipelineMapping:
             msg = "No pipelines found."
             raise ValueError(msg)
         for pipelines in pipeline_snapshot:
-            yield Rule.initial()
+            yield PipelineRule.initial()
 
         return self._pc.snapshot()
+
+    def get_pipelines_to_migrate(self, _pc):
+        pass
 
 
 class PipelinesMigrator:
     def __init__(self,
                  ws: WorkspaceClient,
-                 pipeline_crawler: PipelinesCrawler):
+                 pipeline_crawler: PipelinesCrawler,
+                 pipeline_mapping: PipelineMapping):
         self._ws = ws
         self._pc = pipeline_crawler
-
+        self._pm = pipeline_mapping
 
     def migrate_pipelines(self):
         self._migrate_pipelines()
@@ -71,14 +76,16 @@ class PipelinesMigrator:
         logger.info(f"Found {len(pipelines)} pipelines to migrate")
 
         # get pipelines to migrate
+        pipelines_to_migrate = self._pm.get_pipelines_to_migrate(self._pc)
 
-        # get rules
+        tasks = []
+        for pipeline in pipelines_to_migrate:
+            tasks.append(partial(self._migrate_pipeline, pipeline))
+        Threads.strict("migrate pipelines", tasks)
+        if not tasks:
+            logger.info(f"No pipelines found to migrate")
+        return tasks
 
-        # call api to migrate
-
-        # return or add to
-
-    def _get_pipelines_to_migrate(self):
-
+    def _migrate_pipeline(self, pipeline: PipelineToMigrate):
         pass
 
