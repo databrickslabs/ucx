@@ -6,12 +6,13 @@ from collections.abc import Callable, ValuesView
 from dataclasses import dataclass
 from functools import partial, wraps
 from datetime import timedelta
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, List, Optional, ParamSpec, TypeVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import ApiClient
 from databricks.sdk.errors import (
     BadRequest,
     DatabricksError,
@@ -25,9 +26,12 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
+    Channel,
     EndpointConfPair,
     GetWorkspaceWarehouseConfigResponse,
+    RepeatedEndpointConfPairs,
     SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+    WarehouseTypePair,
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -44,6 +48,86 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 logger = logging.getLogger(__name__)
 P = ParamSpec('P')
 R = TypeVar('R')
+
+
+def set_workspace_warehouse_config_wrapper(
+    api: ApiClient,
+    *,
+    channel: Optional[Channel] = None,
+    config_param: Optional[RepeatedEndpointConfPairs] = None,
+    data_access_config: Optional[List[EndpointConfPair]] = None,
+    enabled_warehouse_types: Optional[List[WarehouseTypePair]] = None,
+    global_param: Optional[RepeatedEndpointConfPairs] = None,
+    google_service_account: Optional[str] = None,
+    instance_profile_arn: Optional[str] = None,
+    security_policy: Optional[SetWorkspaceWarehouseConfigRequestSecurityPolicy] = None,
+    sql_configuration_parameters: Optional[RepeatedEndpointConfPairs] = None,
+    enable_serverless_compute: bool = False,
+):
+    """Set the workspace configuration.
+
+    TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed this wrapper should be discarded.
+
+    Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
+
+    :param api: :class:`ApiClient`
+      The warehouses API client.
+    :param channel: :class:`Channel` (optional)
+      Optional: Channel selection details
+    :param config_param: :class:`RepeatedEndpointConfPairs` (optional)
+      Deprecated: Use sql_configuration_parameters
+    :param data_access_config: List[:class:`EndpointConfPair`] (optional)
+      Spark confs for external hive metastore configuration JSON serialized size must be less than <= 512K
+    :param enabled_warehouse_types: List[:class:`WarehouseTypePair`] (optional)
+      List of Warehouse Types allowed in this workspace (limits allowed value of the type field in
+      CreateWarehouse and EditWarehouse). Note: Some types cannot be disabled, they don't need to be
+      specified in SetWorkspaceWarehouseConfig. Note: Disabling a type may cause existing warehouses to be
+      converted to another type. Used by frontend to save specific type availability in the warehouse
+      create and edit form UI.
+    :param global_param: :class:`RepeatedEndpointConfPairs` (optional)
+      Deprecated: Use sql_configuration_parameters
+    :param google_service_account: str (optional)
+      GCP only: Google Service Account used to pass to cluster to access Google Cloud Storage
+    :param instance_profile_arn: str (optional)
+      AWS Only: Instance profile used to pass IAM role to the cluster
+    :param security_policy: :class:`SetWorkspaceWarehouseConfigRequestSecurityPolicy` (optional)
+      Security policy for warehouses
+    :param sql_configuration_parameters: :class:`RepeatedEndpointConfPairs` (optional)
+      SQL configuration parameters
+    :param enable_serverless_compute: bool (optional)
+        Enable serverless compute. Note that this value does not enforce serverless compute but it allows for serverless
+        compute when `True`. Otherwise, serverless compute it not allowed.
+    """
+    body = {}
+    if channel is not None:
+        body['channel'] = channel.as_dict()
+    if config_param is not None:
+        body['config_param'] = config_param.as_dict()
+    if data_access_config is not None:
+        body['data_access_config'] = [v.as_dict() for v in data_access_config]
+    if enabled_warehouse_types is not None:
+        body['enabled_warehouse_types'] = [v.as_dict() for v in enabled_warehouse_types]
+    if global_param is not None:
+        body['global_param'] = global_param.as_dict()
+    if google_service_account is not None:
+        body['google_service_account'] = google_service_account
+    if instance_profile_arn is not None:
+        body['instance_profile_arn'] = instance_profile_arn
+    if security_policy is not None:
+        body['security_policy'] = security_policy.value
+    if sql_configuration_parameters is not None:
+        body['sql_configuration_parameters'] = sql_configuration_parameters.as_dict()
+    if enable_serverless_compute:
+        body['enable_serverless_compute'] = 'true'
+    else:
+        body['enable_serverless_compute'] = 'false'
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+
+    api.do('PUT', '/api/2.0/sql/config/warehouses', body=body, headers=headers)
 
 
 @dataclass
