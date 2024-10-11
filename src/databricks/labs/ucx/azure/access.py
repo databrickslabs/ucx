@@ -14,6 +14,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     BadRequest,
+    DatabricksError,
     InvalidParameterValue,
     NotFound,
     PermissionDenied,
@@ -421,19 +422,25 @@ class AzureResourcePermissions:
 
     def _delete_uber_principal(self) -> None:
 
-        def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
+        def safe_call(function: Callable[P, R], *, error_message: str) -> Callable[P, R | None]:
+            """Make a safe call of the function
+
+            Args:
+                function (Callable[P, R]) : Function to safely call.
+                error_message (str) : Message to log if error raised by the function
+            """
             @wraps(function)
             def wrapper(*args: Any, **kwargs: Any) -> R | None:
                 try:
                     return function(*args, **kwargs)
-                except PermissionDenied:
-                    logger.error(message, exc_info=True)
+                except DatabricksError as e:
+                    logger.error(error_message, exc_info=e)
                     return None
 
             return wrapper
 
         message = "Missing permissions to load the configuration"
-        config = log_permission_denied(self._installation.load, message=message)(WorkspaceConfig)
+        config = safe_call(self._installation.load, error_message=message)(WorkspaceConfig)
         if config is None or config.uber_spn_id is None:
             return
 
@@ -442,25 +449,25 @@ class AzureResourcePermissions:
 
         storage_account_ids = ' '.join(str(st.id) for st in storage_accounts)
         message = f"Missing permissions to delete storage permissions for: {storage_account_ids}"
-        log_permission_denied(self._azurerm.delete_storage_permission, message=message)(
+        safe_call(self._azurerm.delete_storage_permission, error_message=message)(
             config.uber_spn_id, *storage_accounts, safe=True
         )
         message = f"Missing permissions to delete service principal: {config.uber_spn_id}"
-        log_permission_denied(self._azurerm.delete_service_principal, message=message)(config.uber_spn_id, safe=True)
+        safe_call(self._azurerm.delete_service_principal, error_message=message)(config.uber_spn_id, safe=True)
         if config.policy_id is not None:
             message = "Missing permissions to revert cluster policy"
-            log_permission_denied(self._remove_service_principal_configuration_from_cluster_policy, message=message)(
+            safe_call(self._remove_service_principal_configuration_from_cluster_policy, error_message=message)(
                 config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
             )
         message = "Missing permissions to revert SQL warehouse config"
-        log_permission_denied(
-            self._remove_service_principal_configuration_from_workspace_warehouse_config, message=message
+        safe_call(
+            self._remove_service_principal_configuration_from_workspace_warehouse_config, error_message=message
         )(config.uber_spn_id, secret_identifier, storage_accounts)
         message = "Missing permissions to delete secret scope"
-        log_permission_denied(self._safe_delete_scope, message=message)(config.inventory_database)
+        safe_call(self._safe_delete_scope, error_message=message)(config.inventory_database)
         message = "Missing permissions to save the configuration"
         config.uber_spn_id = None
-        log_permission_denied(self._installation.save, message=message)(config)
+        safe_call(self._installation.save, error_message=message)(config)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
