@@ -6641,13 +6641,6 @@
     "isodate.isostrf": [],
     "isodate.isotime": [],
     "isodate.isotzinfo": [],
-    "isodate.tests": [],
-    "isodate.tests.test_date": [],
-    "isodate.tests.test_datetime": [],
-    "isodate.tests.test_duration": [],
-    "isodate.tests.test_pickle": [],
-    "isodate.tests.test_strf": [],
-    "isodate.tests.test_time": [],
     "isodate.tzinfo": []
   },
   "isoduration": {
