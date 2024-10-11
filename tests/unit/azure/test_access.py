@@ -610,9 +610,13 @@ def test_create_global_spn_spn_present():
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
-def test_create_global_spn_no_storage():
-    w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
+def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None:
+    ws = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "0"]
+        ]
+    }
     backend = MockBackend(rows=rows)
     installation = MockInstallation(
         {
@@ -626,22 +630,24 @@ def test_create_global_spn_no_storage():
             }
         }
     )
-    location = ExternalLocations(w, backend, "ucx")
-    prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
+    location = ExternalLocations(ws, backend, "ucx")
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    assert not azure_resource_permission.create_uber_principal(prompts)
+    azure_resource_permission = AzureResourcePermissions(installation, ws, azure_resources, location)
+    azure_resources.storage_accounts.return_value = []  # No storage accounts listed
+
+    azure_resource_permission.create_uber_principal(MockPrompts({}))
+
     azure_resources.storage_accounts.assert_called_once()
     azure_resources.create_or_update_access_connector.assert_not_called()
     azure_resources.role_assignments.assert_not_called()
     azure_resources.containers.assert_not_called()
-    w.cluster_policies.get.assert_not_called()
-    w.secrets.get_secret.assert_not_called()
-    w.secrets.create_scope.assert_not_called()
-    w.secrets.put_secret.assert_not_called()
-    w.cluster_policies.edit.assert_not_called()
-    w.get_workspace_id.assert_called_once()
-    w.warehouses.set_workspace_warehouse_config.assert_not_called()
+    ws.cluster_policies.get.assert_not_called()
+    ws.secrets.get_secret.assert_not_called()
+    ws.secrets.create_scope.assert_not_called()
+    ws.secrets.put_secret.assert_not_called()
+    ws.cluster_policies.edit.assert_not_called()
+    ws.get_workspace_id.assert_called_once()
+    ws.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def setup_create_uber_principal():
