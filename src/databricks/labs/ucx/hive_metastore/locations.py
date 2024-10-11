@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
 from urllib.parse import urlparse
-from py4j.protocol import Py4JError
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -324,7 +323,7 @@ class Mounts(CrawlerBase[Mount]):
         try:
             for mount_point, source, _ in self._dbutils.fs.mounts():
                 mounts.append(Mount(mount_point, source))
-        except Py4JError as error:
+        except Exception as error:  # pylint: disable=broad-except
             if "com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted" in str(error):
                 logger.warning(
                     "dbutils.fs.mounts() is not whitelisted. Skipping mount point discovery."
