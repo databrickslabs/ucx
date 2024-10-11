@@ -475,4 +475,4 @@ class SparkSqlTablePyCollector(_SparkSqlAnalyzer, TablePyCollector):
                 if not value.is_inferred():
                     continue  # TODO error handling strategy
                 for table in self._sql_collector.collect_tables(value.as_string()):
-                    yield UsedTableNode(table, call_node)  # A
+                    yield UsedTableNode(table, call_node)
