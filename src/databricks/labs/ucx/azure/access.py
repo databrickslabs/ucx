@@ -415,23 +415,36 @@ class AzureResourcePermissions:
             if warehouse_config.security_policy
             else SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
         )
+        succeeded_message = "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
+        sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
+        error_message = (
+            f"Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error. "
+            f"Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}",
+        )
+        # TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed:
+        # - Remove second try-except completely
+        # - Remove first -except, only keeping the contents in the try-statement
         try:
             self._ws.warehouses.set_workspace_warehouse_config(
                 data_access_config=sql_dac,
                 sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
                 security_policy=security_policy,
             )
-            logger.info(
-                "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
-            )
-        # TODO: Remove following try except once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed
+            logger.info(succeeded_message)
         except InvalidParameterValue as e:
-            sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
-            logger.error(
-                f"Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error. "
-                f"Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}",
-                exc_info=e,
+            if "enable_serverless_compute" not in str(e):
+                logger.error(error_message, exc_info=e)
+                raise
+        try:
+            set_workspace_warehouse_config_wrapper(
+                self._ws.api_client,
+                data_access_config=sql_dac,
+                sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+                security_policy=security_policy,
+                enable_serverless_compute=True,
             )
+        except InvalidParameterValue as e:
+            logger.error(error_message, exc_info=e)
             raise
 
     def _remove_service_principal_configuration_from_workspace_warehouse_config(
