@@ -888,6 +888,7 @@ def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, ma
         [
             record.message
             for record in caplog.records
-            if f"{src_table.schema_name}.{src_table.name} set as a source does no longer exist" in record.message
+            if f"failed-to-migrate: {src_table.schema_name}.{src_table.name} set as a source does no longer exist"
+            in record.message
         ]
     )
