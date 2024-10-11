@@ -6631,6 +6631,18 @@
     "ipywidgets.widgets.widget_time": [],
     "ipywidgets.widgets.widget_upload": []
   },
+  "isodate": {
+    "isodate": [],
+    "isodate.duration": [],
+    "isodate.isodates": [],
+    "isodate.isodatetime": [],
+    "isodate.isoduration": [],
+    "isodate.isoerror": [],
+    "isodate.isostrf": [],
+    "isodate.isotime": [],
+    "isodate.isotzinfo": [],
+    "isodate.tzinfo": []
+  },
   "isoduration": {
     "isoduration": [],
     "isoduration.constants": [],
