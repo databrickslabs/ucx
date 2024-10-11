@@ -13,29 +13,26 @@ from databricks.labs.ucx.azure.resources import (
     StorageAccount,
 )
 
-from . import azure_api_client, get_az_api_mapping
+from . import get_az_api_mapping
 
 
-def test_subscriptions_no_subscription():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="001")
+def test_subscriptions_no_subscription(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="001")
     subscriptions = list(azure_resource.subscriptions())
 
     assert len(subscriptions) == 0
 
 
-def test_subscriptions_valid_subscription():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_subscriptions_valid_subscription(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     subscriptions = list(azure_resource.subscriptions())
     assert len(subscriptions) == 1
     for subscription in subscriptions:
         assert subscription.name == "sub2"
 
 
-def test_storage_accounts():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_storage_accounts(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     storage_accounts = list(azure_resource.storage_accounts())
     assert len(storage_accounts) == 2
     for storage_account in storage_accounts:
@@ -44,9 +41,8 @@ def test_storage_accounts():
         assert storage_account.id.subscription_id == "002"
 
 
-def test_containers():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_containers(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
     containers = list(azure_resource.containers(azure_storage))
     assert len(containers) == 3
@@ -57,9 +53,8 @@ def test_containers():
         assert container.subscription_id == "002"
 
 
-def test_role_assignments_storage():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_storage(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 1
@@ -72,9 +67,8 @@ def test_role_assignments_storage():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-def test_role_assignments_container():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_container(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 1
@@ -87,9 +81,8 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-def test_role_assignments_custom_storage():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_custom_storage(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 2
@@ -116,9 +109,8 @@ def test_storage_account_missing_fields(missing_field: str):
         StorageAccount.from_raw_resource(RawResource(raw))
 
 
-def test_create_service_principal():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_create_service_principal(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     global_spn = azure_resource.create_service_principal("disNameuser1")
     assert global_spn.client.client_id == "appIduser1"
     assert global_spn.client.object_id == "Iduser1"
@@ -128,7 +120,6 @@ def test_create_service_principal():
 
 
 def test_create_service_principal_no_access():
-    api_client = azure_api_client()
     api_client.post.side_effect = PermissionDenied()
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
@@ -466,10 +457,9 @@ def azure_api_side_effect(*args, **kwargs):
     return get_az_api_mapping(*args, **kwargs)
 
 
-def test_managed_identity_not_found():
-    api_client = azure_api_client()
-    api_client.get.side_effect = azure_api_side_effect
-    azure_resource = AzureResources(api_client, api_client)
+def test_managed_identity_not_found(azure_api_client):
+    azure_api_client.get.side_effect = azure_api_side_effect
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
 
     assert (
         azure_resource.managed_identity_client_id(
@@ -479,18 +469,16 @@ def test_managed_identity_not_found():
     )
 
 
-def test_azure_resources_list_access_connectors() -> None:
+def test_azure_resources_list_access_connectors(azure_api_client) -> None:
     """Non-zero access connectors are mocked"""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions=["002"])
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions=["002"])
     access_connectors = azure_resource.access_connectors()
     assert len(list(access_connectors)) > 0
 
 
-def test_azure_resources_get_access_connector() -> None:
+def test_azure_resources_get_access_connector(azure_) -> None:
     """Should return the properties of the mocked response."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("002", "rg-test", "test-access-connector")
     assert access_connector is not None
     assert access_connector.name == "test-access-connector"
@@ -498,42 +486,37 @@ def test_azure_resources_get_access_connector() -> None:
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
 
 
-def test_azure_resources_get_access_connector_missing_name() -> None:
+def test_azure_resources_get_access_connector_missing_name(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_missing_location() -> None:
+def test_azure_resources_get_access_connector_missing_location(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-noloc")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_missing_ps() -> None:
+def test_azure_resources_get_access_connector_missing_ps(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-nops")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_inv_identity() -> None:
+def test_azure_resources_get_access_connector_inv_identity(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-invidentity")
     assert access_connector is None
 
 
-def test_azure_resources_create_or_update_access_connector() -> None:
+def test_azure_resources_create_or_update_access_connector(azure_api_client) -> None:
     """Should return the properties of the mocked response."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.create_or_update_access_connector(
         "002", "rg-test", "test-access-connector", "central-us", {"application": "databricks"}
     )
@@ -543,9 +526,8 @@ def test_azure_resources_create_or_update_access_connector() -> None:
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
 
 
-def test_azure_resources_delete_access_connector() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_azure_resources_delete_access_connector(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     url = "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector"
     azure_resource.delete_access_connector(url)
-    assert api_client.delete.called
+    assert azure_api_client.delete.called
