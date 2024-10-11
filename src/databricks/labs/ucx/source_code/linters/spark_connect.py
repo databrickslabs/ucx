@@ -220,7 +220,10 @@ class CatalogApiMatcher(SharedClusterMatcher):
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        if node.attrname == 'catalog' and TreeHelper.get_full_attribute_name(node).endswith('spark.catalog'):
+        name = TreeHelper.get_full_attribute_name(node)
+        if not name:
+            return
+        if node.attrname == 'catalog' and name.endswith('spark.catalog'):
             yield Failure.from_node(
                 code='catalog-api-in-shared-clusters',
                 message=f'spark.catalog functions require DBR 14.3 LTS or above on {self._cluster_type_str()}',

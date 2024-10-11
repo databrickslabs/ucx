@@ -51,11 +51,11 @@ def test_basic_cell_extraction() -> None:
         # asssert actual.original_code == expected["content"], f"Cell {i} starts on the wrong line"
 
 
-def test_pip_cell_language_is_pip():
+def test_pip_cell_language_is_pip() -> None:
     assert PipCell("code", original_offset=1).language == CellLanguage.PIP
 
 
-def test_pip_cell_build_dependency_graph_invokes_register_library():
+def test_pip_cell_build_dependency_graph_invokes_register_library() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install databricks"
@@ -67,7 +67,7 @@ def test_pip_cell_build_dependency_graph_invokes_register_library():
     graph.register_library.assert_called_once_with("databricks")
 
 
-def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
+def test_pip_cell_build_dependency_graph_pip_registers_missing_library() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install"
@@ -81,7 +81,7 @@ def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
     graph.register_library.assert_not_called()
 
 
-def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
+def test_pip_cell_build_dependency_graph_reports_incorrect_syntax() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "%pip installl pytest"  # typo on purpose
@@ -95,7 +95,7 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
     graph.register_library.assert_not_called()
 
 
-def test_pip_cell_build_dependency_graph_reports_unsupported_command():
+def test_pip_cell_build_dependency_graph_reports_unsupported_command() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "!pip freeze"
@@ -109,7 +109,7 @@ def test_pip_cell_build_dependency_graph_reports_unsupported_command():
     graph.register_library.assert_not_called()
 
 
-def test_pip_cell_build_dependency_graph_reports_missing_command():
+def test_pip_cell_build_dependency_graph_reports_missing_command() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "%pip"
@@ -123,14 +123,16 @@ def test_pip_cell_build_dependency_graph_reports_missing_command():
     graph.register_library.assert_not_called()
 
 
-def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_lookup):
+def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_lookup) -> None:
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     allow_list = KnownList()
     pip_resolver = PythonLibraryResolver(allow_list)
     file_resolver = ImportFileResolver(FileLoader(), allow_list)
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], file_resolver, mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        pip_resolver, notebook_resolver, file_resolver, file_resolver, mock_path_lookup
+    )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
     code = "%pip install unknown-library-name"
@@ -143,7 +145,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     assert problems[0].message.startswith("'pip --disable-pip-version-check install unknown-library-name")
 
 
-def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup):
+def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup) -> None:
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
@@ -164,10 +166,12 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("thingy")).exists()
+    lookup_resolve = graph.path_lookup.resolve(Path("thingy"))
+    assert lookup_resolve is not None
+    assert lookup_resolve.exists()
 
 
-def test_pip_cell_build_dependency_graph_handles_multiline_code():
+def test_pip_cell_build_dependency_graph_handles_multiline_code() -> None:
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install databricks\nmore code defined"
@@ -198,7 +202,7 @@ def test_graph_builder_parse_error(
     assert problems
 
 
-def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):
+def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup) -> None:
     code = """
 a = 'something'
 %pip install databricks
@@ -254,7 +258,7 @@ def test_python_cell_with_expression_magic(
         ),
     ],
 )
-def test_pip_magic_split(code, split):
+def test_pip_magic_split(code, split) -> None:
     # Avoid direct protected access to the _split method.
     class _PipMagicFriend(PipCommand):
         @classmethod
@@ -264,7 +268,7 @@ def test_pip_magic_split(code, split):
     assert _PipMagicFriend._split(code) == split  # pylint: disable=protected-access
 
 
-def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
+def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup) -> None:
     source = """
 %unsupported stuff '"%#@!
 """

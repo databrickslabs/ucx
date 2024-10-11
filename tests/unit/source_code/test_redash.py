@@ -100,7 +100,7 @@ def redash_installation():
     return installation
 
 
-def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation):
+def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation) -> None:
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.migrate_dashboards()
     redash_installation.assert_file_written(
@@ -124,14 +124,14 @@ def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation):
     )
 
 
-def test_migrate_all_dashboards_error(redash_ws, empty_index, redash_installation, caplog):
+def test_migrate_all_dashboards_error(redash_ws, empty_index, redash_installation, caplog) -> None:
     redash_ws.dashboards.list.side_effect = PermissionDenied("error")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.migrate_dashboards()
     assert "Cannot list dashboards" in caplog.text
 
 
-def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, caplog):
+def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, caplog) -> None:
     redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards("2")
@@ -146,7 +146,7 @@ def test_revert_single_dashboard(redash_ws, empty_index, redash_installation, ca
     assert "Cannot restore" in caplog.text
 
 
-def test_revert_dashboards(redash_ws, empty_index, redash_installation):
+def test_revert_dashboards(redash_ws, empty_index, redash_installation) -> None:
     redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, redash_installation)
     redash.revert_dashboards()
@@ -161,7 +161,7 @@ def test_revert_dashboards(redash_ws, empty_index, redash_installation):
     redash_ws.queries.update.assert_has_calls(calls)
 
 
-def test_get_queries_from_dashboard(redash_ws):
+def test_get_queries_from_dashboard(redash_ws) -> None:
     empty_dashboard = Dashboard(
         id="1",
     )

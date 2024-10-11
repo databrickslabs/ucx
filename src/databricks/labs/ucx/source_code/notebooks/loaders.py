@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import is_a_notebook, file_language
 from databricks.labs.ucx.source_code.graph import (
@@ -51,10 +52,10 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         # When exported through Git, notebooks are saved with a .py extension. So check with and without extension
         candidates = (path, self._adjust_path(path)) if not path.suffix else (path,)
         for candidate in candidates:
-            absolute_path = path_lookup.resolve(candidate)
-            if not absolute_path:
+            a_path = path_lookup.resolve(candidate)
+            if not a_path:
                 continue
-            return absolute_path
+            return a_path
         return None
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
@@ -79,7 +80,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return Notebook.parse(absolute_path, content, language)
 
     @staticmethod
-    def _detect_language(path: Path, content: str):
+    def _detect_language(path: Path, content: str) -> Language | None:
         language = file_language(path)
         if language:
             return language

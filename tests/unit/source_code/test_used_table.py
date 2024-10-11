@@ -6,7 +6,7 @@ from databricks.labs.ucx.source_code.base import LineageAtom, UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
-def test_crawler_appends_tables():
+def test_crawler_appends_tables() -> None:
     backend = MockBackend()
     crawler = UsedTablesCrawler.for_paths(backend, "schema")
     existing = list(crawler.snapshot())

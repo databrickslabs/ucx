@@ -24,7 +24,7 @@ from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
         ),
     ],
 )
-def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_read, is_write, migration_index):
+def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_read, is_write, migration_index) -> None:
     ws = create_autospec(WorkspaceClient)
     dfsa_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)

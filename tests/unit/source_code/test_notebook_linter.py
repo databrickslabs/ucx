@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 index = TableMigrationIndex([])
 
 
-def test_notebook_linter_name(mock_path_lookup):
+def test_notebook_linter_name(mock_path_lookup) -> None:
     source = """-- Databricks notebook source"""
     linter = NotebookLinter.from_source(index, mock_path_lookup, CurrentSessionState(), source, Language.SQL)
     assert linter.name() == "notebook-linter"

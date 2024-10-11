@@ -57,7 +57,7 @@ class QueryLinter:
         self._used_tables_crawler = used_tables_crawler
         self._include_dashboard_ids = include_dashboard_ids
 
-    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
+    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         assessment_start = datetime.now(timezone.utc)
         context = _ReportingContext()
         self._lint_dashboards(context)
@@ -67,7 +67,7 @@ class QueryLinter:
         self._dump_dfsas(context, assessment_start, assessment_end)
         self._dump_used_tables(context, assessment_start, assessment_end)
 
-    def _dump_problems(self, context: _ReportingContext, sql_backend: SqlBackend, inventory_database: str):
+    def _dump_problems(self, context: _ReportingContext, sql_backend: SqlBackend, inventory_database: str) -> None:
         logger.info(f"Saving {len(context.all_problems)} linting problems...")
         sql_backend.save_table(
             f'{escape_sql_identifier(inventory_database)}.query_problems',
@@ -76,7 +76,7 @@ class QueryLinter:
             mode='overwrite',
         )
 
-    def _dump_dfsas(self, context: _ReportingContext, assessment_start: datetime, assessment_end: datetime):
+    def _dump_dfsas(self, context: _ReportingContext, assessment_start: datetime, assessment_end: datetime) -> None:
         processed_dfsas = []
         for dfsa in context.all_dfsas:
             dfsa = dataclasses.replace(
@@ -87,7 +87,12 @@ class QueryLinter:
             processed_dfsas.append(dfsa)
         self._directfs_crawler.dump_all(processed_dfsas)
 
-    def _dump_used_tables(self, context: _ReportingContext, assessment_start: datetime, assessment_end: datetime):
+    def _dump_used_tables(
+        self,
+        context: _ReportingContext,
+        assessment_start: datetime,
+        assessment_end: datetime,
+    ) -> None:
         processed_tables = []
         for table in context.all_tables:
             table = dataclasses.replace(
@@ -98,7 +103,7 @@ class QueryLinter:
             processed_tables.append(table)
         self._used_tables_crawler.dump_all(processed_tables)
 
-    def _lint_dashboards(self, context: _ReportingContext):
+    def _lint_dashboards(self, context: _ReportingContext) -> None:
         dashboard_ids = self._dashboard_ids_in_scope()
         logger.info(f"Running {len(dashboard_ids)} linting tasks...")
         for dashboard_id in dashboard_ids:
@@ -108,8 +113,9 @@ class QueryLinter:
             context.all_dfsas.extend(dfsas)
             context.all_tables.extend(tables)
 
-    def _lint_queries(self, context: _ReportingContext):
+    def _lint_queries(self, context: _ReportingContext) -> None:
         for query in self._queries_in_scope():
+            assert query.id is not None
             if query.id in context.linted_queries:
                 continue
             context.linted_queries.add(query.id)
@@ -126,7 +132,7 @@ class QueryLinter:
         all_dashboards = self._ws.dashboards.list()
         return [dashboard.id for dashboard in all_dashboards if dashboard.id]
 
-    def _queries_in_scope(self):
+    def _queries_in_scope(self) -> list[LegacyQuery]:
         if self._include_dashboard_ids is not None:  # an empty list is accepted
             return []
         all_queries = self._ws.queries_legacy.list()

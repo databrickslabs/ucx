@@ -19,7 +19,7 @@ from databricks.labs.ucx.source_code.linters.directfs import (
         ("table.we.know.nothing.about", False),
     ],
 )
-def test_matches_dfsa_pattern(path, matches):
+def test_matches_dfsa_pattern(path, matches) -> None:
     """see https://github.com/databrickslabs/ucx/issues/2350"""
     matched = any(pattern.matches(path) for pattern in DIRECT_FS_ACCESS_PATTERNS)
     assert matches == matched
@@ -39,7 +39,7 @@ def test_matches_dfsa_pattern(path, matches):
         ('SOME_CONSTANT = "/dbfs/mnt"; dbutils.fs(SOME_CONSTANT)', 1),
     ],
 )
-def test_detects_dfsa_paths(code, expected):
+def test_detects_dfsa_paths(code, expected) -> None:
     linter = DirectFsAccessPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = list(linter.lint(code))
     for advice in advices:
@@ -73,7 +73,7 @@ ws.api_client.do("DELETE", "/api/2.0/feature-store/feature-tables/delete", body=
         ),
     ],
 )
-def test_directfs_linter(code, expected):
+def test_directfs_linter(code, expected) -> None:
     linter = DirectFsAccessPyLinter(CurrentSessionState(), prevent_spark_duplicates=False)
     advices = linter.lint(code)
     count = 0
@@ -92,7 +92,7 @@ def test_directfs_linter(code, expected):
         "",
     ],
 )
-def test_non_dfsa_triggers_nothing(query):
+def test_non_dfsa_triggers_nothing(query) -> None:
     ftf = DirectFsAccessSqlLinter()
     assert not list(ftf.lint(query))
 
@@ -111,7 +111,7 @@ def test_non_dfsa_triggers_nothing(query):
         ("SELECT * FROM csv.`dbfs:/mnt/foo`", "dbfs:/mnt/foo"),
     ],
 )
-def test_dfsa_tables_trigger_messages_param(query: str, table: str):
+def test_dfsa_tables_trigger_messages_param(query: str, table: str) -> None:
     ftf = DirectFsAccessSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [
@@ -132,7 +132,7 @@ def test_dfsa_tables_trigger_messages_param(query: str, table: str):
         'SELECT * FROM {{some_db.some_table}}',
     ],
 )
-def test_dfsa_queries_failure(query: str):
+def test_dfsa_queries_failure(query: str) -> None:
     ftf = DirectFsAccessSqlLinter()
     actual = list(ftf.lint(query))
     assert actual == [

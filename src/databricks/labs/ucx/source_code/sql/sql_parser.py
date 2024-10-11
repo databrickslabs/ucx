@@ -26,7 +26,10 @@ class SqlExpression:
                 yield info
 
     def _collect_table_info(
-        self, table: Table, required_catalog: str, session_state: CurrentSessionState
+        self,
+        table: Table,
+        required_catalog: str,
+        session_state: CurrentSessionState,
     ) -> UsedTable | None:
         if isinstance(self._expression, Use):
             # Sqlglot captures the database name in the Use statement as a Table, with
