@@ -98,7 +98,7 @@ def set_workspace_warehouse_config_wrapper(
         Enable serverless compute. Note that this value does not enforce serverless compute but it allows for serverless
         compute when `True`. Otherwise, serverless compute it not allowed.
     """
-    body = {}
+    body: dict[Any, Any] = {}
     if channel is not None:
         body['channel'] = channel.as_dict()
     if config_param is not None:

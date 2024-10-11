@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Generator
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -98,7 +99,7 @@ def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_c
 
 
 @pytest.fixture
-def clean_workspace_warehouse_config(env_or_skip, az_cli_ctx) -> None:
+def clean_workspace_warehouse_config(env_or_skip, az_cli_ctx) -> Generator[None, None, None]:
     """Clean workspace warehouse configuration."""
     env_or_skip("IDE_PROJECT_ROOTS")  # Only run from editor
     warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
