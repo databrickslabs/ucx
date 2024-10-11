@@ -17,7 +17,7 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import Source
 from databricks.sdk.service.workspace import Language
@@ -327,7 +327,7 @@ class WorkflowTaskContainer(SourceContainer):
             for library_full_status in library_full_status_list:
                 if library_full_status.library:
                     yield from self._register_library(graph, library_full_status.library)
-        except ResourceDoesNotExist:
+        except (ResourceDoesNotExist, InvalidParameterValue):
             yield DependencyProblem('cluster-not-found', f'Could not find cluster: {self._task.existing_cluster_id}')
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
@@ -340,7 +340,7 @@ class WorkflowTaskContainer(SourceContainer):
             try:
                 cluster_info = self._ws.clusters.get(self._task.existing_cluster_id)
                 return self._new_job_cluster_metadata(cluster_info)
-            except ResourceDoesNotExist:
+            except (ResourceDoesNotExist, InvalidParameterValue):
                 message = f'Could not find cluster: {self._task.existing_cluster_id}'
                 yield DependencyProblem('cluster-not-found', message)
         if self._task.new_cluster:
