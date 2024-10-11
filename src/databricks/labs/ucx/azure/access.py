@@ -589,6 +589,8 @@ class AzureResourcePermissions:
                 storage_acct = location.location[start + 1 : end]
                 if storage_acct not in used_storage_accounts:
                     used_storage_accounts.append(storage_acct)
+        if not used_storage_accounts:  # Avoid unnecessary crawling storage accounts below
+            return []
         storage_accounts = []
         for storage_account in self._azurerm.storage_accounts():
             if storage_account.name in used_storage_accounts:
