@@ -135,6 +135,7 @@ def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, cle
     )
     storage_account = StorageAccount(storage_account_id, "teststorageaccount", "west-europe", "Allow")
 
+    # pylint: disable-next=protected-access
     az_cli_ctx.azure_resource_permissions._add_service_principal_configuration_to_workspace_warehouse_config(
         "test-principal-id",
         "secrets/ucx/test-principal-secret",
