@@ -119,6 +119,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
             view="table_one",
             action_type="SELECT",
         ),
+        Grant(principal="user4", catalog="hive_metastore", database="schema3", action_type="DENY"),
         Grant(
             principal="user5",
             catalog="hive_metastore",
@@ -280,6 +281,9 @@ def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog1.schema3')" in caplog.messages
+    )
     assert "Skipping legacy grant that is not supported in UC: DENY on ('CATALOG', 'catalog2')" in caplog.messages
     assert (
         "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema2')" in caplog.messages
