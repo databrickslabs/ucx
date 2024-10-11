@@ -650,7 +650,7 @@ def migrate_tables(
         try:
             workspace_context.verify_progress_tracking.verify()
         except RuntimeWarning:
-            logger.info(
+            logger.warning(
                 "We couldn't detect a successful run of the assessment workflow."
                 "The assessment workflow is a prerequisite for the migrate-tables workflow."
                 "It can be run by using the `ensure-assessment-run` command."
