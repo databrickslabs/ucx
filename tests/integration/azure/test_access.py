@@ -92,6 +92,7 @@ def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_c
         ]
         == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
     )
+    # TODO: Test the warehouse config to have the same configuration pairs as the cluster
 
 
 def test_create_global_service_principal_clean_up_after_failure(
