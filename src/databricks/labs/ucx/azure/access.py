@@ -171,30 +171,35 @@ class AzureResourcePermissions:
         return {"type": "fixed", "value": value}
 
     def _create_service_principal_cluster_policy_configuration_pairs(
-        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage: StorageAccount,
+        *,
+        configuration_prefix: str,
     ) -> list[tuple[str, dict[str, str]]]:
         """Create the cluster policy configuration pairs to access the storage"""
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         configuration_pairs = [
             (
-                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
                 self._policy_config(principal_client_id),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
                 self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
                 self._policy_config(endpoint),
             ),
             (
-                f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net",
                 self._policy_config("OAuth"),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
                 self._policy_config("{{" + principal_secret_identifier + "}}"),
             ),
         ]
@@ -210,7 +215,10 @@ class AzureResourcePermissions:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
             for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
-                principal_client_id, principal_secret_identifier, storage
+                principal_client_id,
+                principal_secret_identifier,
+                storage,
+                configuration_prefix="spark_conf",
             ):
                 policy_dict[key] = value
         return json.dumps(policy_dict)
@@ -252,7 +260,10 @@ class AzureResourcePermissions:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
             for key, _ in self._create_service_principal_cluster_policy_configuration_pairs(
-                principal_client_id, principal_secret_identifier, storage
+                principal_client_id,
+                principal_secret_identifier,
+                storage,
+                configuration_prefix="spark_conf",
             ):
                 if key in policy_dict:
                     del policy_dict[key]
@@ -285,12 +296,18 @@ class AzureResourcePermissions:
             self._ws.cluster_policies.edit(policy_id, name=policy.name, definition=policy_definition)
 
     def _create_storage_account_data_access_configuration_pairs(
-        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage: StorageAccount,
     ) -> list[EndpointConfPair]:
         """Create the data access configuration pairs to access the storage"""
         configuration_pairs = []
         for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
-            principal_client_id, principal_secret_identifier, storage
+            principal_client_id,
+            principal_secret_identifier,
+            storage,
+            configuration_prefix="spark.hadoop",
         ):
             configuration_pairs.append(EndpointConfPair(key, value["value"]))
         return configuration_pairs
