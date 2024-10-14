@@ -1,5 +1,5 @@
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule, PipelineMapping
 
 _TEST_STORAGE_ACCOUNT = "storage_acct_1"
 _TEST_TENANT_ID = "directory_12345"
@@ -20,7 +20,7 @@ _PIPELINE_CONF_WITH_SECRET = {
 
 
 def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
-                          sql_backend):
+                          sql_backend, runtime_ctx):
 
         created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
         pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
@@ -37,8 +37,14 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
         assert results[0].pipeline_id == created_pipeline.pipeline_id
 
         pipeline_rules = [
+            PipelineRule.from_src_dst("test_catalog", None, None)
         ]
+        pipeline_mapping = PipelineMapping(
+            runtime_ctx.installation,
+            ws,
+            sql_backend
+        )
 
-        pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler)
+        pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler, pipeline_mapping)
         pipelines_migrator.migrate_pipelines()
 
