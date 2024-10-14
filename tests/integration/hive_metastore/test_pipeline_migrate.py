@@ -1,5 +1,5 @@
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule
 
 _TEST_STORAGE_ACCOUNT = "storage_acct_1"
 _TEST_TENANT_ID = "directory_12345"
@@ -35,6 +35,11 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
 
         assert len(results) >= 1
         assert results[0].pipeline_id == created_pipeline.pipeline_id
+
+        pipeline_rules = [
+            PipelineRule.from_src_dst(table_to_revert, dst_schema1),
+            Rule.from_src_dst(table_to_not_revert, dst_schema2),
+        ]
 
         pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler)
         pipelines_migrator.migrate_pipelines()

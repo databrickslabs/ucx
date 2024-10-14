@@ -5,6 +5,7 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.marketplace import Installation
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
@@ -18,6 +19,18 @@ class PipelineRule:
     source_pipeline_name: str
     target_schema_name: str
     target_pipeline_name: str
+
+    @classmethod
+    def from_src_dst(cls, src_pipeline: PipelineInfo, dst_schema: SchemaInfo) -> "Rule":
+        return cls(
+            workspace_name="workspace",
+            catalog_name=str(src_pipeline. or ""),
+            src_schema=str(src_pipeline.pipeline_name or ""),
+            dst_schema=str(dst_schema.name or ""),
+            src_table=str(src_table.name or ""),
+            dst_table=str(src_table.name or ""),
+            recon_tolerance_percent=0,
+        )
 
 @dataclass
 class PipelineToMigrate:
