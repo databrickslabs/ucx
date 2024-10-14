@@ -6871,10 +6871,7 @@
     "doc.conf": [],
     "joblibspark": [],
     "joblibspark.backend": [],
-    "joblibspark.utils": [],
-    "test": [],
-    "test.test_backend": [],
-    "test.test_spark": []
+    "joblibspark.utils": []
   },
   "johnsnowlabs": {
     "johnsnowlabs": [],
