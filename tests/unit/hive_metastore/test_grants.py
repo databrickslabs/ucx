@@ -543,7 +543,12 @@ def test_crawler_should_filter_databases() -> None:
         ),
     ],
 )
-def test_migrate_grants_applies_query(src: Catalog | Table, grant: Grant, target: Catalog | Table, query: str) -> None:
+def test_migrate_grants_applies_query(
+    src: Catalog | Schema | Table,
+    grant: Grant,
+    target: Catalog | Schema | Table,
+    query: str,
+) -> None:
     group_manager = create_autospec(GroupManager)
     backend = MockBackend()
 
