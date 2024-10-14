@@ -1,6 +1,6 @@
 import collections
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -12,43 +12,9 @@ from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.errors.platform import BadRequest
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.objects import Catalog, Schema
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class Catalog:
-    name: str
-
-    @property
-    def full_name(self) -> str:
-        return self.name
-
-    @property
-    def key(self) -> str:
-        return self.full_name
-
-    @property
-    def kind(self) -> str:
-        return "CATALOG"
-
-
-@dataclass(frozen=True)
-class Schema:
-    name: str
-    catalog_name: str
-
-    @property
-    def full_name(self) -> str:
-        return f"{self.catalog_name}.{self.name}"
-
-    @property
-    def key(self) -> str:
-        return self.full_name
-
-    @property
-    def kind(self) -> str:
-        return "DATABASE"
 
 
 class CatalogSchema:

@@ -34,6 +34,7 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.objects import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
 )
@@ -737,7 +738,7 @@ class MigrateGrants:
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
 
-    def apply(self, src: Table, dst: Table) -> bool:
+    def apply(self, src: Catalog | Schema | Table, dst: Catalog | Schema | Table) -> bool:
         for grant in self._match_grants(src):
             acl_migrate_sql = grant.uc_grant_sql(src.kind, dst.full_name)
             if acl_migrate_sql is None:
@@ -767,10 +768,10 @@ class MigrateGrants:
                 grants.append(grant)
         return grants
 
-    def _match_grants(self, table: Table) -> list[Grant]:
+    def _match_grants(self, src: Catalog | Schema | Table) -> list[Grant]:
         matched_grants = []
         for grant in self._grants:
-            if grant.object_key != table.key:
+            if grant.object_key != src.key:
                 continue
             grant = self._replace_account_group(grant)
             matched_grants.append(grant)
