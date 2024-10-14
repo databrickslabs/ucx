@@ -64,7 +64,7 @@ def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-argument
     sql_configuration_parameters: RepeatedEndpointConfPairs | None = None,
     enable_serverless_compute: bool = False,
 ):
-    """ Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
+    """Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
 
     See :meth:WorkspaceClient.warehouses.set_workspace_warehouse_config.
 
