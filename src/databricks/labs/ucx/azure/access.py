@@ -64,39 +64,15 @@ def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-argument
     sql_configuration_parameters: RepeatedEndpointConfPairs | None = None,
     enable_serverless_compute: bool = False,
 ):
-    """Set the workspace configuration.
+    """ Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
 
-    TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed this wrapper should be discarded.
+    See :meth:WorkspaceClient.warehouses.set_workspace_warehouse_config.
 
-    Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
-
-    :param api: :class:`ApiClient`
-      The warehouses API client.
-    :param channel: :class:`Channel` (optional)
-      Optional: Channel selection details
-    :param config_param: :class:`RepeatedEndpointConfPairs` (optional)
-      Deprecated: Use sql_configuration_parameters
-    :param data_access_config: List[:class:`EndpointConfPair`] (optional)
-      Spark confs for external hive metastore configuration JSON serialized size must be less than <= 512K
-    :param enabled_warehouse_types: List[:class:`WarehouseTypePair`] (optional)
-      List of Warehouse Types allowed in this workspace (limits allowed value of the type field in
-      CreateWarehouse and EditWarehouse). Note: Some types cannot be disabled, they don't need to be
-      specified in SetWorkspaceWarehouseConfig. Note: Disabling a type may cause existing warehouses to be
-      converted to another type. Used by frontend to save specific type availability in the warehouse
-      create and edit form UI.
-    :param global_param: :class:`RepeatedEndpointConfPairs` (optional)
-      Deprecated: Use sql_configuration_parameters
-    :param google_service_account: str (optional)
-      GCP only: Google Service Account used to pass to cluster to access Google Cloud Storage
-    :param instance_profile_arn: str (optional)
-      AWS Only: Instance profile used to pass IAM role to the cluster
-    :param security_policy: :class:`SetWorkspaceWarehouseConfigRequestSecurityPolicy` (optional)
-      Security policy for warehouses
-    :param sql_configuration_parameters: :class:`RepeatedEndpointConfPairs` (optional)
-      SQL configuration parameters
     :param enable_serverless_compute: bool (optional)
         Enable serverless compute. Note that this value does not enforce serverless compute but it allows for serverless
         compute when `True`. Otherwise, serverless compute it not allowed.
+
+    TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed this wrapper should be discarded.
     """
     body: dict[Any, Any] = {}
     if channel is not None:
