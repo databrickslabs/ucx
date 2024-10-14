@@ -5,7 +5,6 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
 
-
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     installation_ctx,
