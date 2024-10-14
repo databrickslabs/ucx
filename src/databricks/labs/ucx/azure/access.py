@@ -93,10 +93,7 @@ def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-argument
         body['security_policy'] = security_policy.value
     if sql_configuration_parameters is not None:
         body['sql_configuration_parameters'] = sql_configuration_parameters.as_dict()
-    if enable_serverless_compute:
-        body['enable_serverless_compute'] = 'true'
-    else:
-        body['enable_serverless_compute'] = 'false'
+    body['enable_serverless_compute'] = str(enable_serverless_compute).lower()
 
     headers = {
         'Accept': 'application/json',
