@@ -32,7 +32,7 @@ class _PathLruCache:
     @classmethod
     def _normalize(cls, path: _CachedPath) -> PurePosixPath:
         # Note: must not return the same instance that was passed in, to avoid circular references (and memory leaks).
-        return PurePosixPath(path.resolve())
+        return PurePosixPath(*path.resolve().parts)
 
     def load(self, cached_path: _CachedPath) -> bytes:
         normalized_path = self._normalize(cached_path)
