@@ -156,7 +156,7 @@ class WorkflowTaskContainer(SourceContainer):
         parsed_path = parse.urlparse(path)
         match parsed_path.scheme:
             case "":
-                return self._cache.get_path(path)
+                return self._cache.get_workspace_path(path)
             case "dbfs":
                 return DBFSPath(self._ws, parsed_path.path)
             case other:
@@ -234,7 +234,7 @@ class WorkflowTaskContainer(SourceContainer):
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         # Notebooks can't be on DBFS.
-        path = self._cache.get_path(notebook_path)
+        path = self._cache.get_workspace_path(notebook_path)
         return graph.register_notebook(path, False)
 
     def _register_spark_python_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -309,7 +309,7 @@ class WorkflowTaskContainer(SourceContainer):
             if library.notebook.path:
                 notebook_path = library.notebook.path
                 # Notebooks can't be on DBFS.
-                path = self._cache.get_path(notebook_path)
+                path = self._cache.get_workspace_path(notebook_path)
                 # the notebook is the root of the graph, so there's no context to inherit
                 yield from graph.register_notebook(path, inherit_context=False)
             if library.jar:
