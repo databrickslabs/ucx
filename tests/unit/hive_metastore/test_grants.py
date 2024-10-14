@@ -12,8 +12,8 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
 def test_type_and_key_table() -> None:
-    grant = Grant.type_and_key(catalog="hive_metastore", database="mydb", table="mytable")
-    assert grant == ("TABLE", "hive_metastore.mydb.mytable")
+    type_and_key = Grant.type_and_key(catalog="hive_metastore", database="mydb", table="mytable")
+    assert type_and_key == ("TABLE", "hive_metastore.mydb.mytable")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", table="mytable")
     assert grant.this_type_and_key()[0] == "TABLE"
@@ -21,8 +21,8 @@ def test_type_and_key_table() -> None:
 
 
 def test_type_and_key_view() -> None:
-    grant = Grant.type_and_key(catalog="hive_metastore", database="mydb", view="myview")
-    assert grant == ("VIEW", "hive_metastore.mydb.myview")
+    type_and_key = Grant.type_and_key(catalog="hive_metastore", database="mydb", view="myview")
+    assert type_and_key == ("VIEW", "hive_metastore.mydb.myview")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", view="myview")
     assert grant.this_type_and_key()[0] == "VIEW"
@@ -30,8 +30,8 @@ def test_type_and_key_view() -> None:
 
 
 def test_type_and_key_database() -> None:
-    grant = Grant.type_and_key(catalog="hive_metastore", database="mydb")
-    assert grant == ("DATABASE", "hive_metastore.mydb")
+    type_and_key = Grant.type_and_key(catalog="hive_metastore", database="mydb")
+    assert type_and_key == ("DATABASE", "hive_metastore.mydb")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb")
     assert grant.this_type_and_key()[0] == "DATABASE"
@@ -39,8 +39,8 @@ def test_type_and_key_database() -> None:
 
 
 def test_type_and_key_catalog() -> None:
-    grant = Grant.type_and_key(catalog="mycatalog")
-    assert grant == ("CATALOG", "mycatalog")
+    type_and_key = Grant.type_and_key(catalog="mycatalog")
+    assert type_and_key == ("CATALOG", "mycatalog")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="mycatalog")
     assert grant.this_type_and_key()[0] == "CATALOG"
@@ -48,8 +48,8 @@ def test_type_and_key_catalog() -> None:
 
 
 def test_type_and_key_any_file() -> None:
-    grant = Grant.type_and_key(any_file=True)
-    assert grant == ("ANY FILE", "")
+    type_and_key = Grant.type_and_key(any_file=True)
+    assert type_and_key == ("ANY FILE", "")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", any_file=True)
     assert grant.this_type_and_key()[0] == "ANY FILE"
@@ -57,8 +57,8 @@ def test_type_and_key_any_file() -> None:
 
 
 def test_type_and_key_anonymous_function() -> None:
-    grant = Grant.type_and_key(anonymous_function=True)
-    assert grant == ("ANONYMOUS FUNCTION", "")
+    type_and_key = Grant.type_and_key(anonymous_function=True)
+    assert type_and_key == ("ANONYMOUS FUNCTION", "")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", anonymous_function=True)
     assert grant.this_type_and_key()[0] == "ANONYMOUS FUNCTION"
@@ -66,8 +66,8 @@ def test_type_and_key_anonymous_function() -> None:
 
 
 def test_type_and_key_udf() -> None:
-    grant = Grant.type_and_key(catalog="hive_metastore", database="mydb", udf="myfunction")
-    assert grant == ("FUNCTION", "hive_metastore.mydb.myfunction")
+    type_and_key = Grant.type_and_key(catalog="hive_metastore", database="mydb", udf="myfunction")
+    assert type_and_key == ("FUNCTION", "hive_metastore.mydb.myfunction")
 
     grant = Grant(principal="user", action_type="SELECT", catalog="hive_metastore", database="mydb", udf="myfunction")
     assert grant.this_type_and_key()[0] == "FUNCTION"
