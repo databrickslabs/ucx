@@ -3,7 +3,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, Literal
+from typing import Any
 
 from databricks.sdk.core import (
     ApiClient,
@@ -114,7 +114,7 @@ class StorageAccount:
     id: AzureResource
     name: str
     location: str
-    default_network_action: Literal["Unknown", "Deny", "Allow"]
+    default_network_action: str  # "Unknown", "Deny" or "Allow"
 
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "StorageAccount":
