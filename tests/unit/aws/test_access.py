@@ -217,14 +217,12 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        external_locations,
+        locations,
     )
     aws_resource_permissions.create_uber_principal(prompts)
     aws.put_role_policy.assert_called_with(
@@ -247,8 +245,6 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
     prompts = MockPrompts(
         {
             "There is an existing instance profile *": "yes",
@@ -259,7 +255,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
         mock_installation,
         mock_ws,
         aws,
-        external_locations,
+        locations,
     )
     aws_resource_permissions.create_uber_principal(prompts)
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
@@ -288,14 +284,12 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws.create_migration_role.return_value = instance_profile_arn
     aws.create_instance_profile.return_value = instance_profile_arn
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        external_locations,
+        locations,
     )
 
     aws_resource_permissions.create_uber_principal(prompts)
@@ -337,14 +331,12 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
 
     aws = AWSResources("profile", command_call)
 
-    external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        external_locations,
+        locations,
     )
 
     with pytest.raises(PermissionDenied):
@@ -364,7 +356,12 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
     ],
 )
 def test_create_uber_principal_set_warehouse_config_security_policy(
-    mock_ws, mock_installation, backend, get_security_policy, set_security_policy
+    mock_ws,
+    mock_installation,
+    backend,
+    get_security_policy,
+    set_security_policy,
+    locations,
 ):
     mock_ws.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
     mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
@@ -375,13 +372,11 @@ def test_create_uber_principal_set_warehouse_config_security_policy(
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
 
-    external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        external_locations,
+        locations,
     )
     aws_resource_permissions.create_uber_principal(MockPrompts({".*": "yes"}))
 

@@ -238,7 +238,7 @@ def test_save_external_location_mapping_missing_location():
     tables_crawler.snapshot.return_value = [
         table_factory(["s3://test_location/test1/table1", ""]),
         table_factory(["gcs://test_location2/test2/table2", ""]),
-        table_factory(["abfss://cont1@storagetest1/test2/table3", ""]),
+        table_factory(["abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""]),
         table_factory(["s3a://test_location_2/test1/table1", ""]),
         table_factory(["s3n://test_location_3/test1/table1", ""]),
     ]

@@ -153,10 +153,11 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not location:
             return None
         for mount in self._mounts_snapshot:
-            prefix = mount.as_scheme_prefix()
-            if location.startswith(prefix):
+            for prefix in (mount.as_scheme_prefix(), mount.as_fuse_prefix()):
+                if not location.startswith(prefix):
+                    continue
                 logger.debug(f"Replacing location {prefix} with {mount.source} in {location}")
-                location.replace(prefix, mount.source)
+                location = location.replace(prefix, mount.source)
                 return location
         logger.debug(f"Mount not found for location {location}. Skipping replacement.")
         return location
@@ -313,6 +314,9 @@ class Mount:
 
     def as_scheme_prefix(self) -> str:
         return f'dbfs:{self.name}'  # dbfs:/mnt/mount-name
+
+    def as_fuse_prefix(self) -> str:
+        return f'/dbfs{self.name}'  # /dbfs/mnt/mount-name
 
 
 class MountsCrawler(CrawlerBase[Mount]):

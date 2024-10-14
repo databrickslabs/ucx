@@ -57,7 +57,7 @@ def test_runtime_mounts(run_workflow):
 
 def test_guess_external_locations(run_workflow):
     ctx = run_workflow(Assessment.guess_external_locations)
-    assert "SELECT * FROM `hive_metastore`.`ucx`.`mounts`" in ctx.sql_backend.queries
+    assert "SELECT * FROM `hive_metastore`.`ucx`.`external_locations`" in ctx.sql_backend.queries
 
 
 def test_assess_jobs(run_workflow):

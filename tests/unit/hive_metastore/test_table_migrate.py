@@ -389,7 +389,7 @@ def test_migrate_external_hiveserde_table_in_place(
             return location.replace("dbfs:/mnt/test", "s3://test/folder")
         return location
 
-    external_locations.resolve_mount = resolve_mount
+    external_locations.resolve_mount.side_effect = resolve_mount
 
     table_migrate = TablesMigrator(
         table_crawler,
