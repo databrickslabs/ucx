@@ -75,8 +75,9 @@ class CatalogSchema:
                 continue
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
-        own_grants = [grant for grant in grants if grant.action_type == "OWN"]
-        for grant in own_grants:
+        for grant in grants:
+            if grant.action_type != "OWN":
+                continue
             own_acl_migrate_sql = grant.uc_grant_sql()
             logger.debug(f"Migrating ownership on {grant.this_type_and_key()} using SQL query: {own_acl_migrate_sql}")
             if own_acl_migrate_sql is None:
