@@ -4,7 +4,6 @@ from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 
 @retried(on=[NotFound, InvalidParameterValue])
