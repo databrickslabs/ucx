@@ -10,8 +10,9 @@ from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, MigrateGrants
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
@@ -29,7 +30,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
             raise BadRequest("Catalog 'catalog1' already exists")
 
     ws.catalogs.create.side_effect = raise_catalog_exists
-    ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
+    ws.schemas.list.return_value = [SchemaInfo(catalog_name="catalog1", name="schema1")]
     ws.external_locations.list.return_value = [
         ExternalLocationInfo(url="s3://foo/bar"),
         ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
@@ -99,37 +100,41 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         }
     )
     table_mapping = TableMapping(installation, ws, backend)
-    principal_acl = create_autospec(PrincipalACL)
-    interactive_cluster_grants = [
-        Grant('princ1', 'SELECT', 'catalog1', 'schema3', 'table'),
-        Grant('princ1', 'MODIFY', 'catalog2', 'schema2', 'table'),
-        Grant('princ1', 'SELECT', 'catalog2', 'schema3', 'table2'),
-        Grant('princ1', 'USAGE', 'hive_metastore', 'schema3'),
-        Grant('princ1', 'DENY', 'hive_metastore', 'schema2'),
-    ]
-    principal_acl.get_interactive_cluster_grants.return_value = interactive_cluster_grants
-    hive_acl = create_autospec(GrantsCrawler)
-    hive_grants = [
-        Grant(principal="user1", catalog="hive_metastore", action_type="USE"),
-        Grant(principal="user2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
-        Grant(
-            principal="user3",
-            catalog="hive_metastore",
-            database="database_one",
-            view="table_one",
-            action_type="SELECT",
-        ),
-        Grant(principal="user4", catalog="hive_metastore", database="schema3", action_type="DENY"),
-        Grant(
-            principal="user5",
-            catalog="hive_metastore",
-            database="schema2",
-            action_type="USAGE",
-        ),
-    ]
-    hive_acl.snapshot.return_value = hive_grants
 
-    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl, "ucx")
+    def interactive_cluster_grants_loader() -> list[Grant]:
+        return [
+            Grant('princ1', 'SELECT', 'catalog1', 'schema3', 'table'),
+            Grant('princ1', 'MODIFY', 'catalog2', 'schema2', 'table'),
+            Grant('princ1', 'SELECT', 'catalog2', 'schema3', 'table2'),
+            Grant('princ1', 'USAGE', 'hive_metastore', 'schema3'),
+            Grant('princ1', 'DENY', 'hive_metastore', 'schema2'),
+        ]
+
+    def hive_grants_loader() -> list[Grant]:
+        return [
+            Grant(principal="user1", catalog="hive_metastore", action_type="USE"),
+            Grant(principal="user2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
+            Grant(
+                principal="user3",
+                catalog="hive_metastore",
+                database="database_one",
+                view="table_one",
+                action_type="SELECT",
+            ),
+            Grant(principal="user4", catalog="hive_metastore", database="schema3", action_type="DENY"),
+            Grant(
+                principal="user5",
+                catalog="hive_metastore",
+                database="schema2",
+                action_type="USAGE",
+            ),
+        ]
+
+    group_manager = create_autospec(GroupManager)
+    group_manager.snapshot.return_value = []
+    migrate_grants = MigrateGrants(backend, group_manager, [interactive_cluster_grants_loader, hive_grants_loader])
+
+    return CatalogSchema(ws, table_mapping, migrate_grants, backend, "ucx")
 
 
 def test_create_ucx_catalog_creates_ucx_catalog() -> None:
@@ -226,8 +231,8 @@ def test_create_bad_location() -> None:
     catalog_schema = prepare_test(ws)
     with pytest.raises(NotFound):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    ws.catalogs.get.assert_called_once_with("catalog2")
     ws.catalogs.create.assert_not_called()
-    ws.catalogs.list.assert_called_once()
     ws.schemas.create.assert_not_called()
 
 
@@ -268,9 +273,10 @@ def test_catalog_schema_acl() -> None:
         'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user5`',
         'GRANT USE CATALOG ON CATALOG `catalog2` TO `user5`',
     ]
-    assert len(backend.queries) == len(queries)
-    for query in queries:
-        assert query in backend.queries
+
+    outer = set(backend.queries) ^ set(queries)
+    assert not outer, f"Additional queries {set(backend.queries) - set(queries)}"
+    assert not outer, f"Missing queries {set(queries) - set(backend.queries)}"
 
 
 def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
@@ -281,14 +287,9 @@ def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
-    assert (
-        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog1.schema3')" in caplog.messages
-    )
-    assert "Skipping legacy grant that is not supported in UC: DENY on ('CATALOG', 'catalog2')" in caplog.messages
-    assert (
-        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema2')" in caplog.messages
-    )
-    assert (
-        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema3')" in caplog.messages
-    )
+    message_prefix = "failed-to-migrate: Hive metastore grant 'DENY' cannot be mapped to UC grant for"
+    assert f"{message_prefix} DATABASE 'catalog1.schema3'. Skipping." in caplog.messages
+    assert f"{message_prefix} CATALOG 'catalog2'. Skipping." in caplog.messages
+    assert f"{message_prefix} DATABASE 'catalog2.schema2'. Skipping." in caplog.messages
+    assert f"{message_prefix} DATABASE 'catalog2.schema3'. Skipping." in caplog.messages
     ws.assert_not_called()

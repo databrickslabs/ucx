@@ -740,13 +740,15 @@ class MigrateGrants:
 
     def apply(self, src: Catalog | Schema | Table, dst: Catalog | Schema | Table) -> bool:
         for grant in self._match_grants(src):
-            acl_migrate_sql = grant.uc_grant_sql(src.kind, dst.full_name)
+            acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
                     f"failed-to-migrate: Hive metastore grant '{grant.action_type}' cannot be mapped to UC grant for "
-                    f"{src.kind} '{dst.full_name}'. Skipping."
+                    f"{dst.kind} '{dst.full_name}'. Skipping."
                 )
                 continue
+            if "catalog1" in acl_migrate_sql:
+                print(1)
             logger.debug(f"Migrating acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
             try:
                 self._sql_backend.execute(acl_migrate_sql)

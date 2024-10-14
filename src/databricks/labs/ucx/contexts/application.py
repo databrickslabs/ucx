@@ -376,9 +376,8 @@ class GlobalContext(abc.ABC):
         return CatalogSchema(
             self.workspace_client,
             self.table_mapping,
-            self.principal_acl,
+            self.migrate_grants,
             self.sql_backend,
-            self.grants_crawler,
             self.config.ucx_catalog,
         )
 
