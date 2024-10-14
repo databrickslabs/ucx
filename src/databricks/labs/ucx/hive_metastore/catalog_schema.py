@@ -2,10 +2,8 @@ import logging
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.errors.platform import BadRequest
 
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -17,18 +15,12 @@ logger = logging.getLogger(__name__)
 class CatalogSchema:
 
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        table_mapping: TableMapping,
-        migrate_grants: MigrateGrants,
-        sql_backend: SqlBackend,  # TODO: Delete this
-        ucx_catalog: str,
+        self, ws: WorkspaceClient, table_mapping: TableMapping, migrate_grants: MigrateGrants, ucx_catalog: str
     ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._migrate_grants = migrate_grants
         self._external_locations = list(self._ws.external_locations.list())
-        self._backend = sql_backend
         self._ucx_catalog = ucx_catalog
 
     def create_ucx_catalog(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
