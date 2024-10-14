@@ -243,13 +243,12 @@ def test_save_external_location_mapping_missing_location():
         table_factory(["s3n://test_location_3/test1/table1", ""]),
     ]
     mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
     location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test11")]
 
     installation = create_autospec(Installation)
     location_crawler.save_as_terraform_definitions_on_workspace(installation)
-
-    mounts_crawler.snapshot.assert_called_once()
 
     installation.upload.assert_called_with(
         "external_locations.tf",
@@ -292,6 +291,7 @@ def test_save_external_location_mapping_no_missing_location():
         table_factory(["s3://test_location/test1/table1", ""]),
     ]
     mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
     location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
     location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
@@ -311,6 +311,7 @@ def test_match_table_external_locations():
         table_factory(["abfss://cont1@storagetest1/a/table4", ""]),
     ]
     mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
     location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/a")]
 

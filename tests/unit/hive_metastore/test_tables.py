@@ -483,7 +483,7 @@ def test_in_place_migrate_hiveserde_sql(table, mounts, describe, ddl, expected_h
         mounts_crawler.snapshot.return_value = mounts
         tables_crawler = create_autospec(TablesCrawler)
         ws = create_autospec(WorkspaceClient)
-        external_locations = ExternalLocations(ws, sql_backend, '...', tables_crawler, mounts_crawler)
+        external_locations = ExternalLocations(ws, sql_backend, 'some', tables_crawler, mounts_crawler)
         dst_table_location = external_locations.resolve_mount(table.location)
 
     hiveserde_type = table.hiveserde_type(sql_backend)

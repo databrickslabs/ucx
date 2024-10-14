@@ -84,7 +84,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         not in backend.queries
     )
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
@@ -116,7 +116,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert (
         "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` "
@@ -180,7 +180,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert backend.queries == [
         "SYNC TABLE `ucx_default`.`db1_dst`.`external_dst` FROM `hive_metastore`.`db1_src`.`external_src`;",
@@ -214,7 +214,7 @@ def test_migrate_managed_table_as_external_tables_without_conversion(ws):
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="SYNC_AS_EXTERNAL")
 
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert backend.queries == [
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` AS EXTERNAL FROM `hive_metastore`.`db1_src`.`managed_other`;",
@@ -248,7 +248,7 @@ def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(w
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CLONE")
 
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert backend.queries == [
         "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_other` AS SELECT * FROM `hive_metastore`.`db1_src`.`managed_other`",
@@ -287,7 +287,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
     migrate_grants.apply.assert_not_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -411,7 +411,6 @@ def test_migrate_external_hiveserde_table_in_place(
         migrate_grants.apply.assert_called()
         return
     migrate_grants.apply.assert_not_called()
-    external_locations.resolve_mount.assert_not_called()
     assert expected_value in caplog.text
 
 
@@ -448,7 +447,7 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
             return location.replace("dbfs:/mnt/test", "s3://test/folder")
         return location
 
-    external_locations.resolve_mount = resolve_mount
+    external_locations.resolve_mount.side_effect = resolve_mount
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -462,7 +461,6 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
 
     assert expected_query in backend.queries
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
 
 
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
@@ -509,7 +507,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
 
     assert not backend.queries
     migrate_grants.apply.assert_not_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
@@ -535,7 +533,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
 
     assert len(backend.queries) == 0
     migrate_grants.apply.assert_not_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_view_should_produce_proper_queries(ws):
@@ -578,7 +576,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     assert dst in backend.queries
     migrate_grants.apply.assert_called()
-    external_locations.resolve_mount.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_view_with_local_dataset_should_be_skipped(ws):

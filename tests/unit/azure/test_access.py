@@ -933,6 +933,7 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     """A warning should be logged when no storage account is present."""
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = []
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
@@ -945,7 +946,6 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     w.cluster_policies.get.assert_not_called()
     w.secrets.get_secret.assert_not_called()
     w.secrets.create_scope.assert_not_called()
-    external_locations.snapshot.assert_not_called()
     assert (
         "There are no external table present with azure storage account. Please check if assessment job is run"
         in caplog.messages

@@ -686,7 +686,7 @@ def test_create_aws_uber_principal_calls_dbutils_fs_mounts(ws) -> None:
     )
     prompts = MockPrompts({})
     create_uber_principal(ws, prompts, ctx=ctx)
-    ws.dbutils.fs.mounts.assert_called_once()
+    ws.dbutils.fs.mounts.assert_not_called()
 
 
 def test_migrate_locations_raises_value_error_for_unsupported_cloud_provider(ws) -> None:
