@@ -478,7 +478,7 @@ def test_migrate_acls_calls_workspace_id(
         workspace_client.get_workspace_id.assert_called()
 
 
-def test_migrate_credentials_azure(ws, acc_client):
+def test_migrate_credentials_azure(ws, acc_client) -> None:
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
@@ -491,7 +491,7 @@ def test_migrate_credentials_azure(ws, acc_client):
     )
     migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
-    azure_resources.storage_accounts.assert_called()
+    azure_resources.assert_not_called()
 
 
 def test_migrate_credentials_aws(ws, acc_client):
