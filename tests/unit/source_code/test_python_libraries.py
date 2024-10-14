@@ -5,7 +5,7 @@ from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolv
 from databricks.labs.ucx.source_code.known import KnownList
 
 
-def test_python_library_resolver_resolves_library(mock_path_lookup):
+def test_python_library_resolver_resolves_library(mock_path_lookup) -> None:
     def mock_pip_install(command):
         command_str = command if isinstance(command, str) else " ".join(command)
         assert command_str.startswith("pip --disable-pip-version-check install anything -t")
@@ -17,7 +17,7 @@ def test_python_library_resolver_resolves_library(mock_path_lookup):
     assert len(problems) == 0
 
 
-def test_python_library_resolver_failing(mock_path_lookup):
+def test_python_library_resolver_failing(mock_path_lookup) -> None:
     def mock_pip_install(_):
         return 1, "", "nope"
 
@@ -30,7 +30,7 @@ def test_python_library_resolver_failing(mock_path_lookup):
     assert problems[0].message.endswith("nope'")
 
 
-def test_python_library_resolver_adds_to_path_lookup_only_once():
+def test_python_library_resolver_adds_to_path_lookup_only_once() -> None:
     def mock_pip_install(_):
         return 0, "", ""
 
@@ -47,7 +47,7 @@ def test_python_library_resolver_adds_to_path_lookup_only_once():
     path_lookup.append_path.assert_has_calls([call(venv), call(venv)])
 
 
-def test_python_library_resolver_resolves_library_with_known_problems(mock_path_lookup):
+def test_python_library_resolver_resolves_library_with_known_problems(mock_path_lookup) -> None:
     def mock_pip_install(_):
         return 0, "", ""
 
@@ -58,7 +58,7 @@ def test_python_library_resolver_resolves_library_with_known_problems(mock_path_
     assert problems[0].code == "direct-filesystem-access"
 
 
-def test_python_library_resolver_installs_with_command(mock_path_lookup):
+def test_python_library_resolver_installs_with_command(mock_path_lookup) -> None:
     def mock_pip_install(_):
         return 0, "", ""
 
@@ -68,7 +68,7 @@ def test_python_library_resolver_installs_with_command(mock_path_lookup):
     assert len(problems) == 0
 
 
-def test_python_library_resolver_installs_multiple_eggs(mock_path_lookup):
+def test_python_library_resolver_installs_multiple_eggs(mock_path_lookup) -> None:
     python_library_resolver = PythonLibraryResolver(KnownList())
     problems = python_library_resolver.register_library(mock_path_lookup, "first.egg", "second.egg")
 

@@ -5,7 +5,7 @@ from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
-def test_extracts_root():
+def test_extracts_root() -> None:
     tree = Tree.parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     root = Tree(stmt).root
@@ -13,12 +13,12 @@ def test_extracts_root():
     assert repr(tree)  # for test coverage
 
 
-def test_no_first_statement():
+def test_no_first_statement() -> None:
     tree = Tree.parse("")
     assert not tree.first_statement()
 
 
-def test_extract_call_by_name():
+def test_extract_call_by_name() -> None:
     tree = Tree.parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
@@ -29,7 +29,7 @@ def test_extract_call_by_name():
     assert act.func.attrname == "m2"
 
 
-def test_extract_call_by_name_none():
+def test_extract_call_by_name_none() -> None:
     tree = Tree.parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
@@ -55,7 +55,7 @@ def test_extract_call_by_name_none():
         ("o.m1(4, 3, 2)", 1, "second", 3),
     ],
 )
-def test_linter_gets_arg(code, arg_index, arg_name, expected):
+def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
     tree = Tree.parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
@@ -80,7 +80,7 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected):
         ("o.m1(3, *b, **c, second=3)", 4),
     ],
 )
-def test_args_count(code, expected):
+def test_args_count(code, expected) -> None:
     tree = Tree.parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
@@ -89,7 +89,7 @@ def test_args_count(code, expected):
     assert act == expected
 
 
-def test_tree_walks_nodes_once():
+def test_tree_walks_nodes_once() -> None:
     nodes = set()
     count = 0
     tree = Tree.parse("o.m1().m2().m3()")
@@ -99,7 +99,7 @@ def test_tree_walks_nodes_once():
     assert len(nodes) == count
 
 
-def test_parses_incorrectly_indented_code():
+def test_parses_incorrectly_indented_code() -> None:
     source = """# DBTITLE 1,Get Sales Data for Analysis
  sales = (
    spark
@@ -125,7 +125,7 @@ def test_parses_incorrectly_indented_code():
     assert True
 
 
-def test_ignores_magic_marker_in_multiline_comment():
+def test_ignores_magic_marker_in_multiline_comment() -> None:
     source = """message_unformatted = u\"""
 %s is only supported in Python %s and above.\"""
 name="name"
@@ -136,7 +136,7 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_appends_statements():
+def test_appends_statements() -> None:
     source_1 = "a = 'John'"
     tree_1 = Tree.normalize_and_parse(source_1)
     source_2 = 'b = f"Hello {a}!"'
@@ -149,7 +149,7 @@ def test_appends_statements():
     assert strings == ["Hello John!"]
 
 
-def test_is_from_module():
+def test_is_from_module() -> None:
     source = """
 df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
@@ -162,7 +162,7 @@ df.write.format("delta").saveAsTable("old.things")
 
 
 @pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
-def test_is_instance_of(source, name, class_name):
+def test_is_instance_of(source, name, class_name) -> None:
     tree = Tree.normalize_and_parse(source)
     assert isinstance(tree.node, Module)
     module = tree.node
@@ -171,7 +171,7 @@ def test_is_instance_of(source, name, class_name):
     assert Tree(var[0]).is_instance_of(class_name)
 
 
-def test_supports_recursive_refs_when_checking_module():
+def test_supports_recursive_refs_when_checking_module() -> None:
     source_1 = """
     df = spark.read.csv("hi")
     """
@@ -189,7 +189,7 @@ def test_supports_recursive_refs_when_checking_module():
     assert Tree(assign.value).is_from_module("spark")
 
 
-def test_renumbers_positively():
+def test_renumbers_positively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
@@ -205,7 +205,7 @@ df.write.format("delta").saveAsTable("old.things")
     assert nodes[1].lineno == 6
 
 
-def test_renumbers_negatively():
+def test_renumbers_negatively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
@@ -230,7 +230,7 @@ df.write.format("delta").saveAsTable("old.things")
         ("""df = spark.read.csv("hi")\n# comment\ndf.write.format("delta").saveAsTable("old.things")""", 3),
     ],
 )
-def test_counts_lines(source: str, line_count: int):
+def test_counts_lines(source: str, line_count: int) -> None:
     tree = Tree.normalize_and_parse(source)
     assert tree.line_count() == line_count
 
@@ -250,7 +250,7 @@ x = stuff()""",
         ),
     ],
 )
-def test_is_builtin(source, name, is_builtin):
+def test_is_builtin(source, name, is_builtin) -> None:
     tree = Tree.normalize_and_parse(source)
     nodes = list(tree.node.get_children())
     for node in nodes:
@@ -264,53 +264,53 @@ def test_is_builtin(source, name, is_builtin):
     assert False  # could not locate call
 
 
-def test_first_statement_is_none():
+def test_first_statement_is_none() -> None:
     node = Const("xyz")
     assert not Tree(node).first_statement()
 
 
-def test_repr_is_truncated():
+def test_repr_is_truncated() -> None:
     assert len(repr(Tree(Const("xyz")))) <= (32 + len("...") + len("<Tree: >"))
 
 
-def test_append_tree_fails():
+def test_append_tree_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).append_tree(Tree(Const("xyz")))
 
 
-def test_append_node_fails():
+def test_append_node_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).append_nodes([])
 
 
-def test_nodes_between_fails():
+def test_nodes_between_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).nodes_between(0, 100)
 
 
-def test_has_global_fails():
+def test_has_global_fails() -> None:
     assert not Tree.new_module().has_global("xyz")
 
 
-def test_append_globals_fails():
+def test_append_globals_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).append_globals({})
 
 
-def test_globals_between_fails():
+def test_globals_between_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).line_count()
 
 
-def test_line_count_fails():
+def test_line_count_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).globals_between(0, 100)
 
 
-def test_renumber_fails():
+def test_renumber_fails() -> None:
     with pytest.raises(NotImplementedError):
         Tree(Const("xyz")).renumber(100)
 
 
-def test_const_is_not_from_module():
+def test_const_is_not_from_module() -> None:
     assert not Tree(Const("xyz")).is_from_module("spark")

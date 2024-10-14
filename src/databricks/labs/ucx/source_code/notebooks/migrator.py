@@ -15,7 +15,7 @@ class NotebookMigrator:
         # TODO: move languages to `apply`
         self._languages = languages
 
-    def revert(self, path: Path):
+    def revert(self, path: Path) -> bool:
         backup_path = path.with_suffix(".bak")
         if not backup_path.exists():
             return False
@@ -37,8 +37,6 @@ class NotebookMigrator:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
                 # TODO migration data, see https://github.com/databrickslabs/ucx/issues/1327
-                if cell.migrate_notebook_path():
-                    changed = True
                 continue
             if not self._languages.is_supported(cell.language.language):
                 continue

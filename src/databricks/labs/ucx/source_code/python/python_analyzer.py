@@ -68,6 +68,7 @@ class PythonCodeAnalyzer:
         if len(nodes) == 0:
             return InheritedContext(tree, False)
         context = InheritedContext(Tree.new_module(), False)
+        assert context.tree is not None, "Tree should be initialized"
         last_line = -1
         for base_node in nodes:
             # append nodes
@@ -83,6 +84,7 @@ class PythonCodeAnalyzer:
             if context.found:
                 return context
         line_count = tree.line_count()
+        assert context.tree is not None, "Tree should be initialized"
         if last_line < line_count:
             nodes = tree.nodes_between(last_line + 1, line_count)
             context.tree.append_nodes(nodes)
@@ -146,7 +148,9 @@ class PythonCodeAnalyzer:
 
     @classmethod
     def _filter_import_problem_in_try_except(
-        cls, problem: DependencyProblem, base_node: ImportSource
+        cls,
+        problem: DependencyProblem,
+        base_node: ImportSource,
     ) -> DependencyProblem | None:
         if problem.code != 'import-not-found':
             return problem

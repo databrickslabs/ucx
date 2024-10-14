@@ -17,12 +17,12 @@ class PathLookup:
     """
 
     @classmethod
-    def from_pathlike_string(cls, cwd: Path, syspath: str):
+    def from_pathlike_string(cls, cwd: Path, syspath: str) -> PathLookup:
         paths = syspath.split(':')
         return PathLookup(cwd, [Path(path) for path in paths])
 
     @classmethod
-    def from_sys_path(cls, cwd: Path):
+    def from_sys_path(cls, cwd: Path) -> PathLookup:
         return PathLookup(cwd, [Path(path) for path in sys.path])
 
     def __init__(self, cwd: Path, sys_paths: list[Path]):
@@ -68,7 +68,7 @@ class PathLookup:
         return None
 
     @staticmethod
-    def _standardize_path(path: Path):
+    def _standardize_path(path: Path) -> Path:
         resolved = path.resolve()  # eliminate ".." components
         # on MacOS "/var/..." resolves to "/private/var/.." which breaks path equality
         # let's compare the first meaningful part
@@ -90,18 +90,18 @@ class PathLookup:
             and any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
         )
 
-    def prepend_path(self, path: Path):
+    def prepend_path(self, path: Path) -> None:
         self._sys_paths.insert(0, path)
 
-    def insert_path(self, index: int, path: Path):
+    def insert_path(self, index: int, path: Path) -> None:
         self._sys_paths.insert(index, path)
 
-    def append_path(self, path: Path):
+    def append_path(self, path: Path) -> None:
         if path in self._sys_paths:
             return
         self._sys_paths.append(path)
 
-    def remove_path(self, index: int):
+    def remove_path(self, index: int) -> None:
         del self._sys_paths[index]
 
     @property
@@ -118,7 +118,7 @@ class PathLookup:
         return library_roots
 
     @property
-    def cwd(self):
+    def cwd(self) -> Path:
         return self._cwd
 
     def __repr__(self):

@@ -54,15 +54,15 @@ class Cell(ABC):
         return self._original_offset
 
     @property
-    def original_code(self):
+    def original_code(self) -> str:
         return self._original_code
 
     @property
-    def migrated_code(self):
+    def migrated_code(self) -> str:
         return self._migrated_code
 
     @migrated_code.setter
-    def migrated_code(self, value: str):
+    def migrated_code(self, value: str) -> None:
         self._migrated_code = value
 
     @property
@@ -90,7 +90,7 @@ class Cell(ABC):
 class PythonCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.PYTHON
 
     def is_runnable(self) -> bool:
@@ -124,7 +124,7 @@ class PythonCell(Cell):
 class RCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.R
 
     def is_runnable(self) -> bool:
@@ -134,7 +134,7 @@ class RCell(Cell):
 class ScalaCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.SCALA
 
     def is_runnable(self) -> bool:
@@ -144,7 +144,7 @@ class ScalaCell(Cell):
 class SQLCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.SQL
 
     def is_runnable(self) -> bool:
@@ -159,7 +159,7 @@ class SQLCell(Cell):
 class MarkdownCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.MARKDOWN
 
     def is_runnable(self) -> bool:
@@ -169,7 +169,7 @@ class MarkdownCell(Cell):
 class RunCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.RUN
 
     def is_runnable(self) -> bool:
@@ -205,7 +205,7 @@ class RunCell(Cell):
         path, _, _ = self._read_notebook_path()
         return path
 
-    def _read_notebook_path(self):
+    def _read_notebook_path(self) -> tuple[Path | None, int, str]:
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for idx, line in enumerate(lines):
@@ -218,14 +218,11 @@ class RunCell(Cell):
                 return Path(path), idx, line
         return None, 0, ""
 
-    def migrate_notebook_path(self):
-        pass
-
 
 class ShellCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.SHELL
 
     def is_runnable(self) -> bool:
@@ -235,7 +232,7 @@ class ShellCell(Cell):
 class PipCell(Cell):
 
     @property
-    def language(self):
+    def language(self) -> CellLanguage:
         return CellLanguage.PIP
 
     def is_runnable(self) -> bool:
@@ -268,7 +265,7 @@ class CellLanguage(Enum):
         self._new_cell = args[4]
 
     @property
-    def file_magic_header(self):
+    def file_magic_header(self) -> str:
         return f"{self._comment_prefix} {NOTEBOOK_HEADER}"
 
     @property
@@ -365,7 +362,13 @@ class CellLanguage(Enum):
 
         return cells
 
-    def _process_line(self, line: str, prefix: str, lang_prefix: str, cell_language: CellLanguage) -> list[str]:
+    def _process_line(
+        self,
+        line: str,
+        prefix: str,
+        lang_prefix: str,
+        cell_language: CellLanguage,
+    ) -> list[str]:
         if line.startswith(prefix):
             line = line[len(prefix) :]
             if cell_language.requires_isolated_pi and line.startswith(lang_prefix):

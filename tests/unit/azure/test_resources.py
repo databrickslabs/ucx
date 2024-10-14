@@ -13,29 +13,31 @@ from databricks.labs.ucx.azure.resources import (
     StorageAccount,
 )
 
-from . import azure_api_client, get_az_api_mapping
+from . import azure_api_client as create_azure_api_client, get_az_api_mapping
 
 
-def test_subscriptions_no_subscription():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="001")
+@pytest.fixture
+def azure_api_client() -> AzureAPIClient:
+    return create_azure_api_client()
+
+
+def test_subscriptions_no_subscription(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="001")
     subscriptions = list(azure_resource.subscriptions())
 
     assert len(subscriptions) == 0
 
 
-def test_subscriptions_valid_subscription():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_subscriptions_valid_subscription(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     subscriptions = list(azure_resource.subscriptions())
     assert len(subscriptions) == 1
     for subscription in subscriptions:
         assert subscription.name == "sub2"
 
 
-def test_storage_accounts():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_storage_accounts(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     storage_accounts = list(azure_resource.storage_accounts())
     assert len(storage_accounts) == 2
     for storage_account in storage_accounts:
@@ -44,9 +46,8 @@ def test_storage_accounts():
         assert storage_account.id.subscription_id == "002"
 
 
-def test_containers():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_containers(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
     containers = list(azure_resource.containers(azure_storage))
     assert len(containers) == 3
@@ -57,9 +58,8 @@ def test_containers():
         assert container.subscription_id == "002"
 
 
-def test_role_assignments_storage():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_storage(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 1
@@ -72,9 +72,8 @@ def test_role_assignments_storage():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-def test_role_assignments_container():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_container(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 1
@@ -87,9 +86,8 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-def test_role_assignments_custom_storage():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+def test_role_assignments_custom_storage(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
     resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
     role_assignments = list(azure_resource.role_assignments(resource_id))
     assert len(role_assignments) == 2
@@ -116,9 +114,8 @@ def test_storage_account_missing_fields(missing_field: str):
         StorageAccount.from_raw_resource(RawResource(raw))
 
 
-def test_create_service_principal():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_create_service_principal(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     global_spn = azure_resource.create_service_principal("disNameuser1")
     assert global_spn.client.client_id == "appIduser1"
     assert global_spn.client.object_id == "Iduser1"
@@ -127,17 +124,15 @@ def test_create_service_principal():
     assert global_spn.secret == "mypwd"
 
 
-def test_create_service_principal_no_access():
-    api_client = azure_api_client()
-    api_client.post.side_effect = PermissionDenied()
-    azure_resource = AzureResources(api_client, api_client)
+def test_create_service_principal_no_access(azure_api_client):
+    azure_api_client.post.side_effect = PermissionDenied()
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     with pytest.raises(PermissionDenied):
         azure_resource.create_service_principal("disNameuser1")
 
 
-def test_get_storage_permission_gets_role_assignments_endpoint() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_get_storage_permission_gets_role_assignments_endpoint(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -148,7 +143,7 @@ def test_get_storage_permission_gets_role_assignments_endpoint() -> None:
     permission = azure_resource.get_storage_permission(storage_account, "12345")
 
     path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/12345"
-    api_client.get.assert_any_call(path, "2022-04-01")
+    azure_api_client.get.assert_any_call(path, "2022-04-01")
     assert permission is not None
     assert permission.principal.object_id == "id_system_assigned_mi-123"
     assert permission.resource == storage_account.id
@@ -156,16 +151,15 @@ def test_get_storage_permission_gets_role_assignments_endpoint() -> None:
     assert permission.role_name == "Contributor"
 
 
-def test_get_storage_permission_logs_permission_denied(caplog) -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_get_storage_permission_logs_permission_denied(caplog, azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
         default_network_action="Allow",
     )
-    api_client.get.side_effect = PermissionDenied("Missing permission")
+    azure_api_client.get.side_effect = PermissionDenied("Missing permission")
 
     with pytest.raises(PermissionDenied), caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
         azure_resource.get_storage_permission(storage_account, "12345")
@@ -174,25 +168,23 @@ def test_get_storage_permission_logs_permission_denied(caplog) -> None:
     assert path in caplog.text
 
 
-def test_get_storage_permission_handles_not_found() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_get_storage_permission_handles_not_found(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
         default_network_action="Allow",
     )
-    api_client.get.side_effect = NotFound("Not found")
+    azure_api_client.get.side_effect = NotFound("Not found")
 
     permission = azure_resource.get_storage_permission(storage_account, "12345")
 
     assert permission is None
 
 
-def test_apply_storage_permission():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_apply_storage_permission(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     azure_storage = StorageAccount(
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -209,48 +201,44 @@ def test_apply_storage_permission():
         }
     }
 
-    api_client.put.assert_called_with(path, "2022-04-01", body)
+    azure_api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
-def test_apply_storage_permission_no_access():
-    api_client = azure_api_client()
-    api_client.put.side_effect = PermissionDenied()
+def test_apply_storage_permission_no_access(azure_api_client):
+    azure_api_client.put.side_effect = PermissionDenied()
     azure_storage = StorageAccount(
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
         default_network_action="Allow",
     )
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     with pytest.raises(PermissionDenied):
         azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
 
 
-def test_delete_service_principal_no_access():
-    api_client = azure_api_client()
-    api_client.delete.side_effect = PermissionDenied()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_service_principal_no_access(azure_api_client):
+    azure_api_client.delete.side_effect = PermissionDenied()
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     with pytest.raises(PermissionDenied):
         azure_resource.delete_service_principal("test")
 
 
-def test_delete_service_principal():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_service_principal(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     azure_resource.delete_service_principal("test")
-    api_client.delete.assert_called_with("/v1.0/applications(appId='test')")
+    azure_api_client.delete.assert_called_with("/v1.0/applications(appId='test')")
 
 
-def test_apply_storage_permission_assignment_present():
-    api_client = azure_api_client()
-    api_client.put.side_effect = ResourceConflict()
+def test_apply_storage_permission_assignment_present(azure_api_client):
+    azure_api_client.put.side_effect = ResourceConflict()
     azure_storage = StorageAccount(
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
         default_network_action="Allow",
     )
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
     path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
     body = {
@@ -260,12 +248,11 @@ def test_apply_storage_permission_assignment_present():
             'roleDefinitionId': '/subscriptions/002/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1',
         }
     }
-    api_client.put.assert_called_with(path, "2022-04-01", body)
+    azure_api_client.put.assert_called_with(path, "2022-04-01", body)
 
 
-def test_delete_storage_permission() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -277,14 +264,13 @@ def test_delete_storage_permission() -> None:
     azure_resource.delete_storage_permission(principal_id, storage_account)
 
     path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments?$filter=principalId%20eq%20'{principal_id}'"
-    api_client.get.assert_any_call(path, "2022-04-01")
+    azure_api_client.get.assert_any_call(path, "2022-04-01")
     calls = [call("rol1", "2022-04-01"), call("rol2", "2022-04-01")]
-    api_client.delete.assert_has_calls(calls)
+    azure_api_client.delete.assert_has_calls(calls)
 
 
-def test_delete_storage_permission_logs_permission_denied_on_get(caplog) -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission_logs_permission_denied_on_get(caplog, azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -292,7 +278,7 @@ def test_delete_storage_permission_logs_permission_denied_on_get(caplog) -> None
         default_network_action="Allow",
     )
     principal_id = "principal_id_system_assigned_mi-123"
-    api_client.get.side_effect = PermissionDenied("Permission denied")
+    azure_api_client.get.side_effect = PermissionDenied("Permission denied")
 
     with pytest.raises(PermissionDenied), caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
         azure_resource.delete_storage_permission(principal_id, storage_account)
@@ -302,9 +288,8 @@ def test_delete_storage_permission_logs_permission_denied_on_get(caplog) -> None
     assert principal_id in caplog.text
 
 
-def test_delete_storage_permission_logs_permission_denied_on_delete(caplog) -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission_logs_permission_denied_on_delete(caplog, azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -312,7 +297,7 @@ def test_delete_storage_permission_logs_permission_denied_on_delete(caplog) -> N
         default_network_action="Allow",
     )
     principal_id = "principal_id_system_assigned_mi-123"
-    api_client.delete.side_effect = PermissionDenied("Permission denied")
+    azure_api_client.delete.side_effect = PermissionDenied("Permission denied")
 
     with (
         pytest.raises(PermissionDenied) as error,
@@ -324,9 +309,8 @@ def test_delete_storage_permission_logs_permission_denied_on_delete(caplog) -> N
     assert "rol1, rol2" in str(error.value)
 
 
-def test_delete_storage_permission_raises_not_found_on_get() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission_raises_not_found_on_get(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -334,15 +318,14 @@ def test_delete_storage_permission_raises_not_found_on_get() -> None:
         default_network_action="Allow",
     )
     principal_id = "principal_id_system_assigned_mi-123"
-    api_client.get.side_effect = NotFound("Not found")
+    azure_api_client.get.side_effect = NotFound("Not found")
 
     with pytest.raises(NotFound):
         azure_resource.delete_storage_permission(principal_id, storage_account)
 
 
-def test_delete_storage_permission_safe_handles_not_found_on_get() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission_safe_handles_not_found_on_get(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -350,7 +333,7 @@ def test_delete_storage_permission_safe_handles_not_found_on_get() -> None:
         default_network_action="Allow",
     )
     principal_id = "principal_id_system_assigned_mi-123"
-    api_client.get.side_effect = NotFound("Not found")
+    azure_api_client.get.side_effect = NotFound("Not found")
 
     try:
         azure_resource.delete_storage_permission(principal_id, storage_account, safe=True)
@@ -360,9 +343,8 @@ def test_delete_storage_permission_safe_handles_not_found_on_get() -> None:
         assert True, "Safe handles NotFound"
 
 
-def test_delete_storage_permission_handles_not_found_on_delete(caplog) -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_delete_storage_permission_handles_not_found_on_delete(caplog, azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     storage_account = StorageAccount(
         id=AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
@@ -370,7 +352,7 @@ def test_delete_storage_permission_handles_not_found_on_delete(caplog) -> None:
         default_network_action="Allow",
     )
     principal_id = "principal_id_system_assigned_mi-123"
-    api_client.delete.side_effect = NotFound("Not found")
+    azure_api_client.delete.side_effect = NotFound("Not found")
 
     with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.azure.resources"):
         azure_resource.delete_storage_permission(principal_id, storage_account)
@@ -411,9 +393,8 @@ def test_azure_client_api_delete_spn():
     api_client.delete("/applications/1234")
 
 
-def test_managed_identity_client_id():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_managed_identity_client_id(azure_api_client):
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
 
     assert (
         azure_resource.managed_identity_client_id(
@@ -466,10 +447,9 @@ def azure_api_side_effect(*args, **kwargs):
     return get_az_api_mapping(*args, **kwargs)
 
 
-def test_managed_identity_not_found():
-    api_client = azure_api_client()
-    api_client.get.side_effect = azure_api_side_effect
-    azure_resource = AzureResources(api_client, api_client)
+def test_managed_identity_not_found(azure_api_client):
+    azure_api_client.get.side_effect = azure_api_side_effect
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
 
     assert (
         azure_resource.managed_identity_client_id(
@@ -479,18 +459,16 @@ def test_managed_identity_not_found():
     )
 
 
-def test_azure_resources_list_access_connectors() -> None:
+def test_azure_resources_list_access_connectors(azure_api_client) -> None:
     """Non-zero access connectors are mocked"""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions=["002"])
+    azure_resource = AzureResources(azure_api_client, azure_api_client, include_subscriptions=["002"])
     access_connectors = azure_resource.access_connectors()
     assert len(list(access_connectors)) > 0
 
 
-def test_azure_resources_get_access_connector() -> None:
+def test_azure_resources_get_access_connector(azure_api_client) -> None:
     """Should return the properties of the mocked response."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("002", "rg-test", "test-access-connector")
     assert access_connector is not None
     assert access_connector.name == "test-access-connector"
@@ -498,42 +476,37 @@ def test_azure_resources_get_access_connector() -> None:
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
 
 
-def test_azure_resources_get_access_connector_missing_name() -> None:
+def test_azure_resources_get_access_connector_missing_name(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_missing_location() -> None:
+def test_azure_resources_get_access_connector_missing_location(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-noloc")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_missing_ps() -> None:
+def test_azure_resources_get_access_connector_missing_ps(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-nops")
     assert access_connector is None
 
 
-def test_azure_resources_get_access_connector_inv_identity() -> None:
+def test_azure_resources_get_access_connector_inv_identity(azure_api_client) -> None:
     """Should return none."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-invidentity")
     assert access_connector is None
 
 
-def test_azure_resources_create_or_update_access_connector() -> None:
+def test_azure_resources_create_or_update_access_connector(azure_api_client) -> None:
     """Should return the properties of the mocked response."""
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     access_connector = azure_resource.create_or_update_access_connector(
         "002", "rg-test", "test-access-connector", "central-us", {"application": "databricks"}
     )
@@ -543,9 +516,8 @@ def test_azure_resources_create_or_update_access_connector() -> None:
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
 
 
-def test_azure_resources_delete_access_connector() -> None:
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+def test_azure_resources_delete_access_connector(azure_api_client) -> None:
+    azure_resource = AzureResources(azure_api_client, azure_api_client)
     url = "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector"
     azure_resource.delete_access_connector(url)
-    assert api_client.delete.called
+    assert azure_api_client.delete.called

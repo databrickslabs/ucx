@@ -139,6 +139,20 @@ def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_
     assert expected == backend.rows_written_for("hive_metastore.test.mounts", "overwrite")
 
 
+def test_mount_inventory_warning_on_incompatible_compute(caplog):
+    client = create_autospec(WorkspaceClient)
+    client.dbutils.fs.mounts.side_effect = Exception(
+        "Blah Blah com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted"
+    )
+    backend = MockBackend()
+    instance = Mounts(backend, client, "test")
+
+    instance.snapshot()
+
+    expected_warning = "dbutils.fs.mounts() is not whitelisted"
+    assert expected_warning in caplog.text
+
+
 def test_external_locations():
     row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
     sql_backend = MockBackend(

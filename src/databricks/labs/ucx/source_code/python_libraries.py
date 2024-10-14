@@ -25,7 +25,9 @@ class PythonLibraryResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
     def __init__(
-        self, allow_list: KnownList, runner: Callable[[str | list[str]], tuple[int, str, str]] = run_command
+        self,
+        allow_list: KnownList,
+        runner: Callable[[str | list[str]], tuple[int, str, str]] = run_command,
     ) -> None:
         self._allow_list = allow_list
         self._runner = runner

@@ -94,7 +94,7 @@ class LocatedAdvice:
     path: Path
 
     @property
-    def is_unknown(self):
+    def is_unknown(self) -> bool:
         return self.path == Path('UNKNOWN')
 
     def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
@@ -147,7 +147,7 @@ class SqlLinter(Linter):
             yield self.sql_parse_failure(code)
 
     @staticmethod
-    def sql_parse_failure(code: str):
+    def sql_parse_failure(code: str) -> Failure:
         return Failure(
             code='sql-parse-error',
             message=f"SQL expression is not supported yet: {code}",
@@ -214,7 +214,7 @@ class SourceInfo:
         source_id: str | None = None,
         source_lineage: list[LineageAtom] | None = None,
         source_timestamp: datetime | None = None,
-    ):
+    ) -> Self:
         return dataclasses.replace(
             self,
             source_id=source_id or self.source_id,
@@ -223,8 +223,10 @@ class SourceInfo:
         )
 
     def replace_assessment_infos(
-        self, assessment_start: datetime | None = None, assessment_end: datetime | None = None
-    ):
+        self,
+        assessment_start: datetime | None = None,
+        assessment_end: datetime | None = None,
+    ) -> Self:
         return dataclasses.replace(
             self,
             assessment_start_timestamp=assessment_start or self.assessment_start_timestamp,
@@ -236,7 +238,7 @@ class SourceInfo:
 class UsedTable(SourceInfo):
 
     @classmethod
-    def parse(cls, value: str, default_schema: str) -> UsedTable:
+    def parse(cls, value: str, default_schema: str, is_read=True, is_write=False) -> UsedTable:
         parts = value.split(".")
         if len(parts) >= 3:
             catalog_name = parts.pop(0)
@@ -246,7 +248,9 @@ class UsedTable(SourceInfo):
             schema_name = parts.pop(0)
         else:
             schema_name = default_schema
-        return UsedTable(catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0])
+        return UsedTable(
+            catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0], is_read=is_read, is_write=is_write
+        )
 
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
@@ -420,16 +424,16 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self.append_tree(tree)
         return tree
 
-    def append_tree(self, tree: Tree):
+    def append_tree(self, tree: Tree) -> None:
         self._make_tree().append_tree(tree)
 
-    def append_nodes(self, nodes: list[NodeNG]):
+    def append_nodes(self, nodes: list[NodeNG]) -> None:
         self._make_tree().append_nodes(nodes)
 
-    def append_globals(self, globs: dict):
+    def append_globals(self, globs: dict) -> None:
         self._make_tree().append_globals(globs)
 
-    def process_child_cell(self, code: str):
+    def process_child_cell(self, code: str) -> None:
         try:
             this_tree = self._make_tree()
             tree = Tree.normalize_and_parse(code)
@@ -478,7 +482,7 @@ def file_language(path: Path) -> Language | None:
     return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
 
 
-def guess_encoding(path: Path):
+def guess_encoding(path: Path) -> str:
     # some files encode a unicode BOM (byte-order-mark), so let's use that if available
     with path.open('rb') as _file:
         raw = _file.read(4)

@@ -32,13 +32,13 @@ class DirectFsAccessPattern(ABC):
     def matches(self, value: str) -> bool:
         return value.startswith(self._prefix) and not self._matches_allowed_root(value)
 
-    def _matches_allowed_root(self, value: str):
+    def _matches_allowed_root(self, value: str) -> bool:
         return any(value.startswith(f"{self._prefix}/{root}") for root in self._allowed_roots)
 
 
 class RootPattern(DirectFsAccessPattern):
 
-    def _matches_allowed_root(self, value: str):
+    def _matches_allowed_root(self, value: str) -> bool:
         return any(value.startswith(f"/{root}") for root in self._allowed_roots)
 
 
@@ -70,11 +70,11 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         self._directfs_nodes: list[DirectFsAccessNode] = []
         self._prevent_spark_duplicates = prevent_spark_duplicates
 
-    def visit_call(self, node: Call):
+    def visit_call(self, node: Call) -> None:
         for arg in node.args:
             self._visit_arg(node, arg)
 
-    def _visit_arg(self, call: Call, arg: NodeNG):
+    def _visit_arg(self, call: Call, arg: NodeNG) -> None:
         try:
             for inferred in InferredValue.infer_from_node(arg, self._session_state):
                 if not inferred.is_inferred():
@@ -84,7 +84,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
         except InferenceError as e:
             logger.debug(f"Could not infer value of {arg.as_string()}", exc_info=e)
 
-    def _check_str_arg(self, call_node: Call, arg_node: NodeNG, inferred: InferredValue):
+    def _check_str_arg(self, call_node: Call, arg_node: NodeNG, inferred: InferredValue) -> None:
         value = inferred.as_string()
         for pattern in DIRECT_FS_ACCESS_PATTERNS:
             if not pattern.matches(value):
@@ -111,7 +111,7 @@ class _DetectDirectFsAccessVisitor(TreeVisitor):
             return
 
     @property
-    def directfs_nodes(self):
+    def directfs_nodes(self) -> list[DirectFsAccessNode]:
         return self._directfs_nodes
 
 
@@ -143,7 +143,7 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
 
 class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
 
-    def lint_expression(self, expression: Expression):
+    def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
         for dfsa in self._collect_dfsas(SqlExpression(expression)):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',

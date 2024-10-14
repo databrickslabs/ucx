@@ -1,6 +1,7 @@
 import collections
 import logging
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import AlreadyExists, NotFound, BadRequest
 from databricks.sdk.service.catalog import (
@@ -13,10 +14,21 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 logger = logging.getLogger(__name__)
+
+
+class HiveMetastoreFederationEnabler:
+    def __init__(self, installation: Installation):
+        self._installation = installation
+
+    def enable(self):
+        config = self._installation.load(WorkspaceConfig)
+        config.enable_hms_federation = True
+        self._installation.save(config)
 
 
 class HiveMetastoreFederation:
@@ -25,12 +37,16 @@ class HiveMetastoreFederation:
         workspace_client: WorkspaceClient,
         external_locations: ExternalLocations,
         workspace_info: WorkspaceInfo,
+        enable_hms_federation: bool = False,
     ):
         self._workspace_client = workspace_client
         self._external_locations = external_locations
         self._workspace_info = workspace_info
+        self._enable_hms_federation = enable_hms_federation
 
     def register_internal_hms_as_federated_catalog(self) -> CatalogInfo:
+        if not self._enable_hms_federation:
+            raise RuntimeWarning('Run `databricks labs ucx enable-hms-federation` to enable HMS Federation')
         name = self._workspace_info.current()
         connection_info = self._get_or_create_connection(name)
         assert connection_info.name is not None
@@ -52,7 +68,7 @@ class HiveMetastoreFederation:
         try:
             return self._workspace_client.connections.create(
                 name=name,
-                connection_type=ConnectionType.HIVE_METASTORE,
+                connection_type=ConnectionType.HIVE_METASTORE,  # needs SDK change
                 options={"builtin": "true"},
             )
         except AlreadyExists:
@@ -68,7 +84,7 @@ class HiveMetastoreFederation:
         authorized_paths = []
         current_user = self._workspace_client.current_user.me()
         if not current_user.user_name:
-            raise ValueError('Current user not found')
+            raise NotFound('Current user not found')
         for external_location_info in self._external_locations.snapshot():
             location = external_location_info.location.rstrip('/').replace('s3a://', 's3://')
             existing_location = existing.get(location)
@@ -81,7 +97,7 @@ class HiveMetastoreFederation:
                 continue
             self._add_missing_permissions_if_needed(location_name, current_user.user_name)
             authorized_paths.append(location)
-        return ",".join(sorted(authorized_paths))
+        return ",".join(authorized_paths)
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
         grants = self._location_grants(location_name)

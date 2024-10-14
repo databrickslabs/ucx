@@ -7,6 +7,7 @@ from databricks.sdk.oauth import Token
 
 from databricks.labs.ucx.azure.resources import AzureAPIClient
 
+
 __dir = pathlib.Path(__file__).parent
 
 

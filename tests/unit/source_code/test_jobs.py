@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.service.compute import LibraryInstallStatus
 from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
@@ -28,7 +29,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, 
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
-def test_job_problem_as_message():
+def test_job_problem_as_message() -> None:
     expected_message = "UNKNOWN:-1 [library-not-found] Library not found: lib"
 
     problem = JobProblem(
@@ -60,7 +61,7 @@ def graph(mock_path_lookup, dependency_resolver) -> DependencyGraph:
     return dependency_graph
 
 
-def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph) -> None:
     # Goal of test is to raise test coverage, remove after implementing
     ws = create_autospec(WorkspaceClient)
     library = compute.Library(jar="library.jar")
@@ -74,7 +75,7 @@ def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(moc
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     task = jobs.Task(task_key="test")
 
@@ -85,7 +86,7 @@ def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lo
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="demo-egg"))]  # installs pkgdir
     task = jobs.Task(task_key="test", libraries=libraries)
@@ -98,7 +99,7 @@ def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(moc
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test", libraries=libraries)
@@ -235,7 +236,7 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
     assert registered_notebooks == [expected_path_instance]
 
 
-def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
+def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog) -> None:
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
@@ -259,7 +260,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     assert any(message.startswith(expected_message) for message in caplog.messages)
 
 
-def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"test")
 
@@ -278,7 +279,7 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
 
 def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_other_requirements(
     mock_path_lookup, graph, caplog
-):
+) -> None:
     expected_message = "Reference to other requirements file is not supported: -r other-requirements.txt"
 
     ws = create_autospec(WorkspaceClient)
@@ -298,7 +299,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
 def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constraints(
     mock_path_lookup, graph, caplog
-):
+) -> None:
     expected_message = "Reference to constraints file is not supported: -c constraints.txt"
 
     ws = create_autospec(WorkspaceClient)
@@ -318,9 +319,9 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
 def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_pytest_pypi_library(
     mock_path_lookup, graph
-):
+) -> None:
     ws = create_autospec(WorkspaceClient)
-    libraries = []
+    libraries: list[compute.Library] = []
     existing_cluster_id = "TEST_CLUSTER_ID"
     task = jobs.Task(task_key="test", libraries=libraries, existing_cluster_id=existing_cluster_id)
     libraries_api = create_autospec(compute.LibrariesAPI)
@@ -337,7 +338,7 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
                 whl=None,
             ),
             messages=None,
-            status="<LibraryInstallStatus.PENDING: 'PENDING'>",
+            status=LibraryInstallStatus.PENDING,
         )
     ]
 
@@ -347,7 +348,7 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_library(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_library(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"test")
 
@@ -365,7 +366,7 @@ def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_librar
     ws.workspace.download.assert_called_once_with(unknown_library, format=ExportFormat.AUTO)
 
 
-def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(mock_path_lookup, graph):
+def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
 
     egg_file = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py3.10.egg"
@@ -386,7 +387,7 @@ def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(
 def test_workflow_task_container_builds_dependency_graph_with_missing_distribution_in_python_wheel_task(
     mock_path_lookup,
     graph,
-):
+) -> None:
     ws = create_autospec(WorkspaceClient)
     python_wheel_task = jobs.PythonWheelTask(package_name="databricks_labs_ucx", entry_point="runtime")
     task = jobs.Task(task_key="test", python_wheel_task=python_wheel_task)
@@ -400,7 +401,7 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_distributi
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint_in_python_wheel_task(graph):
+def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint_in_python_wheel_task(graph) -> None:
     ws = create_autospec(WorkspaceClient)
 
     whl_file = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"
@@ -420,7 +421,7 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint
     ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)
 
 
-def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(graph):
+def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(graph) -> None:
     ws = create_autospec(WorkspaceClient)
 
     whl_file = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"
@@ -438,7 +439,7 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(g
     ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)
 
 
-def test_workflow_linter_dlt_pipeline_task(graph):
+def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     ws = create_autospec(WorkspaceClient)
     pipeline = ws.pipelines.create(continous=False, name="test-pipeline")
     task = jobs.Task(task_key="test", pipeline_task=jobs.PipelineTask(pipeline_id=pipeline.pipeline_id))
@@ -484,7 +485,7 @@ def test_workflow_linter_dlt_pipeline_task(graph):
     ws.assert_not_called()
 
 
-def test_xxx(graph):
+def test_xxx(graph) -> None:
     ws = create_autospec(WorkspaceClient)
     notebook_task = jobs.NotebookTask(
         notebook_path="test",
@@ -523,7 +524,7 @@ def test_xxx(graph):
     ws.assert_not_called()
 
 
-def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, migration_index):
+def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, migration_index) -> None:
     path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
