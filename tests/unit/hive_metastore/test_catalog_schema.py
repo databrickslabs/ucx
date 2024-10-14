@@ -209,7 +209,7 @@ def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations()
     "catalog,schema",
     [("catalog1", "schema2"), ("catalog1", "schema3"), ("catalog2", "schema2"), ("catalog3", "schema3")],
 )
-def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str):
+def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str) -> None:
     """Non-existing schemas should be created."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "metastore"})
@@ -220,7 +220,7 @@ def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str):
     ws.schemas.create.assert_any_call(schema, catalog, comment="Created by UCX")
 
 
-def test_create_bad_location():
+def test_create_bad_location() -> None:
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/fail"})
     catalog_schema = prepare_test(ws)
@@ -231,7 +231,7 @@ def test_create_bad_location():
     ws.schemas.create.assert_not_called()
 
 
-def test_no_catalog_storage():
+def test_no_catalog_storage() -> None:
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
 
