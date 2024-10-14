@@ -6,6 +6,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -505,24 +506,48 @@ def test_crawler_should_filter_databases() -> None:
     "src, grant, target, query",
     [
         (
+            Catalog("hive_metastore"),
+            Grant("user", "USAGE"),
+            Catalog("catalog"),
+            "GRANT USE CATALOG ON CATALOG `catalog` TO `user`",
+        ),
+        (
+            Schema("hive_metastore", "schema"),
+            Grant("user", "USAGE"),
+            Schema("schema", "catalog"),
+            "GRANT USE SCHEMA ON DATABASE `catalog`.`schema` TO `user`",
+        ),
+        (
             Table("hive_metastore", "database", "table", "MANAGED", "DELTA"),
             Grant("user", "SELECT"),
             Table("catalog", "database", "table", "MANAGED", "DELTA"),
             "GRANT SELECT ON TABLE `catalog`.`database`.`table` TO `user`",
-        )
+        ),
     ],
 )
-def test_migrate_grants_applies_query(src: Table, grant: Grant, target: Table, query: str) -> None:
+def test_migrate_grants_applies_query(src: Catalog | Table, grant: Grant, target: Catalog | Table, query: str) -> None:
     group_manager = create_autospec(GroupManager)
     backend = MockBackend()
 
     def grant_loader() -> list[Grant]:
+        database = table = None
+        if isinstance(src, Catalog):
+            catalog = src.name
+        elif isinstance(src, Schema):
+            catalog = src.catalog_name
+            database = src.name
+        elif isinstance(src, Table):
+            catalog = src.catalog
+            database = src.database
+            table = src.name
+        else:
+            raise TypeError(f"Unsupported source type: {type(src)}")
         return [
             dataclasses.replace(
                 grant,
-                catalog=src.catalog,
-                database=src.database,
-                table=src.name,
+                catalog=catalog,
+                database=database,
+                table=table,
             ),
         ]
 
@@ -533,6 +558,7 @@ def test_migrate_grants_applies_query(src: Table, grant: Grant, target: Table, q
     )
 
     migrate_grants.apply(src, target)
+
     assert query in backend.queries
     group_manager.assert_not_called()
 

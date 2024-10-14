@@ -770,9 +770,7 @@ class MigrateGrants:
     def _match_grants(self, table: Table) -> list[Grant]:
         matched_grants = []
         for grant in self._grants:
-            if grant.database != table.database:
-                continue
-            if table.name not in (grant.table, grant.view):
+            if grant.object_key != table.key:
                 continue
             grant = self._replace_account_group(grant)
             matched_grants.append(grant)
