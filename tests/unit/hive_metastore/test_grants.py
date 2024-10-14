@@ -523,6 +523,24 @@ def test_crawler_should_filter_databases() -> None:
             Table("catalog", "database", "table", "MANAGED", "DELTA"),
             "GRANT SELECT ON TABLE `catalog`.`database`.`table` TO `user`",
         ),
+        (
+            Catalog("hive_metastore"),
+            Grant("user", "OWN"),
+            Catalog("catalog"),
+            "ALTER CATALOG `catalog` OWNER TO `user`",
+        ),
+        (
+            Schema("hive_metastore", "schema"),
+            Grant("user", "OWN"),
+            Schema("schema", "catalog"),
+            "ALTER DATABASE `catalog`.`schema` OWNER TO `user`",
+        ),
+        (
+            Table("hive_metastore", "database", "table", "MANAGED", "DELTA"),
+            Grant("user", "OWN"),
+            Table("catalog", "database", "table", "MANAGED", "DELTA"),
+            "ALTER TABLE `catalog`.`database`.`table` OWNER TO `user`",
+        ),
     ],
 )
 def test_migrate_grants_applies_query(src: Catalog | Table, grant: Grant, target: Catalog | Table, query: str) -> None:
