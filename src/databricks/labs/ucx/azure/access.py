@@ -50,7 +50,7 @@ P = ParamSpec('P')
 R = TypeVar('R')
 
 
-def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-arguments,too-complex,missing-param-doc
+def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-arguments,missing-param-doc
     api: ApiClient,
     *,
     channel: Channel | None = None,
