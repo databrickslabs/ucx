@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
 from urllib.parse import urlparse
-from py4j.protocol import Py4JError
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
