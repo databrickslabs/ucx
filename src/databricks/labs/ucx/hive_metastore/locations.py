@@ -323,7 +323,7 @@ class Mounts(CrawlerBase[Mount]):
         try:
             for mount_point, source, _ in self._dbutils.fs.mounts():
                 mounts.append(Mount(mount_point, source))
-        except Py4JError as error:
+        except Exception as error: # pylint: disable=broad-except
             if "com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted" in str(error):
                 logger.warning(
                     "dbutils.fs.mounts() is not whitelisted. Skipping mount point discovery."
