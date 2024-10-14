@@ -40,7 +40,9 @@ def test_save_spn_permissions_no_external_table(caplog):
     rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": []}
     backend = MockBackend(rows=rows)
     tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
     mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
     location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
@@ -59,14 +61,11 @@ def test_save_spn_permissions_no_external_table(caplog):
 
 def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
-    backend = MockBackend(rows=rows)
-    tables_crawler = create_autospec(TablesCrawler)
-    mounts_crawler = create_autospec(MountsCrawler)
-    location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [ExternalLocation('s3://bucket1/folder1', 0)]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
     w.cluster_policies.get.assert_not_called()
