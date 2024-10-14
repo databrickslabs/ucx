@@ -12,7 +12,6 @@ def test_running_real_assessment_job(
     make_cluster_policy_permissions,
     make_dashboard,
     sql_backend,
-    inventory_schema,
 ) -> None:
     ws_group, _ = installation_ctx.make_ucx_group()
     # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
@@ -46,8 +45,9 @@ def test_running_real_assessment_job(
     assert after[ws_group.display_name] == PermissionLevel.CAN_USE
 
     expected_tables = {managed_table.name, external_table.name, tmp_table.name, view.name, non_delta.name}
-    assert set(table.name for table in installation_ctx.tables_crawler.snapshot()) == expected_tables
+    actual_tables = set(table.name for table in installation_ctx.tables_crawler.snapshot())
+    assert actual_tables == expected_tables
 
-    query = f"SELECT * FROM {inventory_schema}.workflow_problems"
+    query = f"SELECT * FROM {installation_ctx.inventory_database}.workflow_problems"
     for row in sql_backend.fetch(query):
         assert row['path'] != 'UNKNOWN'
