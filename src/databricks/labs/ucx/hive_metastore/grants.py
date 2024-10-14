@@ -747,8 +747,6 @@ class MigrateGrants:
                     f"{dst.kind} '{dst.full_name}'. Skipping."
                 )
                 continue
-            if "catalog1" in acl_migrate_sql:
-                print(1)
             logger.debug(f"Migrating acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
             try:
                 self._sql_backend.execute(acl_migrate_sql)
