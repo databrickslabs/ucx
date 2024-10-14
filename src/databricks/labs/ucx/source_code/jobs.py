@@ -17,8 +17,10 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.compute import DataSecurityMode
+from databricks.sdk.service.jobs import Source
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
@@ -107,7 +109,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._parameters: list[str] | None = []
         self._spark_conf: dict[str, str] | None = {}
         self._spark_version: str | None = None
-        self._data_security_mode = None
+        self._data_security_mode: DataSecurityMode | None = None
         self._is_serverless = False
 
     @property
@@ -175,31 +177,42 @@ class WorkflowTaskContainer(SourceContainer):
             problems = graph.register_library(library.pypi.package)
             if problems:
                 yield from problems
-        if library.egg:
-            yield from self._register_egg(graph, library)
-        if library.whl:
-            wheel_path = self._as_path(library.whl)
-            with self._temporary_copy(wheel_path) as local_file:
-                yield from graph.register_library(local_file.as_posix())
-        if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
-            logger.info(f"Registering libraries from {library.requirements}")
-            requirements_path = self._as_path(library.requirements)
-            with requirements_path.open() as requirements:
-                for requirement in requirements:
-                    requirement = requirement.rstrip()
-                    clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
-                    if clean_requirement.startswith("-r"):
-                        logger.warning(f"Reference to other requirements file is not supported: {requirement}")
-                        continue
-                    if clean_requirement.startswith("-c"):
-                        logger.warning(f"Reference to constraints file is not supported: {requirement}")
-                        continue
-                    yield from graph.register_library(clean_requirement)
+        try:
+            if library.egg:
+                yield from self._register_egg(graph, library)
+            if library.whl:
+                yield from self._register_whl(graph, library)
+            if library.requirements:
+                yield from self._register_requirements_txt(graph, library)
+        except BadRequest as e:
+            # see https://github.com/databrickslabs/ucx/issues/2916
+            yield DependencyProblem('library-error', f'Cannot retrieve library: {e}')
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
 
-    def _register_egg(self, graph, library):
+    def _register_requirements_txt(self, graph, library) -> Iterable[DependencyProblem]:
+        # https://pip.pypa.io/en/stable/reference/requirements-file-format/
+        logger.info(f"Registering libraries from {library.requirements}")
+        requirements_path = self._as_path(library.requirements)
+        with requirements_path.open() as requirements:
+            for requirement in requirements:
+                requirement = requirement.rstrip()
+                clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
+                if clean_requirement.startswith("-r"):
+                    logger.warning(f"Reference to other requirements file is not supported: {requirement}")
+                    continue
+                if clean_requirement.startswith("-c"):
+                    logger.warning(f"Reference to constraints file is not supported: {requirement}")
+                    continue
+                yield from graph.register_library(clean_requirement)
+
+    def _register_whl(self, graph, library) -> Iterable[DependencyProblem]:
+        wheel_path = self._as_path(library.whl)
+        with self._temporary_copy(wheel_path) as local_file:
+            yield from graph.register_library(local_file.as_posix())
+
+    def _register_egg(self, graph, library) -> Iterable[DependencyProblem]:
         if self.runtime_version > (14, 0):
             yield DependencyProblem(
                 code='not-supported',
@@ -213,6 +226,10 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
             return []
+        if self._task.notebook_task.source == Source.GIT:
+            # see https://github.com/databrickslabs/ucx/issues/2888
+            message = 'Notebooks are in GIT. Use "databricks labs ucx lint-local-code" CLI command to discover problems'
+            return [DependencyProblem("not-supported", message)]
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
@@ -220,7 +237,7 @@ class WorkflowTaskContainer(SourceContainer):
         path = self._cache.get_path(notebook_path)
         return graph.register_notebook(path, False)
 
-    def _register_spark_python_task(self, graph: DependencyGraph):
+    def _register_spark_python_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.spark_python_task:
             return []
         self._parameters = self._task.spark_python_task.parameters
@@ -262,20 +279,20 @@ class WorkflowTaskContainer(SourceContainer):
             ]
         return graph.register_import(entry_point.module)
 
-    def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_spark_jar_task(self, _) -> Iterable[DependencyProblem]:
         if not self._task.spark_jar_task:
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1641
         self._parameters = self._task.spark_jar_task.parameters
         yield DependencyProblem('not-yet-implemented', 'Spark Jar task is not yet implemented')
 
-    def _register_run_job_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_run_job_task(self, _) -> Iterable[DependencyProblem]:
         if not self._task.run_job_task:
             return
         # TODO: it's not clear how to terminate the graph
         yield DependencyProblem('not-yet-implemented', 'Run job task is not yet implemented')
 
-    def _register_pipeline_task(self, graph: DependencyGraph):
+    def _register_pipeline_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.pipeline_task:
             return
 
@@ -302,7 +319,7 @@ class WorkflowTaskContainer(SourceContainer):
             if library.file:
                 yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
 
-    def _register_existing_cluster_id(self, graph: DependencyGraph):
+    def _register_existing_cluster_id(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.existing_cluster_id:
             return
         try:
@@ -311,25 +328,27 @@ class WorkflowTaskContainer(SourceContainer):
             for library_full_status in library_full_status_list:
                 if library_full_status.library:
                     yield from self._register_library(graph, library_full_status.library)
-        except ResourceDoesNotExist:
+        except (ResourceDoesNotExist, InvalidParameterValue):
             yield DependencyProblem('cluster-not-found', f'Could not find cluster: {self._task.existing_cluster_id}')
 
-    def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_spark_submit_task(self, _) -> Iterable[DependencyProblem]:
         if not self._task.spark_submit_task:
             return
         yield DependencyProblem('not-yet-implemented', 'Spark submit task is not yet implemented')
 
-    def _register_cluster_info(self):
+    def _register_cluster_info(self) -> Iterable[DependencyProblem]:
         if self._task.existing_cluster_id:
             try:
                 cluster_info = self._ws.clusters.get(self._task.existing_cluster_id)
                 return self._new_job_cluster_metadata(cluster_info)
-            except ResourceDoesNotExist:
+            except (ResourceDoesNotExist, InvalidParameterValue):
                 message = f'Could not find cluster: {self._task.existing_cluster_id}'
                 yield DependencyProblem('cluster-not-found', message)
         if self._task.new_cluster:
             return self._new_job_cluster_metadata(self._task.new_cluster)
         if self._task.job_cluster_key:
+            assert self._job.settings is not None, "Job settings are missing"
+            assert self._job.settings.job_clusters is not None, "Job clusters are missing"
             for job_cluster in self._job.settings.job_clusters:
                 if job_cluster.job_cluster_key != self._task.job_cluster_key:
                     continue
@@ -338,7 +357,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._is_serverless = True
         return []
 
-    def _new_job_cluster_metadata(self, new_cluster):
+    def _new_job_cluster_metadata(self, new_cluster) -> Iterable[DependencyProblem]:
         self._spark_conf = new_cluster.spark_conf
         self._spark_version = new_cluster.spark_version
         self._data_security_mode = new_cluster.data_security_mode
@@ -364,7 +383,7 @@ class WorkflowLinter:
         self._used_tables_crawler = used_tables_crawler
         self._include_job_ids = include_job_ids
 
-    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
+    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         tasks = []
         all_jobs = list(self._ws.jobs.list())
         logger.info(f"Preparing {len(all_jobs)} linting tasks...")
@@ -490,7 +509,11 @@ class WorkflowLinter:
         yield from walker
 
     def _collect_task_dfsas(
-        self, job: jobs.Job, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
+        self,
+        job: jobs.Job,
+        task: jobs.Task,
+        graph: DependencyGraph,
+        session_state: CurrentSessionState,
     ) -> Iterable[DirectFsAccess]:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
@@ -536,11 +559,14 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         self._session_state = session_state
         self._linter_context = LinterContext(migration_index, session_state)
 
-    def _log_walk_one(self, dependency: Dependency):
+    def _log_walk_one(self, dependency: Dependency) -> None:
         logger.info(f'Linting {self._key} dependency: {dependency}')
 
     def _process_dependency(
-        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+        self,
+        dependency: Dependency,
+        path_lookup: PathLookup,
+        inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
         linter = FileLinter(self._linter_context, path_lookup, self._session_state, dependency.path, inherited_tree)
@@ -566,7 +592,10 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
         self._linter_context = LinterContext(migration_index, session_state)
 
     def _process_dependency(
-        self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+        self,
+        dependency: Dependency,
+        path_lookup: PathLookup,
+        inherited_tree: Tree | None,
     ) -> Iterable[T]:
         language = file_language(dependency.path)
         if not language:
@@ -580,7 +609,11 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             yield from self._collect_from_source(source, cell_language, dependency.path, inherited_tree)
 
     def _collect_from_notebook(
-        self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
+        self,
+        source: str,
+        language: CellLanguage,
+        path: Path,
+        inherited_tree: Tree | None,
     ) -> Iterable[T]:
         notebook = Notebook.parse(path, source, language.language)
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
@@ -595,7 +628,11 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
                 inherited_tree.append_tree(tree)
 
     def _collect_from_source(
-        self, source: str, language: CellLanguage, path: Path, inherited_tree: Tree | None
+        self,
+        source: str,
+        language: CellLanguage,
+        path: Path,
+        inherited_tree: Tree | None,
     ) -> Iterable[T]:
         iterable: Iterable[T] | None = None
         if language is CellLanguage.SQL:

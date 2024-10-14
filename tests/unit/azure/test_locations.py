@@ -105,6 +105,7 @@ def test_run_service_principal():
         comment="Created by UCX",
         read_only=False,
         skip_validation=False,
+        fallback=False,
     )
     ws.external_locations.create.assert_any_call(
         "container2_test",
@@ -113,6 +114,7 @@ def test_run_service_principal():
         comment="Created by UCX",
         read_only=True,
         skip_validation=False,
+        fallback=False,
     )
 
 
@@ -186,6 +188,7 @@ def test_skip_unsupported_location(caplog):
         comment="Created by UCX",
         read_only=False,
         skip_validation=False,
+        fallback=False,
     )
     assert "Skip unsupported location: adl://container2@test.dfs.core.windows.net" in caplog.text
     assert "Skip unsupported location: wasbs://container2@test.dfs.core.windows.net" in caplog.text
@@ -258,6 +261,7 @@ def test_run_managed_identity():
         comment="Created by UCX",
         read_only=False,
         skip_validation=False,
+        fallback=False,
     )
     ws.external_locations.create.assert_any_call(
         "container5_test_a_b",
@@ -266,6 +270,7 @@ def test_run_managed_identity():
         comment="Created by UCX",
         read_only=True,
         skip_validation=False,
+        fallback=False,
     )
 
 
@@ -336,6 +341,7 @@ def test_run_access_connectors():
             comment="Created by UCX",
             read_only=False,
             skip_validation=False,
+            fallback=False,
         ),
         call(
             "container5_test_a_b",
@@ -344,6 +350,7 @@ def test_run_access_connectors():
             comment="Created by UCX",
             read_only=False,
             skip_validation=False,
+            fallback=False,
         ),
     ]
     ws.external_locations.create.assert_has_calls(calls)
@@ -451,6 +458,7 @@ def test_location_failed_to_read():
         comment="Created by UCX",
         read_only=True,
         skip_validation=True,
+        fallback=False,
     )
 
 

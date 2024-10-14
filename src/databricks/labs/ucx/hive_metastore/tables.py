@@ -169,6 +169,10 @@ class Table:  # pylint: disable=too-many-public-methods
         return self.database.startswith("mounted_") and self.is_delta
 
     @property
+    def is_managed(self) -> bool:
+        return self.object_type == "MANAGED"
+
+    @property
     def what(self) -> What:
         if self.is_databricks_dataset:
             return What.DB_DATASET
@@ -190,6 +194,11 @@ class Table:  # pylint: disable=too-many-public-methods
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
+
+    def sql_migrate_as_external(self, target_table_key):
+        return (
+            f"SYNC TABLE {escape_sql_identifier(target_table_key)} AS EXTERNAL FROM {escape_sql_identifier(self.key)};"
+        )
 
     def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
         return (
@@ -365,7 +374,14 @@ class TablesCrawler(CrawlerBase[Table]):
 
     def _all_databases(self) -> list[str]:
         if not self._include_database:
-            return [row[0] for row in self._fetch("SHOW DATABASES")]
+            databases = []
+            for row in self._fetch("SHOW DATABASES"):
+                database = row[0]
+                if database == self._schema:
+                    logger.debug(f"Skipping UCX inventory schema: {database}")
+                    continue
+                databases.append(database)
+            return databases
         return self._include_database
 
     def load_one(self, schema_name: str, table_name: str) -> Table | None:
@@ -603,6 +619,9 @@ class FasterTableScanCrawler(TablesCrawler):
         catalog = "hive_metastore"
         databases = self._all_databases()
         for database in databases:
+            if database == self._schema:
+                logger.debug(f"Skipping UCX inventory schema: {database}")
+                continue
             logger.info(f"Scanning {database}")
             table_names = self._get_table_names(database)
             tasks.extend(self._create_describe_tasks(catalog, database, table_names))
@@ -619,6 +638,7 @@ class FasterTableScanCrawler(TablesCrawler):
         :param database:
         :return: list of table names
         """
+        # TODO: this method is redundant and can be removed in favor of using _list_tables directly
         table_names = []
         table_names_batches = Threads.strict('listing tables', [partial(self._list_tables, database)])
         for table_batch in table_names_batches:

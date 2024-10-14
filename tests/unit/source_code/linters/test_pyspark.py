@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinte
 from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter
 
 
-def test_spark_no_sql(empty_index):
+def test_spark_no_sql(empty_index) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
@@ -22,7 +22,7 @@ def test_spark_no_sql(empty_index):
     assert not list(sqf.lint("print(1)"))
 
 
-def test_spark_dynamic_sql(empty_index):
+def test_spark_dynamic_sql(empty_index) -> None:
     source = """
 schema="some_schema"
 df4.write.saveAsTable(f"{schema}.member_measure")
@@ -33,10 +33,10 @@ df4.write.saveAsTable(f"{schema}.member_measure")
     assert not list(sqf.lint(source))
 
 
-def test_spark_sql_no_match(empty_index):
+def test_spark_sql_no_match(empty_index) -> None:
     context = LinterContext(empty_index, CurrentSessionState())
     sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
 
     old_code = """
 for i in range(10):
@@ -47,10 +47,10 @@ for i in range(10):
     assert not list(spark_linter.lint(old_code))
 
 
-def test_spark_sql_match(migration_index):
+def test_spark_sql_match(migration_index) -> None:
     context = LinterContext(migration_index, CurrentSessionState())
     sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
     python_code = """
 spark.sql("SELECT * FROM old.things")
 spark.sql("SELECT * FROM csv.`s3://bucket/path`")
@@ -76,10 +76,10 @@ spark.sql("SELECT * FROM csv.`s3://bucket/path`")
     ] == advices
 
 
-def test_spark_sql_match_named(migration_index):
+def test_spark_sql_match_named(migration_index) -> None:
     context = LinterContext(migration_index, CurrentSessionState())
     sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), [])
+    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
     old_code = """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
@@ -98,7 +98,7 @@ for i in range(10):
     ]
 
 
-def test_spark_table_return_value_apply(migration_index):
+def test_spark_table_return_value_apply(migration_index) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(migration_index, session_state)
     sqf = SparkTableNamePyLinter(ftf, migration_index, session_state)
@@ -110,7 +110,7 @@ for table in spark.catalog.listTables():
     assert fixed_code.rstrip() == old_code.rstrip()
 
 
-def test_spark_sql_tablename_fix(migration_index):
+def test_spark_sql_tablename_fix(migration_index) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(migration_index, session_state)
     spark_linter = SparkSqlPyLinter(ftf, ftf)
@@ -534,7 +534,7 @@ for i in range(10):
         ),
     ],
 )
-def test_spark_cloud_direct_access(empty_index, code, expected):
+def test_spark_cloud_direct_access(empty_index, code, expected) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
@@ -554,7 +554,7 @@ FS_FUNCTIONS = [
 
 
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
-def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_function):
+def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_function) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
@@ -565,7 +565,7 @@ def test_direct_cloud_access_to_workspace_reports_nothing(empty_index, fs_functi
 
 
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
-def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function):
+def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function) -> None:
     session_state = CurrentSessionState()
     ftf = FromTableSqlLinter(empty_index, session_state)
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
@@ -575,7 +575,7 @@ def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function
     assert not advisories
 
 
-def test_get_full_function_name_for_member_function():
+def test_get_full_function_name_for_member_function() -> None:
     tree = Tree.parse("value.attr()")
     node = tree.first_statement()
     assert isinstance(node, Expr)
@@ -583,7 +583,7 @@ def test_get_full_function_name_for_member_function():
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr'
 
 
-def test_get_full_function_name_for_member_member_function():
+def test_get_full_function_name_for_member_member_function() -> None:
     tree = Tree.parse("value1.value2.attr()")
     node = tree.first_statement()
     assert isinstance(node, Expr)
@@ -591,7 +591,7 @@ def test_get_full_function_name_for_member_member_function():
     assert TreeHelper.get_full_function_name(node.value) == 'value1.value2.attr'
 
 
-def test_get_full_function_name_for_chained_function():
+def test_get_full_function_name_for_chained_function() -> None:
     tree = Tree.parse("value.attr1().attr2()")
     node = tree.first_statement()
     assert isinstance(node, Expr)
@@ -599,7 +599,7 @@ def test_get_full_function_name_for_chained_function():
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr1.attr2'
 
 
-def test_get_full_function_name_for_global_function():
+def test_get_full_function_name_for_global_function() -> None:
     tree = Tree.parse("name()")
     node = tree.first_statement()
     assert isinstance(node, Expr)
@@ -607,14 +607,14 @@ def test_get_full_function_name_for_global_function():
     assert TreeHelper.get_full_function_name(node.value) == 'name'
 
 
-def test_get_full_function_name_for_non_method():
+def test_get_full_function_name_for_non_method() -> None:
     tree = Tree.parse("not_a_function")
     node = tree.first_statement()
     assert isinstance(node, Expr)
     assert TreeHelper.get_full_function_name(node.value) is None
 
 
-def test_apply_table_name_matcher_with_missing_constant(migration_index):
+def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('some.things')")
@@ -627,7 +627,7 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index):
     assert table_constant.value == 'some.things'
 
 
-def test_apply_table_name_matcher_with_existing_constant(migration_index):
+def test_apply_table_name_matcher_with_existing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
     tree = Tree.parse("call('old.things')")
@@ -647,7 +647,7 @@ def test_apply_table_name_matcher_with_existing_constant(migration_index):
         ("spark.read.parquet('dbfs://mnt/foo2/bar2')", []),
     ],
 )
-def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_index):
+def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_index) -> None:
     session_state = CurrentSessionState('old')
     from_table = FromTableSqlLinter(migration_index, session_state)
     linter = SparkTableNamePyLinter(from_table, migration_index, session_state)

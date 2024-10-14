@@ -30,7 +30,7 @@ def temp_document(doc_text, ws):
     return name, doc
 
 
-def test_pylsp_lint(workspace, config):
+def test_pylsp_lint(workspace, config) -> None:
     code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
     _, doc = temp_document(code, workspace)
 
@@ -76,7 +76,7 @@ def test_pylsp_lint(workspace, config):
     ]
 
 
-def test_pylsp_lint_no_dbr_version(workspace, config):
+def test_pylsp_lint_no_dbr_version(workspace, config) -> None:
     code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
     _, doc = temp_document(code, workspace)
     config.update(
@@ -108,14 +108,14 @@ def test_pylsp_lint_no_dbr_version(workspace, config):
     ]
 
 
-def test_pylsp_no_config(workspace, config):
+def test_pylsp_no_config(workspace, config) -> None:
     code = 'sc.emptyRDD()'
     _, doc = temp_document(code, workspace)
     diagnostics = sorted(lsp_plugin.pylsp_lint(config, doc), key=lambda d: d['code'])
     assert diagnostics == []
 
 
-def test_pylsp_invalid_config(workspace, config):
+def test_pylsp_invalid_config(workspace, config) -> None:
     code = 'sc.emptyRDD()\ndf.groupby("id").applyInPandas(udf)'
     _, doc = temp_document(code, workspace)
 
@@ -136,7 +136,7 @@ def test_pylsp_invalid_config(workspace, config):
     assert diagnostics == []
 
 
-def test_pylsp_lint_single_user_cluster(workspace, config):
+def test_pylsp_lint_single_user_cluster(workspace, config) -> None:
     code = 'sc.emptyRDD()'
     _, doc = temp_document(code, workspace)
 
@@ -157,7 +157,7 @@ def test_pylsp_lint_single_user_cluster(workspace, config):
     assert diagnostics == []
 
 
-def test_with_migration_index(workspace, config):
+def test_with_migration_index(workspace, config) -> None:
     code = 'result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()'
     _, doc = temp_document(code, workspace)
 

@@ -64,7 +64,12 @@ class ImportSource(NodeBase):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[T]):
+    def _make_sources_for_import_call_nodes(
+        cls,
+        nodes: list[Call],
+        problem_factory: ProblemFactory,
+        problems: list[T],
+    ) -> Iterable[ImportSource]:
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
@@ -136,7 +141,7 @@ class DbutilsPyLinter(PythonLinter):
             )
 
     @staticmethod
-    def get_dbutils_notebook_run_path_arg(node: Call):
+    def get_dbutils_notebook_run_path_arg(node: Call) -> NodeNG:
         if len(node.args) > 0:
             return node.args[0]
         arg = next((kw for kw in node.keywords if kw.arg == "path"), None)
@@ -162,10 +167,10 @@ class SysPathChange(NodeBase, abc.ABC):
         self._is_append = is_append
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self._path
 
-    def apply_to(self, path_lookup: PathLookup):
+    def apply_to(self, path_lookup: PathLookup) -> None:
         path = Path(self._path)
         if not path.is_absolute():
             path = path_lookup.cwd / path
@@ -198,13 +203,13 @@ class SysPathChangesVisitor(TreeVisitor):
         self._aliases: dict[str, str] = {}
         self.sys_path_changes: list[SysPathChange] = []
 
-    def visit_import(self, node: Import):
+    def visit_import(self, node: Import) -> None:
         for name, alias in node.names:
             if alias is None or name not in {"sys", "os"}:
                 continue
             self._aliases[name] = alias
 
-    def visit_importfrom(self, node: ImportFrom):
+    def visit_importfrom(self, node: ImportFrom) -> None:
         interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
         interesting_alias = next((t for t in interesting_aliases if t[0] == node.modname), None)
         if interesting_alias is None:
@@ -214,7 +219,7 @@ class SysPathChangesVisitor(TreeVisitor):
                 self._aliases[f"{node.modname}.{interesting_alias[1]}"] = alias or name
                 break
 
-    def visit_call(self, node: Call):
+    def visit_call(self, node: Call) -> None:
         func = cast(Attribute, node.func)
         # check for 'sys.path.append'
         if not (
@@ -235,7 +240,7 @@ class SysPathChangesVisitor(TreeVisitor):
         except InferenceError:
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
 
-    def _visit_inferred(self, changed: NodeNG, inferred: InferredValue, is_relative: bool, is_append: bool):
+    def _visit_inferred(self, changed: NodeNG, inferred: InferredValue, is_relative: bool, is_append: bool) -> None:
         if not inferred.is_inferred():
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
             return
@@ -244,7 +249,7 @@ class SysPathChangesVisitor(TreeVisitor):
         else:
             self.sys_path_changes.append(AbsolutePath(changed, inferred.as_string(), is_append))
 
-    def _match_aliases(self, node: NodeNG, names: list[str]):
+    def _match_aliases(self, node: NodeNG, names: list[str]) -> bool:
         if isinstance(node, Attribute):
             if node.attrname != names[-1]:
                 return False

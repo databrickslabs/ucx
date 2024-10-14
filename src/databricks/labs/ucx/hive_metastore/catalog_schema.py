@@ -1,7 +1,6 @@
 import collections
 import logging
 from dataclasses import replace
-import fnmatch
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -30,7 +29,7 @@ class CatalogSchema:
     ):
         self._ws = ws
         self._table_mapping = table_mapping
-        self._external_locations = self._ws.external_locations.list()
+        self._external_locations = list(self._ws.external_locations.list())
         self._principal_grants = principal_grants
         self._backend = sql_backend
         self._hive_grants_crawler = grants_crawler
@@ -45,53 +44,43 @@ class CatalogSchema:
             properties : (dict[str, str] | None), default None
                 The properties to pass to the catalog. If None, no properties are passed.
         """
-        try:
-            self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
-        except BadRequest as e:
-            if "already exists" in str(e):
-                logger.warning(f"Catalog '{self._ucx_catalog}' already exists. Skipping.")
-                return
-            raise
+        self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
-            try:
-                self._create_catalog_validate(candidate_catalog, prompts, properties=None)
-            except BadRequest as e:
-                if "already exists" in str(e):
-                    logger.warning(f"Catalog '{candidate_catalog}' already exists. Skipping.")
-                    continue
+            self._create_catalog_validate(candidate_catalog, prompts, properties=None)
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 try:
                     self._create_schema(candidate_catalog, candidate_schema)
                 except BadRequest as e:
                     if "already exists" in str(e):
-                        logger.warning(
-                            f"Schema '{candidate_schema}' in catalog '{candidate_catalog}' already exists. Skipping."
-                        )
+                        logger.warning(f"Skipping already existing schema: {candidate_catalog}.{candidate_schema}")
                         continue
         self._apply_from_legacy_table_acls()
         self._update_principal_acl()
 
-    def _apply_from_legacy_table_acls(self):
+    def _apply_from_legacy_table_acls(self) -> None:
         grants = self._get_catalog_schema_hive_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
             if acl_migrate_sql is None:
-                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                logger.warning(
+                    f"Skipping legacy grant that is not supported in UC: {grant.action_type} on {grant.this_type_and_key()}"
+                )
                 continue
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
-    def _update_principal_acl(self):
-
+    def _update_principal_acl(self) -> None:
         grants = self._get_catalog_schema_principal_acl_grants()
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql()
             if acl_migrate_sql is None:
-                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                logger.warning(
+                    f"Skipping legacy grant that is not supported in UC: {grant.action_type} on {grant.this_type_and_key()}"
+                )
                 continue
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
@@ -141,19 +130,28 @@ class CatalogSchema:
                 src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
-    def _create_catalog_validate(self, catalog: str, prompts: Prompts, *, properties: dict[str, str] | None) -> None:
-        logger.info(f"Validating UC catalog: {catalog}")
+    def _create_catalog_validate(
+        self, catalog_name: str, prompts: Prompts, *, properties: dict[str, str] | None
+    ) -> None:
+        try:
+            catalog = self._ws.catalogs.get(catalog_name)
+        except NotFound:
+            catalog = None
+        if catalog:
+            logger.warning(f"Skipping already existing catalog: {catalog_name}")
+            return
+        logger.info(f"Validating UC catalog: {catalog_name}")
         attempts = 3
         while True:
             catalog_storage = prompts.question(
-                f"Please provide storage location url for catalog: {catalog}", default="metastore"
+                f"Please provide storage location url for catalog: {catalog_name}", default="metastore"
             )
             if self._validate_location(catalog_storage):
                 break
             attempts -= 1
             if attempts == 0:
-                raise NotFound(f"Failed to validate location for {catalog} catalog")
-        self._create_catalog(catalog, catalog_storage, properties=properties)
+                raise NotFound(f"Failed to validate location for catalog: {catalog_name}")
+        self._create_catalog(catalog_name, catalog_storage, properties=properties)
 
     def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
         """generate a list of existing UC catalogs and schema."""
@@ -203,19 +201,18 @@ class CatalogSchema:
                 target_schemas[catalog] = target_schemas[catalog] - schemas
         return target_catalogs, target_schemas
 
-    def _validate_location(self, location: str):
+    def _validate_location(self, location: str) -> bool:
         if location == "metastore":
             return True
         try:
             PurePath(location)
         except ValueError:
-            logger.error(f"Invalid location path {location}")
+            logger.error(f"Invalid location path: {location}")
             return False
         for external_location in self._external_locations:
-            if location == external_location.url:
+            if external_location.url is not None and location.startswith(external_location.url):
                 return True
-            if external_location.url is not None and fnmatch.fnmatch(location, external_location.url + '*'):
-                return True
+        logger.warning(f"No matching external location found for: {location}")
         return False
 
     def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None) -> None:

@@ -12,8 +12,10 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import ApiClient
 from databricks.sdk.errors import (
     BadRequest,
+    DatabricksError,
     InvalidParameterValue,
     NotFound,
     PermissionDenied,
@@ -24,9 +26,12 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import (
+    Channel,
     EndpointConfPair,
     GetWorkspaceWarehouseConfigResponse,
+    RepeatedEndpointConfPairs,
     SetWorkspaceWarehouseConfigRequestSecurityPolicy,
+    WarehouseTypePair,
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -43,6 +48,59 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 logger = logging.getLogger(__name__)
 P = ParamSpec('P')
 R = TypeVar('R')
+
+
+def set_workspace_warehouse_config_wrapper(  # pylint: disable=too-many-arguments,missing-param-doc
+    api: ApiClient,
+    *,
+    channel: Channel | None = None,
+    config_param: RepeatedEndpointConfPairs | None = None,
+    data_access_config: list[EndpointConfPair] | None = None,
+    enabled_warehouse_types: list[WarehouseTypePair] | None = None,
+    global_param: RepeatedEndpointConfPairs | None = None,
+    google_service_account: str | None = None,
+    instance_profile_arn: str | None = None,
+    security_policy: SetWorkspaceWarehouseConfigRequestSecurityPolicy | None = None,
+    sql_configuration_parameters: RepeatedEndpointConfPairs | None = None,
+    enable_serverless_compute: bool = False,
+):
+    """Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.
+
+    See :meth:WorkspaceClient.warehouses.set_workspace_warehouse_config.
+
+    :param enable_serverless_compute: bool (optional)
+        Enable serverless compute. Note that this value does not enforce serverless compute but it allows for serverless
+        compute when `True`. Otherwise, serverless compute it not allowed.
+
+    TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed this wrapper should be discarded.
+    """
+    body: dict[Any, Any] = {}
+    if channel is not None:
+        body['channel'] = channel.as_dict()
+    if config_param is not None:
+        body['config_param'] = config_param.as_dict()
+    if data_access_config is not None:
+        body['data_access_config'] = [v.as_dict() for v in data_access_config]
+    if enabled_warehouse_types is not None:
+        body['enabled_warehouse_types'] = [v.as_dict() for v in enabled_warehouse_types]
+    if global_param is not None:
+        body['global_param'] = global_param.as_dict()
+    if google_service_account is not None:
+        body['google_service_account'] = google_service_account
+    if instance_profile_arn is not None:
+        body['instance_profile_arn'] = instance_profile_arn
+    if security_policy is not None:
+        body['security_policy'] = security_policy.value
+    if sql_configuration_parameters is not None:
+        body['sql_configuration_parameters'] = sql_configuration_parameters.as_dict()
+    body['enable_serverless_compute'] = str(enable_serverless_compute).lower()
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+
+    api.do('PUT', '/api/2.0/sql/config/warehouses', body=body, headers=headers)
 
 
 @dataclass
@@ -170,30 +228,35 @@ class AzureResourcePermissions:
         return {"type": "fixed", "value": value}
 
     def _create_service_principal_cluster_policy_configuration_pairs(
-        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage: StorageAccount,
+        *,
+        configuration_prefix: str,
     ) -> list[tuple[str, dict[str, str]]]:
         """Create the cluster policy configuration pairs to access the storage"""
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         configuration_pairs = [
             (
-                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
                 self._policy_config(principal_client_id),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
                 self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
                 self._policy_config(endpoint),
             ),
             (
-                f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net",
                 self._policy_config("OAuth"),
             ),
             (
-                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                f"{configuration_prefix}.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
                 self._policy_config("{{" + principal_secret_identifier + "}}"),
             ),
         ]
@@ -209,7 +272,10 @@ class AzureResourcePermissions:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
             for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
-                principal_client_id, principal_secret_identifier, storage
+                principal_client_id,
+                principal_secret_identifier,
+                storage,
+                configuration_prefix="spark_conf",
             ):
                 policy_dict[key] = value
         return json.dumps(policy_dict)
@@ -251,7 +317,10 @@ class AzureResourcePermissions:
         policy_dict = json.loads(policy_definition)
         for storage in storage_accounts:
             for key, _ in self._create_service_principal_cluster_policy_configuration_pairs(
-                principal_client_id, principal_secret_identifier, storage
+                principal_client_id,
+                principal_secret_identifier,
+                storage,
+                configuration_prefix="spark_conf",
             ):
                 if key in policy_dict:
                     del policy_dict[key]
@@ -284,12 +353,18 @@ class AzureResourcePermissions:
             self._ws.cluster_policies.edit(policy_id, name=policy.name, definition=policy_definition)
 
     def _create_storage_account_data_access_configuration_pairs(
-        self, principal_client_id: str, principal_secret_identifier: str, storage: StorageAccount
+        self,
+        principal_client_id: str,
+        principal_secret_identifier: str,
+        storage: StorageAccount,
     ) -> list[EndpointConfPair]:
         """Create the data access configuration pairs to access the storage"""
         configuration_pairs = []
         for key, value in self._create_service_principal_cluster_policy_configuration_pairs(
-            principal_client_id, principal_secret_identifier, storage
+            principal_client_id,
+            principal_secret_identifier,
+            storage,
+            configuration_prefix="spark.hadoop",
         ):
             configuration_pairs.append(EndpointConfPair(key, value["value"]))
         return configuration_pairs
@@ -302,36 +377,53 @@ class AzureResourcePermissions:
     ):
         warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
         self._installation.save(warehouse_config, filename="warehouse-config-backup.json")
+
         sql_dac = warehouse_config.data_access_config or []
         for storage in storage_accounts:
             configuration_pairs = self._create_storage_account_data_access_configuration_pairs(
                 principal_client_id, principal_secret_identifier, storage
             )
             sql_dac.extend(configuration_pairs)
+
         security_policy = (
             SetWorkspaceWarehouseConfigRequestSecurityPolicy(warehouse_config.security_policy.value)
             if warehouse_config.security_policy
             else SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
         )
+
+        succeeded_message = "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
+        sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
+        error_message = (
+            f"Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error. "
+            f"Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}",
+        )
+        # TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed:
+        # - Remove second try-except completely
+        # - Remove first -except, only keeping the contents in the try-statement
         try:
             self._ws.warehouses.set_workspace_warehouse_config(
                 data_access_config=sql_dac,
                 sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
                 security_policy=security_policy,
             )
-            logger.info(
-                "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
+            logger.info(succeeded_message)
+        except InvalidParameterValue as e:
+            if "enable_serverless_compute" not in str(e):
+                logger.error(error_message, exc_info=e)
+                raise
+        try:
+            set_workspace_warehouse_config_wrapper(
+                self._ws.api_client,
+                data_access_config=sql_dac,
+                sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+                security_policy=security_policy,
+                enable_serverless_compute=True,
             )
-        # TODO: Remove following try except once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed
-        except InvalidParameterValue as error:
-            sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
-            logger.error(
-                f'Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error "{error}". '
-                f'Please try applying the following configs manually in the worksapce admin UI:\n{sql_dac_log_msg}'
-            )
-            raise error
+        except InvalidParameterValue as e:
+            logger.error(error_message, exc_info=e)
+            raise
 
-    def _remove_service_principal_configuration_from_workspace_warehouse_config(
+    def _remove_service_principal_configuration_from_workspace_warehouse_config(  # pylint: disable=too-complex
         self,
         principal_client_id: str,
         principal_secret_identifier: str,
@@ -358,28 +450,43 @@ class AzureResourcePermissions:
             if warehouse_config.security_policy
             else SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
         )
+
+        succeeded_message = "Updated workspace warehouse config with service principal connection details for accessing storage accounts"
+        sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
+        error_message = (
+            f"Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error. "
+            f"Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}",
+        )
+        # TODO: Once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed:
+        # - Remove second try-except completely
+        # - Remove first -except, only keeping the contents in the try-statement
         try:
             self._ws.warehouses.set_workspace_warehouse_config(
                 data_access_config=sql_dac,
                 sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
                 security_policy=security_policy,
             )
-        # TODO: Remove following try except once https://github.com/databricks/databricks-sdk-py/issues/305 is fixed
-        except InvalidParameterValue as error:
-            sql_dac_log_msg = "\n".join(f"{config_pair.key} {config_pair.value}" for config_pair in sql_dac)
-            logger.error(
-                f'Adding uber principal to SQL warehouse Data Access Properties is failed using Python SDK with error "{error}". '
-                f'Please try applying the following configs manually in the workspace admin UI:\n{sql_dac_log_msg}'
+            logger.info(succeeded_message)
+        except InvalidParameterValue as e:
+            if "enable_serverless_compute" not in str(e):
+                logger.error(error_message, exc_info=e)
+                raise
+        try:
+            set_workspace_warehouse_config_wrapper(
+                self._ws.api_client,
+                data_access_config=sql_dac,
+                sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+                security_policy=security_policy,
+                enable_serverless_compute=True,
             )
-            raise error
+        except InvalidParameterValue as e:
+            logger.error(error_message, exc_info=e)
+            raise
 
     def create_uber_principal(self, prompts: Prompts) -> None:
         config = self._installation.load(WorkspaceConfig)
         inventory_database = config.inventory_database
         display_name = f"unity-catalog-migration-{inventory_database}-{self._ws.get_workspace_id()}"
-        uber_principal_name = prompts.question(
-            "Enter a name for the uber service principal to be created", default=display_name
-        )
         policy_id = config.policy_id
         if policy_id is None:
             msg = "UCX cluster policy not found in config. Please run latest UCX installation to set cluster policy"
@@ -395,6 +502,9 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
+        uber_principal_name = prompts.question(
+            "Enter a name for the uber service principal to be created", default=display_name
+        )
         logger.info("Creating service principal")
 
         secret_identifier = f"secrets/{inventory_database}/{self._UBER_PRINCIPAL_SECRET_KEY}"
@@ -421,19 +531,26 @@ class AzureResourcePermissions:
 
     def _delete_uber_principal(self) -> None:
 
-        def log_permission_denied(function: Callable[P, R], *, message: str) -> Callable[P, R | None]:
+        def safe_call(function: Callable[P, R], *, error_message: str) -> Callable[P, R | None]:
+            """Make a safe call of the function
+
+            Args:
+                function (Callable[P, R]) : Function to safely call.
+                error_message (str) : Message to log if error raised by the function
+            """
+
             @wraps(function)
             def wrapper(*args: Any, **kwargs: Any) -> R | None:
                 try:
                     return function(*args, **kwargs)
-                except PermissionDenied:
-                    logger.error(message, exc_info=True)
+                except DatabricksError as e:
+                    logger.error(error_message, exc_info=e)
                     return None
 
             return wrapper
 
         message = "Missing permissions to load the configuration"
-        config = log_permission_denied(self._installation.load, message=message)(WorkspaceConfig)
+        config = safe_call(self._installation.load, error_message=message)(WorkspaceConfig)
         if config is None or config.uber_spn_id is None:
             return
 
@@ -442,25 +559,25 @@ class AzureResourcePermissions:
 
         storage_account_ids = ' '.join(str(st.id) for st in storage_accounts)
         message = f"Missing permissions to delete storage permissions for: {storage_account_ids}"
-        log_permission_denied(self._azurerm.delete_storage_permission, message=message)(
+        safe_call(self._azurerm.delete_storage_permission, error_message=message)(
             config.uber_spn_id, *storage_accounts, safe=True
         )
         message = f"Missing permissions to delete service principal: {config.uber_spn_id}"
-        log_permission_denied(self._azurerm.delete_service_principal, message=message)(config.uber_spn_id, safe=True)
+        safe_call(self._azurerm.delete_service_principal, error_message=message)(config.uber_spn_id, safe=True)
         if config.policy_id is not None:
             message = "Missing permissions to revert cluster policy"
-            log_permission_denied(self._remove_service_principal_configuration_from_cluster_policy, message=message)(
+            safe_call(self._remove_service_principal_configuration_from_cluster_policy, error_message=message)(
                 config.policy_id, config.uber_spn_id, secret_identifier, storage_accounts
             )
         message = "Missing permissions to revert SQL warehouse config"
-        log_permission_denied(
-            self._remove_service_principal_configuration_from_workspace_warehouse_config, message=message
-        )(config.uber_spn_id, secret_identifier, storage_accounts)
+        safe_call(self._remove_service_principal_configuration_from_workspace_warehouse_config, error_message=message)(
+            config.uber_spn_id, secret_identifier, storage_accounts
+        )
         message = "Missing permissions to delete secret scope"
-        log_permission_denied(self._safe_delete_scope, message=message)(config.inventory_database)
+        safe_call(self._safe_delete_scope, error_message=message)(config.inventory_database)
         message = "Missing permissions to save the configuration"
         config.uber_spn_id = None
-        log_permission_denied(self._installation.save, message=message)(config)
+        safe_call(self._installation.save, error_message=message)(config)
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
@@ -582,6 +699,8 @@ class AzureResourcePermissions:
                 storage_acct = location.location[start + 1 : end]
                 if storage_acct not in used_storage_accounts:
                     used_storage_accounts.append(storage_acct)
+        if not used_storage_accounts:  # Avoid unnecessary crawling storage accounts below
+            return []
         storage_accounts = []
         for storage_account in self._azurerm.storage_accounts():
             if storage_account.name in used_storage_accounts:

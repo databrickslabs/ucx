@@ -12,7 +12,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
-from databricks.sdk.service import jobs, sql
+from databricks.sdk.service import sql
 from databricks.sdk.service.catalog import ExternalLocationInfo, MetastoreInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
@@ -68,6 +68,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
@@ -478,7 +479,7 @@ def test_migrate_acls_calls_workspace_id(
         workspace_client.get_workspace_id.assert_called()
 
 
-def test_migrate_credentials_azure(ws, acc_client):
+def test_migrate_credentials_azure(ws, acc_client) -> None:
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
@@ -491,7 +492,7 @@ def test_migrate_credentials_azure(ws, acc_client):
     )
     migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
-    azure_resources.storage_accounts.assert_called()
+    azure_resources.assert_not_called()
 
 
 def test_migrate_credentials_aws(ws, acc_client):
@@ -804,8 +805,8 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
     ws.catalogs.list.assert_called_once()
 
-    assert "Catalog 'test' already exists. Skipping." in caplog.messages
-    assert "Schema 'test' in catalog 'test' already exists. Skipping." in caplog.messages
+    assert "Skipping already existing catalog: test" in caplog.messages
+    assert "Skipping already existing schema: test.test" in caplog.messages
 
 
 def test_cluster_remap(ws, caplog):
@@ -842,8 +843,8 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws.workspace.list.assert_called_once()
 
 
-def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
+def test_relay_logs(ws, caplog) -> None:
+    ws.jobs.list_runs.return_value = [Run(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
@@ -887,21 +888,30 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
     acc_client.metastore_assignments.create.assert_called_once()
 
 
-def test_create_ucx_catalog_calls_create_catalog(ws) -> None:
+def test_create_ucx_catalog_calls_get_catalog(ws) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws))
 
-    ws.catalogs.create.assert_called_once()
+    ws.catalogs.get.assert_called()
 
 
 def test_create_ucx_catalog_creates_history_schema_and_table(ws, mock_backend) -> None:
     prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+    ws.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     create_ucx_catalog(ws, prompts, ctx=WorkspaceContext(ws).replace(sql_backend=mock_backend))
 
     assert len(mock_backend.queries) > 0, "No queries executed on backend"
     assert "CREATE SCHEMA" in mock_backend.queries[0]
+
+
+def test_create_ucx_catalog_raises_runtime_error_because_progress_tracking_prerequisites_are_not_met(ws) -> None:
+    prompts = MockPrompts({"Please provide storage location url for catalog: .*": "metastore"})
+
+    with pytest.raises(RuntimeWarning):  # Specific warning is not important here
+        create_ucx_catalog(ws, prompts)
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])
@@ -920,12 +930,37 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
     )
     for workspace_client in workspace_clients:
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
+        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
 
     for workspace_client in workspace_clients:
         workspace_client.jobs.run_now.assert_called_with(456)
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_migrate_tables_errors_out_before_assessment(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    run = Run(
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
+        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.FAILED))]
+
+    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.run_now.assert_not_called()
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
@@ -939,7 +974,9 @@ def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
         table_format="HIVE",
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.return_value = None
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler, verify_progress_tracking=verify_progress_tracking)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS),
         start_time=0,
@@ -970,7 +1007,10 @@ def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
         table_format="EXTERNAL",
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.return_value = None
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler, verify_progress_tracking=verify_progress_tracking)
+
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS),
         start_time=0,

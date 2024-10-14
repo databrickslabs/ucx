@@ -1072,6 +1072,7 @@ class MockInstallationContext(MockRuntimeContext):
                 r"Choose how to map the workspace groups.*": "1",
                 r".*Inventory Database.*": self.inventory_database,
                 r".*Backup prefix*": self.renamed_group_prefix,
+                r"If hive_metastore contains managed table with external.*": "1",
                 r".*": "",
             }
             | (self.extend_prompts or {})

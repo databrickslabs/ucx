@@ -49,11 +49,11 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
         return 'table-migrate'
 
     @property
-    def schema(self):
+    def schema(self) -> str:
         return self._session_state.schema
 
-    def lint_expression(self, expression: Expression):
-        for info in SqlExpression(expression).collect_table_infos("hive_metastore", self._session_state):
+    def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
+        for info in SqlExpression(expression).collect_used_tables("hive_metastore", self._session_state):
             dst = self._index.get(info.schema_name, info.table_name)
             if not dst:
                 return
@@ -70,7 +70,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             for info in SqlParser.walk_expressions(
-                source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
+                source_code, lambda e: e.collect_used_tables("hive_metastore", self._session_state)
             ):
                 if any(pattern.matches(info.table_name) for pattern in DIRECT_FS_ACCESS_PATTERNS):
                     continue
@@ -79,7 +79,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
             pass  # TODO establish a strategy
 
     @staticmethod
-    def _catalog(table):
+    def _catalog(table) -> str:
         if table.catalog:
             return table.catalog
         return 'hive_metastore'
@@ -109,7 +109,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
         return '; '.join(new_statements)
 
     @classmethod
-    def _dependent_tables(cls, statement: Expression):
+    def _dependent_tables(cls, statement: Expression) -> list[Table]:
         dependencies = []
         for old_table in statement.find_all(Table):
             catalog = cls._catalog(old_table)

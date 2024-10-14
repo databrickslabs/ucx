@@ -3,16 +3,19 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Generator
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
+from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResource
+from databricks.labs.ucx.azure.access import set_workspace_warehouse_config_wrapper
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResource, StorageAccount
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
 )
 
-from databricks.sdk.errors.platform import PermissionDenied
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +63,7 @@ def clean_up_spn(env_or_skip):
 
 
 def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_cluster_policy, clean_up_spn) -> None:
+    az_cli_ctx = az_cli_ctx.replace(azure_subscription_ids=[env_or_skip("TEST_AZURE_SUBSCRIPTION_ID")])
     policy = make_cluster_policy()
     az_cli_ctx.installation.save(dataclasses.replace(az_cli_ctx.config, policy_id=policy.policy_id))
     tables = [ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)]
@@ -92,6 +96,80 @@ def test_create_global_spn(skip_if_not_in_debug, env_or_skip, az_cli_ctx, make_c
         ]
         == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
     )
+
+
+@pytest.fixture
+def clean_warehouse_config(az_cli_ctx, is_in_debug) -> Generator[None, None, None]:
+    """Clean workspace warehouse configuration."""
+    warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
+    yield
+    security_policy = (
+        SetWorkspaceWarehouseConfigRequestSecurityPolicy(warehouse_config.security_policy.value)
+        if warehouse_config.security_policy
+        else SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE
+    )
+    try:
+        az_cli_ctx.workspace_client.warehouses.set_workspace_warehouse_config(
+            data_access_config=warehouse_config.data_access_config,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+            security_policy=security_policy,
+        )
+    except InvalidParameterValue as e:
+        if "enable_serverless_compute" not in str(e):
+            raise
+        set_workspace_warehouse_config_wrapper(
+            az_cli_ctx.workspace_client.api_client,
+            data_access_config=warehouse_config.data_access_config,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+            security_policy=security_policy,
+            enable_serverless_compute=True,
+        )
+
+
+def test_add_service_principal_configuration_to_workspace_config(az_cli_ctx, clean_warehouse_config) -> None:
+    # We mock Azure components to keep the testing scope to Databricks components
+    az_cli_ctx = az_cli_ctx.replace(azure_subscription_ids=["test"])
+    storage_account_id = AzureResource(
+        "/subscriptions/test-subscription/resourceGroups/test-resource-group/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
+    )
+    storage_account = StorageAccount(storage_account_id, "teststorageaccount", "west-europe", "Allow")
+
+    # pylint: disable-next=protected-access
+    az_cli_ctx.azure_resource_permissions._add_service_principal_configuration_to_workspace_warehouse_config(
+        "test-principal-id",
+        "secrets/ucx/test-principal-secret",
+        [storage_account],
+    )
+
+    warehouse_config = az_cli_ctx.workspace_client.warehouses.get_workspace_warehouse_config()
+    data_access_config = warehouse_config.data_access_config or []
+    configuration_pairs = [(pair.key, pair.value) for pair in data_access_config]
+    tenant_id = az_cli_ctx.azure_resources.tenant_id()
+    endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+    configuration_pairs_expected = [
+        (
+            "spark.hadoop.fs.azure.account.oauth2.client.id.teststorageaccount.dfs.core.windows.net",
+            "test-principal-id",
+        ),
+        (
+            "spark.hadoop.fs.azure.account.oauth.provider.type.teststorageaccount.dfs.core.windows.net",
+            "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+        ),
+        (
+            "spark.hadoop.fs.azure.account.oauth2.client.endpoint.teststorageaccount.dfs.core.windows.net",
+            endpoint,
+        ),
+        (
+            "spark.hadoop.fs.azure.account.auth.type.teststorageaccount.dfs.core.windows.net",
+            "OAuth",
+        ),
+        (
+            "spark.hadoop.fs.azure.account.oauth2.client.secret.teststorageaccount.dfs.core.windows.net",
+            "{{secrets/ucx/test-principal-secret}}",
+        ),
+    ]
+    missing_configuration_pairs = set(configuration_pairs_expected) - set(configuration_pairs)
+    assert not missing_configuration_pairs, f"Missing configuration pairs: {missing_configuration_pairs}"
 
 
 def test_create_global_service_principal_clean_up_after_failure(

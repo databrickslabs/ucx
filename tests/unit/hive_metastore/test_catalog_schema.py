@@ -17,13 +17,23 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
 
+    def get_catalog(catalog_name: str) -> CatalogInfo:
+        if catalog_name == "catalog1":
+            return CatalogInfo(name="catalog1")
+        raise NotFound(f"Catalog: {catalog_name}")
+
+    ws.catalogs.get.side_effect = get_catalog
+
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "catalog1":
             raise BadRequest("Catalog 'catalog1' already exists")
 
     ws.catalogs.create.side_effect = raise_catalog_exists
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
-    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
+    ws.external_locations.list.return_value = [
+        ExternalLocationInfo(url="s3://foo/bar"),
+        ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
+    ]
     if backend is None:
         backend = MockBackend()
     installation = MockInstallation(
@@ -90,32 +100,33 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     )
     table_mapping = TableMapping(installation, ws, backend)
     principal_acl = create_autospec(PrincipalACL)
-    hive_acl = create_autospec(GrantsCrawler)
-    grants = [
-        Grant('user1', 'SELECT', 'catalog1', 'schema3', 'table'),
-        Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
-        Grant('user1', 'SELECT', 'catalog2', 'schema3', 'table2'),
-        Grant('user1', 'USAGE', 'hive_metastore', 'schema3'),
-        Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
+    interactive_cluster_grants = [
+        Grant('princ1', 'SELECT', 'catalog1', 'schema3', 'table'),
+        Grant('princ1', 'MODIFY', 'catalog2', 'schema2', 'table'),
+        Grant('princ1', 'SELECT', 'catalog2', 'schema3', 'table2'),
+        Grant('princ1', 'USAGE', 'hive_metastore', 'schema3'),
+        Grant('princ1', 'DENY', 'hive_metastore', 'schema2'),
     ]
+    principal_acl.get_interactive_cluster_grants.return_value = interactive_cluster_grants
+    hive_acl = create_autospec(GrantsCrawler)
     hive_grants = [
-        Grant(principal="princ1", catalog="hive_metastore", action_type="USE"),
-        Grant(principal="princ2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
+        Grant(principal="user1", catalog="hive_metastore", action_type="USE"),
+        Grant(principal="user2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
         Grant(
-            principal="princ33",
+            principal="user3",
             catalog="hive_metastore",
             database="database_one",
             view="table_one",
             action_type="SELECT",
         ),
+        Grant(principal="user4", catalog="hive_metastore", database="schema3", action_type="DENY"),
         Grant(
-            principal="princ5",
+            principal="user5",
             catalog="hive_metastore",
             database="schema2",
             action_type="USAGE",
         ),
     ]
-    principal_acl.get_interactive_cluster_grants.return_value = grants
     hive_acl.snapshot.return_value = hive_grants
 
     return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl, "ucx")
@@ -133,8 +144,8 @@ def test_create_ucx_catalog_creates_ucx_catalog() -> None:
 
 def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({"Please provide storage location url for catalog: ucx": "metastore"})
     catalog_schema = prepare_test(ws)
+    ws.catalogs.get.side_effect = lambda catalog_name: CatalogInfo(name=catalog_name)
 
     def raise_catalog_exists(catalog: str, *_, **__) -> None:
         if catalog == "ucx":
@@ -143,12 +154,20 @@ def test_create_ucx_catalog_skips_when_ucx_catalogs_exists(caplog) -> None:
     ws.catalogs.create.side_effect = raise_catalog_exists
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
-        catalog_schema.create_ucx_catalog(mock_prompts)
-    assert "Catalog 'ucx' already exists. Skipping." in caplog.text
+        catalog_schema.create_ucx_catalog(MockPrompts({}))
+    assert "Skipping already existing catalog: ucx" in caplog.text
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
-def test_create_all_catalogs_schemas_creates_catalogs(location: str):
+@pytest.mark.parametrize(
+    "location",
+    [
+        "s3://foo/bar",
+        "s3://foo/bar/test",
+        "s3://foo/bar/test/baz",
+        "abfss://container@storageaccount.dfs.core.windows.net",
+    ],
+)
+def test_create_all_catalogs_schemas_creates_catalogs(location: str) -> None:
     """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": location})
@@ -160,6 +179,28 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str):
         call("catalog2", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog3", storage_root=location, comment="Created by UCX", properties=None),
         call("catalog4", storage_root=location, comment="Created by UCX", properties=None),
+    ]
+    ws.catalogs.create.assert_has_calls(calls, any_order=True)
+
+
+def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations() -> None:
+    """Catalog 2-4 should be created; catalog 1 already exists."""
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts(
+        {
+            "Please provide storage location url for catalog: catalog2": "s3://foo/bar",
+            "Please provide storage location url for catalog: catalog3": "s3://foo/bar/test",
+            "Please provide storage location url for catalog: catalog4": "s3://foo/bar/test/baz",
+        }
+    )
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    calls = [
+        call("catalog2", storage_root="s3://foo/bar", comment="Created by UCX", properties=None),
+        call("catalog3", storage_root="s3://foo/bar/test", comment="Created by UCX", properties=None),
+        call("catalog4", storage_root="s3://foo/bar/test/baz", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
@@ -204,7 +245,7 @@ def test_no_catalog_storage():
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
 
-def test_catalog_schema_acl():
+def test_catalog_schema_acl() -> None:
     ws = create_autospec(WorkspaceClient)
     backend = MockBackend()
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
@@ -219,17 +260,35 @@ def test_catalog_schema_acl():
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     queries = [
-        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user1`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user1`',
-        'GRANT USE CATALOG ON CATALOG `catalog1` TO `user1`',
-        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user1`',
-        'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ2`',
-        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ2`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `princ5`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `princ5`',
-        'GRANT USE CATALOG ON CATALOG `catalog2` TO `princ5`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `user2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user5`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user5`',
+        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user5`',
     ]
     assert len(backend.queries) == len(queries)
     for query in queries:
         assert query in backend.queries
+
+
+def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    backend = MockBackend()
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+    catalog_schema = prepare_test(ws, backend)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
+        catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog1.schema3')" in caplog.messages
+    )
+    assert "Skipping legacy grant that is not supported in UC: DENY on ('CATALOG', 'catalog2')" in caplog.messages
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema2')" in caplog.messages
+    )
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema3')" in caplog.messages
+    )
+    ws.assert_not_called()

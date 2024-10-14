@@ -68,6 +68,7 @@ class TablesMigrator:
         what: What,
         mounts_crawler: Mounts | None = None,
         hiveserde_in_place_migrate: bool = False,
+        managed_table_external_storage: str = "CLONE",
     ):
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
@@ -79,14 +80,33 @@ class TablesMigrator:
             mounts = list(mounts_crawler.snapshot())
         if what == What.VIEW:
             return self._migrate_views()
-        return self._migrate_tables(what, mounts, hiveserde_in_place_migrate)
+        return self._migrate_tables(
+            what,
+            mounts,
+            managed_table_external_storage.upper(),
+            hiveserde_in_place_migrate,
+        )
 
-    def _migrate_tables(self, what: What, mounts: list[Mount], hiveserde_in_place_migrate: bool = False):
+    def _migrate_tables(
+        self,
+        what: What,
+        mounts: list[Mount],
+        managed_table_external_storage: str,
+        hiveserde_in_place_migrate: bool = False,
+    ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
-            tasks.append(partial(self._migrate_table, table, mounts, hiveserde_in_place_migrate))
+            tasks.append(
+                partial(
+                    self._migrate_table,
+                    table,
+                    mounts,
+                    managed_table_external_storage,
+                    hiveserde_in_place_migrate,
+                )
+            )
         Threads.strict("migrate tables", tasks)
         if not tasks:
             logger.info(f"No tables found to migrate with type {what.name}")
@@ -109,7 +129,23 @@ class TablesMigrator:
             self.index(force_refresh=True)
         return all_tasks
 
-    def _migrate_table(self, src_table: TableToMigrate, mounts: list[Mount], hiveserde_in_place_migrate: bool = False):
+    def _migrate_managed_table(
+        self, managed_table_external_storage: str, src_table: TableToMigrate, mounts: list[Mount]
+    ):
+        if managed_table_external_storage == 'SYNC_AS_EXTERNAL':
+            return self._migrate_managed_as_external_table(src_table.src, src_table.rule)  # new method
+        if managed_table_external_storage == 'CLONE':
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, mounts)
+        logger.warning(f"failed-to-migrate: unknown managed_table_external_storage: {managed_table_external_storage}")
+        return True
+
+    def _migrate_table(
+        self,
+        src_table: TableToMigrate,
+        mounts: list[Mount],
+        managed_table_external_storage: str,
+        hiveserde_in_place_migrate: bool = False,
+    ):
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
@@ -117,6 +153,8 @@ class TablesMigrator:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule)
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
             return self._migrate_table_create_ctas(src_table.src, src_table.rule, mounts)
+        if src_table.src.is_managed:
+            return self._migrate_managed_table(managed_table_external_storage, src_table, mounts)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule)
         if src_table.src.what == What.TABLE_IN_MOUNT:
@@ -178,13 +216,25 @@ class TablesMigrator:
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule):
-        if src_table.object_type == "MANAGED":
+    def _convert_hms_table_to_external(self, src_table: Table):
+        pass
+
+    def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
+        target_table_key = rule.as_uc_table_key
+        table_migrate_sql = src_table.sql_migrate_as_external(target_table_key)
+        logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
+        # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
+        sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
+        if sync_result.status_code != "SUCCESS":
             logger.warning(
-                f"failed-to-migrate: Detected MANAGED table {src_table.name} on external storage, not currently "
-                f"supported by UCX"
+                f"failed-to-migrate: SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
+                f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
             )
             return False
+        self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+
+    def _migrate_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")

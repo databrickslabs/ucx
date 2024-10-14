@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
         ('spark.table("a.b").count()', {'r:a.b'}),
         ('spark.getTable("a.b")', {'r:a.b'}),
         ('spark.cacheTable("a.b")', {'r:a.b'}),
-        ('spark.range(10).saveAsTable("a.b")', {'r:a.b'}),  # TODO: bug: has to be w:a.b
+        ('spark.range(10).saveAsTable("a.b")', {'w:a.b'}),
         ('spark.sql("SELECT * FROM b.c LEFT JOIN c.d USING (e)")', {'r:b.c', 'r:c.d'}),
         ('spark.sql("SELECT * FROM delta.`/foo/bar`")', set()),
     ],

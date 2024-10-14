@@ -3,8 +3,10 @@ from __future__ import annotations
 import abc
 import logging
 from pathlib import Path
+from typing import TypeVar
 
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import is_a_notebook, file_language
 from databricks.labs.ucx.source_code.graph import (
@@ -19,6 +21,9 @@ from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
+
+
+PathT = TypeVar("PathT", bound=Path)
 
 
 class NotebookResolver(BaseNotebookResolver):
@@ -41,15 +46,16 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None."""
         # check current working directory first
         absolute_path = path_lookup.cwd / path
+        absolute_path = absolute_path.resolve()
         if is_a_notebook(absolute_path):
             return absolute_path
         # When exported through Git, notebooks are saved with a .py extension. So check with and without extension
         candidates = (path, self._adjust_path(path)) if not path.suffix else (path,)
         for candidate in candidates:
-            absolute_path = path_lookup.resolve(candidate)
-            if not absolute_path:
+            a_path = path_lookup.resolve(candidate)
+            if not a_path:
                 continue
-            return absolute_path
+            return a_path
         return None
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
@@ -74,7 +80,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return Notebook.parse(absolute_path, content, language)
 
     @staticmethod
-    def _detect_language(path: Path, content: str):
+    def _detect_language(path: Path, content: str) -> Language | None:
         language = file_language(path)
         if language:
             return language
@@ -84,10 +90,13 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None
 
     @staticmethod
-    def _adjust_path(path: Path):
-        if path.suffix == ".py":
+    def _adjust_path(path: PathT) -> PathT:
+        existing_suffix = path.suffix
+        if existing_suffix == ".py":
             return path
-        return Path(path.as_posix() + ".py")
+        # Ensure we append instead of replacing an existing suffix.
+        new_suffix = existing_suffix + ".py"
+        return path.with_suffix(new_suffix)
 
     def __repr__(self):
         return "NotebookLoader()"

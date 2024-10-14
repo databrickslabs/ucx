@@ -5,7 +5,7 @@ from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
-def test_infers_empty_list():
+def test_infers_empty_list() -> None:
     tree = Tree.parse("a=[]")
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -13,7 +13,7 @@ def test_infers_empty_list():
     assert not values
 
 
-def test_infers_empty_tuple():
+def test_infers_empty_tuple() -> None:
     tree = Tree.parse("a=tuple()")
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -21,7 +21,7 @@ def test_infers_empty_tuple():
     assert not values
 
 
-def test_infers_empty_set():
+def test_infers_empty_set() -> None:
     tree = Tree.parse("a={}")
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -29,7 +29,7 @@ def test_infers_empty_set():
     assert not values
 
 
-def test_infers_fstring_value():
+def test_infers_fstring_value() -> None:
     source = """
 value = "abc"
 fstring = f"Hello {value}!"
@@ -43,7 +43,7 @@ fstring = f"Hello {value}!"
     assert strings == ["Hello abc!"]
 
 
-def test_infers_fstring_dict_value():
+def test_infers_fstring_dict_value() -> None:
     source = """
 value = { "abc": 123 }
 fstring = f"Hello {value['abc']}!"
@@ -57,7 +57,7 @@ fstring = f"Hello {value['abc']}!"
     assert strings == ["Hello 123!"]
 
 
-def test_infers_string_format_value():
+def test_infers_string_format_value() -> None:
     source = """
 value = "abc"
 fstring = "Hello {0}!".format(value)
@@ -71,7 +71,7 @@ fstring = "Hello {0}!".format(value)
     assert strings == ["Hello abc!"]
 
 
-def test_infers_fstring_values():
+def test_infers_fstring_values() -> None:
     source = """
 values_1 = ["abc", "def"]
 for value1 in values_1:
@@ -88,7 +88,7 @@ for value1 in values_1:
     assert strings == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
 
 
-def test_infers_externally_defined_value():
+def test_infers_externally_defined_value() -> None:
     state = CurrentSessionState()
     state.named_parameters = {"my-widget": "my-value"}
     source = """
@@ -103,7 +103,7 @@ value = dbutils.widgets.get(name)
     assert strings == ["my-value"]
 
 
-def test_infers_externally_defined_values():
+def test_infers_externally_defined_values() -> None:
     state = CurrentSessionState()
     state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
     source = """
@@ -118,7 +118,7 @@ for name in ["my-widget-1", "my-widget-2"]:
     assert strings == ["my-value-1", "my-value-2"]
 
 
-def test_fails_to_infer_missing_externally_defined_value():
+def test_fails_to_infer_missing_externally_defined_value() -> None:
     state = CurrentSessionState()
     state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
     source = """
@@ -132,7 +132,7 @@ value = dbutils.widgets.get(name)
     assert all(not value.is_inferred() for value in values)
 
 
-def test_survives_absence_of_externally_defined_values():
+def test_survives_absence_of_externally_defined_values() -> None:
     source = """
     name = "my-widget"
     value = dbutils.widgets.get(name)
@@ -144,7 +144,7 @@ def test_survives_absence_of_externally_defined_values():
     assert all(not value.is_inferred() for value in values)
 
 
-def test_infers_externally_defined_value_set():
+def test_infers_externally_defined_value_set() -> None:
     state = CurrentSessionState()
     state.named_parameters = {"my-widget": "my-value"}
     source = """

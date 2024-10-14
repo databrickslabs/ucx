@@ -333,3 +333,11 @@ commands:
 
   - name: export-assessment
     description: Export UCX results to a specified location
+
+  - name: create-federated-catalog
+    description: (EXPERIMENTAL) Create a federated catalog in the workspace
+
+  - name: enable-hms-federation
+    description: (EXPERIMENTAL) Enable HMS federation based migration flow. When this is enabled, UCX will create a federated HMS catalog which syncs from the workspace HMS.
+
+

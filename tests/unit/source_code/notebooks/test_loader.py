@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-def test_detects_language():
+def test_detects_language() -> None:
 
     class NotebookLoaderForTesting(NotebookLoader):
 
@@ -24,7 +24,7 @@ def test_detects_language():
     assert not NotebookLoaderForTesting.detect_language(Path("hi"), "stuff")
 
 
-def test_notebook_loader_loads_dependency_with_permission_error(caplog):
+def test_notebook_loader_loads_dependency_with_permission_error(caplog) -> None:
     path = create_autospec(Path)
     path.read_text.side_effect = PermissionError("Permission denied")
     path_lookup = create_autospec(PathLookup)

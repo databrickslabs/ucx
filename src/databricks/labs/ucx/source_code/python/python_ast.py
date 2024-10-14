@@ -36,24 +36,24 @@ T = TypeVar("T", bound=NodeNG)
 class Tree:
 
     @staticmethod
-    def parse(code: str):
+    def parse(code: str) -> Tree:
         root = parse(code)
         return Tree(root)
 
     @classmethod
-    def normalize_and_parse(cls, code: str):
+    def normalize_and_parse(cls, code: str) -> Tree:
         code = cls.normalize(code)
         root = parse(code)
         return Tree(root)
 
     @classmethod
-    def normalize(cls, code: str):
+    def normalize(cls, code: str) -> str:
         code = cls._normalize_indents(code)
         code = cls._convert_magic_lines_to_magic_commands(code)
         return code
 
     @classmethod
-    def _normalize_indents(cls, python_code: str):
+    def _normalize_indents(cls, python_code: str) -> str:
         lines = python_code.split("\n")
         for line in lines:
             # skip leading ws and comments
@@ -72,7 +72,7 @@ class Tree:
         return python_code
 
     @classmethod
-    def _convert_magic_lines_to_magic_commands(cls, python_code: str):
+    def _convert_magic_lines_to_magic_commands(cls, python_code: str) -> str:
         lines = python_code.split("\n")
         magic_markers = {"%", "!"}
         in_multi_line_comment = False
@@ -89,7 +89,7 @@ class Tree:
         return "\n".join(lines)
 
     @classmethod
-    def new_module(cls):
+    def new_module(cls) -> Tree:
         node = Module("root")
         return Tree(node)
 
@@ -97,11 +97,11 @@ class Tree:
         self._node: NodeNG = node
 
     @property
-    def node(self):
+    def node(self) -> NodeNG:
         return self._node
 
     @property
-    def root(self):
+    def root(self) -> NodeNG:
         node = self._node
         while node.parent:
             node = node.parent
@@ -121,7 +121,7 @@ class Tree:
         visitor.visit(self._node)
         return visitor.matched_nodes
 
-    def first_statement(self):
+    def first_statement(self) -> NodeNG | None:
         if isinstance(self._node, Module):
             if len(self._node.body) > 0:
                 return self._node.body[0]
@@ -366,7 +366,7 @@ class TreeHelper(ABC):
         return node.value is None
 
     @classmethod
-    def get_full_attribute_name(cls, node: Attribute) -> str:
+    def get_full_attribute_name(cls, node: Attribute) -> str | None:
         return cls._get_attribute_value(node)
 
     @classmethod
@@ -390,7 +390,7 @@ class TreeHelper(ABC):
         return None
 
     @classmethod
-    def _get_attribute_value(cls, node: Attribute):
+    def _get_attribute_value(cls, node: Attribute) -> str | None:
         if isinstance(node.expr, Name):
             return node.expr.name + '.' + node.attrname
         if isinstance(node.expr, Attribute):
@@ -408,12 +408,12 @@ class TreeHelper(ABC):
 
 class TreeVisitor:
 
-    def visit(self, node: NodeNG):
+    def visit(self, node: NodeNG) -> None:
         self._visit_specific(node)
         for child in node.get_children():
             self.visit(child)
 
-    def _visit_specific(self, node: NodeNG):
+    def _visit_specific(self, node: NodeNG) -> None:
         method_name = "visit_" + type(node).__name__.lower()
         method_slot = getattr(self, method_name, None)
         if callable(method_slot):
@@ -421,7 +421,7 @@ class TreeVisitor:
             return
         self.visit_nodeng(node)
 
-    def visit_nodeng(self, node: NodeNG):
+    def visit_nodeng(self, node: NodeNG) -> None:
         pass
 
 
@@ -434,15 +434,15 @@ class MatchingVisitor(TreeVisitor):
         self._match_nodes = match_nodes
 
     @property
-    def matched_nodes(self):
+    def matched_nodes(self) -> list[NodeNG]:
         return self._matched_nodes
 
-    def visit_assign(self, node: Assign):
+    def visit_assign(self, node: Assign) -> None:
         if self._node_type is not Assign:
             return
         self._matched_nodes.append(node)
 
-    def visit_call(self, node: Call):
+    def visit_call(self, node: Call) -> None:
         if self._node_type is not Call:
             return
         try:
@@ -451,17 +451,17 @@ class MatchingVisitor(TreeVisitor):
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
-    def visit_import(self, node: Import):
+    def visit_import(self, node: Import) -> None:
         if self._node_type is not Import:
             return
         self._matched_nodes.append(node)
 
-    def visit_importfrom(self, node: ImportFrom):
+    def visit_importfrom(self, node: ImportFrom) -> None:
         if self._node_type is not ImportFrom:
             return
         self._matched_nodes.append(node)
 
-    def _matches(self, node: NodeNG, depth: int):
+    def _matches(self, node: NodeNG, depth: int) -> bool:
         if depth >= len(self._match_nodes):
             return False
         if isinstance(node, Call):
@@ -491,7 +491,7 @@ class NodeBase(ABC):
         self._node = node
 
     @property
-    def node(self):
+    def node(self) -> NodeNG:
         return self._node
 
     def __repr__(self):
