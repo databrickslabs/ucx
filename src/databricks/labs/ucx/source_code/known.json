@@ -6879,6 +6879,13 @@
   "joblib": {
     "joblib": []
   },
+  "joblibspark": {
+    "doc": [],
+    "doc.conf": [],
+    "joblibspark": [],
+    "joblibspark.backend": [],
+    "joblibspark.utils": []
+  },
   "johnsnowlabs": {
     "johnsnowlabs": [],
     "johnsnowlabs.abstract_base": [],
