@@ -53,7 +53,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
         return self._session_state.schema
 
     def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
-        for info in SqlExpression(expression).collect_table_infos("hive_metastore", self._session_state):
+        for info in SqlExpression(expression).collect_used_tables("hive_metastore", self._session_state):
             dst = self._index.get(info.schema_name, info.table_name)
             if not dst:
                 return
@@ -70,7 +70,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         try:
             for info in SqlParser.walk_expressions(
-                source_code, lambda e: e.collect_table_infos("hive_metastore", self._session_state)
+                source_code, lambda e: e.collect_used_tables("hive_metastore", self._session_state)
             ):
                 if any(pattern.matches(info.table_name) for pattern in DIRECT_FS_ACCESS_PATTERNS):
                     continue
