@@ -30,7 +30,7 @@ from databricks.labs.ucx.azure.resources import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
-from . import azure_api_client
+from . import azure_api_client as create_azure_api_client
 from .. import DEFAULT_CONFIG
 
 
@@ -680,7 +680,7 @@ def setup_create_uber_principal():
         }
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    api_client = azure_api_client()
+    api_client = create_azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     return w, installation, prompts, azure_resource_permission, api_client
@@ -795,7 +795,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
     }
     location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
     installation = MockInstallation(DEFAULT_CONFIG.copy())
-    api_client = azure_api_client()
+    api_client = create_azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_uber_principal(
