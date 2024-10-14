@@ -30,6 +30,7 @@ from databricks.labs.ucx.azure.resources import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
+from . import azure_api_client
 from .. import DEFAULT_CONFIG
 
 
@@ -649,7 +650,7 @@ def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None
     ws.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
-def setup_create_uber_principal(azure_api_client):
+def setup_create_uber_principal():
     w = create_autospec(WorkspaceClient)
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
@@ -679,13 +680,14 @@ def setup_create_uber_principal(azure_api_client):
         }
     )
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    azure_resources = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
+    api_client = azure_api_client()
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
-    return w, installation, prompts, azure_resource_permission
+    return w, installation, prompts, azure_resource_permission, api_client
 
 
-def test_create_global_spn_cluster_policy_not_found(azure_api_client) -> None:
-    w, _, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_spn_cluster_policy_not_found() -> None:
+    w, _, prompts, azure_resource_permission, _ = setup_create_uber_principal()
     w.cluster_policies.get.side_effect = NotFound()
 
     with pytest.raises(NotFound):
@@ -700,8 +702,8 @@ def test_create_global_spn_cluster_policy_not_found(azure_api_client) -> None:
     w.warehouses.set_workspace_warehouse_config.assert_called_once()
 
 
-def test_create_global_spn(azure_api_client) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_spn() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     azure_resource_permission.create_uber_principal(prompts)
 
     installation.assert_file_written(
@@ -780,11 +782,7 @@ def test_create_global_spn(azure_api_client) -> None:
         (GetWorkspaceWarehouseConfigResponseSecurityPolicy.NONE, SetWorkspaceWarehouseConfigRequestSecurityPolicy.NONE),
     ],
 )
-def test_create_global_spn_set_warehouse_config_security_policy(
-    get_security_policy,
-    set_security_policy,
-    azure_api_client,
-) -> None:
+def test_create_global_spn_set_warehouse_config_security_policy(get_security_policy, set_security_policy) -> None:
     w = create_autospec(WorkspaceClient)
     w.cluster_policies.get.return_value = Policy(definition=json.dumps({"foo": "bar"}))
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
@@ -797,7 +795,8 @@ def test_create_global_spn_set_warehouse_config_security_policy(
     }
     location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
     installation = MockInstallation(DEFAULT_CONFIG.copy())
-    azure_resources = AzureResources(azure_api_client, azure_api_client, include_subscriptions="002")
+    api_client = azure_api_client()
+    azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.create_uber_principal(
         MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
@@ -806,10 +805,8 @@ def test_create_global_spn_set_warehouse_config_security_policy(
     assert w.warehouses.set_workspace_warehouse_config.call_args.kwargs["security_policy"] == set_security_policy
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal(
-    azure_api_client,
-) -> None:
-    _, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_service_principal() -> None:
+    _, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     azure_api_client.post.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -818,8 +815,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
     assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config(azure_api_client) -> None:
-    _, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_save_config() -> None:
+    _, installation, prompts, azure_resource_permission, _ = setup_create_uber_principal()
 
     def raise_permission_denied(*_, **__):
         raise PermissionDenied()
@@ -832,10 +829,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_sa
     assert installation.load(WorkspaceConfig).uber_spn_id is None
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission(
-    azure_api_client,
-) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_apply_storage_permission() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     azure_api_client.put.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -846,8 +841,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_ap
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope(azure_api_client) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_create_scope() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     w.secrets.create_scope.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -863,8 +858,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cr
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret(azure_api_client) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_put_secret() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     w.secrets.put_secret.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -880,10 +875,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_pu
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit(
-    azure_api_client,
-) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_cluster_policies_edit() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     w.cluster_policies.edit.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -899,10 +892,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_cl
     w.secrets.delete_scope.assert_called_with("ucx")
 
 
-def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config(
-    azure_api_client,
-) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_create_global_service_principal_cleans_up_after_permission_denied_on_set_workspace_warehouse_config() -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
     w.warehouses.set_workspace_warehouse_config.side_effect = PermissionDenied
 
     with pytest.raises(PermissionDenied):
@@ -922,8 +913,8 @@ def test_create_global_service_principal_cleans_up_after_permission_denied_on_se
 
 
 @pytest.mark.parametrize("use_backup", [True, False])
-def test_delete_global_service_principal_after_creation(use_backup, azure_api_client) -> None:
-    w, installation, prompts, azure_resource_permission = setup_create_uber_principal(azure_api_client)
+def test_delete_global_service_principal_after_creation(use_backup) -> None:
+    w, installation, prompts, azure_resource_permission, azure_api_client = setup_create_uber_principal()
 
     azure_resource_permission.create_uber_principal(prompts)
     if not use_backup:
