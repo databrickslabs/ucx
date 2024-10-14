@@ -14,6 +14,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
     LocationTrie,
     MountsCrawler,
     TablesInMounts,
+    Mount,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
@@ -153,64 +154,63 @@ def test_mount_inventory_warning_on_incompatible_compute(caplog):
     assert expected_warning in caplog.text
 
 
+def table_factory(args):
+    location, storage_properties = args
+    return Table('', '', '', '', '', location=location, storage_properties=storage_properties)
+
+
 def test_external_locations():
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "storage_properties"]})
-    sql_backend = MockBackend(
-        rows={
-            'SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL': [
-                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
-                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
-                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
-                row_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
-                row_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
-                row_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
-                row_factory(["DatabricksRootmntDatabricksRoot", ""]),
-                row_factory(
-                    [
-                        "jdbc:databricks://",
-                        "[personalAccessToken=*********(redacted), \
-            httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-            dbtable=samples.nyctaxi.trips]",
-                    ]
-                ),
-                row_factory(
-                    [
-                        "jdbc:/MYSQL",
-                        "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
-                port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
-                    ]
-                ),
-                row_factory(
-                    [
-                        "jdbc:providerknown:/",
-                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-                port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
-                provider=providerknown]",
-                    ]
-                ),
-                row_factory(
-                    [
-                        "jdbc:providerknown:/",
-                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-                port=1234, dbtable=sometable2, user=*********(redacted), password=*********(redacted), \
-                provider=providerknown]",
-                    ]
-                ),
-                row_factory(
-                    [
-                        "jdbc:providerunknown:/",
-                        "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
-                port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
-                    ]
-                ),
-            ],
-            r"SELECT \* FROM `hive_metastore`.`test`.`mounts`": [
-                ("/mnt/ucx", "s3://us-east-1-ucx-container"),
-            ],
-        }
-    )
     tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table", ""]),
+        table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
+        table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
+        table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
+        table_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
+        table_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
+        table_factory(["DatabricksRootmntDatabricksRoot", ""]),
+        table_factory(
+            [
+                "jdbc:databricks://",
+                "[personalAccessToken=*********(redacted), \
+    httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
+    dbtable=samples.nyctaxi.trips]",
+            ]
+        ),
+        table_factory(
+            [
+                "jdbc:/MYSQL",
+                "[database=test_db, host=somemysql.us-east-1.rds.amazonaws.com, \
+        port=3306, dbtable=movies, user=*********(redacted), password=*********(redacted)]",
+            ]
+        ),
+        table_factory(
+            [
+                "jdbc:providerknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+        port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted), \
+        provider=providerknown]",
+            ]
+        ),
+        table_factory(
+            [
+                "jdbc:providerknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+        port=1234, dbtable=sometable2, user=*********(redacted), password=*********(redacted), \
+        provider=providerknown]",
+            ]
+        ),
+        table_factory(
+            [
+                "jdbc:providerunknown:/",
+                "[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
+        port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
+            ]
+        ),
+    ]
     mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
+    sql_backend = MockBackend()
     crawler = ExternalLocations(Mock(), sql_backend, "test", tables_crawler, mounts_crawler)
     result_set = crawler.snapshot()
     assert len(result_set) == 7
@@ -233,20 +233,17 @@ TABLE_STORAGE = MockBackend.rows("catalog", "database", "name", "object_type", "
 
 def test_save_external_location_mapping_missing_location():
     ws = create_autospec(WorkspaceClient)
-    sbe = MockBackend(
-        rows={
-            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
-                ("s3://test_location/test1/table1", ""),
-                ("gcs://test_location2/test2/table2", ""),
-                ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
-                ("s3a://test_location_2/test1/table1", ""),
-                ("s3n://test_location_3/test1/table1", ""),
-            ],
-        }
-    )
+    sql_backend = MockBackend()
     tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://test_location/test1/table1", ""]),
+        table_factory(["gcs://test_location2/test2/table2", ""]),
+        table_factory(["abfss://cont1@storagetest1/test2/table3", ""]),
+        table_factory(["s3a://test_location_2/test1/table1", ""]),
+        table_factory(["s3n://test_location_3/test1/table1", ""]),
+    ]
     mounts_crawler = create_autospec(MountsCrawler)
-    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
+    location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test11")]
 
     installation = create_autospec(Installation)
@@ -286,16 +283,14 @@ def test_save_external_location_mapping_missing_location():
 
 def test_save_external_location_mapping_no_missing_location():
     ws = create_autospec(WorkspaceClient)
-    sbe = MockBackend(
-        rows={
-            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
-                ("s3://test_location/test1/table1", ""),
-            ],
-        }
-    )
+    sql_backend = MockBackend()
+
     tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://test_location/test1/table1", ""]),
+    ]
     mounts_crawler = create_autospec(MountsCrawler)
-    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
+    location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
     location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     ws.workspace.upload.assert_not_called()
@@ -303,20 +298,17 @@ def test_save_external_location_mapping_no_missing_location():
 
 def test_match_table_external_locations():
     ws = create_autospec(WorkspaceClient)
-    sbe = MockBackend(
-        rows={
-            "SELECT location, storage_properties FROM `hive_metastore`.`test`.`tables` WHERE location IS NOT NULL": LOCATION_STORAGE[
-                ("s3://test_location/a/b/c/table1", ""),
-                ("s3://test_location/a/b/table1", ""),
-                ("gcs://test_location2/a/b/table2", ""),
-                ("abfss://cont1@storagetest1/a/table3", ""),
-                ("abfss://cont1@storagetest1/a/table4", ""),
-            ],
-        }
-    )
+    sql_backend = MockBackend()
     tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://test_location/a/b/c/table1", ""]),
+        table_factory(["s3://test_location/a/b/table1", ""]),
+        table_factory(["gcs://test_location2/a/b/table2", ""]),
+        table_factory(["abfss://cont1@storagetest1/a/table3", ""]),
+        table_factory(["abfss://cont1@storagetest1/a/table4", ""]),
+    ]
     mounts_crawler = create_autospec(MountsCrawler)
-    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
+    location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/a")]
 
     matching_locations, missing_locations = location_crawler.match_table_external_locations()

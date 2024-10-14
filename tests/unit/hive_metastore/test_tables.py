@@ -478,6 +478,7 @@ def test_in_place_migrate_hiveserde_sql(table, mounts, describe, ddl, expected_h
     )
     dst_table_location = None
     if mounts and table.is_dbfs_mnt:
+        # pylint: disable=mock-no-usage
         mounts_crawler = create_autospec(MountsCrawler)
         mounts_crawler.snapshot.return_value = mounts
         tables_crawler = create_autospec(TablesCrawler)
