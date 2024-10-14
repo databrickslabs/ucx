@@ -6822,6 +6822,19 @@
   "jaraco.functools": {
     "jaraco.functools": []
   },
+  "jax-jumpy": {
+    "jumpy": [],
+    "jumpy._base_fns": [],
+    "jumpy.core": [],
+    "jumpy.lax": [],
+    "jumpy.numpy": [],
+    "jumpy.numpy._factory_fns": [],
+    "jumpy.numpy._transform_data": [],
+    "jumpy.numpy._types": [],
+    "jumpy.numpy.linalg": [],
+    "jumpy.ops": [],
+    "jumpy.random": []
+  },
   "jedi": {
     "jedi": []
   },
