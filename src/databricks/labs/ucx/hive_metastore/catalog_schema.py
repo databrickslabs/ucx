@@ -1,6 +1,6 @@
 import collections
 import logging
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -14,6 +14,21 @@ from databricks.sdk.errors.platform import BadRequest
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Catalog:
+    name: str
+
+
+@dataclass(frozen=True)
+class Schema:
+    name: str
+    catalog_name: str
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.catalog_name}.{self.name}"
 
 
 class CatalogSchema:
@@ -44,7 +59,7 @@ class CatalogSchema:
             properties : (dict[str, str] | None), default None
                 The properties to pass to the catalog. If None, no properties are passed.
         """
-        self._create_catalog_validate(self._ucx_catalog, prompts, properties=properties)
+        self._create_catalog_validate(Catalog(self._ucx_catalog), prompts, properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
@@ -53,10 +68,10 @@ class CatalogSchema:
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 try:
-                    self._create_schema(candidate_catalog, candidate_schema)
+                    self._create_schema(candidate_schema)
                 except BadRequest as e:
                     if "already exists" in str(e):
-                        logger.warning(f"Skipping already existing schema: {candidate_catalog}.{candidate_schema}")
+                        logger.warning(f"Skipping already existing schema: {candidate_schema.full_name}")
                         continue
         self._apply_from_legacy_table_acls()
         self._update_principal_acl()
@@ -145,61 +160,61 @@ class CatalogSchema:
         return src_trg_schema_mapping
 
     def _create_catalog_validate(
-        self, catalog_name: str, prompts: Prompts, *, properties: dict[str, str] | None
+        self,
+        catalog: Catalog,
+        prompts: Prompts,
+        *,
+        properties: dict[str, str] | None,
     ) -> None:
         try:
-            catalog = self._ws.catalogs.get(catalog_name)
+            catalog_info = self._ws.catalogs.get(catalog.name)
         except NotFound:
-            catalog = None
-        if catalog:
-            logger.warning(f"Skipping already existing catalog: {catalog_name}")
+            catalog_info = None
+        if catalog_info:
+            logger.warning(f"Skipping already existing catalog: {catalog_info.name}")
             return
-        logger.info(f"Validating UC catalog: {catalog_name}")
+        logger.info(f"Validating UC catalog: {catalog.name}")
         attempts = 3
         while True:
             catalog_storage = prompts.question(
-                f"Please provide storage location url for catalog: {catalog_name}", default="metastore"
+                f"Please provide storage location url for catalog: {catalog.name}", default="metastore"
             )
             if self._validate_location(catalog_storage):
                 break
             attempts -= 1
             if attempts == 0:
-                raise NotFound(f"Failed to validate location for catalog: {catalog_name}")
-        self._create_catalog(catalog_name, catalog_storage, properties=properties)
+                raise NotFound(f"Failed to validate location for catalog: {catalog.name}")
+        self._create_catalog(catalog, catalog_storage, properties=properties)
 
-    def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
+    def _list_existing(self) -> tuple[set[Catalog], dict[Catalog, set[Schema]]]:
         """generate a list of existing UC catalogs and schema."""
         logger.info("Listing existing UC catalogs and schemas")
-        existing_catalogs: set[str] = set()
+        existing_catalogs = set()
         for catalog_info in self._ws.catalogs.list():
             if catalog_info.name:
-                existing_catalogs.add(catalog_info.name)
+                existing_catalogs.add(Catalog(catalog_info.name))
 
-        existing_schemas: dict[str, set[str]] = {}  # catalog -> set[schema]
+        existing_schemas = collections.defaultdict(set)
         for catalog in existing_catalogs:
-            existing_schemas[catalog] = set()
-            for schema in self._ws.schemas.list(catalog, max_results=0):
+            for schema in self._ws.schemas.list(catalog.name, max_results=0):
                 if schema.name:
-                    existing_schemas[catalog].add(schema.name)
+                    existing_schemas[catalog].add(Schema(schema.name, catalog.name))
 
         return existing_catalogs, existing_schemas
 
-    def _list_target(self) -> tuple[set[str], dict[str, set[str]]]:
+    def _list_target(self) -> tuple[set[Catalog], dict[Catalog, set[Schema]]]:
         """generate a list of catalogs and schema to be created from table mappings."""
-        target_catalogs: set[str] = set()
-        target_schemas: dict[str, set[str]] = {}  # catalog -> set[schema]
+        target_catalogs = set()
+        target_schemas = collections.defaultdict(set)
         table_mappings = self._table_mapping.load()
         for mappings in table_mappings:
-            target_catalog = mappings.catalog_name
-            target_schema = mappings.dst_schema
+            target_catalog = Catalog(name=mappings.catalog_name)
+            target_schema = Schema(mappings.dst_schema, mappings.catalog_name)
             target_catalogs.add(target_catalog)
-            if target_catalog not in target_schemas:
-                target_schemas[target_catalog] = {target_schema}
-                continue
             target_schemas[target_catalog].add(target_schema)
         return target_catalogs, target_schemas
 
-    def _get_missing_catalogs_schemas(self) -> tuple[set[str], dict[str, set[str]]]:
+    def _get_missing_catalogs_schemas(self) -> tuple[set[Catalog], dict[Catalog, set[Schema]]]:
         """prepare a list of catalogs and schema to be created"""
         existing_catalogs, existing_schemas = self._list_existing()
         target_catalogs, target_schemas = self._list_target()
@@ -213,6 +228,7 @@ class CatalogSchema:
         for catalog, schemas in existing_schemas.items():
             if catalog in target_schemas:
                 target_schemas[catalog] = target_schemas[catalog] - schemas
+
         return target_catalogs, target_schemas
 
     def _validate_location(self, location: str) -> bool:
@@ -229,18 +245,18 @@ class CatalogSchema:
         logger.warning(f"No matching external location found for: {location}")
         return False
 
-    def _create_catalog(self, catalog: str, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
-        logger.info(f"Creating UC catalog: {catalog}")
+    def _create_catalog(self, catalog: Catalog, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
+        logger.info(f"Creating UC catalog: {catalog.name}")
         if catalog_storage == "metastore":
-            self._ws.catalogs.create(catalog, comment="Created by UCX", properties=properties)
+            self._ws.catalogs.create(catalog.name, comment="Created by UCX", properties=properties)
         else:
             self._ws.catalogs.create(
-                catalog,
+                catalog.name,
                 storage_root=catalog_storage,
                 comment="Created by UCX",
                 properties=properties,
             )
 
-    def _create_schema(self, catalog, schema):
-        logger.info(f"Creating UC schema: {schema} in catalog: {catalog}")
-        self._ws.schemas.create(schema, catalog, comment="Created by UCX")
+    def _create_schema(self, schema: Schema) -> None:
+        logger.info(f"Creating UC schema: {schema.full_name}")
+        self._ws.schemas.create(schema.name, schema.catalog_name, comment="Created by UCX")
