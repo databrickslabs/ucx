@@ -6607,6 +6607,21 @@
     "importlib_metadata.compat.py39": [],
     "importlib_metadata.diagnose": []
   },
+  "importlib_resources": {
+    "importlib_resources": [],
+    "importlib_resources._adapters": [],
+    "importlib_resources._common": [],
+    "importlib_resources._functional": [],
+    "importlib_resources._itertools": [],
+    "importlib_resources.abc": [],
+    "importlib_resources.compat": [],
+    "importlib_resources.compat.py38": [],
+    "importlib_resources.compat.py39": [],
+    "importlib_resources.future": [],
+    "importlib_resources.future.adapters": [],
+    "importlib_resources.readers": [],
+    "importlib_resources.simple": []
+  },
   "iniconfig": {
     "iniconfig": []
   },
