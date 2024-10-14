@@ -71,7 +71,11 @@ class LocalFile(SourceContainer):
 class Folder(SourceContainer):
 
     def __init__(
-        self, path: Path, notebook_loader: NotebookLoader, file_loader: FileLoader, folder_loader: FolderLoader
+        self,
+        path: Path,
+        notebook_loader: NotebookLoader,
+        file_loader: FileLoader,
+        folder_loader: FolderLoader,
     ):
         self._path = path
         self._notebook_loader = notebook_loader
@@ -340,7 +344,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return None
 
     @staticmethod
-    def _fail(code: str, message: str):
+    def _fail(code: str, message: str) -> MaybeDependency:
         return MaybeDependency(None, [DependencyProblem(code, message)])
 
     def __repr__(self):

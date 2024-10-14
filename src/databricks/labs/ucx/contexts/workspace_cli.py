@@ -18,6 +18,7 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
+from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -27,6 +28,8 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
+
+# pylint: disable=too-many-public-methods
 
 
 class WorkspaceContext(CliContext):
@@ -115,6 +118,7 @@ class WorkspaceContext(CliContext):
                 self.external_locations,
                 self.aws_resource_permissions,
                 self.principal_acl,
+                self.config.enable_hms_federation,
             )
         if self.is_azure:
             return ExternalLocationsMigration(
@@ -123,6 +127,7 @@ class WorkspaceContext(CliContext):
                 self.azure_resource_permissions,
                 self.azure_resources,
                 self.principal_acl,
+                self.config.enable_hms_federation,
             )
         raise NotImplementedError
 
@@ -184,6 +189,19 @@ class WorkspaceContext(CliContext):
     @cached_property
     def progress_tracking_installation(self) -> ProgressTrackingInstallation:
         return ProgressTrackingInstallation(self.sql_backend, self.config.ucx_catalog)
+
+    @cached_property
+    def federation_enabler(self):
+        return HiveMetastoreFederationEnabler(self.installation)
+
+    @cached_property
+    def federation(self):
+        return HiveMetastoreFederation(
+            self.workspace_client,
+            self.external_locations,
+            self.workspace_info,
+            self.config.enable_hms_federation,
+        )
 
 
 class LocalCheckoutContext(WorkspaceContext):

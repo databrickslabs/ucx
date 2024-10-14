@@ -646,6 +646,17 @@ def migrate_tables(
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     for workspace_context in workspace_contexts:
         deployed_workflows = workspace_context.deployed_workflows
+
+        try:
+            workspace_context.verify_progress_tracking.verify()
+        except RuntimeWarning:
+            logger.warning(
+                "We couldn't detect a successful run of the assessment workflow."
+                "The assessment workflow is a prerequisite for the migrate-tables workflow."
+                "It can be run by using the `ensure-assessment-run` command."
+            )
+            return
+
         deployed_workflows.run_workflow("migrate-tables")
 
         tables = list(workspace_context.tables_crawler.snapshot())
@@ -799,6 +810,21 @@ def export_assessment(w: WorkspaceClient, prompts: Prompts):
     ctx = WorkspaceContext(w)
     exporter = ctx.assessment_exporter
     exporter.export_results(prompts)
+
+
+@ucx.command
+def create_federated_catalog(w: WorkspaceClient, _: Prompts):
+    """(Experimental) Create federated catalog from current workspace Hive Metastore."""
+    ctx = WorkspaceContext(w)
+    ctx.federation.register_internal_hms_as_federated_catalog()
+
+
+@ucx.command
+def enable_hms_federation(w: WorkspaceClient, _: Prompts, ctx: WorkspaceContext | None = None):
+    """(Experimental) Create federated catalog from current workspace Hive Metastore."""
+    if not ctx:
+        ctx = WorkspaceContext(w)
+    ctx.federation_enabler.enable()
 
 
 if __name__ == "__main__":

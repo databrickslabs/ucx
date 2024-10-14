@@ -27,36 +27,37 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_notebook_migrator_ignores_unsupported_extensions():
+def test_notebook_migrator_ignores_unsupported_extensions() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
-def test_file_migrator_fix_ignores_unsupported_extensions():
+def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
-def test_file_migrator_fix_ignores_unsupported_language():
+def test_file_migrator_fix_ignores_unsupported_language() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
-    migrator._extensions[".py"] = None  # pylint: disable=protected-access
+    migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
     path = Path('unsupported.py')
-    assert not migrator.apply(path)
+    with pytest.raises(ValueError):
+        assert not migrator.apply(path)
 
 
-def test_file_migrator_fix_reads_supported_extensions(migration_index):
+def test_file_migrator_fix_reads_supported_extensions(migration_index) -> None:
     languages = LinterContext(migration_index)
     migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
     assert not migrator.apply(path)
 
 
-def test_file_migrator_supported_language_no_diagnostics():
+def test_file_migrator_supported_language_no_diagnostics() -> None:
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = []
     migrator = LocalFileMigrator(lambda: languages)
@@ -65,14 +66,14 @@ def test_file_migrator_supported_language_no_diagnostics():
     languages.fixer.assert_not_called()
 
 
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup):
+def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
     path = mock_path_lookup.resolve(Path("root1.run.py"))
     assert not migrator.apply(path)
 
 
-def test_migrator_supported_language_no_fixer():
+def test_migrator_supported_language_no_fixer() -> None:
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer.return_value = None
@@ -82,7 +83,7 @@ def test_migrator_supported_language_no_fixer():
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
 
 
-def test_migrator_supported_language_with_fixer(tmpdir):
+def test_migrator_supported_language_with_fixer(tmpdir) -> None:
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
@@ -93,7 +94,7 @@ def test_migrator_supported_language_with_fixer(tmpdir):
     assert path.read_text("utf-8") == "Hi there!"
 
 
-def test_migrator_walks_directory():
+def test_migrator_walks_directory() -> None:
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer.return_value = None
@@ -161,7 +162,7 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -
     ]
 
 
-def test_triple_dot_import():
+def test_triple_dot_import() -> None:
     file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
@@ -169,11 +170,12 @@ def test_triple_dot_import():
 
     maybe = file_resolver.resolve_import(path_lookup, "...foo")
     assert not maybe.problems
+    assert maybe.dependency is not None
     assert maybe.dependency.path == Path('/some/path/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/../../foo.py'))
 
 
-def test_single_dot_import():
+def test_single_dot_import() -> None:
     file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
@@ -181,11 +183,12 @@ def test_single_dot_import():
 
     maybe = file_resolver.resolve_import(path_lookup, ".foo")
     assert not maybe.problems
+    assert maybe.dependency is not None
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
 
 
-def test_folder_has_repr():
+def test_folder_has_repr() -> None:
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
@@ -199,7 +202,7 @@ site_packages = locate_site_packages()
 @pytest.mark.parametrize(
     "path", [Path("/Users/eric.vergnaud/development/ucx/.venv/lib/python3.10/site-packages/spacy/pipe_analysis.py")]
 )
-def test_known_issues(path: Path, migration_index):
+def test_known_issues(path: Path, migration_index) -> None:
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()

@@ -80,12 +80,14 @@ class KnownList:
             self._module_problems[name] = []
 
     @staticmethod
-    def _get_known():
+    def _get_known() -> dict[str, dict[str, list[dict[str, str]]]]:
         module = __name__
         if __name__ == "__main__":  # code path for UCX developers invoking `make known`
             module = "databricks.labs.ucx.source_code.known"
         # load known.json from package data, because we may want to use zipapp packaging
         data = pkgutil.get_data(module, "known.json")
+        if not data:
+            raise FileNotFoundError("known.json not found")
         return json.loads(data)
 
     def module_compatibility(self, name: str) -> Compatibility:
@@ -109,7 +111,7 @@ class KnownList:
         return Compatibility(True, problems)
 
     @staticmethod
-    def _cleanup_name(name):
+    def _cleanup_name(name) -> str:
         """parses the name to extract the library name, e.g. "numpy==1.21.0" -> "numpy",
         and "dist/databricks_labs_ucx-0.24.0-py3-none-any.whl" -> "databricks-labs-ucx"
 
@@ -126,7 +128,7 @@ class KnownList:
         return name
 
     @classmethod
-    def rebuild(cls, root: Path):
+    def rebuild(cls, root: Path) -> None:
         """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
         try:
@@ -149,7 +151,7 @@ class KnownList:
             logger.info(f"Updated known distributions: {known_json.relative_to(Path.cwd())}")
 
     @classmethod
-    def _analyze_dist_info(cls, dist_info_folder, known_distributions, library_root):
+    def _analyze_dist_info(cls, dist_info_folder, known_distributions, library_root) -> None:
         dist_info = DistInfo(dist_info_folder)
         if dist_info.name in known_distributions:
             logger.debug(f"Skipping distribution: {dist_info.name}")
@@ -168,7 +170,7 @@ class KnownList:
                 continue
 
     @classmethod
-    def _analyze_file(cls, known_distributions, library_root, dist_info, module_path):
+    def _analyze_file(cls, known_distributions, library_root, dist_info, module_path) -> None:
         empty_index = TableMigrationIndex([])
         relative_path = module_path.relative_to(library_root)
         module_ref = relative_path.as_posix().replace('/', '.')
@@ -216,7 +218,7 @@ class DistInfo:
             return email.message_from_file(f)
 
     @property
-    def name(self):
+    def name(self) -> str:
         name = self._metadata.get('Name', 'unknown')
         return name.lower()
 

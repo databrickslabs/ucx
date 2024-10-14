@@ -113,7 +113,9 @@ S3FS_DEPRECATION_MESSAGE = (
         ("", []),
     ],
 )
-def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem], tmp_path, mock_path_lookup):
+def test_detect_s3fs_import(
+    empty_index, source: str, expected: list[DependencyProblem], tmp_path, mock_path_lookup
+) -> None:
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
     mock_path_lookup.append_path(tmp_path)
@@ -150,7 +152,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
 )
 def test_detect_s3fs_import_in_dependencies(
     empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
-):
+) -> None:
     file_loader = FileLoader()
     allow_list = KnownList()
     import_resolver = ImportFileResolver(file_loader, allow_list)

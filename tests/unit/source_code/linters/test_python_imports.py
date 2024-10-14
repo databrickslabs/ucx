@@ -13,12 +13,12 @@ from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAna
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 
-def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
+def test_linter_returns_empty_list_of_dbutils_notebook_run_calls() -> None:
     tree = Tree.parse('')
     assert not DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
 
 
-def test_linter_returns_list_of_dbutils_notebook_run_calls():
+def test_linter_returns_list_of_dbutils_notebook_run_calls() -> None:
     code = """
 dbutils.notebook.run("stuff")
 for i in z:
@@ -29,32 +29,32 @@ for i in z:
     assert {"toto", "stuff"} == {str(call.node.args[0].value) for call in calls}
 
 
-def test_linter_returns_empty_list_of_imports():
+def test_linter_returns_empty_list_of_imports() -> None:
     tree = Tree.parse('')
     assert not ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]
 
 
-def test_linter_returns_import():
+def test_linter_returns_import() -> None:
     tree = Tree.parse('import x')
     assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
-def test_linter_returns_import_from():
+def test_linter_returns_import_from() -> None:
     tree = Tree.parse('from x import z')
     assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
-def test_linter_returns_import_module():
+def test_linter_returns_import_module() -> None:
     tree = Tree.parse('importlib.import_module("x")')
     assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
-def test_linter_returns__import__():
+def test_linter_returns__import__() -> None:
     tree = Tree.parse('importlib.__import__("x")')
     assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem.from_node)[0]]
 
 
-def test_linter_returns_appended_absolute_paths():
+def test_linter_returns_appended_absolute_paths() -> None:
     code = """
 import sys
 sys.path.append("absolute_path_1")
@@ -65,7 +65,7 @@ sys.path.append("absolute_path_2")
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
-def test_linter_returns_appended_absolute_paths_with_sys_alias():
+def test_linter_returns_appended_absolute_paths_with_sys_alias() -> None:
     code = """
 import sys as stuff
 stuff.path.append("absolute_path_1")
@@ -76,7 +76,7 @@ stuff.path.append("absolute_path_2")
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
-def test_linter_returns_appended_absolute_paths_with_sys_path_alias():
+def test_linter_returns_appended_absolute_paths_with_sys_path_alias() -> None:
     code = """
 from sys import path as stuff
 stuff.append("absolute_path")
@@ -86,7 +86,7 @@ stuff.append("absolute_path")
     assert "absolute_path" in [p.path for p in appended]
 
 
-def test_linter_returns_appended_relative_paths():
+def test_linter_returns_appended_relative_paths() -> None:
     code = """
 import sys
 import os
@@ -97,7 +97,7 @@ sys.path.append(os.path.abspath("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_linter_returns_appended_relative_paths_with_os_alias():
+def test_linter_returns_appended_relative_paths_with_os_alias() -> None:
     code = """
 import sys
 import os as stuff
@@ -108,7 +108,7 @@ sys.path.append(stuff.path.abspath("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_linter_returns_appended_relative_paths_with_os_path_alias():
+def test_linter_returns_appended_relative_paths_with_os_path_alias() -> None:
     code = """
 import sys
 from os import path as stuff
@@ -119,7 +119,7 @@ sys.path.append(stuff.abspath("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_linter_returns_appended_relative_paths_with_os_path_abspath_import():
+def test_linter_returns_appended_relative_paths_with_os_path_abspath_import() -> None:
     code = """
 import sys
 from os.path import abspath
@@ -130,7 +130,7 @@ sys.path.append(abspath("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_linter_returns_appended_relative_paths_with_os_path_abspath_alias():
+def test_linter_returns_appended_relative_paths_with_os_path_abspath_alias() -> None:
     code = """
 import sys
 from os.path import abspath as stuff
@@ -141,7 +141,7 @@ sys.path.append(stuff("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_linter_returns_inferred_paths():
+def test_linter_returns_inferred_paths() -> None:
     code = """
 import sys
 path = "absolute_path_1"

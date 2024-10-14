@@ -38,7 +38,7 @@ from tests.unit import (
         (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
     ],
 )
-def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
+def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -> None:
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
@@ -66,7 +66,7 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
         (["simulate-sys-path", "via-sys-path", "import_file_2.py"], 2),
     ],
 )
-def test_locates_files(source: list[str], expected: int):
+def test_locates_files(source: list[str], expected: int) -> None:
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     file_path = Path(*elems)
@@ -84,7 +84,7 @@ def test_locates_files(source: list[str], expected: int):
     assert len(maybe.graph.all_dependencies) == expected
 
 
-def test_locates_notebooks_with_absolute_path():
+def test_locates_notebooks_with_absolute_path() -> None:
     with TemporaryDirectory() as parent_dir:
         parent_dir_path = Path(parent_dir)
         child_dir_path = Path(parent_dir_path, "some_folder")
@@ -124,7 +124,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         assert len(all_paths) == 2
 
 
-def test_locates_files_with_absolute_path():
+def test_locates_files_with_absolute_path() -> None:
     with TemporaryDirectory() as parent_dir:
         parent_dir_path = Path(parent_dir)
         child_dir_path = Path(parent_dir_path, "some_folder")
@@ -163,7 +163,7 @@ def func():
         assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}
 
 
-def test_path_lookup_skips_resolving_within_file_library(tmp_path):
+def test_path_lookup_skips_resolving_within_file_library(tmp_path) -> None:
     file = tmp_path / "file.py"
     file.touch()
 
@@ -177,7 +177,7 @@ def test_path_lookup_skips_resolving_within_file_library(tmp_path):
         assert True
 
 
-def test_path_lookup_skips_resolving_non_existing_library(tmp_path):
+def test_path_lookup_skips_resolving_non_existing_library(tmp_path) -> None:
     library = tmp_path / "non-existing-library"
 
     lookup = PathLookup(Path.cwd(), [library])
@@ -190,7 +190,7 @@ def test_path_lookup_skips_resolving_non_existing_library(tmp_path):
         assert True
 
 
-def test_path_lookup_resolves_egg_package(tmp_path):
+def test_path_lookup_resolves_egg_package(tmp_path) -> None:
     egg_library = tmp_path / "library.egg"
     egg_library.mkdir()
     (egg_library / "EGG-INFO").touch()
@@ -204,7 +204,7 @@ def test_path_lookup_resolves_egg_package(tmp_path):
     assert resolved_path == package_path
 
 
-def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path):
+def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path) -> None:
     # Missing egg-info
     egg_library = tmp_path / "library.egg"
     egg_library.mkdir()
@@ -218,7 +218,7 @@ def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path):
     assert resolved_path is None
 
 
-def test_path_lookup_skips_resolving_egg_files(tmp_path):
+def test_path_lookup_skips_resolving_egg_files(tmp_path) -> None:
     egg_library = tmp_path / "library.egg"
     egg_library.touch()
 
@@ -236,7 +236,7 @@ def raise_permission_error():
     raise PermissionError("Can't access path")
 
 
-def test_path_lookup_raises_permission_error_for_path():
+def test_path_lookup_raises_permission_error_for_path() -> None:
     path = create_autospec(Path)
     path.is_absolute.side_effect = raise_permission_error
 
@@ -247,7 +247,7 @@ def test_path_lookup_raises_permission_error_for_path():
     path.is_absolute.assert_called_once()
 
 
-def test_path_lookup_raises_permission_error_for_library_root():
+def test_path_lookup_raises_permission_error_for_library_root() -> None:
     library_root = create_autospec(Path)
     library_root.is_dir.side_effect = raise_permission_error
 
