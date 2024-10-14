@@ -6,7 +6,7 @@ from collections.abc import Callable, ValuesView
 from dataclasses import dataclass
 from functools import partial, wraps
 from datetime import timedelta
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, Literal, ParamSpec, TypeVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -110,7 +110,7 @@ class StoragePermissionMapping:
     principal: str
     privilege: str
     type: str
-    default_network_action: str = "Unknown"  # "Deny", "Allow" or "Unknown"
+    default_network_action: Literal["Unknown", "Deny", "Allow"] = "Unknown"
     # Need this directory_id/tenant_id when create UC storage credentials using service principal
     directory_id: str | None = None
 
