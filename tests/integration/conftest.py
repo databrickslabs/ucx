@@ -44,7 +44,7 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
@@ -357,7 +357,7 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
         return self._spn_infos
 
 
-class StaticMountCrawler(Mounts):
+class StaticMountCrawler(MountsCrawler):
     def __init__(
         self,
         mounts: list[Mount],

@@ -477,7 +477,7 @@ def test_in_place_migrate_hiveserde_sql(table, mounts, describe, ddl, expected_h
     )
     dst_table_location = None
     if mounts and table.is_dbfs_mnt:
-        dst_table_location = ExternalLocations.resolve_mount(table.location, mounts)
+        dst_table_location = ExternalLocations.resolve_mount(table.location)
 
     hiveserde_type = table.hiveserde_type(sql_backend)
     assert hiveserde_type == expected_hiveserde_type

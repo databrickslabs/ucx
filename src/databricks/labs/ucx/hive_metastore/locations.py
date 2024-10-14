@@ -9,7 +9,6 @@ from typing import ClassVar, Optional
 from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
-from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -17,7 +16,7 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.dbutils import FileInfo
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +28,6 @@ _EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss")
 class ExternalLocation:
     location: str
     table_count: int
-
-
-@dataclass(unsafe_hash=True)
-class Mount:
-    name: str
-    source: str
 
 
 # Union with string is invalid syntax: "LocationTrie" | None
@@ -116,19 +109,36 @@ class LocationTrie:
 class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        sbe: SqlBackend,
+        schema: str,
+        tables_crawler: TablesCrawler,
+        mounts_crawler: 'MountsCrawler',
+    ):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
+        self._tables_crawler = tables_crawler
+        self._mounts_crawler = mounts_crawler
 
-    def _external_locations(self, tables: list[Row], mounts) -> Iterable[ExternalLocation]:
+    @cached_property
+    def _mounts_snapshot(self) -> list['Mount']:
+        """Returns all mounts, sorted by longest prefixes first."""
+        return sorted(self._mounts_crawler.snapshot(), key=lambda _: len(_.name), reverse=True)
+
+    def _external_locations(self) -> Iterable[ExternalLocation]:
         min_slash = 2
         external_locations: list[ExternalLocation] = []
-        for table in tables:
+        for table in self._tables_crawler.snapshot():
             location = table.location
             if not location:
                 continue
+            # TODO: refactor this with LocationTrie
             if location.startswith("dbfs:/mnt"):
-                location = self.resolve_mount(location, mounts)
+                location = self.resolve_mount(location)
+            if not location:
+                continue
             if (
                 not location.startswith("dbfs")
                 and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
@@ -139,12 +149,16 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 self._add_jdbc_location(external_locations, location, table)
         return external_locations
 
-    @staticmethod
-    def resolve_mount(location, mounts):
-        for mount in mounts:
-            if location[5:].startswith(mount.name.lower()):
-                location = location[5:].replace(mount.name, mount.source)
-                break
+    def resolve_mount(self, location: str | None) -> str | None:
+        if not location:
+            return None
+        for mount in self._mounts_snapshot:
+            prefix = mount.as_scheme_prefix()
+            if location.startswith(prefix):
+                logger.debug(f"Replacing location {prefix} with {mount.source} in {location}")
+                location.replace(prefix, mount.source)
+                return location
+        logger.debug(f"Mount not found for location {location}. Skipping replacement.")
         return location
 
     @staticmethod
@@ -202,14 +216,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             external_locations.append(ExternalLocation(jdbc_location, 1))
 
     def _crawl(self) -> Iterable[ExternalLocation]:
-        tables_identifier = escape_sql_identifier(f"{self._catalog}.{self._schema}.tables")
-        tables = list(
-            self._backend.fetch(
-                f"SELECT location, storage_properties FROM {tables_identifier} WHERE location IS NOT NULL"
-            )
-        )
-        mounts = Mounts(self._backend, self._ws, self._schema).snapshot()
-        return self._external_locations(list(tables), list(mounts))
+        return self._external_locations()
 
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
@@ -299,7 +306,16 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return None
 
 
-class Mounts(CrawlerBase[Mount]):
+@dataclass(unsafe_hash=True)
+class Mount:
+    name: str
+    source: str
+
+    def as_scheme_prefix(self) -> str:
+        return f'dbfs:{self.name}'  # dbfs:/mnt/mount-name
+
+
+class MountsCrawler(CrawlerBase[Mount]):
     def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
@@ -362,14 +378,14 @@ class TablesInMounts(CrawlerBase[Table]):
         backend: SqlBackend,
         ws: WorkspaceClient,
         inventory_database: str,
-        mc: Mounts,
+        mounts_crawler: MountsCrawler,
         include_mounts: list[str] | None = None,
         exclude_paths_in_mount: list[str] | None = None,
         include_paths_in_mount: list[str] | None = None,
     ):
         super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
-        self._mounts_crawler = mc
+        self._mounts_crawler = mounts_crawler
         self._include_mounts = include_mounts
         self._ws = ws
         self._include_paths_in_mount = include_paths_in_mount

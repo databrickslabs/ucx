@@ -25,7 +25,7 @@ from databricks.labs.ucx.assessment.azure import (
     ServicePrincipalClusterMapping,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore import MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL, ComputeLocations
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -149,7 +149,7 @@ def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
         ),
     ]
     table_crawler.snapshot.return_value = tables
-    mount_crawler = create_autospec(Mounts)
+    mount_crawler = create_autospec(MountsCrawler)
     mount_crawler.snapshot.return_value = [
         Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1'),
         Mount('/mnt/folder5', 's3://storage5/folder5'),

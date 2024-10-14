@@ -12,10 +12,10 @@ from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
     LocationTrie,
-    Mounts,
+    MountsCrawler,
     TablesInMounts,
 )
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 
 @pytest.mark.parametrize(
@@ -84,7 +84,7 @@ def test_mounts_inventory_should_contain_mounts_without_encryption_type():
     ]
 
     backend = MockBackend()
-    instance = Mounts(backend, client, "test")
+    instance = MountsCrawler(backend, client, "test")
 
     instance.snapshot()
 
@@ -104,7 +104,7 @@ def test_mounts_inventory_should_contain_deduped_mounts_without_encryption_type(
     ]
 
     backend = MockBackend()
-    instance = Mounts(backend, client, "test")
+    instance = MountsCrawler(backend, client, "test")
 
     instance.snapshot()
 
@@ -127,7 +127,7 @@ def test_mounts_inventory_should_contain_deduped_mounts_without_variable_volume_
     ]
 
     backend = MockBackend()
-    instance = Mounts(backend, client, "test")
+    instance = MountsCrawler(backend, client, "test")
 
     instance.snapshot()
 
@@ -145,7 +145,7 @@ def test_mount_inventory_warning_on_incompatible_compute(caplog):
         "Blah Blah com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted"
     )
     backend = MockBackend()
-    instance = Mounts(backend, client, "test")
+    instance = MountsCrawler(backend, client, "test")
 
     instance.snapshot()
 
@@ -209,7 +209,9 @@ def test_external_locations():
             ],
         }
     )
-    crawler = ExternalLocations(Mock(), sql_backend, "test")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    crawler = ExternalLocations(Mock(), sql_backend, "test", tables_crawler, mounts_crawler)
     result_set = crawler.snapshot()
     assert len(result_set) == 7
     assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
@@ -242,7 +244,9 @@ def test_save_external_location_mapping_missing_location():
             ],
         }
     )
-    location_crawler = ExternalLocations(ws, sbe, "test")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test11")]
 
     installation = create_autospec(Installation)
@@ -289,7 +293,9 @@ def test_save_external_location_mapping_no_missing_location():
             ],
         }
     )
-    location_crawler = ExternalLocations(ws, sbe, "test")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
     location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     ws.workspace.upload.assert_not_called()
@@ -308,7 +314,9 @@ def test_match_table_external_locations():
             ],
         }
     )
-    location_crawler = ExternalLocations(ws, sbe, "test")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location_crawler = ExternalLocations(ws, sbe, "test", tables_crawler, mounts_crawler)
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/a")]
 
     matching_locations, missing_locations = location_crawler.match_table_external_locations()
@@ -342,7 +350,7 @@ def test_mount_listing_multiple_folders():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
@@ -381,7 +389,7 @@ def test_mount_listing_sub_folders():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
@@ -422,7 +430,7 @@ def test_partitioned_parquet_layout():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
@@ -479,7 +487,7 @@ def test_partitioned_delta():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 2
     assert results[0].table_format == "DELTA"
@@ -512,7 +520,7 @@ def test_filtering_irrelevant_paths():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     crawler = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"])
     results = crawler.snapshot(force_refresh=True)
     assert results == [
@@ -546,7 +554,7 @@ def test_filter_irrelevant_mounts():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     crawler = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"])
     results = crawler.snapshot(force_refresh=True)
 
@@ -584,7 +592,7 @@ def test_historical_data_should_be_overwritten() -> None:
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert backend.rows_written_for("hive_metastore.test.tables", "overwrite") == [
         Row(
@@ -639,7 +647,7 @@ def test_mount_include_paths():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     crawler = TablesInMounts(backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"])
     results = crawler.snapshot(force_refresh=True)
     assert results == [
@@ -677,7 +685,7 @@ def test_mount_listing_csv_json():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
@@ -727,7 +735,7 @@ def test_mount_listing_seen_tables():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
+    mounts = MountsCrawler(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 3
     assert results[0].location == "adls://bucket/table1"

@@ -28,7 +28,7 @@ from databricks.labs.ucx.azure.resources import (
     StorageAccount,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, MountsCrawler
 
 from . import azure_api_client as create_azure_api_client
 from .. import DEFAULT_CONFIG
@@ -38,7 +38,9 @@ def test_save_spn_permissions_no_external_table(caplog):
     w = create_autospec(WorkspaceClient)
     rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": []}
     backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     azure_resources.storage_accounts.return_value = []
@@ -58,7 +60,9 @@ def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
     rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
     backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
@@ -80,7 +84,9 @@ def test_save_spn_permissions_no_azure_storage_account():
         ]
     }
     backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
@@ -630,7 +636,9 @@ def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None
             }
         }
     )
-    location = ExternalLocations(ws, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location = ExternalLocations(ws, backend, "ucx", tables_crawler, mounts_crawler)
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, ws, azure_resources, location)
     azure_resources.storage_accounts.return_value = []  # No storage accounts listed
@@ -793,7 +801,9 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
             ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
         ]
     }
-    location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location = ExternalLocations(w, MockBackend(rows=rows), "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation(DEFAULT_CONFIG.copy())
     api_client = create_azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")

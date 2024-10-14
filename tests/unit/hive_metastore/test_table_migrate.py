@@ -10,9 +10,8 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
-from databricks.labs.ucx.hive_metastore.locations import Mount
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -50,6 +49,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -57,6 +57,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
@@ -83,6 +84,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         not in backend.queries
     )
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
 
 def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
@@ -101,6 +103,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     table_mapping = mock_table_mapping(["dbfs_parquet"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -108,10 +111,12 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
     assert (
         "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` "
@@ -137,6 +142,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -144,10 +150,12 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_external_tables_should_produce_proper_queries(ws):
@@ -159,6 +167,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     table_mapping = mock_table_mapping(["external_src"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -166,10 +175,12 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
     assert backend.queries == [
         "SYNC TABLE `ucx_default`.`db1_dst`.`external_dst` FROM `hive_metastore`.`db1_src`.`external_src`;",
@@ -190,6 +201,7 @@ def test_migrate_managed_table_as_external_tables_without_conversion(ws):
     table_mapping = mock_table_mapping(["managed_other"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -197,10 +209,12 @@ def test_migrate_managed_table_as_external_tables_without_conversion(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="SYNC_AS_EXTERNAL")
 
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
     assert backend.queries == [
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` AS EXTERNAL FROM `hive_metastore`.`db1_src`.`managed_other`;",
@@ -221,6 +235,7 @@ def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(w
     table_mapping = mock_table_mapping(["managed_other"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -228,10 +243,12 @@ def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(w
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CLONE")
 
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
     assert backend.queries == [
         "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_other` AS SELECT * FROM `hive_metastore`.`db1_src`.`managed_other`",
@@ -257,6 +274,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     table_mapping = mock_table_mapping(["external_src"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -264,10 +282,12 @@ def test_migrate_external_table_failed_sync(ws, caplog):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_called()
 
 
 @pytest.mark.parametrize(
@@ -361,9 +381,15 @@ def test_migrate_external_hiveserde_table_in_place(
     table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping(["external_hiveserde"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    mount_crawler = create_autospec(Mounts)
-    mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+
+    def resolve_mount(location: str) -> str:
+        if location.startswith("dbfs:/mnt/test"):
+            return location.replace("dbfs:/mnt/test", "s3://test/folder")
+        return location
+
+    external_locations.resolve_mount = resolve_mount
 
     table_migrate = TablesMigrator(
         table_crawler,
@@ -372,11 +398,11 @@ def test_migrate_external_hiveserde_table_in_place(
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
 
     table_migrate.migrate_tables(
         what=What.EXTERNAL_HIVESERDE,
-        mounts_crawler=mount_crawler,
         hiveserde_in_place_migrate=hiveserde_in_place_migrate,
     )
 
@@ -385,6 +411,7 @@ def test_migrate_external_hiveserde_table_in_place(
         migrate_grants.apply.assert_called()
         return
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
     assert expected_value in caplog.text
 
 
@@ -413,9 +440,15 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
     table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping([test_table])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    mounts_crawler = create_autospec(Mounts)
-    mounts_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+
+    def resolve_mount(location: str) -> str:
+        if location.startswith("dbfs:/mnt/test"):
+            return location.replace("dbfs:/mnt/test", "s3://test/folder")
+        return location
+
+    external_locations.resolve_mount = resolve_mount
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -423,11 +456,13 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
-    table_migrate.migrate_tables(what=what, mounts_crawler=mounts_crawler)
+    table_migrate.migrate_tables(what=what)
 
     assert expected_query in backend.queries
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
 
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
@@ -459,6 +494,8 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
     ]
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -466,11 +503,13 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert not backend.queries
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_called()
 
 
 def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
@@ -482,6 +521,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     table_mapping = mock_table_mapping(["external_src_unsupported"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -489,11 +529,13 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.UNKNOWN)
 
     assert len(backend.queries) == 0
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_called()
 
 
 def test_migrate_view_should_produce_proper_queries(ws):
@@ -517,6 +559,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     )
     migration_status_refresher.index.return_value = migration_index
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -524,6 +567,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
@@ -534,6 +578,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     dst = f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '123');"
     assert dst in backend.queries
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_called()
 
 
 def test_migrate_view_with_local_dataset_should_be_skipped(ws):
@@ -565,6 +610,7 @@ def test_migrate_view_with_columns(ws):
     )
     migration_status_refresher.index.return_value = migration_index
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -572,12 +618,14 @@ def test_migrate_view_with_columns(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
     create = "CREATE OR REPLACE VIEW IF NOT EXISTS `ucx_default`.`db1_dst`.`view_dst` (`a`, `b`) AS SELECT * FROM `ucx_default`.`db1_dst`.`new_managed_dbfs`"
     assert create in backend.queries
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
@@ -668,6 +716,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     table_mapping = mock_table_mapping()
     migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)  # pylint: disable=mock-no-usage
+    external_locations = create_autospec(ExternalLocations)  # pylint: disable=mock-no-usage
     table_migrate = TablesMigrator(
         table_crawler,
         client,
@@ -675,6 +724,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     return table_migrate
 
@@ -734,6 +784,7 @@ def test_no_migrated_tables(ws):
     ]
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -741,6 +792,7 @@ def test_no_migrated_tables(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.revert_migrated_tables("test_schema1", "test_table1")
@@ -748,6 +800,7 @@ def test_no_migrated_tables(ws):
     table_crawler.snapshot.assert_called()
     table_mapping.get_tables_to_migrate.assert_called()
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_revert_report(ws, capsys):
@@ -775,6 +828,7 @@ def test_empty_revert_report(ws):
     table_mapping = mock_table_mapping()
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -782,12 +836,14 @@ def test_empty_revert_report(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert not table_migrate.print_revert_report(delete_managed=False)
     table_crawler.snapshot.assert_called()
     table_mapping.get_tables_to_migrate.assert_called()
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_is_upgraded(ws):
@@ -807,6 +863,7 @@ def test_is_upgraded(ws):
     table_mapping = mock_table_mapping()
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -814,12 +871,14 @@ def test_is_upgraded(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert table_migrate.is_migrated("schema1", "table1")
     assert not table_migrate.is_migrated("schema1", "table2")
     table_mapping.get_tables_to_migrate.assert_called()
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_table_status():
@@ -1007,6 +1066,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     migration_index.is_migrated.return_value = False
     migration_status_refresher.index.return_value = migration_index
     sql_backend = MockBackend()
+    external_locations = create_autospec(ExternalLocations)
 
     table_migrate = TablesMigrator(
         table_crawler,
@@ -1015,11 +1075,13 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
 
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
+    external_locations.resolve_mount.assert_not_called()
     assert sql_backend.queries == [
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
         "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');",
@@ -1081,6 +1143,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     migration_index.is_migrated.side_effect = lambda _, b: b in {"t1_src", "t2_src"}
     migration_status_refresher.index.return_value = migration_index
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -1088,6 +1151,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_crawler.snapshot.assert_not_called()
     migrate_grants.apply.assert_not_called()
@@ -1096,6 +1160,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
     assert not any(key for key in table_keys if key == "hive_metastore.db1_src.t1_src")
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_table_in_mount_mapping_with_table_owner():
@@ -1122,6 +1187,7 @@ def test_table_in_mount_mapping_with_table_owner():
     table_crawler = TablesCrawler(backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         client,
@@ -1129,6 +1195,7 @@ def test_table_in_mount_mapping_with_table_owner():
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
@@ -1136,6 +1203,7 @@ def test_table_in_mount_mapping_with_table_owner():
         in backend.queries
     )
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_table_in_mount_mapping_with_partition_information():
@@ -1165,6 +1233,7 @@ def test_table_in_mount_mapping_with_partition_information():
     table_crawler = TablesCrawler(backend, "inventory_database")
     migration_status_refresher = TableMigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         client,
@@ -1172,6 +1241,7 @@ def test_table_in_mount_mapping_with_partition_information():
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
@@ -1179,6 +1249,7 @@ def test_table_in_mount_mapping_with_partition_information():
         in backend.queries
     )
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_view_failed(ws, caplog):
@@ -1200,6 +1271,7 @@ def test_migrate_view_failed(ws, caplog):
     )
     migration_status_refresher.index.return_value = migration_index
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -1207,6 +1279,7 @@ def test_migrate_view_failed(ws, caplog):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
@@ -1214,6 +1287,7 @@ def test_migrate_view_failed(ws, caplog):
         "Failed to migrate view hive_metastore.db1_src.view_src to ucx_default.db1_dst.view_dst: error" in caplog.text
     )
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_dbfs_root_tables_failed(ws, caplog):
@@ -1223,6 +1297,7 @@ def test_migrate_dbfs_root_tables_failed(ws, caplog):
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         ws,
@@ -1230,10 +1305,12 @@ def test_migrate_dbfs_root_tables_failed(ws, caplog):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert (
         "Failed to migrate table hive_metastore.db1_src.managed_dbfs to ucx_default.db1_dst.managed_dbfs: error"
@@ -1292,6 +1369,7 @@ def test_refresh_migration_status_published_remained_tables(caplog):
     )
     migration_status_refresher.index.return_value = migration_index
     migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
         client,
@@ -1299,12 +1377,14 @@ def test_refresh_migration_status_published_remained_tables(caplog):
         table_mapping,
         migration_status_refresher,
         migrate_grants,
+        external_locations,
     )
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore"):
         tables = table_migrate.get_remaining_tables()
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
         assert len(tables) == 1 and tables[0].key == "hive_metastore.schema1.table3"
     migrate_grants.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_table_migration_status_owner() -> None:

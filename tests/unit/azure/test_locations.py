@@ -16,7 +16,7 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, Mounts
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, MountsCrawler
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit.azure import azure_api_client
 
@@ -26,10 +26,12 @@ EXTERNAL_LOCATIONS = MockBackend.rows("location", "table_count")
 
 def location_migration_for_test(ws, mock_backend, mock_installation, azurerm=None):
     azurerm = azurerm or AzureResources(azure_api_client(), azure_api_client())
-    location_crawler = ExternalLocations(ws, mock_backend, "location_test")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    location_crawler = ExternalLocations(ws, mock_backend, "location_test", tables_crawler, mounts_crawler)
     azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
     tables_crawler = TablesCrawler(mock_backend, 'ucx')
-    mounts_crawler = Mounts(mock_backend, ws, 'ucx')
+    mounts_crawler = MountsCrawler(mock_backend, ws, 'ucx')
     principal_acl = PrincipalACL(ws, mock_backend, mock_installation, tables_crawler, mounts_crawler, lambda: [])
     external_locations_migration = ExternalLocationsMigration(
         ws, location_crawler, azure_resource_permissions, azurerm, principal_acl
