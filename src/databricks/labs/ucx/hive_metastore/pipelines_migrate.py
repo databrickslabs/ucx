@@ -14,16 +14,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PipelineRule:
-    workspace_name: str
     target_catalog_name: str
     target_schema_name: str | None
     target_pipeline_name: str | None
 
 
     @classmethod
-    def from_src_dst(cls, target_catalog_name: str, target_schema_name: str, target_pipeline_name:str) -> "Rule":
+    def from_src_dst(cls, target_catalog_name: str, target_schema_name: str | None, target_pipeline_name:str | None) -> "PipelineRule":
         return cls(
-            workspace_name="workspace",
             target_catalog_name=target_catalog_name,
             target_schema_name=target_schema_name,
             target_pipeline_name=target_pipeline_name,
