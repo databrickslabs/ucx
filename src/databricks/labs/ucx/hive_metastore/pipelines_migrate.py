@@ -15,21 +15,18 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PipelineRule:
     workspace_name: str
-    source_pipeline_id: str
-    source_pipeline_name: str
-    target_schema_name: str
-    target_pipeline_name: str
+    target_catalog_name: str
+    target_schema_name: str | None
+    target_pipeline_name: str | None
+
 
     @classmethod
-    def from_src_dst(cls, src_pipeline: PipelineInfo, dst_schema: SchemaInfo) -> "Rule":
+    def from_src_dst(cls, target_catalog_name: str, target_schema_name: str, target_pipeline_name:str) -> "Rule":
         return cls(
             workspace_name="workspace",
-            catalog_name=str(src_pipeline. or ""),
-            src_schema=str(src_pipeline.pipeline_name or ""),
-            dst_schema=str(dst_schema.name or ""),
-            src_table=str(src_table.name or ""),
-            dst_table=str(src_table.name or ""),
-            recon_tolerance_percent=0,
+            target_catalog_name=target_catalog_name,
+            target_schema_name=target_schema_name,
+            target_pipeline_name=target_pipeline_name,
         )
 
 @dataclass
@@ -100,5 +97,24 @@ class PipelinesMigrator:
         return tasks
 
     def _migrate_pipeline(self, pipeline: PipelineToMigrate):
+        try:
+            self._clone_pipeline(pipeline)
+        except Exception as e:
+            logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
         pass
+
+    def _clone_pipeline(self, pipeline: PipelineToMigrate):
+        # TODO: implement this in sdk
+        headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
+        body = {}
+        body['catalog'] = pipeline.rule.target_catalog_name
+        if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
+        if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
+        body['clone_mode'] = 'MIGRATE_TO_UC'
+        body['configuration'] = {
+            'pipelines.migration.ignoreExplicitPath': 'true'
+        }
+        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers)
+        return res
+
 
