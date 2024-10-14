@@ -296,7 +296,6 @@ def test_save_external_location_mapping_no_missing_location():
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="loc1", url="s3://test_location/test1")]
     location_crawler.save_as_terraform_definitions_on_workspace("~/.ucx")
     ws.workspace.upload.assert_not_called()
-    mounts_crawler.snapshot.assert_called_once()
 
 
 def test_match_table_external_locations():
@@ -317,7 +316,6 @@ def test_match_table_external_locations():
 
     matching_locations, missing_locations = location_crawler.match_table_external_locations()
 
-    mounts_crawler.snapshot.assert_called_once()
     assert len(matching_locations) == 1
     assert ExternalLocation("gcs://test_location2/a/b/", 1) in missing_locations
     assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations

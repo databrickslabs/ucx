@@ -27,7 +27,7 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL, ComputeLocations
-from databricks.labs.ucx.hive_metastore.locations import Mount
+from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import (
     AwsACL,
 )
@@ -154,6 +154,7 @@ def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
         Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1'),
         Mount('/mnt/folder5', 's3://storage5/folder5'),
     ]
+    external_locations = ExternalLocations(ws, sql_backend, 'schema', table_crawler, mount_crawler)
 
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
@@ -166,7 +167,7 @@ def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
         return None
 
     locations = inner
-    return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, locations)
+    return PrincipalACL(w, sql_backend, install, table_crawler, external_locations, locations)
 
 
 @pytest.fixture
