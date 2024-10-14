@@ -10,6 +10,7 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
@@ -89,3 +90,28 @@ def test_create_catalog_schema_with_principal_acl_aws(
     catalog_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_CATALOG])
     assert schema_grant in schema_grants.privilege_assignments
     assert catalog_grant in catalog_grants.privilege_assignments
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_create_catalog_schema_with_legacy_acls(
+    ws, make_user, prepared_legacy_acl, sql_backend
+):
+    ctx, _, schema_name, catalog_name = prepared_legacy_acl
+
+    user_a = make_user()
+    user_b = make_user()
+
+    sql_backend.execute(f"ALTER DATABASE {schema_name} OWNER TO `{user_a.user_name}`;")
+    sql_backend.execute(f"GRANT USAGE,SELECT ON DATABASE {schema_name} TO {user_b};")
+
+    # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
+    GrantsCrawler(ctx.tables_crawler, ctx.udfs_crawler).snapshot()
+
+    catalog_schema = ctx.catalog_schema
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
+    schema_grant = PrivilegeAssignment(user_a.user_name, [Privilege.USE_SCHEMA])
+    assert schema_grant in schema_grants.privilege_assignments
+
