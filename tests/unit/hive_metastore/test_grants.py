@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from unittest.mock import create_autospec
 
@@ -498,6 +499,42 @@ def test_crawler_should_filter_databases() -> None:
 
     assert "SHOW DATABASES" not in sql_backend.queries
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
+
+
+@pytest.mark.parametrize(
+    "src, grant, target, query",
+    [
+        (
+            Table("hive_metastore", "database", "table", "MANAGED", "DELTA"),
+            Grant("user", "SELECT"),
+            Table("catalog", "database", "table", "MANAGED", "DELTA"),
+            "GRANT SELECT ON TABLE `catalog`.`database`.`table` TO `user`",
+        )
+    ],
+)
+def test_migrate_grants_applies_query(src: Table, grant: Grant, target: Table, query: str) -> None:
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    def grant_loader() -> list[Grant]:
+        return [
+            dataclasses.replace(
+                grant,
+                catalog=src.catalog,
+                database=src.database,
+                table=src.name,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+    )
+
+    migrate_grants.apply(src, target.full_name)
+    assert query in backend.queries
+    group_manager.assert_not_called()
 
 
 def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
