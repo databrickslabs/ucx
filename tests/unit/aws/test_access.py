@@ -370,11 +370,12 @@ def test_create_uber_principal_set_warehouse_config_security_policy(
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
 
+    external_locations = create_autospec(ExternalLocations)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        ExternalLocations(mock_ws, backend, "ucx"),
+        external_locations,
     )
     aws_resource_permissions.create_uber_principal(MockPrompts({".*": "yes"}))
 
