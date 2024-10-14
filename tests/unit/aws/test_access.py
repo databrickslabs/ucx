@@ -27,9 +27,9 @@ from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AW
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, MountsCrawler
 from tests.unit import DEFAULT_CONFIG
 
 
@@ -110,7 +110,9 @@ def backend():
 
 @pytest.fixture
 def locations(mock_ws, backend):
-    return ExternalLocations(mock_ws, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    mounts_crawler = create_autospec(MountsCrawler)
+    return ExternalLocations(mock_ws, backend, "ucx", tables_crawler, mounts_crawler)
 
 
 def test_create_external_locations(mock_ws, installation_multiple_roles, backend, locations):
@@ -214,13 +216,13 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        locations,
+        external_locations,
     )
     aws_resource_permissions.create_uber_principal(prompts)
     aws.put_role_policy.assert_called_with(
@@ -243,7 +245,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
     prompts = MockPrompts(
         {
             "There is an existing instance profile *": "yes",
@@ -254,7 +256,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
         mock_installation,
         mock_ws,
         aws,
-        locations,
+        external_locations,
     )
     aws_resource_permissions.create_uber_principal(prompts)
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
@@ -283,13 +285,13 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws.create_migration_role.return_value = instance_profile_arn
     aws.create_instance_profile.return_value = instance_profile_arn
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        locations,
+        external_locations,
     )
 
     aws_resource_permissions.create_uber_principal(prompts)
@@ -331,13 +333,13 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
 
     aws = AWSResources("profile", command_call)
 
-    locations = ExternalLocations(mock_ws, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        locations,
+        external_locations,
     )
 
     with pytest.raises(PermissionDenied):
@@ -384,14 +386,14 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
-    locations = ExternalLocations(mock_ws, MockBackend(), "ucx")
+    external_locations = create_autospec(ExternalLocations)
     prompts = MockPrompts({})
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         aws,
-        locations,
+        external_locations,
     )
     assert not aws_resource_permissions.create_uber_principal(prompts)
     aws.list_attached_policies_in_role.assert_not_called()
@@ -439,8 +441,7 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
 
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
-    sql_backend = MockBackend(rows={}, fails_on_first={})
-    external_locations = ExternalLocations(mock_ws, sql_backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_no_roles,
@@ -926,7 +927,7 @@ def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
         return 0, '{"account":"1234"}', ""
 
     aws = AWSResources("profile", command_call)
-    external_locations = ExternalLocations(mock_ws, backend, 'ucx')
+    external_locations = create_autospec(ExternalLocations)
     resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
     assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls

@@ -873,7 +873,11 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
             installation_ctx.workspace_client,
             AWSResources(aws_profile()),
             ExternalLocations(
-                installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database
+                installation_ctx.workspace_client,
+                installation_ctx.sql_backend,
+                installation_ctx.inventory_database,
+                installation_ctx.tables_crawler,
+                installation_ctx.mounts_crawler,
             ),
         )
 
