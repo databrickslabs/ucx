@@ -93,9 +93,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_create_catalog_schema_with_legacy_acls(
-    ws, make_user, prepared_legacy_acl, sql_backend
-):
+def test_create_catalog_schema_with_legacy_acls(ws, make_user, prepared_legacy_acl, sql_backend):
     ctx, _, schema_name, catalog_name, table_name = prepared_legacy_acl
 
     user_a = make_user()
@@ -107,7 +105,7 @@ def test_create_catalog_schema_with_legacy_acls(
     sql_backend.execute(f"ALTER TABLE {schema_name}.{table_name} OWNER TO `{user_a.user_name}`;")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    grants = GrantsCrawler(ctx.tables_crawler, ctx.udfs_crawler).snapshot()
+    GrantsCrawler(ctx.tables_crawler, ctx.udfs_crawler).snapshot()
 
     catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
@@ -118,4 +116,3 @@ def test_create_catalog_schema_with_legacy_acls(
     assert schema_grant in schema_grants.privilege_assignments
     schema_info = ws.schemas.get(f"{catalog_name}.{schema_name}")
     assert schema_info.owner == user_b.user_name
-
