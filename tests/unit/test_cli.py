@@ -68,6 +68,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
@@ -478,7 +479,7 @@ def test_migrate_acls_calls_workspace_id(
         workspace_client.get_workspace_id.assert_called()
 
 
-def test_migrate_credentials_azure(ws, acc_client):
+def test_migrate_credentials_azure(ws, acc_client) -> None:
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
@@ -491,7 +492,7 @@ def test_migrate_credentials_azure(ws, acc_client):
     )
     migrate_credentials(ws, prompts, ctx=ctx, a=acc_client)
     ws.storage_credentials.list.assert_called()
-    azure_resources.storage_accounts.assert_called()
+    azure_resources.assert_not_called()
 
 
 def test_migrate_credentials_aws(ws, acc_client):
@@ -929,12 +930,37 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
     )
     for workspace_client in workspace_clients:
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
+        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.SUCCESS))]
 
     migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
 
     for workspace_client in workspace_clients:
         workspace_client.jobs.run_now.assert_called_with(456)
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
+
+
+@pytest.mark.parametrize("run_as_collection", [False, True])
+def test_migrate_tables_errors_out_before_assessment(
+    run_as_collection,
+    workspace_clients,
+    acc_client,
+) -> None:
+    if not run_as_collection:
+        workspace_clients = [workspace_clients[0]]
+    run = Run(
+        state=RunState(result_state=RunResultState.SUCCESS),
+        start_time=0,
+        end_time=1000,
+        run_duration=1000,
+    )
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
+        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.FAILED))]
+
+    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
+
+    for workspace_client in workspace_clients:
+        workspace_client.jobs.run_now.assert_not_called()
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
@@ -948,7 +974,9 @@ def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
         table_format="HIVE",
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.return_value = None
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler, verify_progress_tracking=verify_progress_tracking)
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS),
         start_time=0,
@@ -979,7 +1007,10 @@ def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
         table_format="EXTERNAL",
     )
     tables_crawler.snapshot.return_value = [table]
-    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.return_value = None
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler, verify_progress_tracking=verify_progress_tracking)
+
     ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = Run(
         state=RunState(result_state=RunResultState.SUCCESS),
         start_time=0,

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable
 from typing import TypeVar
 
 from sqlglot import parse
@@ -19,8 +19,8 @@ class SqlExpression:
     def __init__(self, expression: Expression):
         self._expression = expression
 
-    def collect_table_infos(self, required_catalog: str, session_state: CurrentSessionState) -> Iterable[UsedTable]:
-        for table in self._expression.find_all(Table):
+    def collect_used_tables(self, required_catalog: str, session_state: CurrentSessionState) -> Iterable[UsedTable]:
+        for table in self.find_all(Table):
             info = self._collect_table_info(table, required_catalog, session_state)
             if info:
                 yield info
@@ -62,8 +62,12 @@ class SqlExpression:
             is_write=isinstance(self._expression, (Create, Update, Delete)),
         )
 
-    def find_all(self, klass: type[E]) -> Iterator[E]:
-        return self._expression.find_all(klass)
+    def find_all(self, klass: type[E]) -> Iterable[E]:
+        try:
+            return self._expression.find_all(klass)
+        except SqlglotError as e:
+            logger.warning(f"Failed to find all {klass} in expression: {self._expression}", exc_info=e)
+            return []
 
 
 class SqlParser:
@@ -77,5 +81,4 @@ class SqlParser:
                     continue
                 yield from callback(SqlExpression(expression))
         except SqlglotError as e:
-            logger.debug(f"Failed to parse SQL: {sql_code}", exc_info=e)
-            raise e
+            logger.warning(f"Failed to parse SQL: {sql_code}", exc_info=e)
