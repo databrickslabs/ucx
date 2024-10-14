@@ -96,22 +96,26 @@ def test_create_catalog_schema_with_principal_acl_aws(
 def test_create_catalog_schema_with_legacy_acls(
     ws, make_user, prepared_legacy_acl, sql_backend
 ):
-    ctx, _, schema_name, catalog_name = prepared_legacy_acl
+    ctx, _, schema_name, catalog_name, table_name = prepared_legacy_acl
 
     user_a = make_user()
     user_b = make_user()
 
-    sql_backend.execute(f"ALTER DATABASE {schema_name} OWNER TO `{user_a.user_name}`;")
-    sql_backend.execute(f"GRANT USAGE,SELECT ON DATABASE {schema_name} TO {user_b};")
+    sql_backend.execute(f"GRANT USAGE ON DATABASE {schema_name} TO `{user_a.user_name}`;")
+    sql_backend.execute(f"GRANT SELECT ON {schema_name}.{table_name} TO `{user_b.user_name}`;")
+    sql_backend.execute(f"ALTER DATABASE {schema_name} OWNER TO `{user_b.user_name}`;")
+    sql_backend.execute(f"ALTER TABLE {schema_name}.{table_name} OWNER TO `{user_a.user_name}`;")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(ctx.tables_crawler, ctx.udfs_crawler).snapshot()
+    grants = GrantsCrawler(ctx.tables_crawler, ctx.udfs_crawler).snapshot()
 
     catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
-    schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
+    schema_grants = ws.grants.get(SecurableType.SCHEMA, f"{catalog_name}.{schema_name}")
     schema_grant = PrivilegeAssignment(user_a.user_name, [Privilege.USE_SCHEMA])
     assert schema_grant in schema_grants.privilege_assignments
+    schema_info = ws.schemas.get(f"{catalog_name}.{schema_name}")
+    assert schema_info.owner == user_b.user_name
 

@@ -1260,8 +1260,9 @@ def prepared_legacy_acl(runtime_ctx, make_mounted_location, make_catalog, make_s
     return (
         runtime_ctx,
         f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
-        f"{dst_catalog.name}.{dst_schema.name}",
+        f"{src_schema.name}",
         dst_catalog.name,
+        src_external_table.name,
     )
 
 
