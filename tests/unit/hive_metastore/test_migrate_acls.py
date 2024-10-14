@@ -1,5 +1,7 @@
 import logging
+from collections.abc import Callable, Iterable
 from unittest.mock import create_autospec
+
 import pytest
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -71,20 +73,21 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, caplog):
     migrate_grants.apply.assert_called_with(src, 'hms_fed.db1_src.managed_dbfs')
 
 
-def test_migrate_matched_grants_applies():
+def test_migrate_matched_grants_applies() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
-    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    dst = Table('catalog', 'schema', 'table')
+    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
-    migrate_grants.apply(src, 'catalog.schema.table')
+    migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_called()
     sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE `catalog`.`schema`.`table` TO `me`')
 
 
-def test_migrate_matched_grants_applies_and_remaps_group():
+def test_migrate_matched_grants_applies_and_remaps_group() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
     group_manager.snapshot.return_value = [
@@ -96,23 +99,25 @@ def test_migrate_matched_grants_applies_and_remaps_group():
         ),
     ]
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
-    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    dst = Table('catalog', 'schema', 'table')
+    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
-    migrate_grants.apply(src, 'catalog.schema.table')
+    migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_called()
     sql_backend.execute.assert_called_with('GRANT SELECT ON TABLE `catalog`.`schema`.`table` TO `myself`')
 
 
-def test_migrate_no_matched_grants_no_apply():
+def test_migrate_no_matched_grants_no_apply() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
     src = Table('hive_metastore', 'default', 'bar', 'MANAGED', 'DELTA')
-    one_grant = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    dst = Table('catalog', 'schema', 'table')
+    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
-    migrate_grants.apply(src, 'catalog.schema.table')
+    migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_not_called()
     sql_backend.execute.assert_not_called()

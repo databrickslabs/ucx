@@ -737,20 +737,22 @@ class MigrateGrants:
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
 
-    def apply(self, src: Table, uc_table_key: str) -> bool:
+    def apply(self, src: Table, dst: Table) -> bool:
         for grant in self._match_grants(src):
-            acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
                     f"failed-to-migrate: Hive metastore grant '{grant.action_type}' cannot be mapped to UC grant for "
-                    f"{src.kind} '{uc_table_key}'. Skipping."
+                    f"{src.kind} '{dst.full_name}'. Skipping."
                 )
                 continue
-            logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
+            logger.debug(f"Migrating acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
             try:
                 self._sql_backend.execute(acl_migrate_sql)
             except DatabricksError as e:
-                logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {uc_table_key}: {e}")
+                logger.warning(
+                    f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
+                )
         return True
 
     @cached_property

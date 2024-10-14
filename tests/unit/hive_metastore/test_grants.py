@@ -532,7 +532,7 @@ def test_migrate_grants_applies_query(src: Table, grant: Grant, target: Table, q
         [grant_loader],
     )
 
-    migrate_grants.apply(src, target.full_name)
+    migrate_grants.apply(src, target)
     assert query in backend.queries
     group_manager.assert_not_called()
 
@@ -559,9 +559,9 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     )
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.grants"):
-        migrate_grants.apply(table, f"uc.{table.database}.{table.name}")
+        migrate_grants.apply(table, dataclasses.replace(table, catalog="catalog"))
     assert (
-        "failed-to-migrate: Hive metastore grant 'READ_METADATA' cannot be mapped to UC grant for TABLE 'uc.database.table'"
+        "failed-to-migrate: Hive metastore grant 'READ_METADATA' cannot be mapped to UC grant for TABLE 'catalog.database.table'"
         in caplog.text
     )
     group_manager.assert_not_called()

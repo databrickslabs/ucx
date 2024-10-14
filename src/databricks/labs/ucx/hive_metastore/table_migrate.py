@@ -233,7 +233,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table)
 
     def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
         # We have to fetch create statement this way because of columns in:
@@ -309,7 +309,7 @@ class TablesMigrator:
             )
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -324,7 +324,7 @@ class TablesMigrator:
             )
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule):
         # verify hive serde type
@@ -362,7 +362,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -378,7 +378,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_table_create_ctas(self, src_table: Table, rule: Rule):
         if src_table.what not in [What.EXTERNAL_NO_SYNC, What.EXTERNAL_HIVESERDE]:
@@ -402,7 +402,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -417,7 +417,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _table_already_migrated(self, target) -> bool:
         return target in self._seen_tables
