@@ -450,7 +450,7 @@ class AzureResourcePermissions:
             logger.error(error_message, exc_info=e)
             raise
 
-    def _remove_service_principal_configuration_from_workspace_warehouse_config(  # pylint: disable: too-complex
+    def _remove_service_principal_configuration_from_workspace_warehouse_config(  # pylint: disable=too-complex
         self,
         principal_client_id: str,
         principal_secret_identifier: str,
