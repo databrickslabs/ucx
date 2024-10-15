@@ -5,6 +5,7 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.marketplace import Installation
 
@@ -14,14 +15,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PipelineRule:
+    src_pipeline_id: str
     target_catalog_name: str
     target_schema_name: str | None
     target_pipeline_name: str | None
 
 
     @classmethod
-    def from_src_dst(cls, target_catalog_name: str, target_schema_name: str | None, target_pipeline_name:str | None) -> "PipelineRule":
+    def from_src_dst(cls, src_pipeline_id, target_catalog_name: str, target_schema_name: str | None, target_pipeline_name:str | None) -> "PipelineRule":
         return cls(
+            src_pipeline_id = src_pipeline_id,
             target_catalog_name=target_catalog_name,
             target_schema_name=target_schema_name,
             target_pipeline_name=target_pipeline_name,
@@ -63,9 +66,23 @@ class PipelineMapping:
 
         return self._pc.snapshot()
 
-    def get_pipelines_to_migrate(self, _pc):
-        pass
+    def load(self) -> list[PipelineRule]:
+        try:
+            return self._installation.load(list[PipelineRule], filename=self.FILENAME)
+        except NotFound:
+            # TODO: add pipeline mapping creation command
+            msg = "Please create pipeline mapping file"
+            raise ValueError(msg) from None
 
+    def get_pipelines_to_migrate(self, _pc):
+        rules = self.load()
+        # Getting all the source tables from the rules
+        pipelines = list(_pc.snapshot())
+
+        for rule in rules:
+            for pipeline in pipelines:
+                if pipeline.pipeline_id == rule.src_pipeline_id:
+                    yield PipelineToMigrate(pipeline, rule)
 
 class PipelinesMigrator:
     def __init__(self,
