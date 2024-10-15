@@ -95,7 +95,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws, mock_pyspark
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_dbfs_non_delta_tables_should_produce_proper_queries(ws,mock_pyspark):
+def test_dbfs_non_delta_tables_should_produce_proper_queries(ws, mock_pyspark):
     errors = {}
     rows = {
         "SHOW CREATE TABLE": [
@@ -141,7 +141,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws,mock_pyspark):
     ) in backend.queries
 
 
-def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws,mock_pyspark):
+def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws, mock_pyspark):
     errors = {}
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -166,7 +166,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws,m
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_migrate_external_tables_should_produce_proper_queries(ws,mock_pyspark):
+def test_migrate_external_tables_should_produce_proper_queries(ws, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -200,7 +200,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws,mock_pyspark):
     ]
 
 
-def test_migrate_managed_table_as_external_tables_with_conversion(ws,mock_pyspark):
+def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -211,17 +211,12 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws,mock_pyspar
     migrate_grants = create_autospec(MigrateGrants)
     external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
-        table_crawler,
-        ws,
-        backend,
-        table_mapping,
-        migration_status_refresher,
-        migrate_grants,
-        external_locations
+        table_crawler, ws, backend, table_mapping, migration_status_refresher, migrate_grants, external_locations
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, managed_table_external_storage="CONVERT_TO_EXTERNAL")
 
     migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
     assert backend.queries == [
         "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;",
@@ -233,7 +228,7 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws,mock_pyspar
     ]
 
 
-def test_migrate_managed_table_as_external_tables_without_conversion(ws,mock_pyspark):
+def test_migrate_managed_table_as_external_tables_without_conversion(ws, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -267,7 +262,7 @@ def test_migrate_managed_table_as_external_tables_without_conversion(ws,mock_pys
     ]
 
 
-def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(ws,mock_pyspark):
+def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(ws, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -306,7 +301,7 @@ def test_migrate_managed_table_as_managed_tables_should_produce_proper_queries(w
     ]
 
 
-def test_migrate_external_table_failed_sync(ws, caplog,mock_pyspark):
+def test_migrate_external_table_failed_sync(ws, caplog, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("LOCATION_OVERLAP", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -402,15 +397,7 @@ def test_migrate_external_table_failed_sync(ws, caplog,mock_pyspark):
     ],
 )
 def test_migrate_external_hiveserde_table_in_place(
-    ws,
-    caplog,
-    hiveserde_in_place_migrate,
-    describe,
-    ddl,
-    errors,
-    migrated,
-    expected_value,
-    mock_pyspark
+    ws, caplog, hiveserde_in_place_migrate, describe, ddl, errors, migrated, expected_value, mock_pyspark
 ):
     caplog.set_level(logging.INFO)
     backend = MockBackend(
@@ -476,7 +463,7 @@ def test_migrate_external_hiveserde_table_in_place(
         ),
     ],
 )
-def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, test_table, expected_query,mock_pyspark):
+def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, test_table, expected_query, mock_pyspark):
     backend = MockBackend()
     table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = mock_table_mapping([test_table])
@@ -505,7 +492,7 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
     migrate_grants.apply.assert_called()
 
 
-def test_migrate_already_upgraded_table_should_produce_no_queries(ws,mock_pyspark):
+def test_migrate_already_upgraded_table_should_produce_no_queries(ws, mock_pyspark):
     errors = {}
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -552,7 +539,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws,mock_pyspar
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_migrate_unsupported_format_table_should_produce_no_queries(ws,mock_pyspark):
+def test_migrate_unsupported_format_table_should_produce_no_queries(ws, mock_pyspark):
     errors = {}
     rows = {}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -578,7 +565,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws,mock_pysp
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_migrate_view_should_produce_proper_queries(ws,mock_pyspark):
+def test_migrate_view_should_produce_proper_queries(ws, mock_pyspark):
     errors = {}
     original_view = (
         "CREATE OR REPLACE VIEW `hive_metastore`.`db1_src`.`view_src` AS SELECT * FROM `db1_src`.`managed_dbfs`"
@@ -631,7 +618,7 @@ def test_migrate_view_with_local_dataset_should_be_skipped(ws):
     assert dependencies == [TableView(catalog="hive_metastore", schema="database", name="v")]
 
 
-def test_migrate_view_with_columns(ws,mock_pyspark):
+def test_migrate_view_with_columns(ws, mock_pyspark):
     errors = {}
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": create}]}
@@ -813,7 +800,7 @@ def test_revert_migrated_tables_including_managed(mock_pyspark):
     assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest2`" in revert_with_managed_queries
 
 
-def test_no_migrated_tables(ws,mock_pyspark):
+def test_no_migrated_tables(ws, mock_pyspark):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -843,7 +830,7 @@ def test_no_migrated_tables(ws,mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_revert_report(ws, capsys,mock_pyspark):
+def test_revert_report(ws, capsys, mock_pyspark):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -859,7 +846,7 @@ def test_revert_report(ws, capsys,mock_pyspark):
     assert "- Migrated DBFS Root Tables will be left intact" in captured.out
 
 
-def test_empty_revert_report(ws,mock_pyspark):
+def test_empty_revert_report(ws, mock_pyspark):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -886,7 +873,7 @@ def test_empty_revert_report(ws,mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_is_upgraded(ws,mock_pyspark):
+def test_is_upgraded(ws, mock_pyspark):
     errors = {}
     rows = {
         "SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "fake_dest"],
@@ -1093,7 +1080,7 @@ def test_table_status_seen_tables(caplog):
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
 
-def test_migrate_acls_should_produce_proper_queries(ws, caplog,mock_pyspark):
+def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark):
     # all grants succeed except for one
     table_crawler = create_autospec(TablesCrawler)
     src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
@@ -1130,7 +1117,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog,mock_pyspark):
     ]
 
 
-def test_migrate_views_should_be_properly_sequenced(ws,mock_pyspark):
+def test_migrate_views_should_be_properly_sequenced(ws, mock_pyspark):
     errors = {}
     rows = {
         "SHOW CREATE TABLE `hive_metastore`.`db1_src`.`v1_src`": [
@@ -1292,7 +1279,7 @@ def test_table_in_mount_mapping_with_partition_information(mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_migrate_view_failed(ws, caplog,mock_pyspark):
+def test_migrate_view_failed(ws, caplog, mock_pyspark):
     errors = {"CREATE OR REPLACE VIEW": "error"}
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
     rows = {"SHOW CREATE TABLE": [{"createtab_stmt": create}]}
@@ -1330,7 +1317,7 @@ def test_migrate_view_failed(ws, caplog,mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_migrate_dbfs_root_tables_failed(ws, caplog,mock_pyspark):
+def test_migrate_dbfs_root_tables_failed(ws, caplog, mock_pyspark):
     errors = {"CREATE TABLE IF NOT EXISTS": "error"}
     backend = MockBackend(fails_on_first=errors, rows={})
     table_crawler = TablesCrawler(backend, "inventory_database")
@@ -1358,7 +1345,7 @@ def test_migrate_dbfs_root_tables_failed(ws, caplog,mock_pyspark):
     )
 
 
-def test_revert_migrated_tables_failed(caplog,mock_pyspark):
+def test_revert_migrated_tables_failed(caplog, mock_pyspark):
     errors = {"ALTER TABLE": "error"}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -1367,7 +1354,7 @@ def test_revert_migrated_tables_failed(caplog,mock_pyspark):
     assert "Failed to revert table hive_metastore.test_schema1.test_table1: error" in caplog.text
 
 
-def test_refresh_migration_status_published_remained_tables(caplog,mock_pyspark):
+def test_refresh_migration_status_published_remained_tables(caplog, mock_pyspark):
     backend = MockBackend()
     table_crawler = create_autospec(TablesCrawler)
     client = mock_workspace_client()
