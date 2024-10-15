@@ -503,7 +503,7 @@ def test_crawler_should_filter_databases() -> None:
 
 
 @pytest.mark.parametrize(
-    "src, grant, target, query",
+    "src, grant, dst, query",
     [
         (
             Catalog("hive_metastore"),
@@ -546,7 +546,7 @@ def test_crawler_should_filter_databases() -> None:
 def test_migrate_grants_applies_query(
     src: Catalog | Schema | Table,
     grant: Grant,
-    target: Catalog | Schema | Table,
+    dst: Catalog | Schema | Table,
     query: str,
 ) -> None:
     group_manager = create_autospec(GroupManager)
@@ -580,7 +580,7 @@ def test_migrate_grants_applies_query(
         [grant_loader],
     )
 
-    migrate_grants.apply(src, target)
+    migrate_grants.apply(src, dst)
 
     assert query in backend.queries
     group_manager.assert_not_called()
