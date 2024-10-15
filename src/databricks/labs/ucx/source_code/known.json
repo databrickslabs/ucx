@@ -8943,10 +8943,6 @@
     "langcodes.language_lists": [],
     "langcodes.registry_parser": [],
     "langcodes.tag_parser": [],
-    "langcodes.tests.test_alpha3": [],
-    "langcodes.tests.test_language": [],
-    "langcodes.tests.test_language_data": [],
-    "langcodes.tests.test_wikt_languages": [],
     "langcodes.util": []
   },
   "langsmith": {
