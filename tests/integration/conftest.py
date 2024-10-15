@@ -505,7 +505,7 @@ class MockRuntimeContext(
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
 
-    def with_pipeline_mapping_rules(self, rules: PipelineRule):
+    def with_pipeline_mapping_rules(self, rules):
         self.installation.save(rules, filename=PipelineMapping.FILENAME)
 
     def with_workspace_info(self, workspace_info):
