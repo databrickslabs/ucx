@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
-def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # pylint: ignore=too-complex
+def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # pylint: disable=too-complex
     """Prepare tests with the following setup:
 
     Existing HIVE metastore resources:
