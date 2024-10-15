@@ -110,6 +110,15 @@ class Grant:
         _, key = self.this_type_and_key()
         return key.lower()
 
+    @property
+    def order(self) -> int:
+        """Order of the grants to be upheld when applying."""
+        match self.action_type:
+            case "OWN":
+                return 1
+            case _:
+                return 0
+
     def this_type_and_key(self):
         return self.type_and_key(
             catalog=self.catalog,
@@ -775,7 +784,7 @@ class MigrateGrants:
                 continue
             grant = self._replace_account_group(grant)
             matched_grants.append(grant)
-        return matched_grants
+        return sorted(matched_grants, key=lambda g: g.order)
 
     def _replace_account_group(self, grant: Grant) -> Grant:
         target_principal = self._workspace_to_account_group_names.get(grant.principal)

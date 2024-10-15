@@ -586,6 +586,34 @@ def test_migrate_grants_applies_query(
     group_manager.assert_not_called()
 
 
+def test_migrate_grants_alters_ownership_as_last() -> None:
+    queries = [
+        "GRANT USE SCHEMA ON DATABASE `catalog`.`schema` TO `user`",
+        "ALTER DATABASE `catalog`.`schema` OWNER TO `user`",
+    ]
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    def grant_loader() -> list[Grant]:
+        return [
+            Grant("user", "OWN", "hive_metastore", "schema"),
+            Grant("user", "USAGE", "hive_metastore", "schema"),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+    )
+    src = Schema("schema", "hive_metastore")
+    dst = Schema("schema", "catalog")
+
+    migrate_grants.apply(src, dst)
+
+    assert backend.queries == queries
+    group_manager.assert_not_called()
+
+
 def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     group_manager = create_autospec(GroupManager)
     table = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
