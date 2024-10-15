@@ -127,9 +127,7 @@ class TablesMigrator:
             self.index(force_refresh=True)
         return all_tasks
 
-    def _migrate_managed_table(
-        self, managed_table_external_storage: str, src_table: TableToMigrate, mounts: list[Mount]
-    ):
+    def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
         if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
             self._convert_hms_table_to_external(src_table.src)
             return self._migrate_external_table(
