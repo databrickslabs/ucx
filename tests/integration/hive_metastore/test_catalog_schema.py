@@ -40,7 +40,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
     prepared_principal_acl,
     make_cluster_permissions,
     make_cluster,
-):
+) -> None:
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
     ctx, _, schema_name, catalog_name = prepared_principal_acl
@@ -66,8 +66,13 @@ def test_create_catalog_schema_with_principal_acl_azure(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_create_catalog_schema_with_principal_acl_aws(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
-):
+    ws,
+    make_user,
+    prepared_principal_acl,
+    make_cluster_permissions,
+    make_cluster,
+    env_or_skip,
+) -> None:
     ctx, _, schema_name, catalog_name = prepared_principal_acl
 
     cluster = make_cluster(
@@ -95,8 +100,14 @@ def test_create_catalog_schema_with_principal_acl_aws(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_create_catalog_schema_with_legacy_acls(
-    ws, make_user, make_catalog, make_schema, make_mounted_location, runtime_ctx, sql_backend
-):
+    ws,
+    make_user,
+    make_catalog,
+    make_schema,
+    make_mounted_location,
+    runtime_ctx,
+    sql_backend,
+) -> None:
     src_schema = make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name,
