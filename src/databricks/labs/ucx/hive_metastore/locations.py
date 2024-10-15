@@ -42,9 +42,9 @@ class LocationTrie:
     """
 
     key: str = ""
-    parent: OptionalLocationTrie = None
+    parent: OptionalLocationTrie = dataclasses.field(repr=False, default=None)
     children: dict[str, "LocationTrie"] = dataclasses.field(default_factory=dict)
-    tables: list[Table] = dataclasses.field(default_factory=list)
+    tables: list[Table] = dataclasses.field(repr=False, default_factory=list)
 
     @cached_property
     def _path(self) -> list[str]:
@@ -57,9 +57,14 @@ class LocationTrie:
         return list(reversed(parts))[1:]
 
     @property
-    def location(self):
-        scheme, netloc, *path = self._path
-        return f"{scheme}://{netloc}/{'/'.join(path)}"
+    def location(self) -> str | None:
+        if not self.is_valid():
+            return None
+        try:
+            scheme, netloc, *path = self._path
+            return f"{scheme}://{netloc}/{'/'.join(path)}"
+        except ValueError:
+            return None
 
     @staticmethod
     def _parse_location(location: str | None) -> list[str]:
@@ -91,10 +96,14 @@ class LocationTrie:
 
     def is_valid(self) -> bool:
         """A valid location has a scheme and netloc; the path is optional."""
-        if len(self._path) < 3:
+        if len(self._path) < 2:
             return False
         scheme, netloc, *_ = self._path
         return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
+
+    def all_tables(self) -> Iterable[Table]:
+        for node in self:
+            yield from node.tables
 
     def has_children(self):
         return len(self.children) > 0
@@ -128,61 +137,55 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return sorted(self._mounts_crawler.snapshot(), key=lambda _: len(_.name), reverse=True)
 
     def _external_locations(self) -> Iterable[ExternalLocation]:
-        min_slash = 2
-        external_locations: list[ExternalLocation] = []
+        trie = LocationTrie()
         for table in self._tables_crawler.snapshot():
-            location = table.location
-            if not location:
+            table = self._resolve_location(table)
+            if not table.location:
                 continue
-            # TODO: refactor this with LocationTrie
-            if location.startswith("dbfs:/mnt"):
-                location = self.resolve_mount(location)
-            if not location:
+            trie.insert(table)
+        queue = list(trie.children.values())
+        external_locations = []
+        while queue:
+            curr = queue.pop()
+            prefix = curr.location
+            if prefix and len(curr.children) > 1:
+                external_location = ExternalLocation(prefix, len(list(curr.all_tables())))
+                external_locations.append(external_location)
                 continue
-            if (
-                not location.startswith("dbfs")
-                and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
-                and not location.startswith("jdbc")
-            ):
-                self._dbfs_locations(external_locations, location, min_slash)
-            if location.startswith("jdbc"):
-                self._add_jdbc_location(external_locations, location, table)
+            queue.extend(curr.children.values())
         return external_locations
+
+    def _resolve_location(self, table: Table) -> Table:
+        location = table.location
+        if not location:
+            return table
+        location = self._resolve_jdbc(table)  # TODO: trie almost works with JDBC locations
+        location = self.resolve_mount(location)
+        return dataclasses.replace(table, location=location)
 
     def resolve_mount(self, location: str | None) -> str | None:
         if not location:
             return None
+        if location.startswith('/dbfs'):
+            location[0:5] = 'dbfs:'  # convert FUSE path to DBFS path
+        if not location.startswith('dbfs:'):
+            return location  # not a mount, save some cycles
         for mount in self._mounts_snapshot:
-            for prefix in (mount.as_scheme_prefix(), mount.as_fuse_prefix()):
-                if not location.startswith(prefix):
-                    continue
-                logger.debug(f"Replacing location {prefix} with {mount.source} in {location}")
-                location = location.replace(prefix, mount.source)
-                return location
+            prefix = mount.as_scheme_prefix()
+            if not location.startswith(prefix):
+                continue
+            logger.debug(f"Replacing location {prefix} with {mount.source} in {location}")
+            location = location.replace(prefix, mount.source)
+            return location
         logger.debug(f"Mount not found for location {location}. Skipping replacement.")
         return location
 
-    @staticmethod
-    def _dbfs_locations(external_locations, location, min_slash):
-        dupe = False
-        loc = 0
-        while loc < len(external_locations) and not dupe:
-            common = (
-                os.path.commonpath([external_locations[loc].location, os.path.dirname(location) + "/"]).replace(
-                    ":/", "://"
-                )
-                + "/"
-            )
-            if common.count("/") > min_slash:
-                table_count = external_locations[loc].table_count
-                external_locations[loc] = ExternalLocation(common, table_count + 1)
-                dupe = True
-            loc += 1
-        if not dupe:
-            external_locations.append(ExternalLocation(os.path.dirname(location) + "/", 1))
-
-    def _add_jdbc_location(self, external_locations, location, table):
-        dupe = False
+    def _resolve_jdbc(self, table: Table) -> str | None:
+        location = table.location
+        if not location or not table.storage_properties:
+            return None
+        if not location.startswith('jdbc:'):
+            return location
         pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
         # Find all matches in the input string
         # Storage properties is of the format
@@ -201,20 +204,12 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         # currently supporting databricks and mysql external tables
         # add other jdbc types
         if "databricks" in location.lower():
-            jdbc_location = f"jdbc:databricks://{host};httpPath={httppath}"
-        elif "mysql" in location.lower():
-            jdbc_location = f"jdbc:mysql://{host}:{port}/{database}"
-        elif not provider == "":
-            jdbc_location = f"jdbc:{provider.lower()}://{host}:{port}/{database}"
-        else:
-            jdbc_location = f"{location.lower()}/{host}:{port}/{database}"
-        for ext_loc in external_locations:
-            if ext_loc.location == jdbc_location:
-                ext_loc.table_count += 1
-                dupe = True
-                break
-        if not dupe:
-            external_locations.append(ExternalLocation(jdbc_location, 1))
+            return f"jdbc:databricks://{host};httpPath={httppath}"
+        if "mysql" in location.lower():
+            return f"jdbc:mysql://{host}:{port}/{database}"
+        if not provider == "":
+            return f"jdbc:{provider.lower()}://{host}:{port}/{database}"
+        return f"{location.lower()}/{host}:{port}/{database}"
 
     def _crawl(self) -> Iterable[ExternalLocation]:
         return self._external_locations()
