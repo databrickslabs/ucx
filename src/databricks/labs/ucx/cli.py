@@ -87,28 +87,36 @@ def installations(w: WorkspaceClient):
 
 
 @ucx.command
-def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
-    """Create a skip comment on a schema or a table"""
+def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None, view: str | None = None) -> None:
+    """Create a skip comment on a schema, table or a view."""
     logger.info("Running skip command")
     if not schema:
         logger.error("--schema is a required parameter.")
         return None
+    if table and view:
+        logger.error("specify --table OR --view, not both")
+        return None
     ctx = WorkspaceContext(w)
-    if table:
-        return ctx.table_mapping.skip_table_or_view(schema, table, ctx.tables_crawler.load_one)
+    table_or_view = table or view
+    if table_or_view:
+        return ctx.table_mapping.skip_table_or_view(schema, table_or_view, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
 
 @ucx.command
-def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = None):
-    """Unset the skip mark from a schema or a table"""
+def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = None, view: str | None = None) -> None:
+    """Unset the skip mark from a schema, table or a view."""
     logger.info("Running unskip command")
     if not schema:
         logger.error("--schema is a required parameter.")
         return None
+    if table and view:
+        logger.error("specify --table OR --view, not both")
+        return None
     ctx = WorkspaceContext(w)
-    if table:
-        return ctx.table_mapping.unskip_table_or_view(schema, table, ctx.tables_crawler.load_one)
+    table_or_view = table or view
+    if table_or_view:
+        return ctx.table_mapping.unskip_table_or_view(schema, table_or_view, ctx.tables_crawler.load_one)
     return ctx.table_mapping.unskip_schema(schema)
 
 

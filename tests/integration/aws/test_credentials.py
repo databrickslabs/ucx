@@ -29,7 +29,14 @@ def run_migration(ws, sql_backend, env_or_skip, aws_cli_ctx):
         )
 
         aws = AWSResources(env_or_skip("AWS_DEFAULT_PROFILE"))
-        location = ExternalLocations(ws, sql_backend, "inventory_schema")
+        # TODO: refactor this to a more readable code
+        location = ExternalLocations(
+            ws,
+            sql_backend,
+            "inventory_schema",
+            aws_cli_ctx.tables_crawler,
+            aws_cli_ctx.mounts_crawler,
+        )
         resource_permissions = AWSResourcePermissions(
             installation,
             ws,

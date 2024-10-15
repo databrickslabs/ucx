@@ -29,7 +29,7 @@ from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
     ACLMigrator,
@@ -260,6 +260,7 @@ class GlobalContext(abc.ABC):
             self.table_mapping,
             self.migration_status_refresher,
             self.migrate_grants,
+            self.external_locations,
         )
 
     @cached_property
@@ -292,8 +293,8 @@ class GlobalContext(abc.ABC):
         return TableMove(self.workspace_client, self.sql_backend)
 
     @cached_property
-    def mounts_crawler(self) -> Mounts:
-        return Mounts(self.sql_backend, self.workspace_client, self.inventory_database)
+    def mounts_crawler(self) -> MountsCrawler:
+        return MountsCrawler(self.sql_backend, self.workspace_client, self.inventory_database)
 
     @cached_property
     def azure_service_principal_crawler(self) -> AzureServicePrincipalCrawler:
@@ -301,7 +302,13 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def external_locations(self) -> ExternalLocations:
-        return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
+        return ExternalLocations(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.tables_crawler,
+            self.mounts_crawler,
+        )
 
     @cached_property
     def azure_acl(self) -> AzureACL:
@@ -338,7 +345,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.installation,
             self.tables_crawler,
-            self.mounts_crawler,
+            self.external_locations,
             self.principal_locations_retriever,
         )
 

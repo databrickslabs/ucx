@@ -32,12 +32,24 @@ commands:
       {{end}}
 
   - name: skip
-    description: Create a skip comment on a schema or a table
+    description: Add a skip comment on a schema, table or view.
     flags:
       - name: schema
-        description: Schema Name to Skip
+        description: Schema name to skip.
       - name: table
-        description: Table Name to Skip
+        description: (Optional) Table name to skip. Exclusive with `--view`.
+      - name: view
+        description: (Optional) View name to skip. Exclusive with `--table`.
+
+  - name: unskip
+    description: Remove the skip comment from a schema, table or view.
+    flags:
+      - name: schema
+        description: Schema name to unskip.
+      - name: table
+        description: (Optional) Table name to unskip. Exclusive with `--view`.
+      - name: view
+        description: (Optional) View name to unskip. Exclusive with `--table`.
 
   - name: sync-workspace-info
     is_account_level: true

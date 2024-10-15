@@ -12,7 +12,6 @@ from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources,
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
@@ -31,12 +30,11 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     account_id = aws.validate_connection().get("Account")
     s3_prefixes = {f"s3://bucket{rand}"}
 
-    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
         ws,
         aws,
-        external_location,
+        aws_cli_ctx.external_locations,
         account_id,
     )
     role_candidate = AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes))
@@ -51,7 +49,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
 
     external_location_migration = AWSExternalLocationsMigration(
         ws,
-        external_location,
+        aws_cli_ctx.external_locations,
         aws_permissions,
         aws_cli_ctx.principal_acl,
     )
@@ -109,8 +107,6 @@ def test_create_external_location_validate_acl(
     ws,
     make_user,
     make_cluster,
-    make_random,
-    sql_backend,
     aws_cli_ctx,
     env_or_skip,
     inventory_schema,
@@ -136,18 +132,17 @@ def test_create_external_location_validate_acl(
         permission_level=PermissionLevel.CAN_RESTART,
         user_name=cluster_user.user_name,
     )
-    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
     account_id = aws_cli_ctx.aws.validate_connection().get("Account")
     aws_permissions = AWSResourcePermissions(
         aws_cli_ctx.installation,
         ws,
         aws_cli_ctx.aws,
-        external_location,
+        aws_cli_ctx.external_locations,
         account_id,
     )
     external_location_migration = AWSExternalLocationsMigration(
         ws,
-        external_location,
+        aws_cli_ctx.external_locations,
         aws_permissions,
         aws_cli_ctx.principal_acl,
     )
