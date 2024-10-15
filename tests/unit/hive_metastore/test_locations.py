@@ -754,8 +754,8 @@ def test_mount_listing_misplaced_flat_file():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    mounts = MountsCrawler(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert results == [
         Table(
             "hive_metastore",
@@ -813,8 +813,8 @@ def test_mount_dont_list_partitions():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    mounts = MountsCrawler(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 1
     assert results[0].table_format == "DELTA"
     assert results[0].is_partitioned
@@ -856,8 +856,8 @@ def test_mount_infinite_loop(set_recursion_limit):
     )
 
     try:
-        mounts = Mounts(backend, client, "test")
-        results = TablesInMounts(backend, client, "test", mounts).snapshot()
+        mounts = MountsCrawler(backend, client, "test")
+        results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     except RecursionError:
         pytest.fail("Recursion depth exceeded, possible infinite loop.")
 
@@ -899,7 +899,7 @@ def test_mount_exclude_streaming_checkpoint():
             '`test`.`mounts`': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
-    mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    mounts = MountsCrawler(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot(force_refresh=True)
     assert len(results) == 1
     assert results[0].table_format == "CSV"
