@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 from collections import defaultdict
-from functools import partial
+from functools import partial, cached_property
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -43,6 +43,9 @@ class TablesMigrator:
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
     ):
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
         self._tc = table_crawler
         self._backend = backend
         self._ws = ws
@@ -50,6 +53,7 @@ class TablesMigrator:
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._migrate_grants = migrate_grants
+        self._spark = SparkSession.builder.getOrCreate()
 
     def get_remaining_tables(self) -> list[Table]:
         self.index(force_refresh=True)
@@ -221,8 +225,58 @@ class TablesMigrator:
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
 
+    @cached_property
+    def _catalog(self):
+        return self._spark._jsparkSession.sessionState().catalog()  # pylint: disable=protected-access
+
+    @cached_property
+    def _table_identifier(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.TableIdentifier  # pylint: disable=protected-access
+
+    @cached_property
+    def _catalog_type(self):
+        return (
+            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTableType  # pylint: disable=protected-access
+        )
+
+    @cached_property
+    def _catalog_table(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
+
     def _convert_hms_table_to_external(self, src_table: Table):
-        pass
+        try:
+            logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
+            database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
+            table_identifier = self._table_identifier(src_table.name, database)
+            old_table = self._catalog.getTableMetadata(table_identifier)
+            new_table = self._catalog_table(
+                old_table.identifier(),
+                self._catalog_type('EXTERNAL'),
+                old_table.storage(),
+                old_table.schema(),
+                old_table.provider(),
+                old_table.partitionColumnNames(),
+                old_table.bucketSpec(),
+                old_table.owner(),
+                old_table.createTime(),
+                old_table.lastAccessTime(),
+                old_table.createVersion(),
+                old_table.properties(),
+                old_table.stats(),
+                old_table.viewText(),
+                old_table.comment(),
+                old_table.unsupportedFeatures(),
+                old_table.tracksPartitionsInCatalog(),
+                old_table.schemaPreservesCase(),
+                old_table.ignoredProperties(),
+                old_table.viewOriginalText(),
+            )
+            self._catalog.alterTable(new_table)
+            logger.info(f"Converted {src_table.name} to External Table type.")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
+            return None
+        return None
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
