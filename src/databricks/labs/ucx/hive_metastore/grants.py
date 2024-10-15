@@ -608,17 +608,22 @@ class PrincipalACL:
         self._external_locations = external_locations
         self._compute_locations = cluster_locations
 
-    def get_interactive_cluster_grants(self) -> list[Grant]:
+    def get_interactive_cluster_grants(self) -> set[Grant]:
         tables = list(self._tables_crawler.snapshot())
-        grants: set[Grant] = set()
+        grants = set[Grant]()
 
-        for compute_location in self._compute_locations():
+        try:
+            compute_locations = self._compute_locations()
+        except DatabricksError as e:
+            logger.warning("No compute locations found.", exc_info=e)
+            return grants
+        for compute_location in compute_locations:
             principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
             cluster_usage = self._get_grants(compute_location.locations, principals, tables)
             grants.update(cluster_usage)
-        return list(grants)
+        return grants
 
     def _get_privilege(self, table: Table, locations: dict[str, str]) -> str | None:
         if table.view_text is not None:
