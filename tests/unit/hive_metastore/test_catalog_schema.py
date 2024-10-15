@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
-def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
+def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # pylint: ignore=too-complex
     """Prepare tests with the following setup:
 
     Existing HIVE metastore resources:
@@ -345,3 +345,4 @@ def test_create_catalogs_and_schemas_logs_skipping_already_existing_unity_catalo
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
     assert "Skipping already existing catalog: catalog1" in caplog.text
     assert "Skipping already existing schema: catalog1.schema1" in caplog.text
+    ws.assert_not_called()
