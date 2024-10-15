@@ -1,3 +1,7 @@
+"""
+HIVE metastore objects represented by dataclasses.
+"""
+
 from dataclasses import dataclass
 
 
