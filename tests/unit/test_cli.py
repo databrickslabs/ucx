@@ -13,7 +13,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import sql
-from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, MetastoreInfo
+from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, MetastoreInfo, SchemaInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import Run, RunResultState, RunState
@@ -863,7 +863,7 @@ def test_migrate_locations_gcp(ws):
 
 
 @pytest.mark.parametrize("run_as_collection", [False, True])
-def test_create_catalogs_schemas_lists_catalogs(run_as_collection, workspace_clients, acc_client) -> None:
+def test_create_catalogs_schemas_gets_catalog(run_as_collection, workspace_clients, acc_client) -> None:
     if not run_as_collection:
         workspace_clients = [workspace_clients[0]]
     for workspace_client in workspace_clients:
@@ -873,7 +873,7 @@ def test_create_catalogs_schemas_lists_catalogs(run_as_collection, workspace_cli
     create_catalogs_schemas(workspace_clients[0], prompts, run_as_collection=run_as_collection, a=acc_client)
 
     for workspace_client in workspace_clients:
-        workspace_client.catalogs.list.assert_called_once()
+        workspace_client.catalogs.get.assert_called()
 
 
 def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
@@ -881,12 +881,14 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     ws.catalogs.get.return_value = CatalogInfo(name="test")
     ws.catalogs.create.side_effect = [BadRequest("Catalog 'test' already exists")]
+    ws.schemas.get.return_value = SchemaInfo(full_name="test.test")
     ws.schemas.create.side_effect = [BadRequest("Schema 'test' already exists")]
     create_catalogs_schemas(ws, prompts, ctx=WorkspaceContext(ws))
 
     assert "Skipping already existing catalog: test" in caplog.messages
     assert "Skipping already existing schema: test.test" in caplog.messages
-    ws.catalogs.list.assert_called_once()
+    ws.catalogs.get.assert_called()
+    ws.schemas.get.assert_called()
 
 
 def test_cluster_remap(ws, caplog):
