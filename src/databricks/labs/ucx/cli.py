@@ -97,8 +97,9 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         logger.error("specify --table OR --view, not both")
         return None
     ctx = WorkspaceContext(w)
-    if table or view:
-        return ctx.table_mapping.skip_table_or_view(schema, table or view, ctx.tables_crawler.load_one)
+    table_or_view = table or view
+    if table_or_view:
+        return ctx.table_mapping.skip_table_or_view(schema, table_or_view, ctx.tables_crawler.load_one)
     return ctx.table_mapping.skip_schema(schema)
 
 
@@ -113,8 +114,9 @@ def unskip(w: WorkspaceClient, schema: str | None = None, table: str | None = No
         logger.error("specify --table OR --view, not both")
         return None
     ctx = WorkspaceContext(w)
-    if table or view:
-        return ctx.table_mapping.unskip_table_or_view(schema, table or view, ctx.tables_crawler.load_one)
+    table_or_view = table or view
+    if table_or_view:
+        return ctx.table_mapping.unskip_table_or_view(schema, table_or_view, ctx.tables_crawler.load_one)
     return ctx.table_mapping.unskip_schema(schema)
 
 
