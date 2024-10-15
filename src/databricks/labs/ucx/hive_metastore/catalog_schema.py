@@ -5,7 +5,7 @@ from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
@@ -141,6 +141,9 @@ class CatalogSchema:
             return Catalog(catalog_info.name)
         except (NotFound, TimeoutError):
             return None
+        except DatabricksError as e:
+            logger.warning(f"Unexpected error when getting catalog: {catalog.name}", exc_info=e)
+            return None
 
     def _create_catalog(
         self,
@@ -189,6 +192,9 @@ class CatalogSchema:
             schema_info = get(schema.full_name)
             return Schema(schema_info.catalog_name, schema_info.name)
         except (NotFound, TimeoutError):
+            return None
+        except DatabricksError as e:
+            logger.warning(f"Unexpected error when getting schema: {schema.full_name}", exc_info=e)
             return None
 
     def _create_schema(self, schema: Schema) -> Schema:
