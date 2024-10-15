@@ -36,8 +36,6 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
-    Mount,
-    Mounts,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate, Rule
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
@@ -590,37 +588,38 @@ class PrincipalACL:
         backend: SqlBackend,
         installation: Installation,
         tables_crawler: TablesCrawler,
-        mounts_crawler: Mounts,
+        external_locations: ExternalLocations,
         cluster_locations: Callable[[], list[ComputeLocations]],
     ):
         self._backend = backend
         self._ws = ws
         self._installation = installation
         self._tables_crawler = tables_crawler
-        self._mounts_crawler = mounts_crawler
+        self._external_locations = external_locations
         self._compute_locations = cluster_locations
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = list(self._tables_crawler.snapshot())
-        mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
         for compute_location in self._compute_locations():
             principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
-            cluster_usage = self._get_grants(compute_location.locations, principals, tables, mounts)
+            cluster_usage = self._get_grants(compute_location.locations, principals, tables)
             grants.update(cluster_usage)
         return list(grants)
 
-    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]) -> str | None:
+    def _get_privilege(self, table: Table, locations: dict[str, str]) -> str | None:
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
             return None
         if table.location is None:
             return None
         if table.location.startswith('dbfs:/mnt') or table.location.startswith('/dbfs/mnt'):
-            mount_location = ExternalLocations.resolve_mount(table.location, mounts)
+            mount_location = self._external_locations.resolve_mount(table.location)
+            if not mount_location:
+                return None
             for loc, privilege in locations.items():
                 if loc is not None and mount_location.startswith(loc):
                     return privilege
@@ -642,13 +641,11 @@ class PrincipalACL:
                 grants.append(grant)
         return grants
 
-    def _get_grants(
-        self, locations: dict[str, str], principals: list[str], tables: list[Table], mounts: list[Mount]
-    ) -> list[Grant]:
+    def _get_grants(self, locations: dict[str, str], principals: list[str], tables: list[Table]) -> list[Grant]:
         grants = []
         filtered_tables = []
         for table in tables:
-            privilege = self._get_privilege(table, locations, mounts)
+            privilege = self._get_privilege(table, locations)
             if privilege == "READ_FILES":
                 for principal in principals:
                     grants.append(Grant(principal, "SELECT", table.catalog, table.database, table.name))

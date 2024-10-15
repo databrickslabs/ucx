@@ -62,7 +62,6 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         the Hive Metastore to the Unity Catalog."""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            mounts_crawler=ctx.mounts_crawler,
             hiveserde_in_place_migrate=True,
         )
 
@@ -91,7 +90,6 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates non-SYNC supported and non HiveSerde external tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_NO_SYNC,
-            mounts_crawler=ctx.mounts_crawler,
         )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
@@ -99,7 +97,6 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates HiveSerde tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            mounts_crawler=ctx.mounts_crawler,
         )
 
     @job_task(

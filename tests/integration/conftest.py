@@ -44,7 +44,7 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation, ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
@@ -357,7 +357,7 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
         return self._spn_infos
 
 
-class StaticMountCrawler(Mounts):
+class StaticMountCrawler(MountsCrawler):
     def __init__(
         self,
         mounts: list[Mount],
@@ -873,7 +873,11 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
             installation_ctx.workspace_client,
             AWSResources(aws_profile()),
             ExternalLocations(
-                installation_ctx.workspace_client, installation_ctx.sql_backend, installation_ctx.inventory_database
+                installation_ctx.workspace_client,
+                installation_ctx.sql_backend,
+                installation_ctx.inventory_database,
+                installation_ctx.tables_crawler,
+                installation_ctx.mounts_crawler,
             ),
         )
 
