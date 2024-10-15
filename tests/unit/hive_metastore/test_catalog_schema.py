@@ -6,7 +6,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, NotFound
+from databricks.sdk.errors import AlreadyExists, BadRequest, NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -15,7 +15,10 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
-def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # pylint: disable=too-complex
+def prepare_test(  # pylint: disable=too-complex
+    ws,
+    backend: MockBackend | None = None,
+) -> CatalogSchema:
     """Prepare tests with the following setup:
 
     Existing HIVE metastore resources:
@@ -50,15 +53,17 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # py
       - `catalog4.schema4`
     """
     backend = backend or MockBackend()
+    existing_catalogs = {"catalog1"}
 
     def get_catalog(catalog_name: str) -> CatalogInfo:
-        if catalog_name == "catalog1":
-            return CatalogInfo(name="catalog1")
-        raise NotFound(f"Catalog: {catalog_name}")
+        if catalog_name not in existing_catalogs:
+            raise NotFound(f"Catalog '{catalog_name}' does not exists.")
+        return CatalogInfo(name=catalog_name, full_name=catalog_name)
 
-    def raise_catalog1_exists(catalog: str, *_, **__) -> None:
-        if catalog == "catalog1":
-            raise BadRequest("Catalog 'catalog1' already exists")
+    def create_catalog(catalog_name: str, *_, **__) -> None:
+        if catalog_name in existing_catalogs:
+            raise AlreadyExists(f"Catalog '{catalog_name}' already exists.")
+        existing_catalogs.add(catalog_name)
 
     def get_schema(full_name: str) -> SchemaInfo:
         if full_name == "catalog1.schema1":
@@ -71,7 +76,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:  # py
 
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
     ws.catalogs.get.side_effect = get_catalog
-    ws.catalogs.create.side_effect = raise_catalog1_exists
+    ws.catalogs.create.side_effect = create_catalog
     ws.schemas.list.return_value = [SchemaInfo(catalog_name="catalog1", name="schema1")]
     ws.schemas.get.side_effect = get_schema
     ws.schemas.create.side_effect = raise_catalog1_schema1_exists

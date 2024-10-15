@@ -1,10 +1,12 @@
 import collections
+import datetime as dt
 import logging
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -81,14 +83,11 @@ class CatalogSchema:
         prompts: Prompts,
         *,
         properties: dict[str, str] | None,
-    ) -> None:
-        try:
-            catalog_info = self._ws.catalogs.get(catalog.name)
-        except NotFound:
-            catalog_info = None
-        if catalog_info:
-            logger.warning(f"Skipping already existing catalog: {catalog_info.name}")
-            return
+    ) -> Catalog:
+        catalog_existing = self._get_catalog(catalog)
+        if catalog_existing:
+            logger.warning(f"Skipping already existing catalog: {catalog.name}")
+            return catalog_existing
         logger.info(f"Validating UC catalog: {catalog.name}")
         attempts = 3
         while True:
@@ -100,7 +99,7 @@ class CatalogSchema:
             attempts -= 1
             if attempts == 0:
                 raise NotFound(f"Failed to validate location for catalog: {catalog.name}")
-        self._create_catalog(catalog, catalog_storage, properties=properties)
+        return self._create_catalog(catalog, catalog_storage, properties=properties)
 
     def _validate_location(self, location: str) -> bool:
         if location == "metastore":
@@ -116,7 +115,40 @@ class CatalogSchema:
         logger.warning(f"No matching external location found for: {location}")
         return False
 
-    def _create_catalog(self, catalog: Catalog, catalog_storage: str, *, properties: dict[str, str] | None) -> None:
+    def _get_catalog(
+        self,
+        catalog: Catalog,
+        *,
+        timeout: dt.timedelta | None = None,
+    ) -> Catalog | None:
+        """Get a catalog.
+
+        Args:
+            catalog (Catalog) : The catalog to get.
+            timeout (dt.timedelta) : Timeout to wait before concluding the catalog does not exist. If None, no timeout
+                is applied. Defaults to `None`.
+
+        Returns:
+            Catalog : The catalog it got.
+            None : If the catalog does not exist.
+        """
+        if timeout:
+            get = retried(on=[NotFound], timeout=timeout)(self._ws.catalogs.get)
+        else:
+            get = self._ws.catalogs.get
+        try:
+            catalog_info = get(catalog.name)
+            return Catalog(catalog_info.name)
+        except (NotFound, TimeoutError):
+            return None
+
+    def _create_catalog(
+        self,
+        catalog: Catalog,
+        catalog_storage: str,
+        *,
+        properties: dict[str, str] | None,
+    ) -> Catalog:
         logger.info(f"Creating UC catalog: {catalog.name}")
         if catalog_storage == "metastore":
             self._ws.catalogs.create(catalog.name, comment="Created by UCX", properties=properties)
@@ -127,6 +159,10 @@ class CatalogSchema:
                 comment="Created by UCX",
                 properties=properties,
             )
+        catalog_created = self._get_catalog(catalog, timeout=dt.timedelta(seconds=10))
+        if catalog_created is None:
+            raise NotFound(f"Created catalog '{catalog.name}' does not exist.")
+        return catalog_created
 
     def _create_schema(self, schema: Schema) -> None:
         try:

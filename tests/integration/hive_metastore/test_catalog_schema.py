@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import CatalogInfo, PermissionsList, SchemaInfo
+from databricks.sdk.service.catalog import PermissionsList, SchemaInfo
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
@@ -20,11 +20,6 @@ _SPARK_CONF = get_azure_spark_conf()
 
 
 @retried(on=[NotFound], timeout=timedelta(seconds=20))
-def get_catalog(ws: WorkspaceClient, name: str) -> CatalogInfo:
-    return ws.catalogs.get(name)
-
-
-@retried(on=[NotFound], timeout=timedelta(seconds=20))
 def get_schema(ws: WorkspaceClient, full_name: str) -> SchemaInfo:
     return ws.schemas.get(full_name)
 
@@ -35,14 +30,17 @@ def get_schema_permissions_list(ws: WorkspaceClient, full_name: str) -> Permissi
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_after) -> None:
+def test_create_ucx_catalog_creates_catalog(runtime_ctx, watchdog_remove_after) -> None:
     # Delete catalog created for testing to test the creation of a new catalog
     runtime_ctx.workspace_client.catalogs.delete(runtime_ctx.ucx_catalog, force=True)
     prompts = MockPrompts({f"Please provide storage location url for catalog: {runtime_ctx.ucx_catalog}": "metastore"})
+    properties = {"RemoveAfter": watchdog_remove_after}
 
-    runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
+    runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties=properties)
 
-    assert get_catalog(ws, runtime_ctx.ucx_catalog)
+    catalog_info = runtime_ctx.workspace_client.catalogs.get(runtime_ctx.ucx_catalog)
+    assert catalog_info.name == runtime_ctx.ucx_catalog
+    assert catalog_info.properties == properties
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
@@ -69,8 +67,8 @@ def test_create_all_catalogs_schemas(ws: WorkspaceClient, runtime_ctx, make_rand
     runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts, properties=properties)
 
     try:
-        get_catalog(ws, dst_catalog_name)
-    except RuntimeError:
+        runtime_ctx.workspace_client.catalogs.get(dst_catalog_name)
+    except NotFound:
         assert False, f"Catalog not created: {dst_catalog_name}"
     else:
         assert True, f"Catalog created: {dst_catalog_name}"
