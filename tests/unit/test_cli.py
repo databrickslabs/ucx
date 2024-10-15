@@ -56,6 +56,7 @@ from databricks.labs.ucx.cli import (
     show_all_metastores,
     skip,
     sync_workspace_info,
+    unskip,
     upload,
     validate_external_locations,
     validate_groups_membership,
@@ -192,7 +193,7 @@ def test_installations(ws, capsys):
 
 
 def test_skip_with_schema(ws) -> None:
-    skip(ws, "schema", None)
+    skip(ws, "schema")
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
@@ -244,6 +245,63 @@ def test_skip_no_schema(ws, caplog) -> None:
 
 def test_skip_table_and_view(ws, caplog) -> None:
     skip(ws, "schema", "table", "view")
+
+    assert "specify --table OR --view, not both" in caplog.messages
+
+
+def test_unskip_with_schema(ws) -> None:
+    unskip(ws, "schema", None)
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="ALTER SCHEMA hive_metastore.`schema` UNSET DBPROPERTIES IF EXISTS('databricks.labs.ucx.skip');",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=None,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None,
+    )
+
+
+def test_unskip_with_table(ws) -> None:
+    unskip(ws, "schema", "table")
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="SELECT * FROM `hive_metastore`.`ucx`.`tables` WHERE database='schema' AND name='table' LIMIT 1",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=None,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None,
+    )
+
+
+def test_unskip_with_view(ws) -> None:
+    unskip(ws, "schema", view="view")
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="SELECT * FROM `hive_metastore`.`ucx`.`tables` WHERE database='schema' AND name='view' LIMIT 1",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=None,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None,
+    )
+
+
+def test_unskip_no_schema(ws, caplog) -> None:
+    unskip(ws)
+
+    assert '--schema is a required parameter.' in caplog.messages
+
+
+def test_unskip_table_and_view(ws, caplog) -> None:
+    unskip(ws, "schema", "table", "view")
 
     assert "specify --table OR --view, not both" in caplog.messages
 
