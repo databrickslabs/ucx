@@ -645,11 +645,14 @@ flowchart LR
 #### Step 4: Odds and Ends
 The following steps can be used to repair/amend the metastore after the upgrade process.
 
-##### Step 4.1: Skipping Table/Schema
+##### Step 4.1: Skipping schema, table or view
+
 ```bash
-databricks labs ucx skip --schema X [--table Y]
+databricks labs ucx skip --schema X [--table Y] [--view Zj]
 ```
-This command will mark the table or schema as skipped. The table will not be upgraded in the next run of the upgrade process.
+
+This command will mark the schema, table or view as to-be skipped during the migration processes,
+see [`skip` command](#skip-command).
 
 ##### Step 4.2: Moving objects
 ```bash
@@ -1477,15 +1480,15 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 ## `skip` command
 
 ```text
-databricks labs ucx skip --schema X [--table Y]
+databricks labs ucx skip --schema X [--table Y] [--view Z]
 ```
 
 Anytime after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command allows users to skip certain schemas or tables during the [table migration](#table-migration) process.
-The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag
-is provided, all tables in the specified HMS database are skipped.
-This command is useful to temporarily disable migration of a particular schema or table.
+This command allows users to skip certain schemas, tables or views during the [table migration](#table-migration) process.
+The command takes `--schema` and, optionally, `--table` and `--view` flags to specify the schema, table or view to skip.
+If no `--table` flag is provided, all tables in the specified HMS database are skipped. The `--table` and `--view` can
+only be used exclusively. This command is useful to temporarily disable migration of a particular schema, table or view.
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
@@ -1494,9 +1497,10 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 ## `unskip` command
 
 ```commandline
-databricks labs ucx unskip --schema X [--table Y]
+databricks labs ucx unskip --schema X [--table Y] [--view Z]
 ```
-This command removes the mark set by the [`skip` command](#skip-command) on the given schema or table.
+
+This command removes the mark set by the [`skip` command](#skip-command) on the given schema, table or view.
 
 [[back to top](#databricks-labs-ucx)]
 
