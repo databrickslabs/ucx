@@ -17,17 +17,19 @@ logger = logging.getLogger(__name__)
 class PipelineRule:
     src_pipeline_id: str
     target_catalog_name: str
-    target_schema_name: str | None
-    target_pipeline_name: str | None
+    # target_schema_name: str | None
+    # target_pipeline_name: str | None
 
 
     @classmethod
-    def from_src_dst(cls, src_pipeline_id, target_catalog_name: str, target_schema_name: str | None, target_pipeline_name:str | None) -> "PipelineRule":
+    def from_src_dst(cls, src_pipeline_id, target_catalog_name: str,
+                     # target_schema_name: str | None, target_pipeline_name:str | None
+                     ) -> "PipelineRule":
         return cls(
             src_pipeline_id = src_pipeline_id,
             target_catalog_name=target_catalog_name,
-            target_schema_name=target_schema_name,
-            target_pipeline_name=target_pipeline_name,
+            # target_schema_name=target_schema_name,
+            # target_pipeline_name=target_pipeline_name,
         )
 
 @dataclass
@@ -78,11 +80,14 @@ class PipelineMapping:
         rules = self.load()
         # Getting all the source tables from the rules
         pipelines = list(_pc.snapshot())
+        pipelines_to_migrate = []
 
         for rule in rules:
             for pipeline in pipelines:
                 if pipeline.pipeline_id == rule.src_pipeline_id:
-                    yield PipelineToMigrate(pipeline, rule)
+                    pipelines_to_migrate.append(PipelineToMigrate(pipeline, rule))
+
+        return pipelines_to_migrate
 
 class PipelinesMigrator:
     def __init__(self,
@@ -123,8 +128,8 @@ class PipelinesMigrator:
         headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
         body = {}
         body['catalog'] = pipeline.rule.target_catalog_name
-        if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
-        if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
+        # if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
+        # if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
         body['clone_mode'] = 'MIGRATE_TO_UC'
         body['configuration'] = {
             'pipelines.migration.ignoreExplicitPath': 'true'
