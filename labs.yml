@@ -37,8 +37,9 @@ commands:
       - name: schema
         description: Schema name to skip.
       - name: table
-        description: Table Name to Skip
         description: (Optional) Table name to skip. Exclusive with `--view`.
+      - name: view
+        description: (Optional) View name to skip. Exclusive with `--table`.
 
   - name: sync-workspace-info
     is_account_level: true

@@ -191,7 +191,22 @@ def test_installations(ws, capsys):
     assert '{"database": "ucx", "path": "/Users/foo/.ucx", "warehouse_id": "test"}' in capsys.readouterr().out
 
 
-def test_skip_with_table(ws):
+def test_skip_with_schema(ws) -> None:
+    skip(ws, "schema", None)
+
+    ws.statement_execution.execute_statement.assert_called_with(
+        warehouse_id='test',
+        statement="ALTER SCHEMA `schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
+        byte_limit=None,
+        catalog=None,
+        schema=None,
+        disposition=None,
+        format=sql.Format.JSON_ARRAY,
+        wait_timeout=None,
+    )
+
+
+def test_skip_with_table(ws) -> None:
     skip(ws, "schema", "table")
 
     ws.statement_execution.execute_statement.assert_called_with(
@@ -206,12 +221,12 @@ def test_skip_with_table(ws):
     )
 
 
-def test_skip_with_schema(ws):
-    skip(ws, "schema", None)
+def test_skip_with_view(ws) -> None:
+    skip(ws, "schema", view="view")
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER SCHEMA `schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
+        statement="SELECT * FROM `hive_metastore`.`ucx`.`tables` WHERE database='schema' AND name='view' LIMIT 1",
         byte_limit=None,
         catalog=None,
         schema=None,
