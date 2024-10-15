@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 class CatalogSchema:
 
     def __init__(
-        self, ws: WorkspaceClient, table_mapping: TableMapping, migrate_grants: MigrateGrants, ucx_catalog: str
+        self,
+        ws: WorkspaceClient,
+        table_mapping: TableMapping,
+        migrate_grants: MigrateGrants,
+        ucx_catalog: str,
     ):
         self._ws = ws
         self._table_mapping = table_mapping
