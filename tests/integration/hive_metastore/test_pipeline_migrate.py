@@ -39,7 +39,7 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
         assert results[0].pipeline_id == created_pipeline.pipeline_id
 
         pipeline_rules = [
-            PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog", None, None)
+            PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog")
         ]
         runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
         pipeline_mapping = PipelineMapping(
