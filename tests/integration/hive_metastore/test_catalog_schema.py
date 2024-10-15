@@ -3,14 +3,15 @@ from datetime import timedelta
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo
+from databricks.sdk.service.catalog import CatalogInfo, PermissionsList
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from ..conftest import get_azure_spark_conf
 
@@ -100,49 +101,41 @@ def test_create_catalog_schema_with_principal_acl_aws(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_create_catalog_schema_with_legacy_acls(
-    ws,
+    ws: WorkspaceClient,
+    runtime_ctx,
     make_random,
     make_user,
-    make_schema,
-    make_mounted_location,
-    runtime_ctx,
-    sql_backend,
     watchdog_remove_after,
 ) -> None:
-    src_schema = make_schema(catalog_name="hive_metastore")
-    src_table = runtime_ctx.make_table(
-        catalog_name=src_schema.catalog_name,
-        schema_name=src_schema.name,
-        external_csv=make_mounted_location,
-    )
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     dst_catalog_name = f"ucx-{make_random()}"
-    dst_schema = SchemaInfo(catalog_name=dst_catalog_name, name="test", full_name=f"{dst_catalog_name}.test")
-    rules = [Rule.from_src_dst(src_table, dst_schema)]
+    dst_schema_name = "test"
+    rules = [Rule("workspace", dst_catalog_name, src_schema.name, dst_schema_name, src_table.name, src_table.name)]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_resource_permission()
 
-    user_a, user_b = make_user(), make_user()
+    schema_owner, table_owner = make_user(), make_user()
     grants = [
-        Grant(user_a.user_name, "USAGE", src_schema.catalog_name, src_schema.name),
-        Grant(user_b.user_name, "SELECT", src_table.catalog_name, src_table.schema_name, src_table.name),
-        Grant(user_a.user_name, "OWN", src_schema.catalog_name, src_schema.name),
-        Grant(user_b.user_name, "OWN", src_table.catalog_name, src_table.schema_name, src_table.name),
+        Grant(schema_owner.user_name, "USAGE", src_schema.catalog_name, src_schema.name),
+        Grant(table_owner.user_name, "USAGE", src_table.catalog_name, src_table.schema_name),
+        Grant(schema_owner.user_name, "OWN", src_schema.catalog_name, src_schema.name),
+        Grant(table_owner.user_name, "OWN", src_table.catalog_name, src_table.schema_name, src_table.name),
     ]
     for grant in grants:
         for sql in grant.hive_grant_sql():
-            sql_backend.execute(sql)
-
-    # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+            runtime_ctx.sql_backend.execute(sql)
 
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     properties = {"RemoveAfter": watchdog_remove_after}
     runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts, properties=properties)
 
-    schema_grants = ws.grants.get(SecurableType.SCHEMA, dst_schema.full_name)
-    schema_grant = PrivilegeAssignment(user_a.user_name, [Privilege.USE_SCHEMA])
+    @retried(on=[NotFound], timeout=timedelta(seconds=20))
+    def get_schema_permissions_list(full_name: str) -> PermissionsList:
+        return ws.grants.get(SecurableType.SCHEMA, full_name)
+
+    schema_grants = get_schema_permissions_list(f"{dst_catalog_name}.{dst_schema_name}")
+    schema_grant = PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA])
+    schema_info = ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}")
+    assert schema_grants.privilege_assignments is not None
     assert schema_grant in schema_grants.privilege_assignments
-    schema_info = ws.schemas.get(f"{dst_schema.full_name}")
-    assert schema_info.owner == user_b.user_name
-    schema_info = ws.schemas.get(dst_schema.full_name)
-    assert schema_info.owner == user_a.user_name
+    assert schema_info.owner == schema_owner.user_name
