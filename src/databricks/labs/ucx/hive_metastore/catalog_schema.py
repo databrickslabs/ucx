@@ -43,13 +43,14 @@ class CatalogSchema:
         catalogs, schemas = self._catalogs_schemas_from_table_mapping()
         for dst_catalog, src_schemas in catalogs.items():
             self._create_catalog_validate(dst_catalog, prompts, properties=properties)
-            # Apply catalog grants as last to avoid transferring ownership before schema grants are applied
-            for src_schema in src_schemas:
-                self._migrate_grants.apply(src_schema, dst_catalog)
         for dst_schema, src_schemas in schemas.items():
             self._create_schema(dst_schema)
             for src_schema in src_schemas:
                 self._migrate_grants.apply(src_schema, dst_schema)
+        # Apply catalog grants as last to avoid transferring ownership before schema grants are applied
+        for dst_catalog, src_schemas in catalogs.items():
+            for src_schema in src_schemas:
+                self._migrate_grants.apply(src_schema, dst_catalog)
 
     def _catalogs_schemas_from_table_mapping(self) -> tuple[dict[Catalog, set[Schema]], dict[Schema, set[Schema]]]:
         """Generate a list of catalogs and schema to be created from table mapping.
