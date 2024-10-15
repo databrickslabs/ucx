@@ -1,3 +1,4 @@
+import collections
 import logging
 from pathlib import PurePath
 
@@ -35,50 +36,39 @@ class CatalogSchema:
         self._create_catalog_validate(Catalog(self._ucx_catalog), prompts, properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
-        catalogs_existing, schemas_existing = self._catalogs_schemas_from_unity_catalog()
+        """Create all UC catalogs and schemas reference by the table mapping file.
+
+        After creation, the grants from the HIVE metastore schemas are applied to the matching UC catalogs and schemas.
+        """
+        # TODO: Option to skip grants apply
         catalogs, schemas = self._catalogs_schemas_from_table_mapping()
-        for src_schema, dst_catalog in catalogs:
-            if dst_catalog in catalogs_existing:
-                continue
+        for dst_catalog, src_schemas in catalogs.items():
             self._create_catalog_validate(dst_catalog, prompts, properties=None)
             # TODO: Apply ownership as last
-            self._migrate_grants.apply(src_schema, dst_catalog)
-        for src_schema, dst_schema in schemas:
-            if dst_schema in schemas_existing:
-                continue
+            for src_schema in src_schemas:
+                self._migrate_grants.apply(src_schema, dst_catalog)
+        for dst_schema, src_schemas in schemas.items():
             self._create_schema(dst_schema)
-            self._migrate_grants.apply(src_schema, dst_schema)
+            for src_schema in src_schemas:
+                self._migrate_grants.apply(src_schema, dst_schema)
 
-    def _catalogs_schemas_from_unity_catalog(self) -> tuple[set[Catalog], set[Schema]]:
-        """Generate a list of existing UC catalogs and schema."""
-        logger.info("Listing existing UC catalogs and schemas")
-        catalogs, schemas = set[Catalog](), set[Schema]()
-        for catalog_info in self._ws.catalogs.list():
-            if not catalog_info.name:
-                continue
-            catalog = Catalog(catalog_info.name)
-            catalogs.add(catalog)
-            for schema_info in self._ws.schemas.list(catalog.name, max_results=0):
-                if not schema_info.name:
-                    continue
-                schema = Schema(schema_info.name, catalog_info.name)
-                schemas.add(schema)
-        return catalogs, schemas
+    def _catalogs_schemas_from_table_mapping(self) -> tuple[dict[Catalog, set[Schema]], dict[Schema, set[Schema]]]:
+        """Generate a list of catalogs and schema to be created from table mapping.
 
-    def _catalogs_schemas_from_table_mapping(self) -> tuple[list[tuple[Schema, Catalog]], list[tuple[Schema, Schema]]]:
-        """Generate a list of catalogs and schema to be created from table mapping."""
-        catalogs_seen, schemas_seen = set[Catalog](), set[Schema]()
-        catalogs, schemas = [], []
+        For applying grants after creating the catalogs and schemas, we track the HIVE metastore schemas from which the
+        UC catalog or schema is mapped.
+
+        :returns
+            dict[Catalog, set[Schema]] : The UC catalogs to create with the schemas it is mapped from.
+            dict[Schema, set[Schema]] : The UC schemas to create with the schemas it is mapped from.
+        """
+        catalogs, schemas = collections.defaultdict(set), collections.defaultdict(set)
         for mappings in self._table_mapping.load():
             src_schema = Schema(mappings.src_schema, "hive_metastore")
             dst_catalog = Catalog(mappings.catalog_name)
-            if dst_catalog not in catalogs_seen:
-                catalogs.append((src_schema, dst_catalog))
-                catalogs_seen.add(dst_catalog)
             dst_schema = Schema(mappings.dst_schema, mappings.catalog_name)
-            if dst_schema not in schemas_seen:
-                schemas.append((src_schema, dst_schema))
-                schemas_seen.add(dst_schema)
+            catalogs[dst_catalog].add(src_schema)
+            schemas[dst_schema].add(src_schema)
         return catalogs, schemas
 
     def _create_catalog_validate(
@@ -135,5 +125,6 @@ class CatalogSchema:
             )
 
     def _create_schema(self, schema: Schema) -> None:
+        # TODO: Handle schema already exists
         logger.info(f"Creating UC schema: {schema.full_name}")
         self._ws.schemas.create(schema.name, schema.catalog_name, comment="Created by UCX")
