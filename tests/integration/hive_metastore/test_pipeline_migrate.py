@@ -1,3 +1,5 @@
+from venv import create
+
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule, PipelineMapping
 
@@ -37,7 +39,7 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
         assert results[0].pipeline_id == created_pipeline.pipeline_id
 
         pipeline_rules = [
-            PipelineRule.from_src_dst("test_catalog", None, None)
+            PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog", None, None)
         ]
         pipeline_mapping = PipelineMapping(
             runtime_ctx.installation,
