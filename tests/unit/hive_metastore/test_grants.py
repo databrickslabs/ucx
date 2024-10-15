@@ -514,7 +514,7 @@ def test_crawler_should_filter_databases() -> None:
         (
             Schema("hive_metastore", "schema"),
             Grant("user", "USAGE"),
-            Schema("schema", "catalog"),
+            Schema("catalog", "schema"),
             "GRANT USE SCHEMA ON DATABASE `catalog`.`schema` TO `user`",
         ),
         (
@@ -532,7 +532,7 @@ def test_crawler_should_filter_databases() -> None:
         (
             Schema("hive_metastore", "schema"),
             Grant("user", "OWN"),
-            Schema("schema", "catalog"),
+            Schema("catalog", "schema"),
             "ALTER DATABASE `catalog`.`schema` OWNER TO `user`",
         ),
         (
@@ -557,7 +557,7 @@ def test_migrate_grants_applies_query(
         if isinstance(src, Catalog):
             catalog = src.name
         elif isinstance(src, Schema):
-            catalog = src.catalog_name
+            catalog = src.catalog
             database = src.name
         elif isinstance(src, Table):
             catalog = src.catalog
@@ -605,8 +605,8 @@ def test_migrate_grants_alters_ownership_as_last() -> None:
         group_manager,
         [grant_loader],
     )
-    src = Schema("schema", "hive_metastore")
-    dst = Schema("schema", "catalog")
+    src = Schema("hive_metastore", "schema")
+    dst = Schema("catalog", "schema")
 
     migrate_grants.apply(src, dst)
 

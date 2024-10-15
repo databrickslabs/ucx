@@ -68,9 +68,9 @@ class CatalogSchema:
         """
         catalogs, schemas = collections.defaultdict(set), collections.defaultdict(set)
         for mappings in self._table_mapping.load():
-            src_schema = Schema(mappings.src_schema, "hive_metastore")
+            src_schema = Schema("hive_metastore", mappings.src_schema)
             dst_catalog = Catalog(mappings.catalog_name)
-            dst_schema = Schema(mappings.dst_schema, mappings.catalog_name)
+            dst_schema = Schema(mappings.catalog_name, mappings.dst_schema)
             catalogs[dst_catalog].add(src_schema)
             schemas[dst_schema].add(src_schema)
         return catalogs, schemas
@@ -137,4 +137,4 @@ class CatalogSchema:
             logger.warning(f"Skipping already existing schema: {schema_info.full_name}")
             return
         logger.info(f"Creating UC schema: {schema.full_name}")
-        self._ws.schemas.create(schema.name, schema.catalog_name, comment="Created by UCX")
+        self._ws.schemas.create(schema.name, schema.catalog, comment="Created by UCX")

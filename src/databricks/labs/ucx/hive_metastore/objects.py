@@ -24,12 +24,12 @@ class Catalog:
 
 @dataclass(frozen=True)
 class Schema:
+    catalog: str
     name: str
-    catalog_name: str
 
     @property
     def full_name(self) -> str:
-        return f"{self.catalog_name}.{self.name}"
+        return f"{self.catalog}.{self.name}"
 
     @property
     def key(self) -> str:
