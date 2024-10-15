@@ -114,7 +114,7 @@ class Grant:
     def order(self) -> int:
         """Order of the grants to be upheld when applying."""
         match self.action_type:
-            case "OWN":
+            case "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
                 return 1
             case _:
                 return 0
