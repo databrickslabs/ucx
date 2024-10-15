@@ -164,13 +164,41 @@ class CatalogSchema:
             raise NotFound(f"Created catalog '{catalog.name}' does not exist.")
         return catalog_created
 
-    def _create_schema(self, schema: Schema) -> None:
+    def _get_schema(
+        self,
+        schema: Schema,
+        *,
+        timeout: dt.timedelta | None = None,
+    ) -> Schema | None:
+        """Get a schema.
+
+        Args:
+            schema (Schema) : The schema to get.
+            timeout (dt.timedelta) : Timeout to wait before concluding the catalog does not exist. If None, no timeout
+                is applied. Defaults to `None`.
+
+        Returns:
+            Schema : The schema it got.
+            None : If the catalog does not exist.
+        """
+        if timeout:
+            get = retried(on=[NotFound], timeout=timeout)(self._ws.schemas.get)
+        else:
+            get = self._ws.schemas.get
         try:
-            schema_info = self._ws.schemas.get(schema.full_name)
-        except NotFound:
-            schema_info = None
-        if schema_info:
-            logger.warning(f"Skipping already existing schema: {schema_info.full_name}")
-            return
+            schema_info = get(schema.full_name)
+            return Schema(schema_info.catalog_name, schema_info.name)
+        except (NotFound, TimeoutError):
+            return None
+
+    def _create_schema(self, schema: Schema) -> Schema:
+        schema_existing = self._get_schema(schema)
+        if schema_existing:
+            logger.warning(f"Skipping already existing schema: {schema.full_name}")
+            return schema_existing
         logger.info(f"Creating UC schema: {schema.full_name}")
         self._ws.schemas.create(schema.name, schema.catalog, comment="Created by UCX")
+        schema_created = self._get_schema(schema, timeout=dt.timedelta(seconds=10))
+        if schema_created is None:
+            raise NotFound(f"Created schema '{schema.full_name}' does not exist.")
+        return schema_created

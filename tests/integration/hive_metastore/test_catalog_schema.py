@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import PermissionsList, SchemaInfo
+from databricks.sdk.service.catalog import PermissionsList
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
@@ -17,11 +17,6 @@ from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
-
-
-@retried(on=[NotFound], timeout=timedelta(seconds=20))
-def get_schema(ws: WorkspaceClient, full_name: str) -> SchemaInfo:
-    return ws.schemas.get(full_name)
 
 
 @retried(on=[NotFound], timeout=timedelta(seconds=20))
@@ -74,7 +69,7 @@ def test_create_all_catalogs_schemas(ws: WorkspaceClient, runtime_ctx, make_rand
         assert True, f"Catalog created: {dst_catalog_name}"
     for dst_schema_full_name in f"{dst_catalog_name}.{src_schema_1.name}", f"{dst_catalog_name}.{src_schema_2.name}":
         try:
-            get_schema(ws, dst_schema_full_name)
+            ws.schemas.get(dst_schema_full_name)
         except RuntimeError:
             assert False, f"Schema not created: {dst_schema_full_name}"
         else:
@@ -179,4 +174,4 @@ def test_create_catalog_schema_with_legacy_acls(
     schema_grants = get_schema_permissions_list(ws, f"{dst_catalog_name}.{dst_schema_name}")
     assert schema_grants.privilege_assignments is not None
     assert PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA]) in schema_grants.privilege_assignments
-    assert get_schema(ws, f"{dst_catalog_name}.{dst_schema_name}").owner == schema_owner.user_name
+    assert ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}").owner == schema_owner.user_name

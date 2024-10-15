@@ -54,6 +54,7 @@ def prepare_test(  # pylint: disable=too-complex
     """
     backend = backend or MockBackend()
     existing_catalogs = {"catalog1"}
+    existing_schemas = {"catalog1.schema1"}
 
     def get_catalog(catalog_name: str) -> CatalogInfo:
         if catalog_name not in existing_catalogs:
@@ -66,20 +67,23 @@ def prepare_test(  # pylint: disable=too-complex
         existing_catalogs.add(catalog_name)
 
     def get_schema(full_name: str) -> SchemaInfo:
-        if full_name == "catalog1.schema1":
-            return SchemaInfo(catalog_name="catalog1", name="schema", full_name="catalog1.schema1")
-        raise NotFound(f"Schema: {full_name}")
+        if full_name not in existing_schemas:
+            raise NotFound(f"Schema '{full_name}' does not exists.")
+        catalog_name, schema_name = full_name.split(".", maxsplit=1)
+        return SchemaInfo(catalog_name=catalog_name, name=schema_name, full_name=full_name)
 
-    def raise_catalog1_schema1_exists(schema: str, catalog: str, *_, **__) -> None:
-        if catalog == "catalog1" and schema == "schema1":
-            raise BadRequest("Schema 'catalog1.schema1' already exists")
+    def create_schema(schema: str, catalog: str, *_, **__) -> None:
+        full_name = f"{catalog}.{schema}"
+        if full_name in existing_schemas:
+            raise AlreadyExists(f"Schema '{full_name}' already exists.")
+        existing_schemas.add(full_name)
 
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
     ws.catalogs.get.side_effect = get_catalog
     ws.catalogs.create.side_effect = create_catalog
     ws.schemas.list.return_value = [SchemaInfo(catalog_name="catalog1", name="schema1")]
     ws.schemas.get.side_effect = get_schema
-    ws.schemas.create.side_effect = raise_catalog1_schema1_exists
+    ws.schemas.create.side_effect = create_schema
     ws.external_locations.list.return_value = [
         ExternalLocationInfo(url="s3://foo/bar"),
         ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
