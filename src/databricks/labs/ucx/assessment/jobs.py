@@ -43,7 +43,7 @@ class JobInfo:
 
 class JobsMixin:
     @classmethod
-    def _get_cluster_configs_from_all_jobs(cls, all_jobs, all_clusters_by_id):
+    def _get_cluster_configs_from_all_jobs(cls, all_jobs: list[BaseJob], all_clusters_by_id: dict[str, ClusterDetails]):
         for job in all_jobs:
             if job.settings is None:
                 continue
@@ -54,7 +54,9 @@ class JobsMixin:
             yield from cls._task_clusters(job, all_clusters_by_id)
 
     @classmethod
-    def _task_clusters(cls, job, all_clusters_by_id):
+    def _task_clusters(cls, job: BaseJob, all_clusters_by_id: dict[str, ClusterDetails]):
+        assert job.settings
+        assert job.settings.tasks
         for task in job.settings.tasks:
             if task.existing_cluster_id is not None:
                 interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
@@ -65,7 +67,9 @@ class JobsMixin:
                 yield job, task.new_cluster
 
     @staticmethod
-    def _job_clusters(job):
+    def _job_clusters(job: BaseJob):
+        assert job.settings
+        assert job.settings.job_clusters
         for job_cluster in job.settings.job_clusters:
             if job_cluster.new_cluster is None:
                 continue
@@ -79,7 +83,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
-        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        all_clusters = {c.cluster_id or "": c for c in self._ws.clusters.list()}
         return self._assess_jobs(all_jobs, all_clusters)
 
     def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> Iterable[JobInfo]:
