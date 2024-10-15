@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import CatalogInfo, PermissionsList
+from databricks.sdk.service.catalog import CatalogInfo, PermissionsList, SchemaInfo
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
 
 
+@retried(on=[NotFound], timeout=timedelta(seconds=20))
+def get_catalog(ws: WorkspaceClient, name: str) -> CatalogInfo:
+    return ws.catalogs.get(name)
+
+
+@retried(on=[NotFound], timeout=timedelta(seconds=20))
+def get_schema(ws: WorkspaceClient, full_name: str) -> SchemaInfo:
+    return ws.schemas.get(full_name)
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_after) -> None:
     # Delete catalog created for testing to test the creation of a new catalog
@@ -27,11 +37,45 @@ def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_aft
 
     runtime_ctx.catalog_schema.create_ucx_catalog(prompts, properties={"RemoveAfter": watchdog_remove_after})
 
-    @retried(on=[NotFound], timeout=timedelta(seconds=20))
-    def get_catalog(name: str) -> CatalogInfo:
-        return ws.catalogs.get(name)
+    assert get_catalog(ws, runtime_ctx.ucx_catalog)
 
-    assert get_catalog(runtime_ctx.ucx_catalog)
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_create_all_catalogs_schemas(ws: WorkspaceClient, runtime_ctx, make_random, watchdog_remove_after) -> None:
+    """Create one catalog with two schemas mirroring the HIVE metastore schemas."""
+    src_schema_1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_schema_2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_view = runtime_ctx.make_table(
+        catalog_name=src_schema_1.catalog_name,
+        schema_name=src_schema_1.name,
+        ctas="SELECT 2+2 AS four",
+        view=True,
+    )
+    src_table = runtime_ctx.make_table(catalog_name=src_schema_2.catalog_name, schema_name=src_schema_2.name)
+    dst_catalog_name = f"ucx-{make_random()}"
+    rules = [
+        Rule("workspace", dst_catalog_name, src_schema_1.name, src_schema_1.name, src_view.name, src_view.name),
+        Rule("workspace", dst_catalog_name, src_schema_2.name, src_schema_2.name, src_table.name, src_table.name),
+    ]
+    runtime_ctx.with_table_mapping_rules(rules)
+
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+    properties = {"RemoveAfter": watchdog_remove_after}
+    runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts, properties=properties)
+
+    try:
+        get_catalog(ws, dst_catalog_name)
+    except RuntimeError:
+        assert False, f"Catalog not created: {dst_catalog_name}"
+    else:
+        assert True, f"Catalog created: {dst_catalog_name}"
+    for dst_schema_full_name in f"{dst_catalog_name}.{src_schema_1.name}", f"{dst_catalog_name}.{src_schema_2.name}":
+        try:
+            get_schema(ws, dst_schema_full_name)
+        except RuntimeError:
+            assert False, f"Schema not created: {dst_schema_full_name}"
+        else:
+            assert True, f"Schema created: {dst_schema_full_name}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
