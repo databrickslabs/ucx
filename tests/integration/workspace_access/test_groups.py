@@ -129,7 +129,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     # At this time previous ws level groups aren't deleted
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -150,7 +150,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
     # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
-    @retried(on=[KeyError], timeout=timedelta(seconds=90))
+    @retried(on=[KeyError], timeout=timedelta(minutes=5))
     def get_group(group_id: str) -> NoReturn:
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
