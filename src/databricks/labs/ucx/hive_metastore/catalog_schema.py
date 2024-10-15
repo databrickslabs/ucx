@@ -40,7 +40,6 @@ class CatalogSchema:
 
         After creation, the grants from the HIVE metastore schemas are applied to the matching UC catalogs and schemas.
         """
-        # TODO: Option to skip grants apply
         catalogs, schemas = self._catalogs_schemas_from_table_mapping()
         for dst_catalog, src_schemas in catalogs.items():
             self._create_catalog_validate(dst_catalog, prompts, properties=None)
