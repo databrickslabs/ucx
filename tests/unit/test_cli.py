@@ -236,7 +236,7 @@ def test_skip_with_view(ws) -> None:
     )
 
 
-def test_skip_no_schema(ws, caplog):
+def test_skip_no_schema(ws, caplog) -> None:
     skip(ws, schema=None, table="table")
 
     assert '--schema is a required parameter.' in caplog.messages
