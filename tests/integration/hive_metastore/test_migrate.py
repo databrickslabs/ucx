@@ -278,7 +278,13 @@ def test_migrate_external_table_failed_sync(caplog, runtime_ctx, env_or_skip) ->
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_in_place(
-    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws,
+    sql_backend,
+    make_random,
+    runtime_ctx,
+    make_storage_dir,
+    env_or_skip,
+    make_catalog,
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
@@ -296,9 +302,7 @@ def test_migrate_external_table_hiveserde_in_place(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=True
-    )
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_HIVESERDE, hiveserde_in_place_migrate=True)
 
     # assert results
     for src_table in src_tables.values():
@@ -315,7 +319,13 @@ def test_migrate_external_table_hiveserde_in_place(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_ctas(
-    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws,
+    sql_backend,
+    make_random,
+    runtime_ctx,
+    make_storage_dir,
+    env_or_skip,
+    make_catalog,
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_ctas_{random}")
@@ -333,9 +343,7 @@ def test_migrate_external_table_hiveserde_ctas(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=False
-    )
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_HIVESERDE, hiveserde_in_place_migrate=False)
 
     # assert results
     for src_table in src_tables.values():
@@ -859,3 +867,32 @@ def test_migrate_external_tables_with_spn_azure(
             match = True
             break
     assert match
+
+
+def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, make_catalog, make_schema, caplog):
+    src_table = make_table()
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name)
+    # Create table in the destination schema
+    sql_backend.execute(f"CREATE TABLE {dst_schema.full_name}.fake_table (id INT)")
+
+    # Set the target table with non-existing source
+    sql_backend.execute(
+        f"ALTER TABLE {dst_schema.full_name}.fake_table SET "
+        f"TBLPROPERTIES('upgraded_from' = '{src_table.full_name}');"
+    )
+    # Get the latest migration index
+    tables = runtime_ctx.tables_crawler.snapshot()
+
+    # drop the source table
+    sql_backend.execute(f"DROP TABLE {src_table.full_name}")
+    # Assert tables contains the source table
+    assert src_table.full_name in [table.full_name for table in tables]
+
+    migration_index = runtime_ctx.tables_migrator.index(force_refresh=True)
+    assert migration_index
+    # Assert that an error message was recorded containing a line with the text "which does no longer exist"
+    expected_message = (
+        f"failed-to-migrate: {src_table.schema_name}.{src_table.name} set as a source does no longer exist"
+    )
+    assert any(expected_message in record.message for record in caplog.records)

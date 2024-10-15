@@ -171,7 +171,7 @@ def test_job_cluster_policy(ws, installation_ctx):
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
-@retried(on=[NotFound, InvalidParameterValue])
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
     ws_group_a, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
@@ -190,7 +190,7 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
     # happened.
     # Note: If you are adjusting this, also look at: test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only
-    @retried(on=[KeyError], timeout=timedelta(minutes=3))
+    @retried(on=[KeyError], timeout=timedelta(minutes=5))
     def get_group(group_id: str) -> NoReturn:
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
