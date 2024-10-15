@@ -9866,12 +9866,6 @@
     "langchain_community.utilities.searchapi": [],
     "langchain_community.utilities.searx_search": [],
     "langchain_community.utilities.semanticscholar": [],
-    "langchain_community.utilities.serpapi": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /dev/null"
-      }
-    ],
     "langchain_community.utilities.spark_sql": [],
     "langchain_community.utilities.sql_database": [],
     "langchain_community.utilities.stackexchange": [],
@@ -9935,12 +9929,6 @@
     "langchain_community.vectorstores.hologres": [],
     "langchain_community.vectorstores.infinispanvs": [],
     "langchain_community.vectorstores.inmemory": [],
-    "langchain_community.vectorstores.jaguar": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /tmp/debugjaguar.log"
-      }
-    ],
     "langchain_community.vectorstores.kdbai": [],
     "langchain_community.vectorstores.kinetica": [],
     "langchain_community.vectorstores.lancedb": [],
