@@ -278,7 +278,13 @@ def test_migrate_external_table_failed_sync(caplog, runtime_ctx, env_or_skip) ->
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_in_place(
-    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws,
+    sql_backend,
+    make_random,
+    runtime_ctx,
+    make_storage_dir,
+    env_or_skip,
+    make_catalog,
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
@@ -296,9 +302,7 @@ def test_migrate_external_table_hiveserde_in_place(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=True
-    )
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_HIVESERDE, hiveserde_in_place_migrate=True)
 
     # assert results
     for src_table in src_tables.values():
@@ -315,7 +319,13 @@ def test_migrate_external_table_hiveserde_in_place(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_ctas(
-    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws,
+    sql_backend,
+    make_random,
+    runtime_ctx,
+    make_storage_dir,
+    env_or_skip,
+    make_catalog,
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_ctas_{random}")
@@ -333,9 +343,7 @@ def test_migrate_external_table_hiveserde_ctas(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=False
-    )
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_HIVESERDE, hiveserde_in_place_migrate=False)
 
     # assert results
     for src_table in src_tables.values():

@@ -19,7 +19,8 @@ from databricks.labs.ucx.azure.credentials import (
     StorageCredentialValidationResult,
 )
 from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations, MountsCrawler
 from tests.integration.conftest import StaticServicePrincipalCrawler
 
 
@@ -79,7 +80,10 @@ def run_migration(sql_backend, inventory_schema, env_or_skip):
 
         external_location = ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)
         sql_backend.save_table(f"{inventory_schema}.external_locations", [external_location], ExternalLocation)
-        locations = ExternalLocations(ws, sql_backend, inventory_schema)
+        # TODO: refactor this to a more readable code
+        tables_crawler = TablesCrawler(sql_backend, inventory_schema)
+        mounts_crawler = MountsCrawler(sql_backend, ws, inventory_schema)
+        locations = ExternalLocations(ws, sql_backend, inventory_schema, tables_crawler, mounts_crawler)
 
         installation = MockInstallation(
             {

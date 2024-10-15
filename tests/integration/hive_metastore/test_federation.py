@@ -4,7 +4,7 @@ import pytest
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, MountsCrawler
 from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation
 
 
@@ -16,7 +16,9 @@ def ws():
 @pytest.mark.skip("needs to be enabled")
 def test_federation(ws, sql_backend):
     schema = 'ucx'
-    external_locations = ExternalLocations(ws, sql_backend, schema)
+    tables_crawler = TablesCrawler(sql_backend, schema)
+    mounts_crawler = MountsCrawler(sql_backend, ws, schema)
+    external_locations = ExternalLocations(ws, sql_backend, schema, tables_crawler, mounts_crawler)
     workspace_info = create_autospec(WorkspaceInfo)
     workspace_info.current.return_value = 'some_thing'
     federation = HiveMetastoreFederation(ws, external_locations, workspace_info)

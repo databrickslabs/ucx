@@ -28,7 +28,8 @@ from databricks.labs.ucx.azure.resources import (
     StorageAccount,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, MountsCrawler
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 from . import azure_api_client as create_azure_api_client
 from .. import DEFAULT_CONFIG
@@ -38,7 +39,11 @@ def test_save_spn_permissions_no_external_table(caplog):
     w = create_autospec(WorkspaceClient)
     rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": []}
     backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
+    mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
+    location = ExternalLocations(w, backend, "ucx", tables_crawler, mounts_crawler)
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     azure_resources.storage_accounts.return_value = []
@@ -56,12 +61,11 @@ def test_save_spn_permissions_no_external_table(caplog):
 
 def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
-    rows = {"SELECT \\* FROM hive_metastore.ucx.external_locations": [["s3://bucket1/folder1", "0"]]}
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [ExternalLocation('s3://bucket1/folder1', 0)]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
     w.cluster_policies.get.assert_not_called()
@@ -74,16 +78,13 @@ def test_save_spn_permissions_no_external_tables():
 
 def test_save_spn_permissions_no_azure_storage_account():
     w = create_autospec(WorkspaceClient)
-    rows = {
-        "SELECT \\* FROM hive_metastore.ucx.external_locations": [
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
     w.cluster_policies.get.assert_not_called()
@@ -96,14 +97,11 @@ def test_save_spn_permissions_no_azure_storage_account():
 
 def test_save_spn_permissions_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["s3://bucket1/folder1", "1"],
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
-        ]
-    }
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("s3://bucket1/folder1", 1),
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     storage_accounts = '/subscriptions/abc/providers/Microsoft.Storage/storageAccounts'
@@ -146,7 +144,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
             role_permissions=[],
         ),
     ]
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resource_permission.save_spn_permissions()
     w.cluster_policies.get.assert_not_called()
     w.secrets.get_secret.assert_not_called()
@@ -181,14 +179,11 @@ def test_save_spn_permissions_valid_azure_storage_account():
 
 def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["s3://bucket1/folder1", "1"],
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
-        ]
-    }
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("s3://bucket1/folder1", 1),
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     storage_accounts = '/subscriptions/abc/providers/Microsoft.Storage/storageAccounts'
@@ -369,7 +364,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             role_permissions=[],
         ),
     ]
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resource_permission.save_spn_permissions()
     w.cluster_policies.get.assert_not_called()
     w.secrets.get_secret.assert_not_called()
@@ -548,7 +543,7 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
 
 def test_create_global_spn_no_policy():
     w = create_autospec(WorkspaceClient)
-    location = ExternalLocations(w, MockBackend(), "ucx")
+    external_locations = create_autospec(ExternalLocations)
     installation = MockInstallation(
         {
             'config.yml': {
@@ -561,7 +556,7 @@ def test_create_global_spn_no_policy():
         }
     )
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     with pytest.raises(ValueError):
         azure_resource_permission.create_uber_principal(prompts)
@@ -575,11 +570,12 @@ def test_create_global_spn_no_policy():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    external_locations.snapshot.assert_not_called()
 
 
 def test_create_global_spn_spn_present():
     w = create_autospec(WorkspaceClient)
-    location = ExternalLocations(w, MockBackend(), "ucx")
+    external_locations = create_autospec(ExternalLocations)
     installation = MockInstallation(
         {
             'config.yml': {
@@ -595,7 +591,7 @@ def test_create_global_spn_spn_present():
     )
     azure_resources = create_autospec(AzureResources)
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     assert not azure_resource_permission.create_uber_principal(prompts)
     azure_resources.storage_accounts.assert_not_called()
     azure_resources.create_or_update_access_connector.assert_not_called()
@@ -608,16 +604,11 @@ def test_create_global_spn_spn_present():
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
+    external_locations.snapshot.assert_not_called()
 
 
 def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None:
     ws = create_autospec(WorkspaceClient)
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "0"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
     installation = MockInstallation(
         {
             'config.yml': {
@@ -630,9 +621,12 @@ def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None
             }
         }
     )
-    location = ExternalLocations(ws, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 0),
+    ]
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, ws, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, ws, azure_resources, external_locations)
     azure_resources.storage_accounts.return_value = []  # No storage accounts listed
 
     azure_resource_permission.create_uber_principal(MockPrompts({}))
@@ -660,13 +654,10 @@ def setup_create_uber_principal():
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
         data_access_config=[EndpointConfPair(key="foo", value="bar")]
     )
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@sto2.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation(
         {
             'config.yml': {
@@ -682,7 +673,7 @@ def setup_create_uber_principal():
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     api_client = create_azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     return w, installation, prompts, azure_resource_permission, api_client
 
 
@@ -788,16 +779,14 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
     w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
         security_policy=get_security_policy
     )
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    location = ExternalLocations(w, MockBackend(rows=rows), "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@sto2.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation(DEFAULT_CONFIG.copy())
     api_client = create_azure_api_client()
     azure_resources = AzureResources(api_client, api_client, include_subscriptions="002")
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
     azure_resource_permission.create_uber_principal(
         MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     )
@@ -943,14 +932,14 @@ def test_delete_global_service_principal_after_creation(use_backup) -> None:
 def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):
     """A warning should be logged when no storage account is present."""
     w = create_autospec(WorkspaceClient)
-    backend = MockBackend()
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = []
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
     azure_resources.storage_accounts.return_value = []
 
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
 
     azure_resource_permission.create_access_connectors_for_storage_accounts()
 
@@ -968,14 +957,10 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     """One access connector should be created for one storage account."""
     w = create_autospec(WorkspaceClient)
 
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
-
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
@@ -1009,7 +994,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
         tenant_id="test",
     )
 
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
 
     access_connectors = azure_resource_permission.create_access_connectors_for_storage_accounts()
 
@@ -1027,15 +1012,10 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
 def test_create_access_connectors_for_storage_accounts_log_permission_applied(caplog):
     """Log that the permissions for the access connector are applied."""
     w = create_autospec(WorkspaceClient)
-
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]
-        ]
-    }
-    backend = MockBackend(rows=rows)
-
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+    ]
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
@@ -1061,7 +1041,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
         tenant_id="test",
     )
 
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
 
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx"):
         azure_resource_permission.create_access_connectors_for_storage_accounts()
@@ -1075,16 +1055,11 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
 def test_create_access_connectors_for_storage_accounts_rollback(caplog):
     """Log that the permissions for the access connector are applied."""
     w = create_autospec(WorkspaceClient)
-
-    rows = {
-        "SELECT \\* FROM `hive_metastore`.`ucx`.`external_locations`": [
-            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
-            ["abfss://container2@storage2.dfs.core.windows.net/folder2", "1"],
-        ]
-    }
-    backend = MockBackend(rows=rows)
-
-    location = ExternalLocations(w, backend, "ucx")
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
+        ExternalLocation("abfss://container2@storage2.dfs.core.windows.net/folder2", 1),
+    ]
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
@@ -1119,7 +1094,7 @@ def test_create_access_connectors_for_storage_accounts_rollback(caplog):
         PermissionDenied(),
     ]
 
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
 
     with pytest.raises(ManyError):
         azure_resource_permission.create_access_connectors_for_storage_accounts()
