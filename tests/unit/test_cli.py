@@ -242,6 +242,12 @@ def test_skip_no_schema(ws, caplog) -> None:
     assert '--schema is a required parameter.' in caplog.messages
 
 
+def test_skip_table_and_view(ws, caplog) -> None:
+    skip(ws, "schema", "table", "view")
+
+    assert "specify --table OR --view, not both" in caplog.messages
+
+
 def test_sync_workspace_info():
     a = create_autospec(AccountClient)
     sync_workspace_info(a)
