@@ -60,10 +60,21 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         if catalog == "catalog1":
             raise BadRequest("Catalog 'catalog1' already exists")
 
+    def get_schema(full_name: str) -> SchemaInfo:
+        if full_name == "catalog1.schema1":
+            return SchemaInfo(catalog_name="catalog1", name="schema", full_name="catalog1.schema1")
+        raise NotFound(f"Schema: {full_name}")
+
+    def raise_catalog1_schema1_exists(schema: str, catalog: str, *_, **__) -> None:
+        if catalog == "catalog1" and schema == "schema1":
+            raise BadRequest("Schema 'catalog1.schema1' already exists")
+
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
     ws.catalogs.get.side_effect = get_catalog
     ws.catalogs.create.side_effect = raise_catalog1_exists
     ws.schemas.list.return_value = [SchemaInfo(catalog_name="catalog1", name="schema1")]
+    ws.schemas.get.side_effect = get_schema
+    ws.schemas.create.side_effect = raise_catalog1_schema1_exists
     ws.external_locations.list.return_value = [
         ExternalLocationInfo(url="s3://foo/bar"),
         ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
@@ -71,6 +82,14 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     installation = MockInstallation(
         {
             "mapping.csv": [
+                {
+                    "catalog_name": "catalog1",
+                    "dst_schema": "schema1",
+                    "dst_table": "table1",
+                    "src_schema": "schema1",
+                    "src_table": "table1",
+                    "workspace_name": "workspace",
+                },
                 {
                     "catalog_name": "catalog1",
                     "dst_schema": "schema2",
@@ -315,3 +334,14 @@ def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
     assert f"{message_prefix} DATABASE 'catalog2.schema2'. Skipping." in caplog.messages
     assert f"{message_prefix} DATABASE 'catalog2.schema3'. Skipping." in caplog.messages
     ws.assert_not_called()
+
+
+def test_create_catalogs_and_schemas_logs_skipping_already_existing_unity_catalog_resources(caplog) -> None:
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+    catalog_schema = prepare_test(ws)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
+        catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    assert "Skipping already existing catalog: catalog1" in caplog.text
+    assert "Skipping already existing schema: catalog1.schema1" in caplog.text

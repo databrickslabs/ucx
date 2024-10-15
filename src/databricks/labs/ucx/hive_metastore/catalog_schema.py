@@ -125,6 +125,12 @@ class CatalogSchema:
             )
 
     def _create_schema(self, schema: Schema) -> None:
-        # TODO: Handle schema already exists
+        try:
+            schema_info = self._ws.schemas.get(schema.full_name)
+        except NotFound:
+            schema_info = None
+        if schema_info:
+            logger.warning(f"Skipping already existing schema: {schema_info.full_name}")
+            return
         logger.info(f"Creating UC schema: {schema.full_name}")
         self._ws.schemas.create(schema.name, schema.catalog_name, comment="Created by UCX")
