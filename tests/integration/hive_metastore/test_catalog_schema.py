@@ -29,6 +29,11 @@ def get_schema(ws: WorkspaceClient, full_name: str) -> SchemaInfo:
     return ws.schemas.get(full_name)
 
 
+@retried(on=[NotFound], timeout=timedelta(seconds=20))
+def get_schema_permissions_list(ws: WorkspaceClient, full_name: str) -> PermissionsList:
+    return ws.grants.get(SecurableType.SCHEMA, full_name)
+
+
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_ucx_catalog_creates_catalog(ws, runtime_ctx, watchdog_remove_after) -> None:
     # Delete catalog created for testing to test the creation of a new catalog
@@ -173,13 +178,7 @@ def test_create_catalog_schema_with_legacy_acls(
     properties = {"RemoveAfter": watchdog_remove_after}
     runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts, properties=properties)
 
-    @retried(on=[NotFound], timeout=timedelta(seconds=20))
-    def get_schema_permissions_list(full_name: str) -> PermissionsList:
-        return ws.grants.get(SecurableType.SCHEMA, full_name)
-
-    schema_grants = get_schema_permissions_list(f"{dst_catalog_name}.{dst_schema_name}")
-    schema_grant = PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA])
-    schema_info = ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}")
+    schema_grants = get_schema_permissions_list(ws, f"{dst_catalog_name}.{dst_schema_name}")
     assert schema_grants.privilege_assignments is not None
-    assert schema_grant in schema_grants.privilege_assignments
-    assert schema_info.owner == schema_owner.user_name
+    assert PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA]) in schema_grants.privilege_assignments
+    assert get_schema(ws, f"{dst_catalog_name}.{dst_schema_name}").owner == schema_owner.user_name
