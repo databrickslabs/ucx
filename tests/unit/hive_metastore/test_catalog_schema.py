@@ -134,7 +134,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     group_manager.snapshot.return_value = []
     migrate_grants = MigrateGrants(backend, group_manager, [interactive_cluster_grants_loader, hive_grants_loader])
 
-    return CatalogSchema(ws, table_mapping, migrate_grants, backend, "ucx")
+    return CatalogSchema(ws, table_mapping, migrate_grants, "ucx")
 
 
 def test_create_ucx_catalog_creates_ucx_catalog() -> None:
@@ -254,8 +254,8 @@ def test_catalog_schema_acl() -> None:
     ws = create_autospec(WorkspaceClient)
     backend = MockBackend()
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
-
     catalog_schema = prepare_test(ws, backend)
+
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     calls = [
@@ -265,18 +265,17 @@ def test_catalog_schema_acl() -> None:
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     queries = [
-        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ1`',
         'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ1`',
         'GRANT USE CATALOG ON CATALOG `catalog1` TO `user2`',
+        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user5`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ1`',
         'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user2`',
         'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user5`',
         'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user5`',
-        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user5`',
     ]
 
-    outer = set(backend.queries) ^ set(queries)
-    assert not outer, f"Additional queries {set(backend.queries) - set(queries)}"
-    assert not outer, f"Missing queries {set(queries) - set(backend.queries)}"
+    assert not set(backend.queries) - set(queries), f"Additional queries {set(backend.queries) - set(queries)}"
+    assert not set(queries) - set(backend.queries), f"Missing queries {set(queries) - set(backend.queries)}"
 
 
 def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
