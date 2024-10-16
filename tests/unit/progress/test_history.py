@@ -11,7 +11,7 @@ from databricks.labs.ucx.progress.history import HistoricalEncoder
 from databricks.labs.ucx.progress.install import Historical
 
 
-@dataclass
+@dataclass(frozen=True, kw_only=True)
 class _TestRecord:
     a_field: str
     b_field: int
