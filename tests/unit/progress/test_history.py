@@ -277,6 +277,36 @@ def test_historical_encoder_naive_timestamps_banned(ownership, field_name, recor
         _ = encoder.to_historical(record)
 
 
+@dataclass(frozen=True, kw_only=True)
+class _InnerClassWithUnserializable:
+    b_field: object
+
+
+@dataclass(frozen=True, kw_only=True)
+class _OuterclassWithUnserializable:
+    object_id: str = "not used"
+    a_field: object | None = None
+    inner: _InnerClassWithUnserializable | None = None
+
+    __id_fields__: ClassVar = ("object_id",)
+
+
+@pytest.mark.parametrize(
+    "field_name,record",
+    (
+        ("a_field", _OuterclassWithUnserializable(a_field=object())),
+        ("inner", _OuterclassWithUnserializable(inner=_InnerClassWithUnserializable(b_field=object()))),
+    ),
+)
+def test_historical_encoder_unserializable_values(ownership, field_name, record: _OuterclassWithUnserializable) -> None:
+    """Verify that encoding catches and handles unserializable values."""
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_OuterclassWithUnserializable)
+
+    expected_msg = f"Cannot encode value in or within field {field_name}: "
+    with pytest.raises(TypeError, match=f"^{re.escape(expected_msg)}"):
+        _ = encoder.to_historical(record)
+
+
 @pytest.mark.parametrize("failures", (["failures-1", "failures-2"], []))
 def test_historical_encoder_failures(ownership, failures: list[str]) -> None:
     """Verify an encoder places failures on the top-level field instead of within the object data."""
