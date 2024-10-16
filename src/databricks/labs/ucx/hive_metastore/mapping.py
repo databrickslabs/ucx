@@ -60,7 +60,13 @@ class Rule:
 
     @property
     def as_uc_table(self) -> Table:
-        return Table(self.catalog_name, self.dst_schema, self.dst_table)
+        return Table(
+            self.catalog_name,
+            self.dst_schema,
+            self.dst_table,
+            object_type="UNKNOWN",
+            table_format="UNKNOWN",
+        )
 
     @property
     def as_uc_table_key(self) -> str:

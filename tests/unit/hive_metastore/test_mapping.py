@@ -47,7 +47,7 @@ EXTERNAL_DELTA_TABLE = Table(
 
 
 def test_rule_as_uc_table() -> None:
-    table = Table("catalog", "destination_schema", "destination_table")
+    table = Table("catalog", "destination_schema", "destination_table", "UNKNOWN", "UNKNOWN")
     rule = Rule(
         workspace_name="workspace",
         catalog_name="catalog",

@@ -77,7 +77,7 @@ def test_migrate_matched_grants_applies() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
-    dst = Table('catalog', 'schema', 'table')
+    dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
     one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
@@ -99,7 +99,7 @@ def test_migrate_matched_grants_applies_and_remaps_group() -> None:
         ),
     ]
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
-    dst = Table('catalog', 'schema', 'table')
+    dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
     one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
@@ -113,7 +113,7 @@ def test_migrate_no_matched_grants_no_apply() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
     src = Table('hive_metastore', 'default', 'bar', 'MANAGED', 'DELTA')
-    dst = Table('catalog', 'schema', 'table')
+    dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
     one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
     migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)

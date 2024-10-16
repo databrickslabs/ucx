@@ -53,8 +53,8 @@ class Table:  # pylint: disable=too-many-public-methods
     catalog: str
     database: str
     name: str
-    object_type: str | None = None
-    table_format: str | None = None
+    object_type: str
+    table_format: str
 
     location: str | None = None
     view_text: str | None = None

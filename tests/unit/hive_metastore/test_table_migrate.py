@@ -1085,7 +1085,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark) ->
     # all grants succeed except for one
     table_crawler = create_autospec(TablesCrawler)
     src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
-    dst = Table('ucx_default', 'db1_dst', 'managed_dbfs')
+    dst = Table('ucx_default', 'db1_dst', 'managed_dbfs', 'MANAGED', 'DELTA')
     table_crawler.snapshot.return_value = [src]
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
