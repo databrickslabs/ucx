@@ -17,6 +17,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
+
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
@@ -44,8 +45,6 @@ class TablesMigrator:
         migrate_grants: MigrateGrants,
         external_locations: ExternalLocations,
     ):
-        # pylint: disable-next=import-error,import-outside-toplevel
-        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         self._tc = table_crawler
         self._backend = backend
@@ -55,7 +54,6 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._migrate_grants = migrate_grants
         self._external_locations = external_locations
-        self._spark = SparkSession.builder.getOrCreate()
 
     def get_remaining_tables(self) -> list[Table]:
         self.index(force_refresh=True)
@@ -126,6 +124,13 @@ class TablesMigrator:
             all_tasks.extend(tasks)
             self.index(force_refresh=True)
         return all_tasks
+
+    @cached_property
+    def _spark(self):
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+        return SparkSession.builder.getOrCreate()
 
     def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
         if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
