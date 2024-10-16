@@ -10389,13 +10389,6 @@
     "llvmlite.ir.transforms": [],
     "llvmlite.ir.types": [],
     "llvmlite.ir.values": [],
-    "llvmlite.tests": [],
-    "llvmlite.tests.customize": [],
-    "llvmlite.tests.refprune_proto": [],
-    "llvmlite.tests.test_binding": [],
-    "llvmlite.tests.test_ir": [],
-    "llvmlite.tests.test_refprune": [],
-    "llvmlite.tests.test_valuerepr": [],
     "llvmlite.utils": []
   },
   "lxml": {
