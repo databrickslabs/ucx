@@ -145,8 +145,8 @@ class TablesMigrator:
         except Exception as e:  # pylint: disable=broad-exception-caught
             # Catching a Spark AnalysisException here, for which we do not have the dependency to catch explicitly
             pattern = (  # See https://github.com/databrickslabs/ucx/issues/2891
-                r"INVALID_PARAMETER_VALUE: Invalid input: RPC CreateTable Field managedcatalog.ColumnInfo.name: At columns.\d+: name "
-                " is not a valid name`"
+                r"INVALID_PARAMETER_VALUE: Invalid input: RPC CreateTable Field managedcatalog.ColumnInfo.name: "
+                r'At columns.\d+: name "" is not a valid name`'
             )
             if re.match(pattern, str(e)):
                 logger.error(f"Cannot migrate table with empty column name: {src_table.src.key}", exc_info=e)
