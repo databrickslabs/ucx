@@ -1,4 +1,5 @@
 import datetime as dt
+import re
 from dataclasses import dataclass, field
 from typing import ClassVar
 from unittest.mock import create_autospec
@@ -244,9 +245,26 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
     }
 
 
-def test_historical_encoder_failures(ownership) -> None:
-    """Verify that encoder places failures on the top-level field instead of within the object data."""
+@pytest.mark.parametrize("failures", (["failures-1", "failures-2"], []))
+def test_historical_encoder_failures(ownership, failures) -> None:
+    """Verify an encoder places failures on the top-level field instead of within the object data."""
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_TestRecord)
+
+    historical = encoder.to_historical(_TestRecord(a_field="foo", b_field=10, failures=list(failures)))
+
+    assert historical.failures == failures
+    assert "failures" not in historical.data
 
 
 def test_historical_encoder_failures_verification(ownership) -> None:
-    """Verify that the encoder checks the failures field type during initialization."""
+    """Verify that encoders checks the failures field type during initialization."""
+
+    @dataclass
+    class _BrokenFailures:
+        a_field: str = "a_field"
+        failures: list[int] = field(default_factory=list)
+
+        __id_fields__: ClassVar = ("a_field",)
+
+    with pytest.raises(TypeError, match=re.escape("Historical record class has invalid failures type: list[int]")):
+        _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_BrokenFailures)
