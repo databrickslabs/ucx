@@ -31,11 +31,11 @@ from databricks.labs.ucx.source_code.base import (
     LocatedAdvice,
     is_a_notebook,
     file_language,
-    guess_encoding,
     SourceInfo,
     UsedTable,
     LineageAtom,
     PythonSequentialLinter,
+    read_text,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -616,7 +616,7 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             logger.warning(f"Unknown language for {dependency.path}")
             return
         cell_language = CellLanguage.of_language(language)
-        source = dependency.path.read_text(guess_encoding(dependency.path))
+        source = read_text(dependency.path)
         if is_a_notebook(dependency.path):
             yield from self._collect_from_notebook(source, cell_language, dependency.path, inherited_tree)
         elif dependency.path.is_file():

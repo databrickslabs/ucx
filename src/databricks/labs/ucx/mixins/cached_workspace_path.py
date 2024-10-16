@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import codecs
-import io
 import os
 from collections import OrderedDict
 from collections.abc import Generator
@@ -12,6 +10,8 @@ from typing import IO, TypeVar
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo
 from databricks.labs.blueprint.paths import WorkspacePath
+
+from databricks.labs.ucx.source_code.base import decode_with_bom
 
 
 # lru_cache won't let us invalidate cache entries
@@ -34,7 +34,7 @@ class _PathLruCache:
         # Note: must not return the same instance that was passed in, to avoid circular references (and memory leaks).
         return PurePosixPath(*path.resolve().parts)
 
-    def load(self, cached_path: _CachedPath) -> bytes:
+    def load(self, cached_path: _CachedPath, buffering: int = -1) -> bytes:
         normalized_path = self._normalize(cached_path)
 
         data = self._datas.get(normalized_path, None)
@@ -43,7 +43,7 @@ class _PathLruCache:
             return data
 
         # Need to bypass the _CachedPath.open() override to actually open and retrieve the file content.
-        with WorkspacePath.open(cached_path, mode="rb") as workspace_file:
+        with WorkspacePath.open(cached_path, mode="rb", buffering=buffering) as workspace_file:
             data = workspace_file.read()
         if self._max_entries <= len(self._datas):
             self._datas.popitem(last=False)
@@ -82,19 +82,6 @@ class _CachedPath(WorkspacePath):
         for object_info in self._ws.workspace.list(self.as_posix()):
             yield self._from_object_info_with_cache(self._cache, self._ws, object_info)
 
-    @classmethod
-    def _detect_encoding_bom(cls, data: io.BytesIO) -> str | None:
-        # Peek at the first (up to) 4 bytes.
-        maybe_bom = data.read(4)
-        data.seek(-len(maybe_bom), os.SEEK_CUR)
-        if maybe_bom.startswith(codecs.BOM_UTF32_LE) or maybe_bom.startswith(codecs.BOM_UTF32_BE):
-            return "utf-32"
-        if maybe_bom.startswith(codecs.BOM_UTF16_LE) or maybe_bom.startswith(codecs.BOM_UTF16_BE):
-            return "utf-16"
-        if maybe_bom.startswith(codecs.BOM_UTF8):
-            return "utf-8"
-        return None
-
     def open(  # type: ignore[override]
         self,
         mode: str = "r",
@@ -108,13 +95,12 @@ class _CachedPath(WorkspacePath):
             self._cache.remove(self)
             return super().open(mode, buffering, encoding, errors, newline)
 
-        binary_data = self._cache.load(self)
+        binary_data = self._cache.load(self, buffering=buffering)
         binary_io = BytesIO(binary_data)
         if 'b' in mode:
             return binary_io
 
-        use_encoding = self._detect_encoding_bom(binary_io) if encoding is None else encoding
-        return io.TextIOWrapper(binary_io, use_encoding, errors, newline)
+        return decode_with_bom(binary_io, encoding, errors, newline)
 
     # _rename calls unlink so no need to override it
     def unlink(self, missing_ok: bool = False) -> None:

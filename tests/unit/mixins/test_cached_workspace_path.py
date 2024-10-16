@@ -9,7 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
-from databricks.labs.ucx.source_code.base import guess_encoding
+from databricks.labs.ucx.source_code.base import decode_with_bom
 
 
 class _WorkspaceCacheFriend(WorkspaceCache):
@@ -103,7 +103,9 @@ def test_encoding_is_guessed_after_download() -> None:
     cache = WorkspaceCache(ws)
     path = cache.get_workspace_path("/a/path")
     _ = path.read_text()
-    guess_encoding(path)
+    # TODO: Figure out what this is supposed to be testing?
+    with decode_with_bom(path.open("rb")) as f:
+        assert f.encoding
 
 
 @pytest.mark.parametrize(
