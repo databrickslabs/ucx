@@ -1532,11 +1532,8 @@ def test_migrate_tables_handles_table_with_empty_column(caplog) -> None:
         external_locations,
     )
 
-    with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore"):
-        table_migrator.migrate_tables(
-            table.what,
-            managed_table_external_storage="CLONE",  # Migrates above table using CTAS
-        )
+    with caplog.at_level(logging.WARN, logger="databricks.labs.ucx.hive_metastore"):
+        table_migrator.migrate_tables(table.what)
     assert "failed-to-migrate: Table with empty column name 'hive_metastore.schema.table'" in caplog.messages
 
     table_crawler.snapshot.assert_not_called()  # Mocking table mapping instead
