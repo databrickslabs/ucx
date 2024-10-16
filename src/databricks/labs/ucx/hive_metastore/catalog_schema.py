@@ -29,10 +29,16 @@ class Catalog:
 
     @property
     def full_name(self) -> str:
+        """The full name of the catalog.
+
+        For a catalog, this is same as the attr:name as the catalog is the top of the object hierarchy (see doc link
+        above).
+        """
         return self.name
 
     @property
     def key(self) -> str:
+        """Synonym for attr:full_name:."""
         return self.full_name
 
     @property
