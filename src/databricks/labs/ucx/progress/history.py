@@ -85,7 +85,7 @@ class HistoricalEncoder(Generic[Record]):
         if value is None:
             return None
         value_type = self._field_types[name]
-        if value_type == str or value_type == (str | None):
+        if value_type in (str, (str | None)):
             return value
         encoded_value = json.dumps(
             value,
