@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawle
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
 
@@ -264,7 +265,7 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"test")
 
-    libraries = [compute.Library(requirements="requirements.txt")]
+    libraries = [compute.Library(requirements="/path/to/requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
@@ -285,7 +286,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"-r other-requirements.txt")
 
-    libraries = [compute.Library(requirements="requirements.txt")]
+    libraries = [compute.Library(requirements="/path/to/requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
@@ -294,7 +295,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
         workflow_task_container.build_dependency_graph(graph)
 
     assert expected_message in caplog.messages
-    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+    ws.workspace.download.assert_called_once_with("/path/to/requirements.txt", format=ExportFormat.AUTO)
 
 
 def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constraints(
@@ -305,7 +306,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value = io.BytesIO(b"-c constraints.txt")
 
-    libraries = [compute.Library(requirements="requirements.txt")]
+    libraries = [compute.Library(requirements="/path/to/requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
@@ -314,7 +315,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
         workflow_task_container.build_dependency_graph(graph)
 
     assert expected_message in caplog.messages
-    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+    ws.workspace.download.assert_called_once_with("/path/to/requirements.txt", format=ExportFormat.AUTO)
 
 
 def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_pytest_pypi_library(
@@ -473,12 +474,13 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
                 PipelineLibrary(
                     jar="some.jar",
                     maven=compute.MavenLibrary(coordinates="com.example:example:1.0.0"),
-                    notebook=NotebookLibrary(path="test.py"),
+                    notebook=NotebookLibrary(path="/path/to/test.py"),
                     file=FileLibrary(path="test.txt"),
                 )
             ]
         ),
     )
+    ws.workspace.get_status.side_effect = NotFound("Simulated workspace file not found.")
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 4
@@ -487,8 +489,9 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
 
 def test_xxx(graph) -> None:
     ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.side_effect = NotFound("Simulated workspace file not found.")
     notebook_task = jobs.NotebookTask(
-        notebook_path="test",
+        notebook_path="/path/to/test",
         base_parameters={"a": "b", "c": "dbfs:/mnt/foo"},
     )
     task = jobs.Task(

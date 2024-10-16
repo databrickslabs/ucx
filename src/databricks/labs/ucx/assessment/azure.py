@@ -73,7 +73,7 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
 
         # list all relevant service principals in jobs
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
-        all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list()}
+        all_clusters_by_id = {c.cluster_id: c for c in self._ws.clusters.list() if c.cluster_id}
         for _job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             set_service_principals.update(self._get_azure_spn_from_cluster_config(cluster_config))
 
