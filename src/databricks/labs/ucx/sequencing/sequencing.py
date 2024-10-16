@@ -4,6 +4,7 @@ import itertools
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
 
 from databricks.labs.ucx.source_code.graph import DependencyGraph
@@ -66,7 +67,8 @@ class MigrationNode:
 
 class MigrationSequencer:
 
-    def __init__(self):
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
         self._root = MigrationNode(
             node_id=0, object_type="ROOT", object_id="ROOT", object_name="ROOT", object_owner="NONE"
         )
@@ -83,7 +85,7 @@ class MigrationSequencer:
             object_type="TASK",
             object_id=task_id,
             object_name=task.task_key,
-            object_owner=job_node.object_owner, # no task owner so use job one
+            object_owner=job_node.object_owner,  # no task owner so use job one
         )
         job_node.required_steps.append(task_node)
         if task.existing_cluster_id:
@@ -127,14 +129,17 @@ class MigrationSequencer:
         cluster_node = self._find_node(object_type="CLUSTER", object_id=cluster_key)
         if cluster_node:
             return cluster_node
+        details = self._ws.clusters.get(cluster_key)
+        object_name = details.cluster_name if details and details.cluster_name else cluster_key
+        object_owner = details.creator_user_name if details and details.creator_user_name else "<UNKNOWN>"
         MigrationNode.last_node_id += 1
         cluster_node = MigrationNode(
             node_id=MigrationNode.last_node_id,
             object_type="CLUSTER",
             object_id=cluster_key,
-            object_name=cluster_key,
-            object_owner="NONE",
-        )  # TODO object_owner
+            object_name=object_name,
+            object_owner=object_owner,
+        )
         # TODO register warehouses and policies
         self._root.required_steps.append(cluster_node)
         return cluster_node
@@ -155,6 +160,8 @@ class MigrationSequencer:
         for step in steps:
             existing = best_steps.get(step.step_id, None)
             # keep the step with the highest step number
+            # TODO this possibly affects the step_number of steps that depend on this one
+            # but it's probably OK to not be 100% accurate initially
             if existing and existing.step_number >= step.step_number:
                 continue
             best_steps[step.step_id] = step
