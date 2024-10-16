@@ -93,7 +93,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             cluster_failures.extend(self._check_jar_task(job.settings.tasks))
             job_assessment[job_id].update(cluster_failures)
 
-        for job_key, job_info in job_details:
+        for job_key, job_info in job_details.items():
             job_info.failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:
                 job_info.success = 0
