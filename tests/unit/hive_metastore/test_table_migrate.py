@@ -1537,7 +1537,7 @@ def test_migrate_tables_handles_table_with_empty_column(caplog) -> None:
             table.what,
             managed_table_external_storage="CLONE",  # Migrates above table using CTAS
         )
-    assert "Cannot migrate table with empty column name: hive_metastore.schema.table" in caplog.messages
+    assert "failed-to-migrate: Table with empty column name 'hive_metastore.schema.table'" in caplog.messages
 
     table_crawler.snapshot.assert_not_called()  # Mocking table mapping instead
     ws.get_workspace_id.assert_not_called()  # Errors before getting here

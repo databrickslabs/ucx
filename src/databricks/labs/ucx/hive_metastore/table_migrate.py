@@ -149,9 +149,9 @@ class TablesMigrator:
                 r'At columns.\d+: name "" is not a valid name`'
             )
             if re.match(pattern, str(e)):
-                logger.warning(f"Cannot migrate table with empty column name: {src_table.src.key}", exc_info=e)
+                logger.warning(f"failed-to-migrate: Table with empty column name '{src_table.src.key}'", exc_info=e)
             else:
-                logger.warning(f"Cannot migrate table: {src_table.src.key}", exc_info=e)
+                logger.warning(f"failed-to-migrate: Unknown reason for table '{src_table.src.key}'", exc_info=e)
             return False
 
     def _migrate_table(
