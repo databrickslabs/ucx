@@ -10252,12 +10252,7 @@
     "lazr.uri.tests.test_uri": []
   },
   "lazy_loader": {
-    "lazy_loader": [],
-    "lazy_loader.tests": [],
-    "lazy_loader.tests.fake_pkg": [],
-    "lazy_loader.tests.fake_pkg.some_func": [],
-    "lazy_loader.tests.import_np_parallel": [],
-    "lazy_loader.tests.test_lazy_loader": []
+    "lazy_loader": []
   },
   "libclang": {
     "clang": [],
