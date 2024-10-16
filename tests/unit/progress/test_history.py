@@ -248,7 +248,7 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
 
 
 @pytest.mark.parametrize("failures", (["failures-1", "failures-2"], []))
-def test_historical_encoder_failures(ownership, failures) -> None:
+def test_historical_encoder_failures(ownership, failures: list[str]) -> None:
     """Verify an encoder places failures on the top-level field instead of within the object data."""
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_TestRecord)
 
