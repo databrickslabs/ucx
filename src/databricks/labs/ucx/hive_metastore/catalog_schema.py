@@ -47,7 +47,13 @@ class Schema:
 
     @property
     def kind(self) -> str:
-        return "DATABASE"  # TODO: Refactor code to use "SCHEMA" instead (see docstring above)
+        """The object kind.
+
+        Below "DATABASE" is chosen as this is the kind used in the grants module. However, more consistent with
+        Databricks documentation would be to use "SCHEMA" instead:
+        https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore
+        """
+        return "DATABASE"  # TODO: https://github.com/databrickslabs/ucx/issues/2974
 
 
 class CatalogSchema:
