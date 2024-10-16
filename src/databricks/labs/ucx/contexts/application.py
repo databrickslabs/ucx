@@ -12,6 +12,8 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -277,6 +279,13 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def pipeline_migrator(self) -> PipelinesMigrator:
+        return PipelinesMigrator(
+            self.workspace_client,
+            self.pipelines_crawler,
+        )
+
+    @cached_property
     def migrate_grants(self) -> MigrateGrants:
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
             self.grants_crawler.snapshot,
@@ -295,6 +304,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def mounts_crawler(self) -> MountsCrawler:
         return MountsCrawler(self.sql_backend, self.workspace_client, self.inventory_database)
+
+    @cached_property
+    def pipelines_crawler(self) -> PipelinesCrawler:
+        return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def azure_service_principal_crawler(self) -> AzureServicePrincipalCrawler:
