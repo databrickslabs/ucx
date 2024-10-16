@@ -93,11 +93,10 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             cluster_failures.extend(self._check_jar_task(job.settings.tasks))
             job_assessment[job_id].update(cluster_failures)
 
-        # TODO: next person looking at this - rewrite, as this code makes no sense
-        for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
-            job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
+        for job_key, job_info in job_details:
+            job_info.failures = json.dumps(list(job_assessment[job_key]))
             if len(job_assessment[job_key]) > 0:
-                job_details[job_key].success = 0
+                job_info.success = 0
         return list(job_details.values())
 
     @staticmethod
