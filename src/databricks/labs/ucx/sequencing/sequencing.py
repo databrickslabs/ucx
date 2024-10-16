@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -11,6 +12,7 @@ from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInf
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.source_code.graph import DependencyGraph
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 @dataclass
@@ -51,6 +53,7 @@ class MigrationNode:
 class MigrationSequencer:
 
     def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
+    def __init__(self, ws: WorkspaceClient, path_lookup: PathLookup):
         self._ws = ws
         self._admin_locator = admin_locator
         self._last_node_id = 0
@@ -58,7 +61,7 @@ class MigrationSequencer:
         self._incoming: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
         self._outgoing: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
 
-    def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
+    def register_workflow_task(self, task: jobs.Task, job: jobs.Job, graph: DependencyGraph) -> MigrationNode:
         task_id = f"{job.job_id}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
         if task_node:
@@ -86,15 +89,49 @@ class MigrationSequencer:
         # TODO register dependency graph
         return task_node
 
+    def _visit_dependency(self, graph: DependencyGraph) -> bool | None:
+        lineage = graph.dependency.lineage[-1]
+        parent_node = self._find_node(lineage.object_type, lineage.object_id)
+        for dependency in graph.local_dependencies:
+            lineage = dependency.lineage[-1]
+            child_node = self.register_dependency(lineage.object_type, lineage.object_id)
+            parent_node.required_steps.append(child_node)
+            # TODO tables and dfsas
+        return None
+
+    def register_dependency(self, object_type: str, object_id: str) -> MigrationNode:
+        existing = self._find_node(object_type, object_id)
+        if existing:
+            return existing
+        object_name: str = "<ANONYMOUS>"
+        object_owner: str = "<UNKNOWN>"
+        if object_type in { "NOTEBOOK", "FILE" }:
+            path = Path(object_id)
+            for library_root in self._path_lookup.library_roots:
+                if not path.is_relative_to(library_root):
+                    continue
+                object_name = path.relative_to(library_root).as_posix()
+                break
+        else:
+            raise ValueError(f"{object_type} not supported yet!")
+        MigrationNode.last_node_id += 1
+        return MigrationNode(
+            node_id=MigrationNode.last_node_id,
+            object_type=object_type,
+            object_id=object_id,
+            object_name=object_name,
+            object_owner=object_owner,
+        )
+
     def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
-        job_node = self._nodes.get(("JOB", str(job.job_id)), None)
+        job_node = self._nodes.get(("WORKFLOW", str(job.job_id)), None)
         if job_node:
             return job_node
         self._last_node_id += 1
         job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
         job_node = MigrationNode(
             node_id=self._last_node_id,
-            object_type="JOB",
+            object_type="WORKFLOW",
             object_id=str(job.job_id),
             object_name=job_name,
             object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
