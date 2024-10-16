@@ -83,8 +83,8 @@ class MigrationSequencer:
             object_type="TASK",
             object_id=task_id,
             object_name=task.task_key,
-            object_owner="NONE",
-        )  # TODO object_owner
+            object_owner=job_node.object_owner, # no task owner so use job one
+        )
         job_node.required_steps.append(task_node)
         if task.existing_cluster_id:
             cluster_node = self.register_cluster(task.existing_cluster_id)
@@ -105,8 +105,8 @@ class MigrationSequencer:
             object_type="JOB",
             object_id=str(job.job_id),
             object_name=job_name,
-            object_owner="NONE",
-        )  # TODO object_owner
+            object_owner=job.creator_user_name or "<UNKNOWN>",
+        )
         top_level = True
         if job.settings and job.settings.job_clusters:
             for job_cluster in job.settings.job_clusters:
