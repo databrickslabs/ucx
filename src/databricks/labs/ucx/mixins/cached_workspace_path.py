@@ -127,12 +127,26 @@ _CachedPathT = TypeVar("_CachedPathT", bound=_CachedPath)
 
 class WorkspaceCache:
 
+    class InvalidWorkspacePath(ValueError):
+        pass
+
     def __init__(self, ws: WorkspaceClient, max_entries: int = 2048) -> None:
         self._ws = ws
         self._cache = _PathLruCache(max_entries)
 
     def get_workspace_path(self, path: str) -> WorkspacePath:
+        """Obtain a `WorkspacePath` instance for a path that refers to a workspace file or notebook.
+
+        The instance returned participates in this content cache: the first time the path is opened the content will
+        be immediately retrieved (prior to reading) and cached.
+
+        Args:
+            path: a valid workspace path (must be absolute)
+        Raises:
+            WorkspaceCache.InvalidWorkspacePath: this is raised immediately if the supplied path is not a syntactically
+                valid workspace path. (This is not raised if the path is syntactically valid but does not exist.)
+        """
         if not path.startswith("/"):
             msg = f"Invalid workspace path; must be absolute and start with a slash ('/'): {path}"
-            raise ValueError(msg)
+            raise WorkspaceCache.InvalidWorkspacePath(msg)
         return _CachedPath(self._cache, self._ws, path)

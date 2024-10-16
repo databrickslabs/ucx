@@ -29,7 +29,7 @@ def test_path_like_returns_cached_instance() -> None:
 
 def test_non_absolute_path_error() -> None:
     cache = _WorkspaceCacheFriend(mock_workspace_client())
-    with pytest.raises(ValueError, match="Invalid workspace path; must be absolute"):
+    with pytest.raises(WorkspaceCache.InvalidWorkspacePath, match="Invalid workspace path; must be absolute"):
         _ = cache.get_workspace_path("not/an/absolute/path")
 
 
