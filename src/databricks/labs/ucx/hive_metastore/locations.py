@@ -346,7 +346,13 @@ class Mount:
 
 
 class MountsCrawler(CrawlerBase[Mount]):
-    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str, enable_hms_federation: bool = False,):
+    def __init__(
+        self,
+        backend: SqlBackend,
+        ws: WorkspaceClient,
+        inventory_database: str,
+        enable_hms_federation: bool = False,
+    ):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
         self._enable_hms_federation = enable_hms_federation
