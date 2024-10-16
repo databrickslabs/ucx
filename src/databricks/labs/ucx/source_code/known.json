@@ -10252,7 +10252,7 @@
     "lazr.uri.tests.test_uri": []
   },
   "lazy_loader": {
-    "lazy_loader": [],
+    "lazy_loader": []
   },
   "libclang": {
     "clang": [],
