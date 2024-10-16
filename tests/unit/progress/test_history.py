@@ -262,19 +262,18 @@ class _OuterclassWithTimestamps:
 
 
 @pytest.mark.parametrize(
-    "field,record",
+    "field_name,record",
     (
         ("a_field", _OuterclassWithTimestamps(a_field=dt.datetime.now())),
         ("inner", _OuterclassWithTimestamps(inner=_InnerClassWithTimestamp(b_field=dt.datetime.now()))),
     ),
 )
-def test_historical_encoder_naive_timestamps_banned(ownership, field: str, record: _OuterclassWithTimestamps) -> None:
+def test_historical_encoder_naive_timestamps_banned(ownership, field_name, record: _OuterclassWithTimestamps) -> None:
     """Verify that encoding detects and disallows naive timestamps."""
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_OuterclassWithTimestamps)
 
-    with pytest.raises(
-        ValueError, match=re.escape(f"Timestamp without timezone not supported in or within field {field}")
-    ):
+    expected_msg = f"Timestamp without timezone not supported in or within field {field_name}"
+    with pytest.raises(ValueError, match=f"^{re.escape(expected_msg)}"):
         _ = encoder.to_historical(record)
 
 
