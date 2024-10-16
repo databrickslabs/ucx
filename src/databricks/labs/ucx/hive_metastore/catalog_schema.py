@@ -56,15 +56,37 @@ class Catalog:
 
 @dataclass(frozen=True)
 class Schema:
+    """Represents a schema from Unity Catalog.
+
+    The Databricks SDK also comes with a representation for a schema: `databricks.sdk.service.catalog.SchemaInfo`.
+    However, we introduce this dataclass to have a minimal, extensible representation required for UCX.
+
+    Docs:
+        https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/privileges.html#securable-objects-in-unity-catalog
+    """
+
     catalog: str
+    """The catalog the schema is part of.
+
+    Note:
+        Maps to `SchemaInfo.catalog_name`, when introducing this class `catalog` is consistent with
+        `databricks.labs.ucx.hive_metastore.tables.Table.catalog`.
+    """
+
     name: str
+    """The schema name"""
 
     @property
     def full_name(self) -> str:
+        """The full name of the schema.
+
+        For a schema, the second layer of the object hierarchy (see doc link above).
+        """
         return f"{self.catalog}.{self.name}"
 
     @property
     def key(self) -> str:
+        """Synonym for attr:full_name."""
         return self.full_name
 
     @property
