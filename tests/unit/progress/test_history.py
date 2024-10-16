@@ -228,7 +228,7 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
             )
         )
         array_field: list[str] = field(default_factory=lambda: ["foo", "bar", "baz"])
-        nested_dataclass: list = field(default_factory=lambda: [_InnerClass(x) for x in range(2)])
+        nested_dataclass: list[_InnerClass] = field(default_factory=lambda: [_InnerClass(x) for x in range(2)])
 
         __id_fields__: ClassVar = ("str_field",)
 
