@@ -37,6 +37,11 @@ class Catalog:
 
     @property
     def kind(self) -> str:
+        """The object kind.
+
+        Note:
+            In the SDK this maps to attr:securable_type.
+        """
         return "CATALOG"
 
 
