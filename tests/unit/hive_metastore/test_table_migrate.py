@@ -1483,3 +1483,46 @@ def test_table_migration_status_source_table_unknown() -> None:
 
     assert owner == "an_admin"
     table_ownership.owner_of.assert_not_called()
+
+
+def test_migrate_tables_handles_table_with_empty_column(caplog) -> None:
+    backend = MockBackend()
+    table_crawler = create_autospec(TablesCrawler)
+    client = mock_workspace_client()
+    table_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+            location="s3://some_location/table1",
+            upgraded_to="ucx_default.db1_dst.dst_table1",
+        ),
+    ]
+    table_mapping = mock_table_mapping()
+    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
+    migration_index = TableMigrationIndex(
+        [
+            TableMigrationStatus("schema1", "table1", "ucx_default", "db1_dst", "dst_table1"),
+            TableMigrationStatus("schema1", "table2", "ucx_default", "db1_dst", "dst_table2"),
+        ]
+    )
+    migration_status_refresher.index.return_value = migration_index
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrator = TablesMigrator(
+        table_crawler,
+        client,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+
+    with caplog.at_level(logging.ERROR, logger="databricks.labs.ucx.hive_metastore"):
+        assert not table_migrator.migrate_tables()
+    assert "Cannot migrate table with empty column name: hive_metastore.schema1.table1" in caplog.messages
+    migrate_grants.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
