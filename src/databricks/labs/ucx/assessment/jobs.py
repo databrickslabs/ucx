@@ -8,7 +8,7 @@ from hashlib import sha256
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 from databricks.sdk.service.jobs import (
     BaseJob,
     BaseRun,
@@ -67,9 +67,9 @@ class JobsMixin:
                 yield job, task.new_cluster
 
     @staticmethod
-    def _job_clusters(job: BaseJob):
-        assert job.settings
-        assert job.settings.job_clusters is not None
+    def _job_clusters(job: BaseJob) -> Iterable[tuple[BaseJob, ClusterSpec]]:
+        if not job.settings or not job.settings.job_clusters:
+            return
         for job_cluster in job.settings.job_clusters:
             if job_cluster.new_cluster is None:
                 continue
