@@ -83,7 +83,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
-        all_clusters = {c.cluster_id or "": c for c in self._ws.clusters.list()}
+        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list() if c.cluster_id}
         return self._assess_jobs(all_jobs, all_clusters)
 
     def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> Iterable[JobInfo]:
