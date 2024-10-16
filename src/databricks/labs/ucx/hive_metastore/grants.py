@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from functools import partial, cached_property
+from typing import Protocol
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -34,7 +35,6 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.objects import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
 )
@@ -741,6 +741,27 @@ class PrincipalACL:
         return None
 
 
+class SecurableObject(Protocol):
+    """A protocol for a securable object.
+
+    Docs:
+        https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore
+    """
+
+    @property
+    def kind(self) -> str:
+        """The type of securable objects, see doc referenced above."""
+
+    @property
+    def full_name(self) -> str:
+        """The object name often a synonym for `key`"""
+
+    @property
+    def key(self) -> str:
+        """The object identifier often a synonym for `full_name`"""
+        return self.full_name
+
+
 class MigrateGrants:
     def __init__(
         self,
@@ -752,7 +773,7 @@ class MigrateGrants:
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
 
-    def apply(self, src: Catalog | Schema | Table, dst: Catalog | Schema | Table) -> bool:
+    def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
         for grant in self._match_grants(src):
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
@@ -782,7 +803,7 @@ class MigrateGrants:
                 grants.append(grant)
         return grants
 
-    def _match_grants(self, src: Catalog | Schema | Table) -> list[Grant]:
+    def _match_grants(self, src: SecurableObject) -> list[Grant]:
         matched_grants = []
         for grant in self._grants:
             if grant.object_key != src.key:
