@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import ClassVar, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, ParseResult
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
@@ -62,18 +62,41 @@ class LocationTrie:
             return None
         try:
             scheme, netloc, *path = self._path
-            return f"{scheme}://{netloc}/{'/'.join(path)}"
+            return f"{scheme}://{netloc}/{'/'.join(path)}".rstrip("/")
         except ValueError:
             return None
 
-    @staticmethod
-    def _parse_location(location: str | None) -> list[str]:
+    @classmethod
+    def _parse_location(cls, location: str | None) -> list[str]:
         if not location:
             return []
-        parse_result = urlparse(location)
+        parse_result = cls._parse_url(location.rstrip("/"))
+        if not parse_result:
+            return []
         parts = [parse_result.scheme, parse_result.netloc]
-        parts.extend(parse_result.path.strip("/").split("/"))
+        for part in parse_result.path.split("/"):
+            if not part:
+                continue  # remove empty strings
+            parts.append(part)
         return parts
+
+    @staticmethod
+    def _parse_url(location: str) -> ParseResult | None:
+        parse_result = urlparse(location)
+        if parse_result.scheme == 'jdbc':
+            jdbc_path = parse_result.path.split('://')
+            if len(jdbc_path) != 2:
+                return None
+            netloc, path = jdbc_path[1].split('/', 1)
+            parse_result = ParseResult(
+                scheme=f'{parse_result.scheme}:{jdbc_path[0]}',
+                netloc=netloc,
+                path=path,
+                params='',
+                query='',
+                fragment='',
+            )
+        return parse_result
 
     def insert(self, table: Table) -> None:
         current = self
@@ -99,7 +122,14 @@ class LocationTrie:
         if len(self._path) < 2:
             return False
         scheme, netloc, *_ = self._path
+        if scheme.startswith('jdbc:') and len(netloc) > 0:
+            return True
         return scheme in _EXTERNAL_FILE_LOCATION_SCHEMES and len(netloc) > 0
+
+    def is_jdbc(self) -> bool:
+        if not self.is_valid():
+            return False
+        return self._path[0].startswith('jdbc:')
 
     def all_tables(self) -> Iterable[Table]:
         for node in self:
@@ -134,7 +164,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     @cached_property
     def _mounts_snapshot(self) -> list['Mount']:
         """Returns all mounts, sorted by longest prefixes first."""
-        return sorted(self._mounts_crawler.snapshot(), key=lambda _: len(_.name), reverse=True)
+        return sorted(self._mounts_crawler.snapshot(), key=lambda _: (len(_.name), _.name), reverse=True)
 
     def _external_locations(self) -> Iterable[ExternalLocation]:
         trie = LocationTrie()
@@ -147,19 +177,22 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         external_locations = []
         while queue:
             curr = queue.pop()
-            prefix = curr.location
-            if prefix and len(curr.children) > 1:
-                external_location = ExternalLocation(prefix, len(list(curr.all_tables())))
+            num_children = len(curr.children)  # 0 - take parent
+            if curr.location and (num_children > 1 or num_children == 0):
+                if curr.parent and num_children == 0 and not curr.is_jdbc():  # one table having the prefix
+                    curr = curr.parent
+                assert curr.location is not None
+                external_location = ExternalLocation(curr.location, len(list(curr.all_tables())))
                 external_locations.append(external_location)
                 continue
             queue.extend(curr.children.values())
-        return external_locations
+        return sorted(external_locations, key=lambda _: _.location)
 
     def _resolve_location(self, table: Table) -> Table:
         location = table.location
         if not location:
             return table
-        location = self._resolve_jdbc(table)  # TODO: trie almost works with JDBC locations
+        location = self._resolve_jdbc(table)
         location = self.resolve_mount(location)
         return dataclasses.replace(table, location=location)
 
@@ -167,7 +200,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not location:
             return None
         if location.startswith('/dbfs'):
-            location[0:5] = 'dbfs:'  # convert FUSE path to DBFS path
+            location = 'dbfs:' + location[5:]  # convert FUSE path to DBFS path
         if not location.startswith('dbfs:'):
             return location  # not a mount, save some cycles
         for mount in self._mounts_snapshot:
@@ -182,9 +215,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
 
     def _resolve_jdbc(self, table: Table) -> str | None:
         location = table.location
-        if not location or not table.storage_properties:
-            return None
-        if not location.startswith('jdbc:'):
+        if not location or not table.storage_properties or not location.startswith('jdbc:'):
             return location
         pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
         # Find all matches in the input string
