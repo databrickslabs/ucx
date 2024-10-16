@@ -61,8 +61,10 @@ class CustomIterator:
     def __init__(self, values):
         self._values = iter(values)
         self._has_next = True
+        self._next_value = None
 
-    def hasNext(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def hasNext(self):
         try:
             self._next_value = next(self._values)
             self._has_next = True
@@ -154,9 +156,11 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = (
                     mock_list_databases_iterator
                 )
+                # pylint: disable=protected-access
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = (
                     mock_list_tables_iterator
                 )
+                # pylint: disable=protected-access
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = (
                     get_table_mock
                 )
@@ -169,8 +173,9 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
 
 @pytest.fixture
 def acc_client():
-    acc = create_autospec(AccountClient)  # pylint: disable=mock-no-usage
+    acc = create_autospec(AccountClient)
     acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+    acc.asset_not_called()
     return acc
 
 
