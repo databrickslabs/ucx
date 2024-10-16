@@ -19,7 +19,7 @@ from databricks.labs.ucx.source_code.base import decode_with_bom
 class _PathLruCache:
 
     _datas: OrderedDict[PurePosixPath, bytes]
-    """Cached binary data of files, keyed by resolved workspace path, ordered from oldest to newest."""
+    """Cached binary data of files, keyed by workspace path, ordered from oldest to newest."""
 
     _max_entries: int
     """The maximum number of entries to hold in the cache."""
@@ -32,7 +32,7 @@ class _PathLruCache:
     @classmethod
     def _normalize(cls, path: _CachedPath) -> PurePosixPath:
         # Note: must not return the same instance that was passed in, to avoid circular references (and memory leaks).
-        return PurePosixPath(*path.resolve().parts)
+        return PurePosixPath(*path.parts)
 
     def load(self, cached_path: _CachedPath, buffering: int = -1) -> bytes:
         normalized_path = self._normalize(cached_path)

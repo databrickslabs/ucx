@@ -55,15 +55,6 @@ def test_download_is_only_called_once_per_instance() -> None:
     assert ws.workspace.download.call_count == 1
 
 
-def test_download_is_only_called_once_across_same_resolved_path() -> None:
-    ws = mock_workspace_client()
-    ws.workspace.download.side_effect = lambda _, *, format: io.BytesIO("abc".encode())
-    cache = WorkspaceCache(ws)
-    cache.get_workspace_path("/a/path").read_text()
-    cache.get_workspace_path("/a/b/../path").read_text()
-    assert ws.workspace.download.call_count == 1
-
-
 def test_download_is_only_called_once_across_instances() -> None:
     ws = mock_workspace_client()
     ws.workspace.download.side_effect = lambda _, *, format: io.BytesIO("abc".encode())
