@@ -73,6 +73,8 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
         managed_table_external_storage: str = "CLONE",
     ):
+        if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
+            self._spark = self._spark_session
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
@@ -126,7 +128,7 @@ class TablesMigrator:
         return all_tasks
 
     @cached_property
-    def _spark(self):
+    def _spark_session(self):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
