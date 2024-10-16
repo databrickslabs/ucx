@@ -15,6 +15,7 @@ class MigrationStep:
     step_number: int
     object_type: str
     object_id: str
+    object_name: str
     object_owner: str
     required_step_ids: list[int] = field(default_factory=list)
 
@@ -25,6 +26,7 @@ class MigrationNode:
     node_id: int
     object_type: str
     object_id: str
+    object_name: str
     object_owner: str
     required_steps: list[MigrationNode] = field(default_factory=list)
 
@@ -46,6 +48,7 @@ class MigrationNode:
             step_number=highest_step_number + 1,
             object_type=self.object_type,
             object_id=self.object_id,
+            object_name=self.object_name,
             object_owner=self.object_owner,
             required_step_ids=required_step_ids,
         )
@@ -64,16 +67,23 @@ class MigrationNode:
 class MigrationSequencer:
 
     def __init__(self):
-        self._root = MigrationNode(node_id=0, object_type="ROOT", object_id="ROOT", object_owner="NONE")
+        self._root = MigrationNode(
+            node_id=0, object_type="ROOT", object_id="ROOT", object_name="ROOT", object_owner="NONE"
+        )
 
     def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
-        task_node = self._find_node(object_type="TASK", object_id=task.task_key)
+        task_id = f"{job.job_id}/{task.task_key}"
+        task_node = self._find_node(object_type="TASK", object_id=task_id)
         if task_node:
             return task_node
         job_node = self.register_workflow_job(job)
         MigrationNode.last_node_id += 1
         task_node = MigrationNode(
-            node_id=MigrationNode.last_node_id, object_type="TASK", object_id=task.task_key, object_owner="NONE"
+            node_id=MigrationNode.last_node_id,
+            object_type="TASK",
+            object_id=task_id,
+            object_name=task.task_key,
+            object_owner="NONE",
         )  # TODO object_owner
         job_node.required_steps.append(task_node)
         if task.existing_cluster_id:
@@ -89,8 +99,13 @@ class MigrationSequencer:
         if job_node:
             return job_node
         MigrationNode.last_node_id += 1
+        job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
         job_node = MigrationNode(
-            node_id=MigrationNode.last_node_id, object_type="JOB", object_id=str(job.job_id), object_owner="NONE"
+            node_id=MigrationNode.last_node_id,
+            object_type="JOB",
+            object_id=str(job.job_id),
+            object_name=job_name,
+            object_owner="NONE",
         )  # TODO object_owner
         top_level = True
         if job.settings and job.settings.job_clusters:
@@ -114,7 +129,11 @@ class MigrationSequencer:
             return cluster_node
         MigrationNode.last_node_id += 1
         cluster_node = MigrationNode(
-            node_id=MigrationNode.last_node_id, object_type="CLUSTER", object_id=cluster_key, object_owner="NONE"
+            node_id=MigrationNode.last_node_id,
+            object_type="CLUSTER",
+            object_id=cluster_key,
+            object_name=cluster_key,
+            object_owner="NONE",
         )  # TODO object_owner
         # TODO register warehouses and policies
         self._root.required_steps.append(cluster_node)
