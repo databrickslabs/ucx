@@ -175,7 +175,7 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
 def acc_client():
     acc = create_autospec(AccountClient)
     acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-    acc.asset_not_called()
+    acc.assert_not_called()
     return acc
 
 
