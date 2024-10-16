@@ -48,7 +48,7 @@ dependencies = ["databricks-sdk~=0.30",
                 "databricks-labs-lsql>=0.5,<0.13",
                 "databricks-labs-blueprint>=0.9.1,<0.10",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=25.5.0,<25.25",
+                "sqlglot>=25.5.0,<25.26",
                 "astroid>=3.3.1"]
 
 [project.optional-dependencies]
