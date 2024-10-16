@@ -25963,15 +25963,6 @@
     "pooch.downloaders": [],
     "pooch.hashes": [],
     "pooch.processors": [],
-    "pooch.tests": [],
-    "pooch.tests.test_core": [],
-    "pooch.tests.test_downloaders": [],
-    "pooch.tests.test_hashes": [],
-    "pooch.tests.test_integration": [],
-    "pooch.tests.test_processors": [],
-    "pooch.tests.test_utils": [],
-    "pooch.tests.test_version": [],
-    "pooch.tests.utils": [],
     "pooch.utils": []
   },
   "prometheus_client": {
