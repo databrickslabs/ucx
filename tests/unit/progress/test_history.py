@@ -247,6 +247,37 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
     }
 
 
+@dataclass(frozen=True, kw_only=True)
+class _InnerClassWithTimestamp:
+    b_field: dt.datetime
+
+
+@dataclass(frozen=True, kw_only=True)
+class _OuterclassWithTimestamps:
+    object_id: str = "not used"
+    a_field: dt.datetime | None = None
+    inner: _InnerClassWithTimestamp | None = None
+
+    __id_fields__: ClassVar = ("object_id",)
+
+
+@pytest.mark.parametrize(
+    "field,record",
+    (
+        ("a_field", _OuterclassWithTimestamps(a_field=dt.datetime.now())),
+        ("inner", _OuterclassWithTimestamps(inner=_InnerClassWithTimestamp(b_field=dt.datetime.now()))),
+    ),
+)
+def test_historical_encoder_naive_timestamps_banned(ownership, field: str, record: _OuterclassWithTimestamps) -> None:
+    """Verify that encoding detects and disallows naive timestamps."""
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_OuterclassWithTimestamps)
+
+    with pytest.raises(
+        ValueError, match=re.escape(f"Timestamp without timezone not supported in or within field {field}")
+    ):
+        _ = encoder.to_historical(record)
+
+
 @pytest.mark.parametrize("failures", (["failures-1", "failures-2"], []))
 def test_historical_encoder_failures(ownership, failures: list[str]) -> None:
     """Verify an encoder places failures on the top-level field instead of within the object data."""

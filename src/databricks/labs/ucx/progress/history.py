@@ -72,7 +72,8 @@ class HistoricalEncoder(Generic[Record]):
         if isinstance(value, dt.datetime):
             # Only allow tz-aware timestamps.
             if value.tzinfo is None:
-                msg = f"Timestamp without timezone not supported for field {name}: {value}"
+                # Name refers to the outermost field, not necessarily a field on a (nested) dataclass.
+                msg = f"Timestamp without timezone not supported in or within field {name}: {value}"
                 raise ValueError(msg)
             # Always store with 'Z'.
             ts_utc = value.astimezone(dt.timezone.utc)
