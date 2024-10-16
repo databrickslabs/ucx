@@ -178,12 +178,13 @@ def test_historical_encoder_object_data_values_strings_as_is(ownership) -> None:
     class _AClass:
         a_field: str = "value"
         existing_json_field: str = "[1, 2, 3]"
+        optional_string_field: str | None = "value"
 
         __id_fields__: ClassVar = ("a_field",)
 
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
     historical = encoder.to_historical(_AClass())
-    assert historical.data == {"a_field": "value", "existing_json_field": "[1, 2, 3]"}
+    assert historical.data == {"a_field": "value", "existing_json_field": "[1, 2, 3]", "optional_string_field": "value"}
 
 
 def test_historical_encoder_object_data_missing_optional_values(ownership) -> None:
