@@ -188,7 +188,7 @@ def test_historical_encoder_object_data_values_strings_as_is(ownership) -> None:
 def test_historical_encoder_object_data_missing_optional_values(ownership) -> None:
     """Verify the encoding of missing (optional) field values."""
 
-    @dataclass
+    @dataclass(frozen=True)
     class _InnerClass:
         optional_field: str | None = None
 
@@ -209,7 +209,7 @@ def test_historical_encoder_object_data_missing_optional_values(ownership) -> No
 def test_historical_encoder_object_data_values_non_strings_as_json(ownership) -> None:
     """Verify that non-string fields are encoded as JSON in the object_data"""
 
-    @dataclass
+    @dataclass(frozen=True)
     class _InnerClass:
         counter: int
         boolean: bool = True
