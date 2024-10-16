@@ -1081,10 +1081,11 @@ def test_table_status_seen_tables(caplog):
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
 
-def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark):
+def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark) -> None:
     # all grants succeed except for one
     table_crawler = create_autospec(TablesCrawler)
     src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
+    dst = Table('ucx_default', 'db1_dst', 'managed_dbfs', 'MANAGED', 'DELTA')
     table_crawler.snapshot.return_value = [src]
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
@@ -1108,7 +1109,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark):
 
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
-    migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
+    migrate_grants.apply.assert_called_with(src, dst)
     external_locations.resolve_mount.assert_not_called()
     assert sql_backend.queries == [
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',

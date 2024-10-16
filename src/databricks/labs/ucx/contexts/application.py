@@ -373,14 +373,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def catalog_schema(self) -> CatalogSchema:
-        return CatalogSchema(
-            self.workspace_client,
-            self.table_mapping,
-            self.principal_acl,
-            self.sql_backend,
-            self.grants_crawler,
-            self.config.ucx_catalog,
-        )
+        return CatalogSchema(self.workspace_client, self.table_mapping, self.migrate_grants, self.config.ucx_catalog)
 
     @cached_property
     def verify_timeout(self) -> timedelta:
