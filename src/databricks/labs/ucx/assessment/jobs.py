@@ -54,9 +54,11 @@ class JobsMixin:
             yield from cls._task_clusters(job, all_clusters_by_id)
 
     @classmethod
-    def _task_clusters(cls, job: BaseJob, all_clusters_by_id: dict[str, ClusterDetails]):
-        assert job.settings
-        assert job.settings.tasks
+    def _task_clusters(
+        cls, job: BaseJob, all_clusters_by_id: dict[str, ClusterDetails]
+    ) -> Iterable[tuple[BaseJob, ClusterDetails | ClusterSpec]]:
+        if not job.settings or not job.settings.tasks:
+            return
         for task in job.settings.tasks:
             if task.existing_cluster_id is not None:
                 interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
