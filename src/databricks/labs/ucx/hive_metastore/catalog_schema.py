@@ -47,6 +47,9 @@ class Catalog:
 
         Note:
             In the SDK this maps to attr:securable_type.
+
+        TODO:
+            https://github.com/databrickslabs/ucx/issues/2975
         """
         return "CATALOG"
 
@@ -71,6 +74,9 @@ class Schema:
         Below "DATABASE" is chosen as this is the kind used in the grants module. However, more consistent with
         Databricks documentation would be to use "SCHEMA" instead:
         https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore
+
+        TODO:
+            https://github.com/databrickslabs/ucx/issues/2975
         """
         return "DATABASE"  # TODO: https://github.com/databrickslabs/ucx/issues/2974
 
