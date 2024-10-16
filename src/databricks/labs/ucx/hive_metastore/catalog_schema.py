@@ -252,7 +252,7 @@ class CatalogSchema:
                 comment="Created by UCX",
                 properties=properties,
             )
-        catalog_created = self._get_catalog(catalog, timeout=dt.timedelta(seconds=10))
+        catalog_created = self._get_catalog(catalog, timeout=dt.timedelta(seconds=30))
         if catalog_created is None:
             raise NotFound(f"Created catalog '{catalog.name}' does not exist.")
         return catalog_created
@@ -294,7 +294,7 @@ class CatalogSchema:
             return schema_existing
         logger.info(f"Creating UC schema: {schema.full_name}")
         self._ws.schemas.create(schema.name, schema.catalog, comment="Created by UCX")
-        schema_created = self._get_schema(schema, timeout=dt.timedelta(seconds=10))
+        schema_created = self._get_schema(schema, timeout=dt.timedelta(seconds=30))
         if schema_created is None:
             raise NotFound(f"Created schema '{schema.full_name}' does not exist.")
         return schema_created
