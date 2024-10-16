@@ -5,10 +5,10 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
