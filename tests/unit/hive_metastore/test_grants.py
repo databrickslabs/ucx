@@ -6,7 +6,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.hive_metastore.objects import Catalog, Schema
+from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler

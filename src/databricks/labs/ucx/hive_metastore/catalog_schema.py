@@ -1,6 +1,7 @@
 import collections
 import datetime as dt
 import logging
+from dataclasses import dataclass
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -10,9 +11,43 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.objects import Catalog, Schema
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Catalog:
+    name: str
+
+    @property
+    def full_name(self) -> str:
+        return self.name
+
+    @property
+    def key(self) -> str:
+        return self.full_name
+
+    @property
+    def kind(self) -> str:
+        return "CATALOG"
+
+
+@dataclass(frozen=True)
+class Schema:
+    catalog: str
+    name: str
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.catalog}.{self.name}"
+
+    @property
+    def key(self) -> str:
+        return self.full_name
+
+    @property
+    def kind(self) -> str:
+        return "DATABASE"  # TODO: Refactor code to use "SCHEMA" instead (see docstring above)
 
 
 class CatalogSchema:
