@@ -31,11 +31,11 @@ from databricks.labs.ucx.source_code.base import (
     LocatedAdvice,
     is_a_notebook,
     file_language,
-    guess_encoding,
     SourceInfo,
     UsedTable,
     LineageAtom,
     PythonSequentialLinter,
+    read_text,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -156,7 +156,7 @@ class WorkflowTaskContainer(SourceContainer):
         parsed_path = parse.urlparse(path)
         match parsed_path.scheme:
             case "":
-                return self._cache.get_path(path)
+                return self._cache.get_workspace_path(path)
             case "dbfs":
                 return DBFSPath(self._ws, parsed_path.path)
             case other:
@@ -184,6 +184,8 @@ class WorkflowTaskContainer(SourceContainer):
                 yield from self._register_whl(graph, library)
             if library.requirements:
                 yield from self._register_requirements_txt(graph, library)
+        except WorkspaceCache.InvalidWorkspacePath as e:
+            yield DependencyProblem('cannot-load-file', str(e))
         except BadRequest as e:
             # see https://github.com/databrickslabs/ucx/issues/2916
             yield DependencyProblem('library-error', f'Cannot retrieve library: {e}')
@@ -233,8 +235,11 @@ class WorkflowTaskContainer(SourceContainer):
         self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
-        # Notebooks can't be on DBFS.
-        path = self._cache.get_path(notebook_path)
+        try:
+            # Notebooks can't be on DBFS.
+            path = self._cache.get_workspace_path(notebook_path)
+        except WorkspaceCache.InvalidWorkspacePath as e:
+            return [DependencyProblem('cannot-load-notebook', str(e))]
         return graph.register_notebook(path, False)
 
     def _register_spark_python_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -243,7 +248,10 @@ class WorkflowTaskContainer(SourceContainer):
         self._parameters = self._task.spark_python_task.parameters
         python_file = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {python_file}')
-        path = self._as_path(python_file)
+        try:
+            path = self._as_path(python_file)
+        except WorkspaceCache.InvalidWorkspacePath as e:
+            return [DependencyProblem('cannot-load-file', str(e))]
         return graph.register_file(path)
 
     @staticmethod
@@ -307,17 +315,23 @@ class WorkflowTaskContainer(SourceContainer):
             if not library.notebook:
                 return
             if library.notebook.path:
-                notebook_path = library.notebook.path
-                # Notebooks can't be on DBFS.
-                path = self._cache.get_path(notebook_path)
-                # the notebook is the root of the graph, so there's no context to inherit
-                yield from graph.register_notebook(path, inherit_context=False)
+                yield from self._register_notebook_path(graph, library.notebook.path)
             if library.jar:
                 yield from self._register_library(graph, compute.Library(jar=library.jar))
             if library.maven:
                 yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
             if library.file:
                 yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
+
+    def _register_notebook_path(self, graph: DependencyGraph, notebook_path: str) -> Iterable[DependencyProblem]:
+        try:
+            # Notebooks can't be on DBFS.
+            path = self._cache.get_workspace_path(notebook_path)
+        except WorkspaceCache.InvalidWorkspacePath as e:
+            yield DependencyProblem('cannot-load-notebook', str(e))
+            return
+        # the notebook is the root of the graph, so there's no context to inherit
+        yield from graph.register_notebook(path, inherit_context=False)
 
     def _register_existing_cluster_id(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.existing_cluster_id:
@@ -602,7 +616,7 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             logger.warning(f"Unknown language for {dependency.path}")
             return
         cell_language = CellLanguage.of_language(language)
-        source = dependency.path.read_text(guess_encoding(dependency.path))
+        source = read_text(dependency.path)
         if is_a_notebook(dependency.path):
             yield from self._collect_from_notebook(source, cell_language, dependency.path, inherited_tree)
         elif dependency.path.is_file():
