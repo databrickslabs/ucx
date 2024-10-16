@@ -1,14 +1,15 @@
 import dataclasses
 import logging
+import re
 from collections import defaultdict
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -28,7 +29,6 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
-from databricks.sdk.errors.platform import DatabricksError
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class TablesMigrator:
         for table in tables_in_scope:
             tasks.append(
                 partial(
-                    self._migrate_table,
+                    self._safe_migrate_table,
                     table,
                     managed_table_external_storage,
                     hiveserde_in_place_migrate,
@@ -131,15 +131,35 @@ class TablesMigrator:
         logger.warning(f"failed-to-migrate: unknown managed_table_external_storage: {managed_table_external_storage}")
         return True
 
+    def _safe_migrate_table(
+        self,
+        src_table: TableToMigrate,
+        managed_table_external_storage: str,
+        hiveserde_in_place_migrate: bool = False,
+    ) -> bool:
+        if self._table_already_migrated(src_table.rule.as_uc_table_key):
+            logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
+            return True
+        try:
+            return self._migrate_table(src_table, managed_table_external_storage, hiveserde_in_place_migrate)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catching a Spark AnalysisException here, for which we do not have the dependency to catch explicitly
+            pattern = (  # See https://github.com/databrickslabs/ucx/issues/2891
+                r"INVALID_PARAMETER_VALUE: Invalid input: RPC CreateTable Field managedcatalog.ColumnInfo.name: "
+                r'At columns.\d+: name "" is not a valid name`'
+            )
+            if re.match(pattern, str(e)):
+                logger.warning(f"failed-to-migrate: Table with empty column name '{src_table.src.key}'", exc_info=e)
+            else:
+                logger.warning(f"failed-to-migrate: Unknown reason for table '{src_table.src.key}'", exc_info=e)
+            return False
+
     def _migrate_table(
         self,
         src_table: TableToMigrate,
         managed_table_external_storage: str,
         hiveserde_in_place_migrate: bool = False,
-    ):
-        if self._table_already_migrated(src_table.rule.as_uc_table_key):
-            logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
-            return True
+    ) -> bool:
         if src_table.src.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule)
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
