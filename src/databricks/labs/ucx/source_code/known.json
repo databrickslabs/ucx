@@ -8935,6 +8935,16 @@
     "langchain_text_splitters.sentence_transformers": [],
     "langchain_text_splitters.spacy": []
   },
+  "langcodes": {
+    "langcodes": [],
+    "langcodes.build_data": [],
+    "langcodes.data_dicts": [],
+    "langcodes.language_distance": [],
+    "langcodes.language_lists": [],
+    "langcodes.registry_parser": [],
+    "langcodes.tag_parser": [],
+    "langcodes.util": []
+  },
   "langsmith": {
     "langsmith": [],
     "langsmith._expect": [],
@@ -8967,6 +8977,16 @@
     "langsmith.utils": [],
     "langsmith.wrappers": [],
     "langsmith.wrappers._openai": []
+  },
+  "language_data": {
+    "language_data": [],
+    "language_data.build_data": [],
+    "language_data.language_lists": [],
+    "language_data.name_data": [],
+    "language_data.names": [],
+    "language_data.population_data": [],
+    "language_data.registry_parser": [],
+    "language_data.util": []
   },
   "launchpadlib": {
     "launchpadlib": [],
@@ -9082,6 +9102,7 @@
   "mako": {
     "mako": []
   },
+  "marisa-trie": {},
   "markdown": {
     "markdown": []
   },
