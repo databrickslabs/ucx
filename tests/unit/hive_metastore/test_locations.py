@@ -717,3 +717,20 @@ def test_mount_listing_seen_tables():
     assert results[0].location == "adls://bucket/table1"
     assert results[1].location == "dbfs:/mnt/test_mount/table2"
     assert results[2].location is None
+
+
+def test_resolve_dbfs_root_in_hms_federation():
+    jvm = Mock()
+    sql_backend = MockBackend()
+    client = create_autospec(WorkspaceClient)
+    client.dbutils.fs.mounts.return_value = [MountInfo('/', 'DatabricksRoot', '')]
+
+    mounts_crawler = MountsCrawler(sql_backend, client, "test", enable_hms_federation=True)
+    mounts_crawler.__dict__['_jvm'] = jvm
+
+    hms_fed_dbfs_utils = jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
+    hms_fed_dbfs_utils.resolveDbfsPath().get().toString.return_value = 's3://original/bucket/user/hive/warehouse'
+
+    mounts = mounts_crawler.snapshot()
+
+    assert [Mount("/", 's3://original/bucket/')] == mounts

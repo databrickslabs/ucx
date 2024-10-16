@@ -341,14 +341,18 @@ class Mount:
     def as_scheme_prefix(self) -> str:
         return f'dbfs:{self.name}'  # dbfs:/mnt/mount-name
 
-    def as_fuse_prefix(self) -> str:
-        return f'/dbfs{self.name}'  # /dbfs/mnt/mount-name
-
 
 class MountsCrawler(CrawlerBase[Mount]):
-    def __init__(self, backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
+    def __init__(
+        self,
+        backend: SqlBackend,
+        ws: WorkspaceClient,
+        inventory_database: str,
+        enable_hms_federation: bool = False,
+    ):
         super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
+        self._enable_hms_federation = enable_hms_federation
 
     @staticmethod
     def _deduplicate_mounts(mounts: list) -> list:
@@ -364,11 +368,48 @@ class MountsCrawler(CrawlerBase[Mount]):
                 deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
+    @cached_property
+    def _jvm(self):
+        # pylint: disable=import-error,import-outside-toplevel,broad-exception-caught
+        try:
+            from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+            spark = SparkSession.builder.getOrCreate()
+            return spark._jvm  # pylint: disable=protected-access
+        except Exception as err:
+            logger.warning(f"Cannot create Py4j proxy: {err}")
+            return None
+
+    def _resolve_dbfs_root(self) -> Mount | None:
+        # pylint: disable=broad-exception-caught,too-many-try-statements
+        try:
+            jvm = self._jvm
+            if not jvm:
+                return None
+            uri = jvm.java.net.URI
+            some = jvm.scala.Some
+            hms_fed_dbfs_utils = jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
+            root_location_opt = hms_fed_dbfs_utils.resolveDbfsPath(some(uri("dbfs:/user/hive/warehouse")))
+            if root_location_opt.isDefined():
+                source: str = root_location_opt.get().toString()
+                source = source.removesuffix('user/hive/warehouse')
+                return Mount("/", source)
+            return None
+        except Exception as err:
+            logger.warning(f"Failed to resolve DBFS root location: {err}")
+            return None
+
     def _crawl(self) -> Iterable[Mount]:
         mounts = []
         try:
             for mount_point, source, _ in self._dbutils.fs.mounts():
                 mounts.append(Mount(mount_point, source))
+            if self._enable_hms_federation:
+                root_mount = self._resolve_dbfs_root()
+                if root_mount:
+                    # filter out DatabricksRoot, otherwise ExternalLocations.resolve_mount() won't work
+                    mounts = list(filter(lambda _: _.source != 'DatabricksRoot', mounts))
+                    mounts.append(root_mount)
         except Exception as error:  # pylint: disable=broad-except
             if "com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted" in str(error):
                 logger.warning(

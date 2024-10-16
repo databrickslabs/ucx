@@ -294,7 +294,12 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def mounts_crawler(self) -> MountsCrawler:
-        return MountsCrawler(self.sql_backend, self.workspace_client, self.inventory_database)
+        return MountsCrawler(
+            self.sql_backend,
+            self.workspace_client,
+            self.inventory_database,
+            self.config.enable_hms_federation,
+        )
 
     @cached_property
     def azure_service_principal_crawler(self) -> AzureServicePrincipalCrawler:
