@@ -3,7 +3,7 @@ import dataclasses
 import datetime as dt
 import json
 import logging
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from typing import ClassVar, Protocol, TypeVar, Generic, Any
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -140,15 +140,6 @@ class HistoryLog(Generic[Record]):
         self._table = table
         encoder = HistoricalEncoder(job_run_id=run_id, workspace_id=workspace_id, ownership=ownership, klass=klass)
         self._encoder = encoder
-
-    @staticmethod
-    def _record_identifier(record_type: type[Record]) -> Callable[[Record], list[str]]:
-        key_field_names = getattr(record_type, "key_fields", ())
-
-        def identify_record(record: Record) -> list[str]:
-            return [getattr(record, key_field) for key_field in key_field_names]
-
-        return identify_record
 
     @property
     def full_name(self) -> str:
