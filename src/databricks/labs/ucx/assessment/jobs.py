@@ -69,7 +69,7 @@ class JobsMixin:
     @staticmethod
     def _job_clusters(job: BaseJob):
         assert job.settings
-        assert job.settings.job_clusters
+        assert job.settings.job_clusters is not None
         for job_cluster in job.settings.job_clusters:
             if job_cluster.new_cluster is None:
                 continue
