@@ -68,7 +68,7 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
             "bar",
             "EXTERNAL",
             "delta",
-            location="jdbc://providerunknown/",
+            location="jdbc:providerunknown:/",
             storage_properties="[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
             port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
         ),
@@ -81,14 +81,14 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     crawler = ExternalLocations(ws, sql_backend, inventory_schema, tables_crawler, mounts_crawler)
     results = crawler.snapshot()
     assert results == [
-        ExternalLocation('s3://test_location/', 2),
-        ExternalLocation('s3://bar/test3/', 1),
         ExternalLocation(
             'jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be', 1
         ),
         ExternalLocation('jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db', 1),
         ExternalLocation('jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', table_count=2),
-        ExternalLocation('jdbc://providerunknown//somedb.us-east-1.rds.amazonaws.com:1234/test_db', 1),
+        ExternalLocation('jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', 1),
+        ExternalLocation('s3://bar/test3', 1),
+        ExternalLocation('s3://test_location', 2),
     ]
 
 
