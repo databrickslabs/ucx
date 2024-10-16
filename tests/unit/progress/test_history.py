@@ -5,10 +5,11 @@ from typing import ClassVar
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.lsql.core import Row
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import Ownership
-from databricks.labs.ucx.progress.history import HistoricalEncoder
+from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog
 from databricks.labs.ucx.progress.install import Historical
 
 
@@ -269,3 +270,73 @@ def test_historical_encoder_failures_verification(ownership) -> None:
 
     with pytest.raises(TypeError, match=re.escape("Historical record class has invalid failures type: list[int]")):
         _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_BrokenFailures)
+
+
+def test_history_log_appends_historical_records(ws, mock_backend, ownership) -> None:
+    """Verify that we can journal a snapshot of records to the historical log."""
+    ownership.owner_of.side_effect = lambda o: f"owner-{o.a_field}"
+
+    records = (
+        _TestRecord(a_field="first_record", b_field=1, failures=[]),
+        _TestRecord(a_field="second_record", b_field=2, failures=["a_failure"]),
+        _TestRecord(a_field="third_record", b_field=3, failures=["another_failure", "yet_another_failure"]),
+    )
+    expected_historical_entries = (
+        Row(
+            workspace_id=2,
+            job_run_id=1,
+            object_type="_TestRecord",
+            object_id=["first_record"],
+            data={"a_field": "first_record", "b_field": "1"},
+            failures=[],
+            owner="owner-first_record",
+            ucx_version=ucx_version,
+        ),
+        Row(
+            workspace_id=2,
+            job_run_id=1,
+            object_type="_TestRecord",
+            object_id=["second_record"],
+            data={"a_field": "second_record", "b_field": "2"},
+            failures=["a_failure"],
+            owner="owner-second_record",
+            ucx_version=ucx_version,
+        ),
+        Row(
+            workspace_id=2,
+            job_run_id=1,
+            object_type="_TestRecord",
+            object_id=["third_record"],
+            data={"a_field": "third_record", "b_field": "3"},
+            failures=["another_failure", "yet_another_failure"],
+            owner="owner-third_record",
+            ucx_version=ucx_version,
+        ),
+    )
+
+    history_log = HistoryLog(
+        ws,
+        mock_backend,
+        ownership,
+        _TestRecord,
+        run_id=1,
+        workspace_id=2,
+        catalog="the_catalog",
+        schema="the_schema",
+        table="the_table",
+    )
+    history_log.append_inventory_snapshot(records)
+
+    rows_appended = mock_backend.rows_written_for("`the_catalog`.`the_schema`.`the_table`", mode="append")
+    assert rows_appended == list(expected_historical_entries)
+
+
+def test_history_log_default_location(ws, mock_backend, ownership) -> None:
+    """Verify that the history log defaults to the ucx.history in the configured catalog."""
+
+    record = _TestRecord(a_field="foo", b_field=1, failures=[])
+    history_log = HistoryLog(ws, mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
+    history_log.append_inventory_snapshot([record])
+
+    assert history_log.full_name == "the_catalog.ucx.history"
+    assert mock_backend.has_rows_written_for("`the_catalog`.`ucx`.`history`")
