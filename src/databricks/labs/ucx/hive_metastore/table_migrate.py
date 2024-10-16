@@ -2,7 +2,7 @@ import dataclasses
 import logging
 import re
 from collections import defaultdict
-from functools import partial
+from functools import partial, cached_property
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -18,6 +18,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
+
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
@@ -44,6 +45,7 @@ class TablesMigrator:
         migrate_grants: MigrateGrants,
         external_locations: ExternalLocations,
     ):
+
         self._tc = table_crawler
         self._backend = backend
         self._ws = ws
@@ -71,6 +73,8 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
         managed_table_external_storage: str = "CLONE",
     ):
+        if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
+            self._spark = self._spark_session
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
@@ -123,7 +127,19 @@ class TablesMigrator:
             self.index(force_refresh=True)
         return all_tasks
 
+    @cached_property
+    def _spark_session(self):
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+        return SparkSession.builder.getOrCreate()
+
     def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
+        if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
+            if self._convert_hms_table_to_external(src_table.src):
+                return self._migrate_external_table(
+                    src_table.src, src_table.rule
+                )  # _migrate_external_table remains unchanged
         if managed_table_external_storage == 'SYNC_AS_EXTERNAL':
             return self._migrate_managed_as_external_table(src_table.src, src_table.rule)  # new method
         if managed_table_external_storage == 'CLONE':
@@ -227,8 +243,58 @@ class TablesMigrator:
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
 
+    @cached_property
+    def _catalog(self):
+        return self._spark._jsparkSession.sessionState().catalog()  # pylint: disable=protected-access
+
+    @cached_property
+    def _table_identifier(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.TableIdentifier  # pylint: disable=protected-access
+
+    @cached_property
+    def _catalog_type(self):
+        return (
+            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTableType  # pylint: disable=protected-access
+        )
+
+    @cached_property
+    def _catalog_table(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
+
     def _convert_hms_table_to_external(self, src_table: Table):
-        pass
+        try:
+            logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
+            database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
+            table_identifier = self._table_identifier(src_table.name, database)
+            old_table = self._catalog.getTableMetadata(table_identifier)
+            new_table = self._catalog_table(
+                old_table.identifier(),
+                self._catalog_type('EXTERNAL'),
+                old_table.storage(),
+                old_table.schema(),
+                old_table.provider(),
+                old_table.partitionColumnNames(),
+                old_table.bucketSpec(),
+                old_table.owner(),
+                old_table.createTime(),
+                old_table.lastAccessTime(),
+                old_table.createVersion(),
+                old_table.properties(),
+                old_table.stats(),
+                old_table.viewText(),
+                old_table.comment(),
+                old_table.unsupportedFeatures(),
+                old_table.tracksPartitionsInCatalog(),
+                old_table.schemaPreservesCase(),
+                old_table.ignoredProperties(),
+                old_table.viewOriginalText(),
+            )
+            self._catalog.alterTable(new_table)
+            logger.info(f"Converted {src_table.name} to External Table type.")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
+            return False
+        return True
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
