@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Catalog:
+    """Represents a catalog from Unity Catalog.
+
+    The Databricks SDK also comes with a representation for a catalog: `databricks.sdk.service.catalog.CatalogInfo`.
+    However, we introduce this dataclass to have a minimal, extensible representation required for UCX.
+
+    Docs:
+        https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/privileges.html#securable-objects-in-unity-catalog
+    """
     name: str
 
     @property
