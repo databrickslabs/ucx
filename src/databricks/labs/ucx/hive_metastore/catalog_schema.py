@@ -25,7 +25,9 @@ class Catalog:
     Docs:
         https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/privileges.html#securable-objects-in-unity-catalog
     """
+
     name: str
+    """The catalog name"""
 
     @property
     def full_name(self) -> str:
