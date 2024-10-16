@@ -113,12 +113,15 @@ class CatalogSchema:
         table_mapping: TableMapping,
         migrate_grants: MigrateGrants,
         ucx_catalog: str,
+        *,
+        timeout: dt.timedelta | None = dt.timedelta(seconds=30),
     ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._migrate_grants = migrate_grants
         self._external_locations = list(self._ws.external_locations.list())
         self._ucx_catalog = ucx_catalog
+        self._timeout = timeout
 
     def create_ucx_catalog(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
         """Create the UCX catalog.
@@ -205,25 +208,18 @@ class CatalogSchema:
         logger.warning(f"No matching external location found for: {location}")
         return False
 
-    def _get_catalog(
-        self,
-        catalog: Catalog,
-        *,
-        timeout: dt.timedelta | None = None,
-    ) -> Catalog | None:
+    def _get_catalog(self, catalog: Catalog) -> Catalog | None:
         """Get a catalog.
 
         Args:
             catalog (Catalog) : The catalog to get.
-            timeout (dt.timedelta) : Timeout to wait before concluding the catalog does not exist. If None, no timeout
-                is applied. Defaults to `None`.
 
         Returns:
             Catalog : The catalog it got.
             None : If the catalog does not exist.
         """
-        if timeout:
-            get = retried(on=[NotFound], timeout=timeout)(self._ws.catalogs.get)
+        if self._timeout:
+            get = retried(on=[NotFound], timeout=self._timeout)(self._ws.catalogs.get)
         else:
             get = self._ws.catalogs.get
         try:
@@ -252,30 +248,23 @@ class CatalogSchema:
                 comment="Created by UCX",
                 properties=properties,
             )
-        catalog_created = self._get_catalog(catalog, timeout=dt.timedelta(seconds=30))
+        catalog_created = self._get_catalog(catalog)
         if catalog_created is None:
             raise NotFound(f"Created catalog '{catalog.name}' does not exist.")
         return catalog_created
 
-    def _get_schema(
-        self,
-        schema: Schema,
-        *,
-        timeout: dt.timedelta | None = None,
-    ) -> Schema | None:
+    def _get_schema(self, schema: Schema) -> Schema | None:
         """Get a schema.
 
         Args:
             schema (Schema) : The schema to get.
-            timeout (dt.timedelta) : Timeout to wait before concluding the catalog does not exist. If None, no timeout
-                is applied. Defaults to `None`.
 
         Returns:
             Schema : The schema it got.
             None : If the catalog does not exist.
         """
-        if timeout:
-            get = retried(on=[NotFound], timeout=timeout)(self._ws.schemas.get)
+        if self._timeout:
+            get = retried(on=[NotFound], timeout=self._timeout)(self._ws.schemas.get)
         else:
             get = self._ws.schemas.get
         try:
@@ -294,7 +283,7 @@ class CatalogSchema:
             return schema_existing
         logger.info(f"Creating UC schema: {schema.full_name}")
         self._ws.schemas.create(schema.name, schema.catalog, comment="Created by UCX")
-        schema_created = self._get_schema(schema, timeout=dt.timedelta(seconds=30))
+        schema_created = self._get_schema(schema)
         if schema_created is None:
             raise NotFound(f"Created schema '{schema.full_name}' does not exist.")
         return schema_created

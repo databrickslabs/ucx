@@ -180,7 +180,7 @@ def prepare_test(  # pylint: disable=too-complex
     group_manager.snapshot.return_value = []
     migrate_grants = MigrateGrants(backend, group_manager, [interactive_cluster_grants_loader, hive_grants_loader])
 
-    return CatalogSchema(ws, table_mapping, migrate_grants, "ucx")
+    return CatalogSchema(ws, table_mapping, migrate_grants, "ucx", timeout=None)
 
 
 def test_create_ucx_catalog_creates_ucx_catalog() -> None:
