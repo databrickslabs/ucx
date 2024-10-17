@@ -8,15 +8,17 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
     SqlSequentialLinter,
     CurrentSessionState,
-    PythonSequentialLinter,
-    PythonLinter,
     SqlLinter,
-    TablePyCollector,
     TableSqlCollector,
     TableCollector,
     DfsaCollector,
-    DfsaPyCollector,
     DfsaSqlCollector,
+)
+from databricks.labs.ucx.source_code.python.python_ast import (
+    PythonLinter,
+    TablePyCollector,
+    DfsaPyCollector,
+    PythonSequentialLinter,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
