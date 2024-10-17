@@ -20,6 +20,7 @@ from databricks.sdk.service.jobs import (
     RunType,
     SparkJarTask,
     SqlTask,
+    Job,
 )
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
@@ -39,6 +40,17 @@ class JobInfo:
     job_name: str | None = None
     creator: str | None = None
     """User-name of the creator of the pipeline, if known."""
+
+    @classmethod
+    def from_job(cls, job: Job):
+        job_name = job.settings.name if job.settings and job.settings.name else "Unknown"
+        return JobInfo(
+            job_id=str(job.job_id),
+            success=1,
+            failures="[]",
+            job_name=job_name,
+            creator=job.creator_user_name or None,
+        )
 
 
 class JobsMixin:
@@ -124,17 +136,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_settings = job.settings
             if not job_settings:
                 continue
-            job_name = job_settings.name
-            if not job_name:
-                job_name = "Unknown"
-
-            job_details[job.job_id] = JobInfo(
-                job_id=str(job.job_id),
-                job_name=job_name,
-                creator=creator_user_name,
-                success=1,
-                failures="[]",
-            )
+            job_details[job.job_id] = JobInfo.from_job(job)
         return job_assessment, job_details
 
     def _try_fetch(self) -> Iterable[JobInfo]:
