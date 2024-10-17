@@ -200,6 +200,6 @@ def test_create_catalog_schema_when_users_group_in_warehouse_acl(
         runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     failed_to_migrate_message = (
-        f"failed-to-migrate: Failed to migrate ACL for {src_table.full_name} to {dst_catalog_name}"
+        f"failed-to-migrate: Failed to migrate ACL for {src_schema.full_name} to {dst_catalog_name}"
     )
     assert failed_to_migrate_message not in caplog.messages
