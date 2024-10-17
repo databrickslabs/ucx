@@ -22,7 +22,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 @pytest.mark.parametrize(
     "location",
     [
-        "s3://databricks-e2demofieldengwest/b169/b50",
+        "s3://databricks-e2demofieldengwest/b169/b50"
         "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
         "s3n://bucket-name/path-to-file-in-bucket",
         "gcs://test_location2/test2/table2",
@@ -166,9 +166,8 @@ def test_external_locations():
         table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/Table2", ""]),
         table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
         table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
-        table_factory(["gcs://test_location2/a/b/table2", ""]),
         table_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
-        table_factory(["/dbfs/mnt/ucx/database2/table2", ""]),
+        table_factory(["dbfs:/mnt/ucx/database2/table2", ""]),
         table_factory(["DatabricksRootmntDatabricksRoot", ""]),
         table_factory(
             [
@@ -213,18 +212,18 @@ def test_external_locations():
     mounts_crawler.snapshot.return_value = [Mount("/mnt/ucx", "s3://us-east-1-ucx-container")]
     sql_backend = MockBackend()
     crawler = ExternalLocations(Mock(), sql_backend, "test", tables_crawler, mounts_crawler)
-    assert crawler.snapshot() == [
-        ExternalLocation('gcs://test_location2/a/b', 1),
-        ExternalLocation(
-            'jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be', 1
-        ),
-        ExternalLocation('jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db', 1),
-        ExternalLocation('jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', 2),
-        ExternalLocation('jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', 1),
-        ExternalLocation('s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location', 2),
-        ExternalLocation('s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23', 2),
-        ExternalLocation('s3://us-east-1-ucx-container', 2),
-    ]
+    result_set = crawler.snapshot()
+    assert len(result_set) == 7
+    assert result_set[0].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-1/Location/"
+    assert result_set[0].table_count == 2
+    assert result_set[1].location == "s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/"
+    assert (
+        result_set[3].location
+        == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
+    )
+    assert result_set[4].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
+    assert result_set[5].location == "jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
+    assert result_set[6].location == "jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
 LOCATION_STORAGE = MockBackend.rows("location", "storage_properties")
@@ -238,7 +237,10 @@ def test_save_external_location_mapping_missing_location():
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         table_factory(["s3://test_location/test1/table1", ""]),
-        table_factory(["s3://test_location/test1/table2", ""]),
+        table_factory(["gcs://test_location2/test2/table2", ""]),
+        table_factory(["abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""]),
+        table_factory(["s3a://test_location_2/test1/table1", ""]),
+        table_factory(["s3n://test_location_3/test1/table1", ""]),
     ]
     mounts_crawler = create_autospec(MountsCrawler)
     mounts_crawler.snapshot.return_value = []
@@ -254,6 +256,26 @@ def test_save_external_location_mapping_missing_location():
             'resource "databricks_external_location" "test_location_test1" { \n'
             '    name = "test_location_test1"\n'
             '    url  = "s3://test_location/test1"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location2_test2" { \n'
+            '    name = "test_location2_test2"\n'
+            '    url  = "gcs://test_location2/test2"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "cont1_storagetest1_test2" { \n'
+            '    name = "cont1_storagetest1_test2"\n'
+            '    url  = "abfss://cont1@storagetest1.dfs.core.windows.net/test2"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location_2_test1" { \n'
+            '    name = "test_location_2_test1"\n'
+            '    url  = "s3a://test_location_2/test1"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location_3_test1" { \n'
+            '    name = "test_location_3_test1"\n'
+            '    url  = "s3n://test_location_3/test1"\n'
             "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
             "}\n"
         ).encode("utf8"),
@@ -295,10 +317,8 @@ def test_match_table_external_locations():
     matching_locations, missing_locations = location_crawler.match_table_external_locations()
 
     assert len(matching_locations) == 1
-    assert [
-        ExternalLocation("abfss://cont1@storagetest1/a", 2),
-        ExternalLocation("gcs://test_location2/a/b", 1),
-    ] == missing_locations
+    assert ExternalLocation("gcs://test_location2/a/b/", 1) in missing_locations
+    assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations
 
 
 def test_mount_listing_multiple_folders():
@@ -717,20 +737,3 @@ def test_mount_listing_seen_tables():
     assert results[0].location == "adls://bucket/table1"
     assert results[1].location == "dbfs:/mnt/test_mount/table2"
     assert results[2].location is None
-
-
-def test_resolve_dbfs_root_in_hms_federation():
-    jvm = Mock()
-    sql_backend = MockBackend()
-    client = create_autospec(WorkspaceClient)
-    client.dbutils.fs.mounts.return_value = [MountInfo('/', 'DatabricksRoot', '')]
-
-    mounts_crawler = MountsCrawler(sql_backend, client, "test", enable_hms_federation=True)
-    mounts_crawler.__dict__['_jvm'] = jvm
-
-    hms_fed_dbfs_utils = jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
-    hms_fed_dbfs_utils.resolveDbfsPath().get().toString.return_value = 's3://original/bucket/user/hive/warehouse'
-
-    mounts = mounts_crawler.snapshot()
-
-    assert [Mount("/", 's3://original/bucket/')] == mounts

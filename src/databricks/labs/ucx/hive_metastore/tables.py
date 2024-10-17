@@ -99,7 +99,6 @@ class Table:  # pylint: disable=too-many-public-methods
 
     @property
     def key(self) -> str:
-        # TODO: https://github.com/databrickslabs/ucx/issues/2979
         if self.is_table_in_mount:
             return f"{self.catalog}.{self.database}.{self.location}".lower()
         return f"{self.catalog}.{self.database}.{self.name}".lower()

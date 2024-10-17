@@ -46,19 +46,6 @@ EXTERNAL_DELTA_TABLE = Table(
 )
 
 
-def test_rule_as_uc_table() -> None:
-    table = Table("catalog", "destination_schema", "destination_table", "UNKNOWN", "UNKNOWN")
-    rule = Rule(
-        workspace_name="workspace",
-        catalog_name="catalog",
-        src_schema="source_schema",
-        dst_schema="destination_schema",
-        src_table="source_table",
-        dst_table="destination_table",
-    )
-    assert rule.as_uc_table == table
-
-
 def test_current_tables_empty_fails():
     ws = create_autospec(WorkspaceClient)
     errors = {}

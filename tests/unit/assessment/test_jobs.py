@@ -2,9 +2,9 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk.service.jobs import BaseJob, JobSettings, Job
+from databricks.sdk.service.jobs import BaseJob, JobSettings
 
-from databricks.labs.ucx.assessment.jobs import JobInfo, JobInfoOwnership, JobsCrawler, SubmitRunsCrawler, JobOwnership
+from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 
 from .. import mock_workspace_client
@@ -135,43 +135,22 @@ def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
     assert result[0].failures == failures
 
 
-def test_jobinfo_owner_creator() -> None:
+def test_pipeline_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)
 
-    ownership = JobInfoOwnership(admin_locator)
+    ownership = JobOwnership(admin_locator)
     owner = ownership.owner_of(JobInfo(creator="bob", job_id="1", success=1, failures="[]"))
 
     assert owner == "bob"
     admin_locator.get_workspace_administrator.assert_not_called()
 
 
-def test_jobinfo_owner_creator_unknown() -> None:
+def test_pipeline_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
-    ownership = JobInfoOwnership(admin_locator)
+    ownership = JobOwnership(admin_locator)
     owner = ownership.owner_of(JobInfo(creator=None, job_id="1", success=1, failures="[]"))
-
-    assert owner == "an_admin"
-    admin_locator.get_workspace_administrator.assert_called_once()
-
-
-def test_job_owner_creator() -> None:
-    admin_locator = create_autospec(AdministratorLocator)
-
-    ownership = JobOwnership(admin_locator)
-    owner = ownership.owner_of(Job(creator_user_name="bob", job_id=1))
-
-    assert owner == "bob"
-    admin_locator.get_workspace_administrator.assert_not_called()
-
-
-def test_job_owner_creator_unknown() -> None:
-    admin_locator = create_autospec(AdministratorLocator)
-    admin_locator.get_workspace_administrator.return_value = "an_admin"
-
-    ownership = JobOwnership(admin_locator)
-    owner = ownership.owner_of(Job(job_id=1))
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()

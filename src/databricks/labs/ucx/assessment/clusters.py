@@ -182,7 +182,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
             yield ClusterInfo(*row)
 
 
-class ClusterInfoOwnership(Ownership[ClusterInfo]):
+class ClusterOwnership(Ownership[ClusterInfo]):
     """Determine ownership of clusters in the inventory.
 
     This is the cluster creator (if known).
@@ -190,16 +190,6 @@ class ClusterInfoOwnership(Ownership[ClusterInfo]):
 
     def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
         return record.creator
-
-
-class ClusterDetailsOwnership(Ownership[ClusterDetails]):
-    """Determine ownership of clusters in the workspace.
-
-    This is the cluster creator (if known).
-    """
-
-    def _maybe_direct_owner(self, record: ClusterDetails) -> str | None:
-        return record.creator_user_name
 
 
 @dataclass

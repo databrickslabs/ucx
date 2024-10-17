@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import codecs
 import dataclasses
-import io
+import locale
 import logging
 import sys
 from abc import abstractmethod, ABC
@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import Any
 
 from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
@@ -482,71 +482,18 @@ def file_language(path: Path) -> Language | None:
     return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
 
 
-def _detect_encoding_bom(binary_io: BinaryIO, *, preserve_position: bool) -> str | None:
-    # Peek at the first (up to) 4 bytes, preserving the file position if requested.
-    position = binary_io.tell() if preserve_position else None
-    try:
-        maybe_bom = binary_io.read(4)
-    finally:
-        if position is not None:
-            binary_io.seek(position)
-    # For these encodings, TextIOWrapper will skip over the BOM during decoding.
-    if maybe_bom.startswith(codecs.BOM_UTF32_LE) or maybe_bom.startswith(codecs.BOM_UTF32_BE):
-        return "utf-32"
-    if maybe_bom.startswith(codecs.BOM_UTF16_LE) or maybe_bom.startswith(codecs.BOM_UTF16_BE):
-        return "utf-16"
-    if maybe_bom.startswith(codecs.BOM_UTF8):
-        return "utf-8-sig"
-    return None
-
-
-def decode_with_bom(
-    file: BinaryIO,
-    encoding: str | None = None,
-    errors: str | None = None,
-    newline: str | None = None,
-) -> TextIO:
-    """Wrap an open binary file with a text decoder.
-
-    This has the same semantics as the built-in `open()` call, except that if the encoding is not specified and the
-    file is seekable then it will be checked for a BOM. If a BOM marker is found, that encoding is used. When neither
-    an encoding nor a BOM are present the encoding of the system locale is used.
-
-    Args:
-          file: the open (binary) file to wrap in text mode.
-          encoding: force decoding with a specific locale. If not present the file BOM and system locale are used.
-          errors: how decoding errors should be handled, as per open().
-          newline: how newlines should be handled, as per open().
-    Raises:
-          ValueError: if the encoding should be detected via potential BOM marker but the file is not seekable.
-    Returns:
-          a text-based IO wrapper that will decode the underlying binary-mode file as text.
-    """
-    use_encoding = _detect_encoding_bom(file, preserve_position=True) if encoding is None else encoding
-    return io.TextIOWrapper(file, encoding=use_encoding, errors=errors, newline=newline)
-
-
-def read_text(path: Path, size: int = -1) -> str:
-    """Read a file as text, decoding according to the BOM marker if that is present.
-
-    This differs to the normal `.read_text()` method on path which does not support BOM markers.
-
-    Arguments:
-        path: the path to read text from.
-        size: how much text (measured in characters) to read. If negative, all text is read. Less may be read if the
-            file is smaller than the specified size.
-    Returns:
-        The string content of the file, up to the specified size.
-    """
-    with path.open("rb") as binary_io:
-        # If the open file is seekable, we can detect the BOM and decode without re-opening.
-        if binary_io.seekable():
-            with decode_with_bom(binary_io) as f:
-                return f.read(size)
-        encoding = _detect_encoding_bom(binary_io, preserve_position=False)
-    # Otherwise having read the BOM there's no way to rewind so we need to re-open and read from that.
-    with path.open("rt", encoding=encoding) as f:
-        return f.read(size)
+def guess_encoding(path: Path) -> str:
+    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
+    with path.open('rb') as _file:
+        raw = _file.read(4)
+        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
+            return 'utf-32'
+        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
+            return 'utf-16'
+        if raw.startswith(codecs.BOM_UTF8):
+            return 'utf-8-sig'
+        # no BOM, let's use default encoding
+        return locale.getpreferredencoding(False)
 
 
 # duplicated from CellLanguage to prevent cyclic import
@@ -566,7 +513,8 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     if content is not None:
         return content.startswith(magic_header)
     try:
-        file_header = read_text(path, size=len(magic_header))
+        with path.open('rt', encoding=guess_encoding(path)) as f:
+            file_header = f.read(len(magic_header))
     except (FileNotFoundError, UnicodeDecodeError, PermissionError):
         logger.warning(f"Could not read file {path}")
         return False

@@ -172,14 +172,18 @@ def test_migrate_external_table(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_table_to_external_table_without_conversion(
-    ws, sql_backend, runtime_ctx, make_catalog, make_mounted_location, make_random, env_or_skip
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
 ):
-    src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
-    src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
+    # TODO: update pytest fixture for make_schema to take location as parameter to create managed schema
+    # TODO: update azure blueprint to add spn in sql warehouse data access config
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
-        external=False,
+        external_csv=make_mounted_location,
         columns=[("`back`ticks`", "STRING")],  # Test with column that needs escaping
     )
     dst_catalog = make_catalog()
@@ -210,14 +214,18 @@ def test_migrate_managed_table_to_external_table_without_conversion(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_table_to_external_table_with_clone(
-    ws, sql_backend, runtime_ctx, make_catalog, make_mounted_location, make_random, env_or_skip
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
 ):
-    src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
-    src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
+    # TODO: update pytest fixture for make_schema to take location as parameter to create managed schema
+    # TODO: update azure blueprint to add spn in sql warehouse data access config
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
-        external=False,
+        external_csv=make_mounted_location,
         columns=[("`back`ticks`", "STRING")],  # Test with column that needs escaping
     )
     dst_catalog = make_catalog()

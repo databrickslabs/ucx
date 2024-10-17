@@ -7,7 +7,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.jobs import NotebookTask, RunTask
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.ucx.assessment.jobs import JobInfoOwnership, JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobsCrawler, SubmitRunsCrawler
 
 from .test_assessment import _SPARK_CONF
 
@@ -80,5 +80,5 @@ def test_job_ownership(ws, runtime_ctx, make_job, inventory_schema, sql_backend)
     job_record = next(record for record in records if record.job_id == str(job.job_id))
 
     # Verify ownership is as expected.
-    ownership = JobInfoOwnership(runtime_ctx.administrator_locator)
+    ownership = JobOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(job_record) == ws.current_user.me().user_name

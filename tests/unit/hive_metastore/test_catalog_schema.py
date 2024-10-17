@@ -6,181 +6,130 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import AlreadyExists, BadRequest, NotFound
+from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.grants import Grant, MigrateGrants
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
-def prepare_test(  # pylint: disable=too-complex
-    ws,
-    backend: MockBackend | None = None,
-) -> CatalogSchema:
-    """Prepare tests with the following setup:
-
-    Existing HIVE metastore resources:
-    - Schemas: `schema1`, `schema2`, `schema3`
-    - Tables: Irrelevant for creating catalogs and schemas.
-    - Legacy ACLS:
-      - Principal `principal1`:
-        - DENY on `schema2`
-        - USAGE on `schema3`
-      - Users:
-        - `user1` has USE on `hive_metastore`
-        - `user2` has USAGE on `hive_metastore.schema2`
-        - `user3` has USAGE on `hive_metastore.schema3`
-        - `user4` has DENY on `hive_metastore.schema3`
-        - `user5` has SELECT on a table and view (Irrelevant for creating catalogs and schemas)
-
-    Existing UC resources:
-    - Catalog `catalog1`
-    - Schema `catalog1.schema1`
-    - External locations (can be referenced when creating catalogs):
-      - `"s3://foo/bar"`
-      - `"abfss://container@storageaccount.dfs.core.windows.net"`
-
-    To be created UC resources inferred from the mapping.csv
-    - Catalogs `catalog1`, `catalog2`, `catalog3` and `catalog4`
-    - Schemas:
-      - `catalog1.schema2`
-      - `catalog1.schema3`
-      - `catalog2.schema2`
-      - `catalog2.schema3`
-      - `catalog3.schema3`
-      - `catalog4.schema4`
-    """
-    backend = backend or MockBackend()
-    existing_catalogs = {"catalog1"}
-    existing_schemas = {"catalog1.schema1"}
+def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
+    ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
 
     def get_catalog(catalog_name: str) -> CatalogInfo:
-        if catalog_name not in existing_catalogs:
-            raise NotFound(f"Catalog '{catalog_name}' does not exists.")
-        return CatalogInfo(name=catalog_name, full_name=catalog_name)
+        if catalog_name == "catalog1":
+            return CatalogInfo(name="catalog1")
+        raise NotFound(f"Catalog: {catalog_name}")
 
-    def create_catalog(catalog_name: str, *_, **__) -> None:
-        if catalog_name in existing_catalogs:
-            raise AlreadyExists(f"Catalog '{catalog_name}' already exists.")
-        existing_catalogs.add(catalog_name)
-
-    def get_schema(full_name: str) -> SchemaInfo:
-        if full_name not in existing_schemas:
-            raise NotFound(f"Schema '{full_name}' does not exists.")
-        catalog_name, schema_name = full_name.split(".", maxsplit=1)
-        return SchemaInfo(catalog_name=catalog_name, name=schema_name, full_name=full_name)
-
-    def create_schema(schema: str, catalog: str, *_, **__) -> None:
-        full_name = f"{catalog}.{schema}"
-        if full_name in existing_schemas:
-            raise AlreadyExists(f"Schema '{full_name}' already exists.")
-        existing_schemas.add(full_name)
-
-    ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
     ws.catalogs.get.side_effect = get_catalog
-    ws.catalogs.create.side_effect = create_catalog
-    ws.schemas.list.return_value = [SchemaInfo(catalog_name="catalog1", name="schema1")]
-    ws.schemas.get.side_effect = get_schema
-    ws.schemas.create.side_effect = create_schema
+
+    def raise_catalog_exists(catalog: str, *_, **__) -> None:
+        if catalog == "catalog1":
+            raise BadRequest("Catalog 'catalog1' already exists")
+
+    ws.catalogs.create.side_effect = raise_catalog_exists
+    ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
     ws.external_locations.list.return_value = [
         ExternalLocationInfo(url="s3://foo/bar"),
         ExternalLocationInfo(url="abfss://container@storageaccount.dfs.core.windows.net"),
     ]
+    if backend is None:
+        backend = MockBackend()
     installation = MockInstallation(
         {
-            "mapping.csv": [
+            'mapping.csv': [
                 {
-                    "catalog_name": "catalog1",
-                    "dst_schema": "schema1",
-                    "dst_table": "table1",
-                    "src_schema": "schema1",
-                    "src_table": "table1",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog1',
+                    'dst_schema': 'schema3',
+                    'dst_table': 'table',
+                    'src_schema': 'schema3',
+                    'src_table': 'table',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog1",
-                    "dst_schema": "schema2",
-                    "dst_table": "table1",
-                    "src_schema": "schema1",
-                    "src_table": "abfss://container@msft/path/dest1",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog2',
+                    'dst_schema': 'schema2',
+                    'dst_table': 'table',
+                    'src_schema': 'schema2',
+                    'src_table': 'table',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog1",
-                    "dst_schema": "schema3",
-                    "dst_table": "table1",
-                    "src_schema": "schema3",
-                    "src_table": "table",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog2',
+                    'dst_schema': 'schema3',
+                    'dst_table': 'table2',
+                    'src_schema': 'schema2',
+                    'src_table': 'table2',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog2",
-                    "dst_schema": "schema2",
-                    "dst_table": "table1",
-                    "src_schema": "schema2",
-                    "src_table": "table",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog1',
+                    'dst_schema': 'schema2',
+                    'dst_table': 'table3',
+                    'src_schema': 'schema1',
+                    'src_table': 'abfss://container@msft/path/dest1',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog2",
-                    "dst_schema": "schema2",
-                    "dst_table": "table2",
-                    "src_schema": "schema2",
-                    "src_table": "abfss://container@msft/path/dest2",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog2',
+                    'dst_schema': 'schema2',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema2',
+                    'src_table': 'abfss://container@msft/path/dest2',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog2",
-                    "dst_schema": "schema3",
-                    "dst_table": "table1",
-                    "src_schema": "schema2",
-                    "src_table": "table2",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog3',
+                    'dst_schema': 'schema3',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema1',
+                    'src_table': 'abfss://container@msft/path/dest3',
+                    'workspace_name': 'workspace',
                 },
                 {
-                    "catalog_name": "catalog3",
-                    "dst_schema": "schema3",
-                    "dst_table": "table1",
-                    "src_schema": "schema1",
-                    "src_table": "abfss://container@msft/path/dest3",
-                    "workspace_name": "workspace",
-                },
-                {
-                    "catalog_name": "catalog4",
-                    "dst_schema": "schema4",
-                    "dst_table": "table1",
-                    "src_schema": "schema1",
-                    "src_table": "abfss://container@msft/path/dest4",
-                    "workspace_name": "workspace",
+                    'catalog_name': 'catalog4',
+                    'dst_schema': 'schema4',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema1',
+                    'src_table': 'abfss://container@msft/path/dest4',
+                    'workspace_name': 'workspace',
                 },
             ]
         }
     )
     table_mapping = TableMapping(installation, ws, backend)
+    principal_acl = create_autospec(PrincipalACL)
+    interactive_cluster_grants = [
+        Grant('princ1', 'SELECT', 'catalog1', 'schema3', 'table'),
+        Grant('princ1', 'MODIFY', 'catalog2', 'schema2', 'table'),
+        Grant('princ1', 'SELECT', 'catalog2', 'schema3', 'table2'),
+        Grant('princ1', 'USAGE', 'hive_metastore', 'schema3'),
+        Grant('princ1', 'DENY', 'hive_metastore', 'schema2'),
+    ]
+    principal_acl.get_interactive_cluster_grants.return_value = interactive_cluster_grants
+    hive_acl = create_autospec(GrantsCrawler)
+    hive_grants = [
+        Grant(principal="user1", catalog="hive_metastore", action_type="USE"),
+        Grant(principal="user2", catalog="hive_metastore", database="schema3", action_type="USAGE"),
+        Grant(
+            principal="user3",
+            catalog="hive_metastore",
+            database="database_one",
+            view="table_one",
+            action_type="SELECT",
+        ),
+        Grant(principal="user4", catalog="hive_metastore", database="schema3", action_type="DENY"),
+        Grant(
+            principal="user5",
+            catalog="hive_metastore",
+            database="schema2",
+            action_type="USAGE",
+        ),
+    ]
+    hive_acl.snapshot.return_value = hive_grants
 
-    def interactive_cluster_grants_loader() -> list[Grant]:
-        return [
-            Grant("principal1", "DENY", "hive_metastore", "schema2"),
-            Grant("principal1", "USAGE", "hive_metastore", "schema3"),
-        ]
-
-    def hive_grants_loader() -> list[Grant]:
-        return [
-            Grant("user1", "USE", "hive_metastore"),
-            Grant("user2", "USAGE", "hive_metastore", "schema2"),
-            Grant("user3", "USAGE", "hive_metastore", "schema3"),
-            Grant("user4", "DENY", "hive_metastore", "schema3"),
-            Grant("user5", "SELECT", "hive_metastore", "schema2", table="table"),
-            Grant("user5", "SELECT", "hive_metastore", "schema2", view="view"),
-        ]
-
-    group_manager = create_autospec(GroupManager)
-    group_manager.snapshot.return_value = []
-    migrate_grants = MigrateGrants(backend, group_manager, [interactive_cluster_grants_loader, hive_grants_loader])
-
-    return CatalogSchema(ws, table_mapping, migrate_grants, "ucx", timeout=None)
+    return CatalogSchema(ws, table_mapping, principal_acl, backend, hive_acl, "ucx")
 
 
 def test_create_ucx_catalog_creates_ucx_catalog() -> None:
@@ -260,7 +209,7 @@ def test_create_all_catalogs_schemas_creates_catalogs_with_different_locations()
     "catalog,schema",
     [("catalog1", "schema2"), ("catalog1", "schema3"), ("catalog2", "schema2"), ("catalog3", "schema3")],
 )
-def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str) -> None:
+def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str):
     """Non-existing schemas should be created."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "metastore"})
@@ -271,21 +220,18 @@ def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str) 
     ws.schemas.create.assert_any_call(schema, catalog, comment="Created by UCX")
 
 
-def test_create_catalogs_and_schemas_with_invalid_storage_location() -> None:
+def test_create_bad_location():
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/fail"})
     catalog_schema = prepare_test(ws)
-
     with pytest.raises(NotFound):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
-    # `catalog3` and `catalog4` are not reached as the logic breaks when the users fails to supply a valid location
-    calls = [call("catalog1"), call("catalog2")]
-    ws.catalogs.get.assert_has_calls(calls)
     ws.catalogs.create.assert_not_called()
+    ws.catalogs.list.assert_called_once()
     ws.schemas.create.assert_not_called()
 
 
-def test_no_catalog_storage() -> None:
+def test_no_catalog_storage():
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
 
@@ -295,7 +241,6 @@ def test_no_catalog_storage() -> None:
     calls = [
         call("catalog2", comment="Created by UCX", properties=None),
         call("catalog3", comment="Created by UCX", properties=None),
-        call("catalog4", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
@@ -304,29 +249,28 @@ def test_catalog_schema_acl() -> None:
     ws = create_autospec(WorkspaceClient)
     backend = MockBackend()
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
-    catalog_schema = prepare_test(ws, backend)
 
+    catalog_schema = prepare_test(ws, backend)
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     calls = [
         call("catalog2", comment="Created by UCX", properties=None),
         call("catalog3", comment="Created by UCX", properties=None),
-        call("catalog4", comment="Created by UCX", properties=None),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     queries = [
-        'GRANT USE CATALOG ON CATALOG `catalog1` TO `principal1`',
-        'GRANT USE CATALOG ON CATALOG `catalog1` TO `user3`',
-        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user2`',
-        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `principal1`',
-        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user3`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user2`',
-        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `princ1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `princ1`',
+        'GRANT USE CATALOG ON CATALOG `catalog1` TO `user2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog1`.`schema3` TO `user2`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema2` TO `user5`',
+        'GRANT USE SCHEMA ON DATABASE `catalog2`.`schema3` TO `user5`',
+        'GRANT USE CATALOG ON CATALOG `catalog2` TO `user5`',
     ]
-
-    assert not set(backend.queries) - set(queries), f"Additional queries {set(backend.queries) - set(queries)}"
-    assert not set(queries) - set(backend.queries), f"Missing queries {set(queries) - set(backend.queries)}"
+    assert len(backend.queries) == len(queries)
+    for query in queries:
+        assert query in backend.queries
 
 
 def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
@@ -337,21 +281,14 @@ def test_create_all_catalogs_schemas_logs_untranslatable_grant(caplog) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
-    message_prefix = "failed-to-migrate: Hive metastore grant 'DENY' cannot be mapped to UC grant for"
-    assert f"{message_prefix} DATABASE 'catalog1.schema3'. Skipping." in caplog.messages
-    assert f"{message_prefix} CATALOG 'catalog2'. Skipping." in caplog.messages
-    assert f"{message_prefix} DATABASE 'catalog2.schema2'. Skipping." in caplog.messages
-    assert f"{message_prefix} DATABASE 'catalog2.schema3'. Skipping." in caplog.messages
-    ws.assert_not_called()
-
-
-def test_create_catalogs_and_schemas_logs_skipping_already_existing_unity_catalog_resources(caplog) -> None:
-    ws = create_autospec(WorkspaceClient)
-    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
-    catalog_schema = prepare_test(ws)
-
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.catalog_schema"):
-        catalog_schema.create_all_catalogs_schemas(mock_prompts)
-    assert "Skipping already existing catalog: catalog1" in caplog.text
-    assert "Skipping already existing schema: catalog1.schema1" in caplog.text
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog1.schema3')" in caplog.messages
+    )
+    assert "Skipping legacy grant that is not supported in UC: DENY on ('CATALOG', 'catalog2')" in caplog.messages
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema2')" in caplog.messages
+    )
+    assert (
+        "Skipping legacy grant that is not supported in UC: DENY on ('DATABASE', 'catalog2.schema3')" in caplog.messages
+    )
     ws.assert_not_called()
