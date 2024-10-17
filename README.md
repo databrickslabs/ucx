@@ -146,6 +146,11 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 # Installation
 
+UCX installation is covered by this section.
+
+## Installation requirements
+
+UCX has the following installation requirements:
 - Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli).
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
 - Databricks Premium or Enterprise workspace.
