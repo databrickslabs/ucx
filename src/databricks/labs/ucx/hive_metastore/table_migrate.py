@@ -1,14 +1,15 @@
 import dataclasses
 import logging
+import re
 from collections import defaultdict
-from functools import partial
+from functools import partial, cached_property
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.sdk import WorkspaceClient
-
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -17,6 +18,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
+
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
@@ -28,7 +30,6 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
-from databricks.sdk.errors.platform import DatabricksError
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class TablesMigrator:
         migrate_grants: MigrateGrants,
         external_locations: ExternalLocations,
     ):
+
         self._tc = table_crawler
         self._backend = backend
         self._ws = ws
@@ -71,6 +73,8 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
         managed_table_external_storage: str = "CLONE",
     ):
+        if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
+            self._spark = self._spark_session
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
@@ -95,7 +99,7 @@ class TablesMigrator:
         for table in tables_in_scope:
             tasks.append(
                 partial(
-                    self._migrate_table,
+                    self._safe_migrate_table,
                     table,
                     managed_table_external_storage,
                     hiveserde_in_place_migrate,
@@ -123,7 +127,19 @@ class TablesMigrator:
             self.index(force_refresh=True)
         return all_tasks
 
+    @cached_property
+    def _spark_session(self):
+        # pylint: disable-next=import-error,import-outside-toplevel
+        from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
+
+        return SparkSession.builder.getOrCreate()
+
     def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
+        if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
+            if self._convert_hms_table_to_external(src_table.src):
+                return self._migrate_external_table(
+                    src_table.src, src_table.rule
+                )  # _migrate_external_table remains unchanged
         if managed_table_external_storage == 'SYNC_AS_EXTERNAL':
             return self._migrate_managed_as_external_table(src_table.src, src_table.rule)  # new method
         if managed_table_external_storage == 'CLONE':
@@ -131,15 +147,35 @@ class TablesMigrator:
         logger.warning(f"failed-to-migrate: unknown managed_table_external_storage: {managed_table_external_storage}")
         return True
 
+    def _safe_migrate_table(
+        self,
+        src_table: TableToMigrate,
+        managed_table_external_storage: str,
+        hiveserde_in_place_migrate: bool = False,
+    ) -> bool:
+        if self._table_already_migrated(src_table.rule.as_uc_table_key):
+            logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
+            return True
+        try:
+            return self._migrate_table(src_table, managed_table_external_storage, hiveserde_in_place_migrate)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catching a Spark AnalysisException here, for which we do not have the dependency to catch explicitly
+            pattern = (  # See https://github.com/databrickslabs/ucx/issues/2891
+                r"INVALID_PARAMETER_VALUE: Invalid input: RPC CreateTable Field managedcatalog.ColumnInfo.name: "
+                r'At columns.\d+: name "" is not a valid name`'
+            )
+            if re.match(pattern, str(e)):
+                logger.warning(f"failed-to-migrate: Table with empty column name '{src_table.src.key}'", exc_info=e)
+            else:
+                logger.warning(f"failed-to-migrate: Unknown reason for table '{src_table.src.key}'", exc_info=e)
+            return False
+
     def _migrate_table(
         self,
         src_table: TableToMigrate,
         managed_table_external_storage: str,
         hiveserde_in_place_migrate: bool = False,
-    ):
-        if self._table_already_migrated(src_table.rule.as_uc_table_key):
-            logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
-            return True
+    ) -> bool:
         if src_table.src.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule)
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
@@ -197,7 +233,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table)
 
     def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
         # We have to fetch create statement this way because of columns in:
@@ -207,8 +243,58 @@ class TablesMigrator:
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
 
+    @cached_property
+    def _catalog(self):
+        return self._spark._jsparkSession.sessionState().catalog()  # pylint: disable=protected-access
+
+    @cached_property
+    def _table_identifier(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.TableIdentifier  # pylint: disable=protected-access
+
+    @cached_property
+    def _catalog_type(self):
+        return (
+            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTableType  # pylint: disable=protected-access
+        )
+
+    @cached_property
+    def _catalog_table(self):
+        return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
+
     def _convert_hms_table_to_external(self, src_table: Table):
-        pass
+        try:
+            logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
+            database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
+            table_identifier = self._table_identifier(src_table.name, database)
+            old_table = self._catalog.getTableMetadata(table_identifier)
+            new_table = self._catalog_table(
+                old_table.identifier(),
+                self._catalog_type('EXTERNAL'),
+                old_table.storage(),
+                old_table.schema(),
+                old_table.provider(),
+                old_table.partitionColumnNames(),
+                old_table.bucketSpec(),
+                old_table.owner(),
+                old_table.createTime(),
+                old_table.lastAccessTime(),
+                old_table.createVersion(),
+                old_table.properties(),
+                old_table.stats(),
+                old_table.viewText(),
+                old_table.comment(),
+                old_table.unsupportedFeatures(),
+                old_table.tracksPartitionsInCatalog(),
+                old_table.schemaPreservesCase(),
+                old_table.ignoredProperties(),
+                old_table.viewOriginalText(),
+            )
+            self._catalog.alterTable(new_table)
+            logger.info(f"Converted {src_table.name} to External Table type.")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
+            return False
+        return True
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -223,7 +309,7 @@ class TablesMigrator:
             )
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -238,7 +324,7 @@ class TablesMigrator:
             )
             return False
         self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule):
         # verify hive serde type
@@ -276,7 +362,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -292,7 +378,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_table_create_ctas(self, src_table: Table, rule: Rule):
         if src_table.what not in [What.EXTERNAL_NO_SYNC, What.EXTERNAL_HIVESERDE]:
@@ -316,7 +402,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
@@ -331,7 +417,7 @@ class TablesMigrator:
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
-        return self._migrate_grants.apply(src_table, rule.as_uc_table_key)
+        return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _table_already_migrated(self, target) -> bool:
         return target in self._seen_tables

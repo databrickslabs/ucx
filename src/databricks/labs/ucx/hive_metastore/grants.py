@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from functools import partial, cached_property
+from typing import Protocol
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -108,6 +109,15 @@ class Grant:
     def object_key(self) -> str:
         _, key = self.this_type_and_key()
         return key.lower()
+
+    @property
+    def order(self) -> int:
+        """Order of the grants to be upheld when applying."""
+        match self.action_type:
+            case "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
+                return 1
+            case _:
+                return 0
 
     def this_type_and_key(self):
         return self.type_and_key(
@@ -598,17 +608,22 @@ class PrincipalACL:
         self._external_locations = external_locations
         self._compute_locations = cluster_locations
 
-    def get_interactive_cluster_grants(self) -> list[Grant]:
+    def get_interactive_cluster_grants(self) -> set[Grant]:
         tables = list(self._tables_crawler.snapshot())
-        grants: set[Grant] = set()
+        grants = set[Grant]()
 
-        for compute_location in self._compute_locations():
+        try:
+            compute_locations = self._compute_locations()
+        except DatabricksError as e:
+            logger.warning("No compute locations found.", exc_info=e)
+            return grants
+        for compute_location in compute_locations:
             principals = self._get_cluster_principal_mapping(compute_location.compute_id, compute_location.compute_type)
             if len(principals) == 0:
                 continue
             cluster_usage = self._get_grants(compute_location.locations, principals, tables)
             grants.update(cluster_usage)
-        return list(grants)
+        return grants
 
     def _get_privilege(self, table: Table, locations: dict[str, str]) -> str | None:
         if table.view_text is not None:
@@ -726,6 +741,27 @@ class PrincipalACL:
         return None
 
 
+class SecurableObject(Protocol):
+    """A protocol for a securable object.
+
+    Docs:
+        https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore
+    """
+
+    @property
+    def kind(self) -> str:
+        """The type of securable objects, see doc referenced above."""
+
+    @property
+    def full_name(self) -> str:
+        """The object name often a synonym for `key`"""
+
+    @property
+    def key(self) -> str:
+        """The object identifier often a synonym for `full_name`"""
+        return self.full_name
+
+
 class MigrateGrants:
     def __init__(
         self,
@@ -737,20 +773,22 @@ class MigrateGrants:
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
 
-    def apply(self, src: Table, uc_table_key: str) -> bool:
+    def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
         for grant in self._match_grants(src):
-            acl_migrate_sql = grant.uc_grant_sql(src.kind, uc_table_key)
+            acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
                     f"failed-to-migrate: Hive metastore grant '{grant.action_type}' cannot be mapped to UC grant for "
-                    f"{src.kind} '{uc_table_key}'. Skipping."
+                    f"{dst.kind} '{dst.full_name}'. Skipping."
                 )
                 continue
-            logger.debug(f"Migrating acls on {uc_table_key} using SQL query: {acl_migrate_sql}")
+            logger.debug(f"Migrating acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
             try:
                 self._sql_backend.execute(acl_migrate_sql)
             except DatabricksError as e:
-                logger.warning(f"failed-to-migrate: Failed to migrate ACL for {src.key} to {uc_table_key}: {e}")
+                logger.warning(
+                    f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
+                )
         return True
 
     @cached_property
@@ -765,16 +803,14 @@ class MigrateGrants:
                 grants.append(grant)
         return grants
 
-    def _match_grants(self, table: Table) -> list[Grant]:
+    def _match_grants(self, src: SecurableObject) -> list[Grant]:
         matched_grants = []
         for grant in self._grants:
-            if grant.database != table.database:
-                continue
-            if table.name not in (grant.table, grant.view):
+            if grant.object_key != src.key:
                 continue
             grant = self._replace_account_group(grant)
             matched_grants.append(grant)
-        return matched_grants
+        return sorted(matched_grants, key=lambda g: g.order)
 
     def _replace_account_group(self, grant: Grant) -> Grant:
         target_principal = self._workspace_to_account_group_names.get(grant.principal)

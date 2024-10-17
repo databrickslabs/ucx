@@ -13,7 +13,9 @@ class TableMigration(Workflow):
         """This workflow task migrates the external tables that are supported by SYNC command from the Hive Metastore
         to the Unity Catalog.
         """
-        ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
+        ctx.tables_migrator.migrate_tables(
+            what=What.EXTERNAL_SYNC, managed_table_external_storage=ctx.config.managed_table_external_storage
+        )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_dbfs_root_delta_tables(self, ctx: RuntimeContext):
