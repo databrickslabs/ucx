@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
@@ -91,21 +91,20 @@ class MigrationSequencer:
 
     def _visit_dependency(self, graph: DependencyGraph) -> bool | None:
         lineage = graph.dependency.lineage[-1]
-        parent_node = self._find_node(lineage.object_type, lineage.object_id)
+        parent_node = self._nodes[(lineage.object_type, lineage.object_id)]
         for dependency in graph.local_dependencies:
             lineage = dependency.lineage[-1]
-            child_node = self.register_dependency(lineage.object_type, lineage.object_id)
-            parent_node.required_steps.append(child_node)
+            self.register_dependency(parent_node, lineage.object_type, lineage.object_id)
             # TODO tables and dfsas
         return None
 
-    def register_dependency(self, object_type: str, object_id: str) -> MigrationNode:
-        existing = self._find_node(object_type, object_id)
-        if existing:
-            return existing
+    def register_dependency(self, parent_node: MigrationNode, object_type: str, object_id: str) -> MigrationNode:
+        dependency_node = self._nodes.get((object_type, object_id), None)
+        if dependency_node:
+            return dependency_node
         object_name: str = "<ANONYMOUS>"
         object_owner: str = "<UNKNOWN>"
-        if object_type in { "NOTEBOOK", "FILE" }:
+        if object_type in {"NOTEBOOK", "FILE"}:
             path = Path(object_id)
             for library_root in self._path_lookup.library_roots:
                 if not path.is_relative_to(library_root):
@@ -114,14 +113,18 @@ class MigrationSequencer:
                 break
         else:
             raise ValueError(f"{object_type} not supported yet!")
-        MigrationNode.last_node_id += 1
-        return MigrationNode(
-            node_id=MigrationNode.last_node_id,
+        self._last_node_id += 1
+        dependency_node = MigrationNode(
+            node_id=self._last_node_id,
             object_type=object_type,
             object_id=object_id,
             object_name=object_name,
             object_owner=object_owner,
         )
+        self._nodes[dependency_node.key] = dependency_node
+        self._incoming[dependency_node.key].add(parent_node.key)
+        self._outgoing[parent_node.key].add(dependency_node.key)
+        return dependency_node
 
     def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
         job_node = self._nodes.get(("WORKFLOW", str(job.job_id)), None)
