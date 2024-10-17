@@ -262,8 +262,9 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.parse(source)
-    nodes = linter.list_dbutils_notebook_run_calls(tree)
+    tree = Tree.maybe_parse(source)
+    assert tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
     assert len(nodes) == 2
 
 
@@ -274,8 +275,9 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.parse(source)
-    nodes = linter.list_dbutils_notebook_run_calls(tree)
+    tree = Tree.maybe_parse(source)
+    assert tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
     assert len(nodes) == 0
 
 

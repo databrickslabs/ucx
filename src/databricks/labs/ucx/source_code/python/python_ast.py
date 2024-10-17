@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import builtins
 import sys
-from abc import ABC
+from abc import ABC, abstractmethod
 import logging
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
@@ -24,6 +25,19 @@ from astroid import (  # type: ignore
     NodeNG,
     parse,
     Uninferable,
+    AstroidSyntaxError,
+)
+
+from databricks.labs.ucx.source_code.base import (
+    Failure,
+    Linter,
+    Advice,
+    TableCollector,
+    UsedTable,
+    UsedTableNode,
+    DfsaCollector,
+    DirectFsAccess,
+    DirectFsAccessNode,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,18 +47,61 @@ missing_handlers: set[str] = set()
 T = TypeVar("T", bound=NodeNG)
 
 
+@dataclass(frozen=True)
+class MaybeTree:
+    tree: Tree | None
+    failure: Failure | None
+
+    def walk(self) -> Iterable[NodeNG]:
+        # mainly a helper method for unit testing
+        if self.tree is None:
+            assert self.failure is not None
+            logger.warning(self.failure.message)
+            return []
+        return self.tree.walk()
+
+    def first_statement(self) -> NodeNG | None:
+        # mainly a helper method for unit testing
+        if self.tree is None:
+            assert self.failure is not None
+            logger.warning(self.failure.message)
+            return None
+        return self.tree.first_statement()
+
+
 class Tree:
 
+    @classmethod
+    def maybe_parse(cls, code: str) -> MaybeTree:
+        try:
+            root = parse(code)
+            tree = Tree(root)
+            return MaybeTree(tree, None)
+        except AstroidSyntaxError as e:
+            return cls._definitely_failure('syntax-error', code, e)
+        except SystemError as e:
+            # see https://github.com/databrickslabs/ucx/issues/2976
+            return cls._definitely_failure('system-error', code, e)
+
     @staticmethod
-    def parse(code: str) -> Tree:
-        root = parse(code)
-        return Tree(root)
+    def _definitely_failure(message_code: str, source_code: str, e: Exception) -> MaybeTree:
+        return MaybeTree(
+            None,
+            Failure(
+                code=message_code,
+                message=f"Failed to parse code `{source_code}`: {e}. Report this as an issue on UCX GitHub.",
+                # Lines and columns are both 0-based: the first line is line 0.
+                start_line=0,
+                start_col=0,
+                end_line=1,
+                end_col=1,
+            ),
+        )
 
     @classmethod
-    def normalize_and_parse(cls, code: str) -> Tree:
+    def maybe_normalized_parse(cls, code: str) -> MaybeTree:
         code = cls.normalize(code)
-        root = parse(code)
-        return Tree(root)
+        return cls.maybe_parse(code)
 
     @classmethod
     def normalize(cls, code: str) -> str:
@@ -496,3 +553,131 @@ class NodeBase(ABC):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {repr(self._node)}>"
+
+
+class PythonLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        maybe_tree = Tree.maybe_normalized_parse(code)
+        if maybe_tree.failure:
+            yield maybe_tree.failure
+            return
+        assert maybe_tree.tree is not None
+        yield from self.lint_tree(maybe_tree.tree)
+
+    @abstractmethod
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
+
+
+class TablePyCollector(TableCollector, ABC):
+
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
+        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
+            yield table_node.table
+
+    @abstractmethod
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...
+
+
+class DfsaPyCollector(DfsaCollector, ABC):
+
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
+            yield dfsa_node.dfsa
+
+    @abstractmethod
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
+
+
+class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
+
+    def __init__(
+        self,
+        linters: list[PythonLinter],
+        dfsa_collectors: list[DfsaPyCollector],
+        table_collectors: list[TablePyCollector],
+    ):
+        self._linters = linters
+        self._dfsa_collectors = dfsa_collectors
+        self._table_collectors = table_collectors
+        self._tree: Tree | None = None
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        maybe_tree = self._parse_and_append(code)
+        if maybe_tree.failure:
+            yield maybe_tree.failure
+            return
+        assert maybe_tree.tree is not None
+        yield from self.lint_tree(maybe_tree.tree)
+
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        for linter in self._linters:
+            yield from linter.lint_tree(tree)
+
+    def _parse_and_append(self, code: str) -> MaybeTree:
+        maybe_tree = Tree.maybe_normalized_parse(code)
+        if maybe_tree.failure:
+            return maybe_tree
+        assert maybe_tree.tree is not None
+        self.append_tree(maybe_tree.tree)
+        return maybe_tree
+
+    def append_tree(self, tree: Tree) -> None:
+        self._make_tree().append_tree(tree)
+
+    def append_nodes(self, nodes: list[NodeNG]) -> None:
+        self._make_tree().append_nodes(nodes)
+
+    def append_globals(self, globs: dict) -> None:
+        self._make_tree().append_globals(globs)
+
+    def process_child_cell(self, code: str) -> None:
+        this_tree = self._make_tree()
+        maybe_tree = Tree.maybe_normalized_parse(code)
+        if maybe_tree.failure:
+            # TODO: bubble up this error
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        this_tree.append_tree(maybe_tree.tree)
+
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        maybe_tree = self._parse_and_append(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
+            yield dfsa_node.dfsa
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
+        for collector in self._dfsa_collectors:
+            yield from collector.collect_dfsas_from_tree(tree)
+
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
+        maybe_tree = self._parse_and_append(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
+            yield table_node.table
+
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
+        for collector in self._table_collectors:
+            yield from collector.collect_tables_from_tree(tree)
+
+    def _make_tree(self) -> Tree:
+        if self._tree is None:
+            self._tree = Tree.new_module()
+        return self._tree
