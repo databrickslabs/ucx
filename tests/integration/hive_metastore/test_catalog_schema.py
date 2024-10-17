@@ -146,7 +146,7 @@ def test_create_catalog_schema_with_legacy_hive_metastore_privileges(  # TODO: I
 ) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
-    dst_catalog_name = f"ucx-{make_random()}"
+    dst_catalog_name = f"ucx_{make_random()}"
     dst_schema_name = "test"
     rules = [Rule("workspace", dst_catalog_name, src_schema.name, dst_schema_name, src_table.name, src_table.name)]
     runtime_ctx.with_table_mapping_rules(rules)
