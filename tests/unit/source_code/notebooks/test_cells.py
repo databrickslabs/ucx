@@ -184,22 +184,18 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code() -> None:
 
 
 def test_graph_builder_parse_error(
-    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup
+    simple_dependency_resolver: DependencyResolver,
+    mock_path_lookup: PathLookup,
 ) -> None:
     """Check that internal parsing errors are caught and logged."""
-    # Fixture.
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     analyser = PythonCodeAnalyzer(graph.new_dependency_graph_context(), "this is not valid python")
 
-    # Run the test.
-    problems = []
-    for problem in analyser.build_graph():
-        if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code"):
-            problems.append(problem)
+    problems = analyser.build_graph()
+    codes = {_.code for _ in problems}
 
-    # Check results.
-    assert problems
+    assert codes == {'syntax-error'}
 
 
 def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup) -> None:
@@ -272,7 +268,9 @@ def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_
     source = """
 %unsupported stuff '"%#@!
 """
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree, maybe_tree.failure
+    tree = maybe_tree.tree
     commands, _ = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())

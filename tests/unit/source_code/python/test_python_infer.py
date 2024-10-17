@@ -6,7 +6,9 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_infers_empty_list() -> None:
-    tree = Tree.parse("a=[]")
+    maybe_tree = Tree.maybe_parse("a=[]")
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
     values = list(InferredValue.infer_from_node(tree.node))
@@ -14,7 +16,9 @@ def test_infers_empty_list() -> None:
 
 
 def test_infers_empty_tuple() -> None:
-    tree = Tree.parse("a=tuple()")
+    maybe_tree = Tree.maybe_parse("a=tuple()")
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
     values = list(InferredValue.infer_from_node(tree.node))
@@ -22,7 +26,9 @@ def test_infers_empty_tuple() -> None:
 
 
 def test_infers_empty_set() -> None:
-    tree = Tree.parse("a={}")
+    maybe_tree = Tree.maybe_parse("a={}")
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
     values = list(InferredValue.infer_from_node(tree.node))
@@ -34,7 +40,9 @@ def test_infers_fstring_value() -> None:
 value = "abc"
 fstring = f"Hello {value}!"
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
     values = list(InferredValue.infer_from_node(tree.node))
@@ -48,7 +56,9 @@ def test_infers_fstring_dict_value() -> None:
 value = { "abc": 123 }
 fstring = f"Hello {value['abc']}!"
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
     values = list(InferredValue.infer_from_node(tree.node))
@@ -62,7 +72,9 @@ def test_infers_string_format_value() -> None:
 value = "abc"
 fstring = "Hello {0}!".format(value)
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
     values = list(InferredValue.infer_from_node(tree.node))
@@ -79,7 +91,9 @@ for value1 in values_1:
     for value2 in values_2:
         fstring = f"Hello {value1}, {value2}!"
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of fstring = ...
     values = list(InferredValue.infer_from_node(tree.node))
@@ -95,7 +109,9 @@ def test_infers_externally_defined_value() -> None:
 name = "my-widget"
 value = dbutils.widgets.get(name)
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
     values = list(InferredValue.infer_from_node(tree.node, state))
@@ -110,7 +126,9 @@ def test_infers_externally_defined_values() -> None:
 for name in ["my-widget-1", "my-widget-2"]:
     value = dbutils.widgets.get(name)
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # value of value = ...
     values = list(InferredValue.infer_from_node(tree.node, state))
@@ -125,7 +143,9 @@ def test_fails_to_infer_missing_externally_defined_value() -> None:
 name = "my-widget"
 value = dbutils.widgets.get(name)
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
     values = InferredValue.infer_from_node(tree.node, state)
@@ -137,7 +157,9 @@ def test_survives_absence_of_externally_defined_values() -> None:
     name = "my-widget"
     value = dbutils.widgets.get(name)
     """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
     values = InferredValue.infer_from_node(tree.node, CurrentSessionState())
@@ -152,7 +174,9 @@ values = dbutils.widgets.getAll()
 name = "my-widget"
 value = values[name]
 """
-    tree = Tree.parse(source)
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of value = ...
     values = list(InferredValue.infer_from_node(tree.node, state))
