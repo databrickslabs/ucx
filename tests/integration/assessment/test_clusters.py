@@ -11,7 +11,7 @@ from databricks.labs.ucx.assessment.clusters import (
     PoliciesCrawler,
     ClusterDetailsOwnership,
     ClusterInfoOwnership,
-    ClusterPolicyOwnership, 
+    ClusterPolicyOwnership,
 )
 
 from .test_assessment import _SPARK_CONF

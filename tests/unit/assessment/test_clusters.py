@@ -9,11 +9,12 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
-    PoliciesCrawler,
+    ClusterDetailsOwnership,
     ClusterInfoOwnership,
     ClusterInfo,
     ClusterPolicyOwnership,
-    PolicyInfo, ClusterDetailsOwnership,
+    PoliciesCrawler,
+    PolicyInfo,
 )
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.owners import AdministratorLocator
