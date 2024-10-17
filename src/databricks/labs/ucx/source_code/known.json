@@ -10251,6 +10251,9 @@
     "lazr.uri.tests.test_docs": [],
     "lazr.uri.tests.test_uri": []
   },
+  "lazy_loader": {
+    "lazy_loader": []
+  },
   "libclang": {
     "clang": [],
     "clang.cindex": [],
