@@ -56,9 +56,9 @@ class MigrationNode:
 
 class MigrationSequencer:
 
-    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
-    def __init__(self, ws: WorkspaceClient, path_lookup: PathLookup):
+    def __init__(self, ws: WorkspaceClient, path_lookup: PathLookup, admin_locator: AdministratorLocator):
         self._ws = ws
+        self._path_lookup = path_lookup
         self._admin_locator = admin_locator
         self._last_node_id = 0
         self._nodes: dict[tuple[str, str], MigrationNode] = {}
@@ -100,7 +100,7 @@ class MigrationSequencer:
             lineage = dependency.lineage[-1]
             self.register_dependency(parent_node, lineage.object_type, lineage.object_id)
             # TODO tables and dfsas
-        return None
+        return False
 
     def register_dependency(self, parent_node: MigrationNode, object_type: str, object_id: str) -> MigrationNode:
         dependency_node = self._nodes.get((object_type, object_id), None)

@@ -34,7 +34,6 @@ from databricks.labs.ucx.source_code.base import (
     SourceInfo,
     UsedTable,
     LineageAtom,
-    read_text,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
