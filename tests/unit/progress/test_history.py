@@ -302,8 +302,8 @@ def test_historical_encoder_unserializable_values(ownership, field_name, record:
     """Verify that encoding catches and handles unserializable values."""
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_OuterclassWithUnserializable)
 
-    expected_msg = f"Cannot encode value in or within field {field_name}: "
-    with pytest.raises(TypeError, match=f"^{re.escape(expected_msg)}"):
+    expected_msg = f"^Cannot encode .* value in or within field {re.escape(field_name)}: "
+    with pytest.raises(TypeError, match=expected_msg):
         _ = encoder.to_historical(record)
 
 

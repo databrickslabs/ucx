@@ -79,7 +79,7 @@ class HistoricalEncoder(Generic[Record]):
             ts_utc = value.astimezone(dt.timezone.utc)
             return ts_utc.isoformat().replace("+00:00", "Z")
 
-        msg = f"Cannot encode value in or within field {name}: {value!r}"
+        msg = f"Cannot encode {type(value)} value in or within field {name}: {value!r}"
         raise TypeError(msg)
 
     def _encode_field_value(self, name: str, value: Any | None) -> str | None:
