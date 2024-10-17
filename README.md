@@ -442,15 +442,12 @@ centrally while most other Databricks resources that UCX touches are scoped to a
 If you do not have account groups matching the workspace in which UCX is installed, please
 run [`create-account-groups` command](#create-account-groups-command) before running the group migration workflow.
 
-The group migration workflow is designed to migrate workspace-local groups to account-level groups. It ensures that all
-the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and
-permissions. The tasks in the group migration workflow depend on the
-output of the assessment workflow and should only be executed after a successful run of the assessment workflow. The
-output of each [inventory database](#installation-resources) to be used for further analysis and decision-making.
-The group migration workflow can be executed multiple times to ensure that all groups are migrated successfully and that
-all the necessary permissions are assigned.
+The group migration workflow is designed to migrate workspace-local groups to account-level groups. It verifies if
+the necessary groups are available to the workspace with the correct permissions, and removes unnecessary groups and
+permissions. The group migration workflow depends on the output of the assessment workflow, thus, should only be
+executed after a successful run of the assessment workflow. The group migration workflow may be executed multiple times.
 
-1. `verify_metastore_attached`: Verifies if a metastore is attached. Account level groups are only available when a
+1. `verify_metastore_attached`: Verifies if a metastore is attached. Account level groups are only available when
     a metastore is attached. [See `assign-metastore` command.](#assign-metastore-command)
 2. `rename_workspace_local_groups`: This task renames workspace-local groups by adding a `ucx-renamed-` prefix. This
    step is taken to avoid conflicts with account groups that may have the same name as workspace-local groups.
