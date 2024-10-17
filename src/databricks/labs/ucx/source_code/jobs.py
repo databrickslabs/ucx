@@ -34,6 +34,7 @@ from databricks.labs.ucx.source_code.base import (
     SourceInfo,
     UsedTable,
     LineageAtom,
+    read_text,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -77,8 +78,8 @@ class JobProblem:
 
 
 class WorkflowTask(Dependency):
-    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
-        loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
+    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job, cache: WorkspaceCache | None = None):
+        loader = WrappingLoader(WorkflowTaskContainer(ws, task, job, cache))
         super().__init__(loader, Path(f'/jobs/{task.task_key}'), inherits_context=False)
         self._task = task
         self._job = job
@@ -98,11 +99,11 @@ class WorkflowTask(Dependency):
 
 
 class WorkflowTaskContainer(SourceContainer):
-    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
+    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job, cache: WorkspaceCache | None = None):
         self._task = task
         self._job = job
         self._ws = ws
-        self._cache = WorkspaceCache(ws)
+        self._cache = cache or WorkspaceCache(ws)
         self._named_parameters: dict[str, str] | None = {}
         self._parameters: list[str] | None = []
         self._spark_conf: dict[str, str] | None = {}
