@@ -10251,11 +10251,52 @@
     "lazr.uri.tests.test_docs": [],
     "lazr.uri.tests.test_uri": []
   },
+  "lazy_loader": {
+    "lazy_loader": []
+  },
   "libclang": {
     "clang": [],
     "clang.cindex": [],
     "clang.enumerations": [],
     "clang.native": []
+  },
+  "librosa": {
+    "librosa": [],
+    "librosa._cache": [],
+    "librosa._typing": [],
+    "librosa.beat": [],
+    "librosa.core": [],
+    "librosa.core.audio": [],
+    "librosa.core.constantq": [],
+    "librosa.core.convert": [],
+    "librosa.core.fft": [],
+    "librosa.core.harmonic": [],
+    "librosa.core.intervals": [],
+    "librosa.core.notation": [],
+    "librosa.core.pitch": [],
+    "librosa.core.spectrum": [],
+    "librosa.decompose": [],
+    "librosa.display": [],
+    "librosa.effects": [],
+    "librosa.feature": [],
+    "librosa.feature.inverse": [],
+    "librosa.feature.rhythm": [],
+    "librosa.feature.spectral": [],
+    "librosa.feature.utils": [],
+    "librosa.filters": [],
+    "librosa.onset": [],
+    "librosa.segment": [],
+    "librosa.sequence": [],
+    "librosa.util": [],
+    "librosa.util._nnls": [],
+    "librosa.util.decorators": [],
+    "librosa.util.deprecation": [],
+    "librosa.util.example_data": [],
+    "librosa.util.exceptions": [],
+    "librosa.util.files": [],
+    "librosa.util.matching": [],
+    "librosa.util.utils": [],
+    "librosa.version": []
   },
   "lifelines": {
     "lifelines": [],
@@ -10309,6 +10350,12 @@
     "lightgbm.plotting": [],
     "lightgbm.sklearn": []
   },
+  "linkify-it-py": {
+    "linkify_it": [],
+    "linkify_it.main": [],
+    "linkify_it.tlds": [],
+    "linkify_it.ucre": []
+  },
   "livereload": {
     "livereload": [],
     "livereload.cli": [],
@@ -10318,8 +10365,46 @@
     "livereload.server": [],
     "livereload.watcher": []
   },
+  "llvmlite": {
+    "llvmlite": [],
+    "llvmlite._version": [],
+    "llvmlite.binding": [],
+    "llvmlite.binding.analysis": [],
+    "llvmlite.binding.common": [],
+    "llvmlite.binding.context": [],
+    "llvmlite.binding.dylib": [],
+    "llvmlite.binding.executionengine": [],
+    "llvmlite.binding.ffi": [],
+    "llvmlite.binding.initfini": [],
+    "llvmlite.binding.linker": [],
+    "llvmlite.binding.module": [],
+    "llvmlite.binding.object_file": [],
+    "llvmlite.binding.options": [],
+    "llvmlite.binding.orcjit": [],
+    "llvmlite.binding.passmanagers": [],
+    "llvmlite.binding.targets": [],
+    "llvmlite.binding.transforms": [],
+    "llvmlite.binding.typeref": [],
+    "llvmlite.binding.value": [],
+    "llvmlite.ir": [],
+    "llvmlite.ir._utils": [],
+    "llvmlite.ir.builder": [],
+    "llvmlite.ir.context": [],
+    "llvmlite.ir.instructions": [],
+    "llvmlite.ir.module": [],
+    "llvmlite.ir.transforms": [],
+    "llvmlite.ir.types": [],
+    "llvmlite.ir.values": [],
+    "llvmlite.utils": []
+  },
   "lxml": {
     "lxml": []
+  },
+  "lz4": {
+    "lz4": [],
+    "lz4.block": [],
+    "lz4.frame": [],
+    "lz4.version": []
   },
   "mako": {
     "mako": []
@@ -10600,6 +10685,12 @@
     "msal.token_cache": [],
     "msal.wstrust_request": [],
     "msal.wstrust_response": []
+  },
+  "msgpack": {
+    "msgpack": [],
+    "msgpack.exceptions": [],
+    "msgpack.ext": [],
+    "msgpack.fallback": []
   },
   "multidict": {
     "multidict": []
@@ -25877,6 +25968,15 @@
   "pluggy": {
     "pluggy": []
   },
+  "pooch": {
+    "pooch": [],
+    "pooch._version": [],
+    "pooch.core": [],
+    "pooch.downloaders": [],
+    "pooch.hashes": [],
+    "pooch.processors": [],
+    "pooch.utils": []
+  },
   "prometheus_client": {
     "prometheus_client": [],
     "prometheus_client.asgi": [],
@@ -28731,6 +28831,11 @@
   "solacc": {
     "solacc.companion": []
   },
+  "soundfile": {
+    "_soundfile": [],
+    "_soundfile_data": [],
+    "soundfile": []
+  },
   "soupsieve": {
     "soupsieve": [],
     "soupsieve.__meta__": [],
@@ -28739,6 +28844,10 @@
     "soupsieve.css_types": [],
     "soupsieve.pretty": [],
     "soupsieve.util": []
+  },
+  "soxr": {
+    "soxr": [],
+    "soxr._version": []
   },
   "spacy": {
     "spacy": [],
@@ -31664,6 +31773,21 @@
   },
   "tzdata": {
     "tzdata": []
+  },
+  "uc-micro-py": {
+    "uc_micro": [],
+    "uc_micro.categories.Cc": [],
+    "uc_micro.categories.Cc.regex": [],
+    "uc_micro.categories.Cf": [],
+    "uc_micro.categories.Cf.regex": [],
+    "uc_micro.categories.P": [],
+    "uc_micro.categories.P.regex": [],
+    "uc_micro.categories.Z": [],
+    "uc_micro.categories.Z.regex": [],
+    "uc_micro.categories": [],
+    "uc_micro.properties.Any": [],
+    "uc_micro.properties.Any.regex": [],
+    "uc_micro.properties": []
   },
   "ujson": {},
   "umap": {
