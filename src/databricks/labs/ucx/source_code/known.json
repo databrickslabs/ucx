@@ -10350,6 +10350,12 @@
     "lightgbm.plotting": [],
     "lightgbm.sklearn": []
   },
+  "linkify-it-py": {
+    "linkify_it": [],
+    "linkify_it.main": [],
+    "linkify_it.tlds": [],
+    "linkify_it.ucre": []
+  },
   "livereload": {
     "livereload": [],
     "livereload.cli": [],
@@ -31767,6 +31773,21 @@
   },
   "tzdata": {
     "tzdata": []
+  },
+  "uc-micro-py": {
+    "uc_micro": [],
+    "uc_micro.categories.Cc": [],
+    "uc_micro.categories.Cc.regex": [],
+    "uc_micro.categories.Cf": [],
+    "uc_micro.categories.Cf.regex": [],
+    "uc_micro.categories.P": [],
+    "uc_micro.categories.P.regex": [],
+    "uc_micro.categories.Z": [],
+    "uc_micro.categories.Z.regex": [],
+    "uc_micro.categories": [],
+    "uc_micro.properties.Any": [],
+    "uc_micro.properties.Any.regex": [],
+    "uc_micro.properties": []
   },
   "ujson": {},
   "umap": {
