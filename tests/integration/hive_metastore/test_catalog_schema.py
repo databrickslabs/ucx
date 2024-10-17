@@ -176,7 +176,6 @@ def test_create_catalog_schema_with_legacy_hive_metastore_privileges(  # TODO: I
     assert PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA]) in schema_grants.privilege_assignments
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_catalog_schema_when_users_group_in_warehouse_acl(
     caplog,
     runtime_ctx,
@@ -184,7 +183,7 @@ def test_create_catalog_schema_when_users_group_in_warehouse_acl(
     make_warehouse,
     make_warehouse_permissions,
 ) -> None:
-    """Privileges inferred from being part of the 'users' group are ignored."""
+    """Privileges inferred from being a member of the 'users' group are ignored."""
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     dst_catalog_name = f"ucx_{make_random()}"
