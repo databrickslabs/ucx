@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.service.compute import LibraryInstallStatus
 from databricks.sdk.service.jobs import Job, SparkPythonTask
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
@@ -17,7 +18,7 @@ from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
-from databricks.sdk.service.workspace import ExportFormat
+from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, Language
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import (
@@ -537,3 +538,56 @@ def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, m
         advices += 1
         assert "UNKNOWN" not in advice.path.as_posix()
     assert advices
+
+
+def test_workflow_linter_refresh_report(dependency_resolver, mock_path_lookup, migration_index) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.return_value = ObjectInfo(object_id=123, language=Language.PYTHON)
+    some_things = mock_path_lookup.resolve(Path("functional/zoo.py"))
+    assert some_things is not None
+    ws.workspace.download.return_value = some_things.read_bytes()
+    notebook_task = jobs.NotebookTask(
+        notebook_path=some_things.absolute().as_posix(),
+        base_parameters={"a": "b", "c": "dbfs:/mnt/foo"},
+    )
+    task = jobs.Task(
+        task_key="test",
+        job_cluster_key="main",
+        notebook_task=notebook_task,
+    )
+    settings = jobs.JobSettings(
+        tasks=[task],
+        name='some',
+        job_clusters=[
+            jobs.JobCluster(
+                job_cluster_key="main",
+                new_cluster=compute.ClusterSpec(
+                    spark_version="15.2.x-photon-scala2.12",
+                    node_type_id="Standard_F4s",
+                    num_workers=2,
+                    data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
+                    spark_conf={"spark.databricks.cluster.profile": "singleNode"},
+                ),
+            ),
+        ],
+    )
+    ws.jobs.list.return_value = [Job(job_id=1), Job(job_id=2, settings=settings)]
+    ws.jobs.get.return_value = Job(job_id=2, settings=settings)
+
+    sql_backend = MockBackend()
+    directfs_crawler = DirectFsAccessCrawler.for_paths(sql_backend, "test")
+    used_tables_crawler = UsedTablesCrawler.for_paths(sql_backend, "test")
+    linter = WorkflowLinter(
+        ws,
+        dependency_resolver,
+        mock_path_lookup,
+        migration_index,
+        directfs_crawler,
+        used_tables_crawler,
+        [1],
+    )
+    linter.refresh_report(sql_backend, 'test')
+
+    sql_backend.has_rows_written_for('test.workflow_problems')
+    sql_backend.has_rows_written_for('hive_metastore.test.used_tables_in_paths')
+    sql_backend.has_rows_written_for('hive_metastore.test.directfs_in_paths')
