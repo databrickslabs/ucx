@@ -50,8 +50,9 @@ class MigrationNode:
 
 class MigrationSequencer:
 
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
         self._ws = ws
+        self._admin_locator = admin_locator
         self._last_node_id = 0
         self._nodes: dict[tuple[str, str], MigrationNode] = {}
         self._incoming: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)

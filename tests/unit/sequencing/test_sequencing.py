@@ -1,6 +1,9 @@
-from databricks.sdk.service import jobs
+from unittest.mock import create_autospec
+
+from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
 from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph
@@ -15,7 +18,10 @@ def test_cluster_from_task_has_children(ws, simple_dependency_resolver, mock_pat
     ws.jobs.get.return_value = job
     dependency = WorkflowTask(ws, task, job)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    sequencer = MigrationSequencer(ws)
+    admin_finder = create_autospec(AdministratorFinder)
+    admin_user = iam.User(user_name="John Doe", active=True, roles=[iam.ComplexValue(value="account_admin")])
+    admin_finder.find_admin_users.return_value = (admin_user,)
+    sequencer = MigrationSequencer(ws, AdministratorLocator(ws, finders=[lambda _ws: admin_finder]))
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
     step = steps[-1]
