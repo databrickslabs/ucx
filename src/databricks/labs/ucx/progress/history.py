@@ -124,7 +124,7 @@ class HistoryLog(Generic[Record]):
     def __init__(  # pylint: disable=too-many-arguments
         self,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         ownership: Ownership[Record],
         klass: type[Record],
         run_id: int,
@@ -134,7 +134,7 @@ class HistoryLog(Generic[Record]):
         table: str = "history",
     ) -> None:
         self._ws = ws
-        self._backend = backend
+        self._sql_backend = sql_backend
         self._klass = klass
         self._catalog = catalog
         self._schema = schema
@@ -150,4 +150,4 @@ class HistoryLog(Generic[Record]):
         history_records = [self._encoder.to_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
         # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
-        self._backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
+        self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
