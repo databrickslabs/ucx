@@ -1,5 +1,5 @@
 import pytest
-from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+from astroid import Assign, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -17,7 +17,8 @@ def test_extracts_root() -> None:
 
 def test_no_first_statement() -> None:
     maybe_tree = Tree.maybe_parse("")
-    assert maybe_tree.tree is None
+    assert maybe_tree.tree is not None
+    assert maybe_tree.tree.first_statement() is None
 
 
 def test_extract_call_by_name() -> None:
@@ -121,10 +122,10 @@ def test_parses_incorrectly_indented_code() -> None:
   )
 """
     # ensure it would fail if not normalized
-    with pytest.raises(AstroidSyntaxError):
-        Tree.maybe_parse(source)
-    Tree.maybe_normalized_parse(source)
-    assert True
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.failure is not None
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.failure is None
 
 
 def test_ignores_magic_marker_in_multiline_comment() -> None:
