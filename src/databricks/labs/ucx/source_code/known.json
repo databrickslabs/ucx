@@ -5650,6 +5650,9 @@
   "gunicorn": {
     "gunicorn": []
   },
+  "gviz-api": {
+    "gviz_api": []
+  },
   "gymnasium": {
     "gymnasium": [],
     "gymnasium.core": [],
@@ -5806,9 +5809,6 @@
     "gymnasium.wrappers.transform_observation": [],
     "gymnasium.wrappers.transform_reward": [],
     "gymnasium.wrappers.vector_list_info": []
-  },
-  "gviz-api": {
-    "gviz_api": []
   },
   "h11": {
     "h11": [],
@@ -10445,6 +10445,39 @@
   },
   "mccabe": {
     "mccabe": []
+  },
+  "mdit-py-plugins": {
+    "mdit_py_plugins": [],
+    "mdit_py_plugins.admon": [],
+    "mdit_py_plugins.admon.index": [],
+    "mdit_py_plugins.amsmath": [],
+    "mdit_py_plugins.anchors": [],
+    "mdit_py_plugins.anchors.index": [],
+    "mdit_py_plugins.attrs": [],
+    "mdit_py_plugins.attrs.index": [],
+    "mdit_py_plugins.attrs.parse": [],
+    "mdit_py_plugins.colon_fence": [],
+    "mdit_py_plugins.container": [],
+    "mdit_py_plugins.container.index": [],
+    "mdit_py_plugins.deflist": [],
+    "mdit_py_plugins.deflist.index": [],
+    "mdit_py_plugins.dollarmath": [],
+    "mdit_py_plugins.dollarmath.index": [],
+    "mdit_py_plugins.field_list": [],
+    "mdit_py_plugins.footnote": [],
+    "mdit_py_plugins.footnote.index": [],
+    "mdit_py_plugins.front_matter": [],
+    "mdit_py_plugins.front_matter.index": [],
+    "mdit_py_plugins.myst_blocks": [],
+    "mdit_py_plugins.myst_blocks.index": [],
+    "mdit_py_plugins.myst_role": [],
+    "mdit_py_plugins.myst_role.index": [],
+    "mdit_py_plugins.substitution": [],
+    "mdit_py_plugins.tasklists": [],
+    "mdit_py_plugins.texmath": [],
+    "mdit_py_plugins.texmath.index": [],
+    "mdit_py_plugins.utils": [],
+    "mdit_py_plugins.wordcount": []
   },
   "mdurl": {
     "mdurl": [],
