@@ -68,7 +68,7 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
             "bar",
             "EXTERNAL",
             "delta",
-            location="jdbc://providerunknown/",
+            location="jdbc:providerunknown:/",
             storage_properties="[database=test_db, host=somedb.us-east-1.rds.amazonaws.com, \
             port=1234, dbtable=sometable, user=*********(redacted), password=*********(redacted)]",
         ),
@@ -80,16 +80,16 @@ def test_external_locations(ws, sql_backend, inventory_schema, env_or_skip):
     mounts_crawler = MountsCrawler(sql_backend, ws, inventory_schema)
     crawler = ExternalLocations(ws, sql_backend, inventory_schema, tables_crawler, mounts_crawler)
     results = crawler.snapshot()
-    assert len(results) == 6
-    assert results[1].location == "s3://bar/test3/"
-    assert (
-        results[2].location
-        == "jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be"
-    )
-    assert results[3].location == "jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db"
-    assert results[4].location == "jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
-    assert results[4].table_count == 2
-    assert results[5].location == "jdbc://providerunknown//somedb.us-east-1.rds.amazonaws.com:1234/test_db"
+    assert results == [
+        ExternalLocation(
+            'jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be', 1
+        ),
+        ExternalLocation('jdbc:mysql://somemysql.us-east-1.rds.amazonaws.com:3306/test_db', 1),
+        ExternalLocation('jdbc:providerknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', table_count=2),
+        ExternalLocation('jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db', 1),
+        ExternalLocation('s3://bar/test3', 1),
+        ExternalLocation('s3://test_location', 2),
+    ]
 
 
 def test_save_external_location_mapping_missing_location(ws, sql_backend, inventory_schema, make_random):

@@ -9,7 +9,8 @@ from databricks.sdk.service.compute import DataSecurityMode
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
     PoliciesCrawler,
-    ClusterOwnership,
+    ClusterDetailsOwnership,
+    ClusterInfoOwnership,
     ClusterPolicyOwnership,
 )
 
@@ -76,9 +77,12 @@ def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_s
 
     # Verify ownership is as expected.
     administrator_locator = runtime_ctx.administrator_locator
-    ownership = ClusterOwnership(administrator_locator)
-    assert ownership.owner_of(my_cluster_record) == ws.current_user.me().user_name
-    assert ownership.owner_of(their_cluster_record) == another_user.user_name
+    info_ownership = ClusterInfoOwnership(administrator_locator)
+    assert info_ownership.owner_of(my_cluster_record) == ws.current_user.me().user_name
+    assert info_ownership.owner_of(their_cluster_record) == another_user.user_name
+    details_ownership = ClusterDetailsOwnership(administrator_locator)
+    assert details_ownership.owner_of(ws.clusters.get(my_cluster.cluster_id)) == ws.current_user.me().user_name
+    assert details_ownership.owner_of(ws.clusters.get(their_cluster.cluster_id)) == another_user.user_name
 
 
 def test_cluster_crawler_mlr_no_isolation(ws, make_cluster, inventory_schema, sql_backend):

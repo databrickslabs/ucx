@@ -96,7 +96,7 @@ def test_file_linter_lints_non_ascii_encoded_file(migration_index, mock_path_loo
 def test_file_linter_lints_file_with_missing_file(migration_index, mock_path_lookup) -> None:
     path = create_autospec(Path)
     path.suffix = ".py"
-    path.read_text.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
+    path.open.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
     linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
 
     advices = list(linter.lint())
@@ -109,7 +109,7 @@ def test_file_linter_lints_file_with_missing_file(migration_index, mock_path_loo
 def test_file_linter_lints_file_with_missing_read_permission(migration_index, mock_path_lookup) -> None:
     path = create_autospec(Path)
     path.suffix = ".py"
-    path.read_text.side_effect = PermissionError("Permission denied")
+    path.open.side_effect = PermissionError("Permission denied")
     linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
 
     advices = list(linter.lint())
