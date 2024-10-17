@@ -1,6 +1,5 @@
 import datetime
 import logging
-import sys
 from collections.abc import Generator
 from itertools import cycle
 from unittest.mock import create_autospec

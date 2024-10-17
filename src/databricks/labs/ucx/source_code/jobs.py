@@ -35,7 +35,6 @@ from databricks.labs.ucx.source_code.base import (
     SourceInfo,
     UsedTable,
     LineageAtom,
-    PythonSequentialLinter,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
