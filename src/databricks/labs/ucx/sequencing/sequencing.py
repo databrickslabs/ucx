@@ -23,7 +23,6 @@ class MigrationStep:
 
 @dataclass
 class MigrationNode:
-    last_node_id = 0
     node_id: int
     object_type: str
     object_id: str
@@ -69,6 +68,7 @@ class MigrationSequencer:
 
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
+        self._last_node_id = 0
         self._root = MigrationNode(
             node_id=0, object_type="ROOT", object_id="ROOT", object_name="ROOT", object_owner="NONE"
         )
@@ -79,9 +79,9 @@ class MigrationSequencer:
         if task_node:
             return task_node
         job_node = self.register_workflow_job(job)
-        MigrationNode.last_node_id += 1
+        self._last_node_id += 1
         task_node = MigrationNode(
-            node_id=MigrationNode.last_node_id,
+            node_id=self._last_node_id,
             object_type="TASK",
             object_id=task_id,
             object_name=task.task_key,
@@ -100,10 +100,10 @@ class MigrationSequencer:
         job_node = self._find_node(object_type="JOB", object_id=str(job.job_id))
         if job_node:
             return job_node
-        MigrationNode.last_node_id += 1
+        self._last_node_id += 1
         job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
         job_node = MigrationNode(
-            node_id=MigrationNode.last_node_id,
+            node_id=self._last_node_id,
             object_type="JOB",
             object_id=str(job.job_id),
             object_name=job_name,
@@ -132,9 +132,9 @@ class MigrationSequencer:
         details = self._ws.clusters.get(cluster_key)
         object_name = details.cluster_name if details and details.cluster_name else cluster_key
         object_owner = details.creator_user_name if details and details.creator_user_name else "<UNKNOWN>"
-        MigrationNode.last_node_id += 1
+        self._last_node_id += 1
         cluster_node = MigrationNode(
-            node_id=MigrationNode.last_node_id,
+            node_id=self._last_node_id,
             object_type="CLUSTER",
             object_id=cluster_key,
             object_name=object_name,
