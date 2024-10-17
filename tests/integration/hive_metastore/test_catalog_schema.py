@@ -137,7 +137,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_create_catalog_schema_with_legacy_acls(
+def test_create_catalog_schema_with_legacy_hive_metastore_privileges(  # TODO: Issue about ACL vs grants vs privileges
     ws: WorkspaceClient,
     runtime_ctx,
     make_random,
