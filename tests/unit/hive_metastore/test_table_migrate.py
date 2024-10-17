@@ -1,6 +1,7 @@
 import datetime
 import logging
 import sys
+from collections.abc import Generator
 from itertools import cycle
 from unittest.mock import create_autospec
 
@@ -909,14 +910,36 @@ def test_is_upgraded(ws, mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_table_status():
-    class FakeDate(datetime.datetime):
+@pytest.fixture
+def datetime_with_epoch_timestamp(monkeypatch) -> Generator[None, None, None]:
+    # The timestamp() method on datetime() is immutable, so we can't just patch/mock it. Rather we need to substitute
+    # the entire class, which the normal mocking/patching routines don't seem to support.
+    # Note: this will not affect any modules that have already initialized and imported the class directly. Similarly,
+    # the effect cannot be unwound if this test triggers initializing of modules that import the class directly instead
+    # of the module.
+    # If you find yourself here debugging an issue, please be aware that the following can be problematic:
+    # >>> from datetime import datetime
+    # (Why? It's reference to the class directly, and having the name of the module makes inspection tedious.)
+    # Prefer instead:
+    # >>> import datetime
+    # Or even better:
+    # >>> import datetime as dt
+
+    class FakeDateTime(datetime.datetime):
 
         def timestamp(self):
             return 0
 
-    datetime.datetime = FakeDate
-    errors = {}
+    _original_datetime = datetime.datetime
+    try:
+        datetime.datetime = FakeDateTime  # type: ignore[misc]
+        yield
+    finally:
+        datetime.datetime = _original_datetime  # type: ignore[misc]
+
+
+def test_table_status(datetime_with_epoch_timestamp) -> None:
+    errors: dict[str, str] = {}
     rows = {
         "SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]
     }
