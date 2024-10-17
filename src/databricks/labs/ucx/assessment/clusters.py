@@ -46,6 +46,18 @@ class ClusterInfo:
     creator: str | None = None
     """User-name of the creator of the cluster, if known."""
 
+    @classmethod
+    def from_cluster_details(cls, details: ClusterDetails):
+        return ClusterInfo(
+            cluster_id=details.cluster_id if details.cluster_id else "",
+            cluster_name=details.cluster_name,
+            policy_id=details.policy_id,
+            spark_version=details.spark_version,
+            creator=details.creator_user_name or None,
+            success=1,
+            failures="[]",
+        )
+
 
 class CheckClusterMixin(CheckInitScriptMixin):
     _ws: WorkspaceClient
@@ -152,7 +164,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         all_clusters = list(self._ws.clusters.list())
         return list(self._assess_clusters(all_clusters))
 
-    def _assess_clusters(self, all_clusters):
+    def _assess_clusters(self, all_clusters: Iterable[ClusterDetails]):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
@@ -162,15 +174,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            cluster_info = ClusterInfo(
-                cluster_id=cluster.cluster_id if cluster.cluster_id else "",
-                cluster_name=cluster.cluster_name,
-                policy_id=cluster.policy_id,
-                spark_version=cluster.spark_version,
-                creator=creator,
-                success=1,
-                failures="[]",
-            )
+            cluster_info = ClusterInfo.from_cluster_details(cluster)
             failures = self._check_cluster_failures(cluster, "cluster")
             if len(failures) > 0:
                 cluster_info.success = 0
