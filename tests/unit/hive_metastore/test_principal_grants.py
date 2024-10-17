@@ -77,6 +77,10 @@ def ws():
                     service_principal_name='spn1',
                     all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
                 ),
+                iam.AccessControlResponse(
+                    group_name='admins',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
             ],
         ),
         'warehouse1': iam.ObjectPermissions(
@@ -84,6 +88,7 @@ def ws():
             object_type="warehouses",
             access_control_list=[
                 iam.AccessControlResponse(group_name='group2', all_permissions=[iam.Permission(inherited=False)]),
+                iam.AccessControlResponse(group_name='users', all_permissions=[iam.Permission(inherited=False)]),
             ],
         ),
     }
