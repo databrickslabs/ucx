@@ -20,6 +20,7 @@ from databricks.sdk.service.jobs import (
     RunType,
     SparkJarTask,
     SqlTask,
+    Job,
 )
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
@@ -149,7 +150,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         return task_failures
 
 
-class JobOwnership(Ownership[JobInfo]):
+class JobInfoOwnership(Ownership[JobInfo]):
     """Determine ownership of jobs (workflows) in the inventory.
 
     This is the job creator (if known).
@@ -157,6 +158,16 @@ class JobOwnership(Ownership[JobInfo]):
 
     def _maybe_direct_owner(self, record: JobInfo) -> str | None:
         return record.creator
+
+
+class JobOwnership(Ownership[Job]):
+    """Determine ownership of jobs (workflows) in the workspace.
+
+    This is the job creator (if known).
+    """
+
+    def _maybe_direct_owner(self, record: Job) -> str | None:
+        return record.creator_user_name
 
 
 @dataclass
