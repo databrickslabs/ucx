@@ -8,7 +8,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import cast
 
-from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
+from astroid import Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
@@ -17,7 +17,6 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
     Linter,
-    PythonSequentialLinter,
     CurrentSessionState,
     Advisory,
     guess_encoding,
@@ -37,7 +36,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, PythonSequentialLinter
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -196,13 +195,14 @@ class NotebookLinter:
                 continue
 
     def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
-        try:
-            tree = Tree.normalize_and_parse(python_cell.original_code)
-            if register_trees:
-                self._python_trees[python_cell] = tree
-            yield from self._load_children_from_tree(tree)
-        except AstroidSyntaxError as e:
-            yield Failure('syntax-error', str(e), 0, 0, 0, 0)
+        maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
+        if maybe_tree.failure:
+            yield maybe_tree.failure
+        assert maybe_tree.tree is not None
+        tree = maybe_tree.tree
+        if register_trees:
+            self._python_trees[python_cell] = tree
+        yield from self._load_children_from_tree(tree)
 
     def _load_children_from_tree(self, tree: Tree) -> Iterable[Advice]:
         assert isinstance(tree.node, Module)

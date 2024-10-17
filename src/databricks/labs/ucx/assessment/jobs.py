@@ -8,7 +8,7 @@ from hashlib import sha256
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 from databricks.sdk.service.jobs import (
     BaseJob,
     BaseRun,
@@ -43,7 +43,7 @@ class JobInfo:
 
 class JobsMixin:
     @classmethod
-    def _get_cluster_configs_from_all_jobs(cls, all_jobs, all_clusters_by_id):
+    def _get_cluster_configs_from_all_jobs(cls, all_jobs: list[BaseJob], all_clusters_by_id: dict[str, ClusterDetails]):
         for job in all_jobs:
             if job.settings is None:
                 continue
@@ -54,7 +54,11 @@ class JobsMixin:
             yield from cls._task_clusters(job, all_clusters_by_id)
 
     @classmethod
-    def _task_clusters(cls, job, all_clusters_by_id):
+    def _task_clusters(
+        cls, job: BaseJob, all_clusters_by_id: dict[str, ClusterDetails]
+    ) -> Iterable[tuple[BaseJob, ClusterDetails | ClusterSpec]]:
+        if not job.settings or not job.settings.tasks:
+            return
         for task in job.settings.tasks:
             if task.existing_cluster_id is not None:
                 interactive_cluster = all_clusters_by_id.get(task.existing_cluster_id, None)
@@ -65,7 +69,9 @@ class JobsMixin:
                 yield job, task.new_cluster
 
     @staticmethod
-    def _job_clusters(job):
+    def _job_clusters(job: BaseJob) -> Iterable[tuple[BaseJob, ClusterSpec]]:
+        if not job.settings or not job.settings.job_clusters:
+            return
         for job_cluster in job.settings.job_clusters:
             if job_cluster.new_cluster is None:
                 continue
@@ -79,7 +85,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
-        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list()}
+        all_clusters = {c.cluster_id: c for c in self._ws.clusters.list() if c.cluster_id}
         return self._assess_jobs(all_jobs, all_clusters)
 
     def _assess_jobs(self, all_jobs: list[BaseJob], all_clusters_by_id) -> Iterable[JobInfo]:
@@ -93,11 +99,11 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             cluster_failures.extend(self._check_jar_task(job.settings.tasks))
             job_assessment[job_id].update(cluster_failures)
 
-        # TODO: next person looking at this - rewrite, as this code makes no sense
-        for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
-            job_details[job_key].failures = json.dumps(list(job_assessment[job_key]))
-            if len(job_assessment[job_key]) > 0:
-                job_details[job_key].success = 0
+        for job_key, job_info in job_details.items():
+            failures = job_assessment[job_key]
+            job_info.failures = json.dumps(list(failures))
+            if len(failures) > 0:
+                job_info.success = 0
         return list(job_details.values())
 
     @staticmethod

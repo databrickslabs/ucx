@@ -576,40 +576,45 @@ def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function
 
 
 def test_get_full_function_name_for_member_function() -> None:
-    tree = Tree.parse("value.attr()")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("value.attr()")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr'
 
 
 def test_get_full_function_name_for_member_member_function() -> None:
-    tree = Tree.parse("value1.value2.attr()")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("value1.value2.attr()")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value1.value2.attr'
 
 
 def test_get_full_function_name_for_chained_function() -> None:
-    tree = Tree.parse("value.attr1().attr2()")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("value.attr1().attr2()")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr1.attr2'
 
 
 def test_get_full_function_name_for_global_function() -> None:
-    tree = Tree.parse("name()")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("name()")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'name'
 
 
 def test_get_full_function_name_for_non_method() -> None:
-    tree = Tree.parse("not_a_function")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("not_a_function")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert TreeHelper.get_full_function_name(node.value) is None
 
@@ -617,8 +622,9 @@ def test_get_full_function_name_for_non_method() -> None:
 def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.parse("call('some.things')")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("call('some.things')")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)
@@ -630,8 +636,9 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None
 def test_apply_table_name_matcher_with_existing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.parse("call('old.things')")
-    node = tree.first_statement()
+    tree = Tree.maybe_parse("call('old.things')")
+    assert tree.tree is not None
+    node = tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)
