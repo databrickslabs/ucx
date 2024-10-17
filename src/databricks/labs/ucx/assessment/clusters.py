@@ -182,7 +182,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
             yield ClusterInfo(*row)
 
 
-class ClusterOwnership(Ownership[ClusterInfo]):
+class ClusterInfoOwnership(Ownership[ClusterInfo]):
     """Determine ownership of clusters in the inventory.
 
     This is the cluster creator (if known).

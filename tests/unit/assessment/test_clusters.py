@@ -10,7 +10,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
     PoliciesCrawler,
-    ClusterOwnership,
+    ClusterInfoOwnership,
     ClusterInfo,
     ClusterPolicyOwnership,
     PolicyInfo,
@@ -185,21 +185,21 @@ def test_unsupported_clusters():
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
 
 
-def test_cluster_owner_creator() -> None:
+def test_clusterinfo_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)
 
-    ownership = ClusterOwnership(admin_locator)
+    ownership = ClusterInfoOwnership(admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator="bob", cluster_id="1", success=1, failures="[]"))
 
     assert owner == "bob"
     admin_locator.get_workspace_administrator.assert_not_called()
 
 
-def test_cluster_owner_creator_unknown() -> None:
+def test_clusterinfo_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
-    ownership = ClusterOwnership(admin_locator)
+    ownership = ClusterInfoOwnership(admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator=None, cluster_id="1", success=1, failures="[]"))
 
     assert owner == "an_admin"

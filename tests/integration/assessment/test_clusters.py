@@ -9,7 +9,7 @@ from databricks.sdk.service.compute import DataSecurityMode
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
     PoliciesCrawler,
-    ClusterOwnership,
+    ClusterInfoOwnership,
     ClusterPolicyOwnership,
 )
 
@@ -53,7 +53,7 @@ def _change_cluster_owner(ws, cluster_id: str, owner_user_name: str) -> None:
     ws.api_client.do('POST', '/api/2.1/clusters/change-owner', body=body, headers=headers)
 
 
-def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_schema, sql_backend) -> None:
+def test_clusterinfo_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled clusters."""
 
     # Set up two clusters: one with us as owner and one for a different user.
@@ -76,7 +76,7 @@ def test_cluster_ownership(ws, runtime_ctx, make_cluster, make_user, inventory_s
 
     # Verify ownership is as expected.
     administrator_locator = runtime_ctx.administrator_locator
-    ownership = ClusterOwnership(administrator_locator)
+    ownership = ClusterInfoOwnership(administrator_locator)
     assert ownership.owner_of(my_cluster_record) == ws.current_user.me().user_name
     assert ownership.owner_of(their_cluster_record) == another_user.user_name
 
