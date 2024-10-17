@@ -2,7 +2,6 @@ from unittest.mock import Mock, call, create_autospec
 import sys
 
 import pytest
-import sys
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
