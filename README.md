@@ -53,7 +53,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
       * [Table migration workflows](#table-migration-workflows)
       * [Step 4: Odds and Ends](#step-4-odds-and-ends)
-        * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
+        * [Step 4.1: Skipping schema, table or view](#step-41-skipping-schema-table-or-view)
         * [Step 4.2: Moving objects](#step-42-moving-objects)
         * [Step 4.2: Aliasing objects](#step-42-aliasing-objects)
         * [Step 4.3: Reverting objects](#step-43-reverting-objects)
