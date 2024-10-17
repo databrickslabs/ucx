@@ -225,6 +225,17 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 [[back to top](#databricks-labs-ucx)]
 
+## Installation resources
+
+The following resources are installed by UCX:
+
+| Installed UCX resources | Description                                                                                      |
+|-------------------------|--------------------------------------------------------------------------------------------------|
+| Inventory database      | A HIVE metastore database/schema in which UCX persist inventory required for the upgrade process |
+| Jobs                    | |
+| Lakeview dashboards     | |
+| Installation folder     | |
+
 ## [ADVANCED] Force install over existing UCX
 Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
 The values for the environment variable are 'global' and 'user'.
