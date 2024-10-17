@@ -29,6 +29,9 @@ class Catalog:
     name: str
     """The catalog name"""
 
+    connection_name: str | None = None
+    """The connection name for the catalog used for federated catalogs."""
+
     @property
     def full_name(self) -> str:
         """The full name of the catalog.
@@ -133,6 +136,34 @@ class CatalogSchema:
                 The properties to pass to the catalog. If None, no properties are passed.
         """
         self._create_catalog_validate(Catalog(self._ucx_catalog), prompts, properties=properties)
+
+    def create_federated_catalog(
+        self,
+        prompts: Prompts,
+        catalog_name: str,
+        connection_name: str,
+        authorized_paths: str,
+        *,
+        properties: dict[str, str] | None = None,
+    ) -> None:
+        """Create the HMS Federated catalog.
+
+        Args:
+            prompts : Prompts
+                The prompts object to use for interactive input.
+            catalog_name : str
+                The catalog name to use for the federated catalog.
+            connection_name : str
+                The connection name to use for the federated catalog.
+            authorized_paths : str
+                The authorized paths to pass to the catalog.
+            properties : (dict[str, str] | None), default None
+                The properties to pass to the catalog. If None, no properties are passed.
+        """
+        if properties is None:
+            properties = {}
+        properties["authorized_paths"] = authorized_paths
+        self._create_catalog_validate(Catalog(catalog_name, connection_name), prompts, properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
         """Create all UC catalogs and schemas reference by the table mapping file.
