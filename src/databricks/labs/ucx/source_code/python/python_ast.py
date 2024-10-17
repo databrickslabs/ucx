@@ -53,6 +53,7 @@ class MaybeTree:
     failure: Failure | None
 
     def walk(self) -> Iterable[NodeNG]:
+        # mainly a helper method for unit testing
         if self.tree is None:
             assert self.failure is not None
             logger.warning(self.failure.message)
@@ -60,19 +61,12 @@ class MaybeTree:
         return self.tree.walk()
 
     def first_statement(self) -> NodeNG | None:
+        # mainly a helper method for unit testing
         if self.tree is None:
             assert self.failure is not None
             logger.warning(self.failure.message)
             return None
         return self.tree.first_statement()
-
-    def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
-        # TODO: remove
-        if self.tree is None:
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return []
-        return self.tree.locate(node_type, match_nodes)
 
 
 class Tree:
