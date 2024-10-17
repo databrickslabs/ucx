@@ -801,6 +801,7 @@ def test_mount_listing_misplaced_flat_file():
         ),
     ]
 
+
 def test_mount_dont_list_partitions():
     client = create_autospec(WorkspaceClient)
 
