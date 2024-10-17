@@ -174,3 +174,32 @@ def test_create_catalog_schema_with_legacy_hive_metastore_privileges(  # TODO: I
     schema_grants = get_schema_permissions_list(f"{dst_catalog_name}.{dst_schema_name}")
     assert schema_grants.privilege_assignments is not None
     assert PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA]) in schema_grants.privilege_assignments
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_create_catalog_schema_when_users_group_in_warehouse_acl(
+    caplog,
+    runtime_ctx,
+    make_random,
+    make_warehouse,
+    make_warehouse_permissions,
+) -> None:
+    """Privileges inferred from being part of the 'users' group are ignored."""
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    dst_catalog_name = f"ucx_{make_random()}"
+    dst_schema_name = "test"
+    rule = Rule("workspace", dst_catalog_name, src_schema.name, dst_schema_name, src_table.name, src_table.name)
+    runtime_ctx.with_table_mapping_rules([rule])
+    runtime_ctx.with_dummy_resource_permission()
+    warehouse = make_warehouse()
+    make_warehouse_permissions(object_id=warehouse.id, permission_level=PermissionLevel.CAN_USE, group_name="users")
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
+        runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    failed_to_migrate_message = (
+        f"failed-to-migrate: Failed to migrate ACL for {src_table.full_name} to {dst_catalog_name}"
+    )
+    assert failed_to_migrate_message not in caplog.messages
