@@ -1,9 +1,9 @@
 from unittest.mock import create_autospec
 
-from databricks.sdk.service import iam, jobs
 from pathlib import Path
 
-from databricks.sdk.service import jobs
+from databricks.sdk.service import iam, jobs
+
 from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.jobs import NotebookTask
 
@@ -65,7 +65,10 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     step1 = next((step for step in steps if step.object_name == notebook_path.as_posix()), None)
     assert step1
     assert step1.step_number > step0.step_number
-    step2 = next((step for step in steps if step.object_name == "parent_that_magic_runs_child_that_uses_value_from_parent.py"), None)
+    step2 = next(
+        (step for step in steps if step.object_name == "parent_that_magic_runs_child_that_uses_value_from_parent.py"),
+        None,
+    )
     assert step2
     assert step2.step_number > step1.step_number
     step3 = next((step for step in steps if step.object_name == "_child_that_uses_value_from_parent.py"), None)
