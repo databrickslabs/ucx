@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
 
+from databricks.labs.ucx.assessment.clusters import ClusterDetailsOwnership
+from databricks.labs.ucx.assessment.jobs import JobOwnership
+from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 
 
@@ -66,8 +69,9 @@ class MigrationNode:
 
 class MigrationSequencer:
 
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
         self._ws = ws
+        self._admin_locator = admin_locator
         self._last_node_id = 0
         self._root = MigrationNode(
             node_id=0, object_type="ROOT", object_id="ROOT", object_name="ROOT", object_owner="NONE"
@@ -107,7 +111,7 @@ class MigrationSequencer:
             object_type="JOB",
             object_id=str(job.job_id),
             object_name=job_name,
-            object_owner=job.creator_user_name or "<UNKNOWN>",
+            object_owner=JobOwnership(self._admin_locator).owner_of(job),
         )
         top_level = True
         if job.settings and job.settings.job_clusters:
@@ -131,14 +135,13 @@ class MigrationSequencer:
             return cluster_node
         details = self._ws.clusters.get(cluster_key)
         object_name = details.cluster_name if details and details.cluster_name else cluster_key
-        object_owner = details.creator_user_name if details and details.creator_user_name else "<UNKNOWN>"
         self._last_node_id += 1
         cluster_node = MigrationNode(
             node_id=self._last_node_id,
             object_type="CLUSTER",
             object_id=cluster_key,
             object_name=object_name,
-            object_owner=object_owner,
+            object_owner=ClusterDetailsOwnership(self._admin_locator).owner_of(details),
         )
         # TODO register warehouses and policies
         self._root.required_steps.append(cluster_node)
