@@ -137,7 +137,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_create_catalog_schema_with_legacy_hive_metastore_privileges(  # TODO: Issue about ACL vs grants vs privileges
+def test_create_catalog_schema_with_legacy_hive_metastore_privileges(
     ws: WorkspaceClient,
     runtime_ctx,
     make_random,
@@ -191,6 +191,7 @@ def test_create_catalog_schema_when_users_group_in_warehouse_acl(
     rule = Rule("workspace", dst_catalog_name, src_schema.name, dst_schema_name, src_table.name, src_table.name)
     runtime_ctx.with_table_mapping_rules([rule])
     runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.make_group()
     warehouse = make_warehouse()
     make_warehouse_permissions(object_id=warehouse.id, permission_level=PermissionLevel.CAN_USE, group_name="users")
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
