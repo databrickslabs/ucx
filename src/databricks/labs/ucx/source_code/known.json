@@ -5650,6 +5650,9 @@
   "gunicorn": {
     "gunicorn": []
   },
+  "gviz-api": {
+    "gviz_api": []
+  },
   "gymnasium": {
     "gymnasium": [],
     "gymnasium.core": [],
@@ -5806,9 +5809,6 @@
     "gymnasium.wrappers.transform_observation": [],
     "gymnasium.wrappers.transform_reward": [],
     "gymnasium.wrappers.vector_list_info": []
-  },
-  "gviz-api": {
-    "gviz_api": []
   },
   "h11": {
     "h11": [],
@@ -10723,6 +10723,13 @@
   },
   "multitasking": {
     "multitasking": []
+  },
+  "murmurhash": {
+    "murmurhash": [],
+    "murmurhash.about": [],
+    "murmurhash.tests": [],
+    "murmurhash.tests.test_hash": [],
+    "murmurhash.tests.test_import": []
   },
   "mypy": {
     "mypy": [],
