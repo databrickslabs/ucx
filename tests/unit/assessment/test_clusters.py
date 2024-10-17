@@ -13,7 +13,7 @@ from databricks.labs.ucx.assessment.clusters import (
     ClusterInfoOwnership,
     ClusterInfo,
     ClusterPolicyOwnership,
-    PolicyInfo,
+    PolicyInfo, ClusterDetailsOwnership,
 )
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.owners import AdministratorLocator
@@ -185,7 +185,7 @@ def test_unsupported_clusters():
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
 
 
-def test_clusterinfo_owner_creator() -> None:
+def test_cluster_info_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)
 
     ownership = ClusterInfoOwnership(admin_locator)
@@ -195,12 +195,33 @@ def test_clusterinfo_owner_creator() -> None:
     admin_locator.get_workspace_administrator.assert_not_called()
 
 
-def test_clusterinfo_owner_creator_unknown() -> None:
+def test_cluster_info_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     ownership = ClusterInfoOwnership(admin_locator)
     owner = ownership.owner_of(ClusterInfo(creator=None, cluster_id="1", success=1, failures="[]"))
+
+    assert owner == "an_admin"
+    admin_locator.get_workspace_administrator.assert_called_once()
+
+
+def test_cluster_details_owner_creator() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+
+    ownership = ClusterDetailsOwnership(admin_locator)
+    owner = ownership.owner_of(ClusterDetails(creator_user_name="bob", cluster_id="1"))
+
+    assert owner == "bob"
+    admin_locator.get_workspace_administrator.assert_not_called()
+
+
+def test_cluster_details_owner_creator_unknown() -> None:
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "an_admin"
+
+    ownership = ClusterDetailsOwnership(admin_locator)
+    owner = ownership.owner_of(ClusterDetails(cluster_id="1"))
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()

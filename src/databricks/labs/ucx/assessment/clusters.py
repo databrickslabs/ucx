@@ -192,6 +192,16 @@ class ClusterInfoOwnership(Ownership[ClusterInfo]):
         return record.creator
 
 
+class ClusterDetailsOwnership(Ownership[ClusterDetails]):
+    """Determine ownership of clusters in the workspace.
+
+    This is the cluster creator (if known).
+    """
+
+    def _maybe_direct_owner(self, record: ClusterDetails) -> str | None:
+        return record.creator_user_name
+
+
 @dataclass
 class PolicyInfo:
     policy_id: str
