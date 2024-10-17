@@ -592,7 +592,7 @@ class AzureACL:
 
 
 class PrincipalACL:
-    _system_groups = {"admins", "users"}
+    _workspace_system_groups = {"admins", "users"}
 
     def __init__(
         self,
@@ -694,7 +694,7 @@ class PrincipalACL:
             if acl.user_name is not None:
                 principal_list.append(acl.user_name)
             if acl.group_name is not None:
-                if acl.group_name in self._system_groups:
+                if acl.group_name in self._workspace_system_groups:  # Do not exists on account level
                     continue
                 principal_list.append(acl.group_name)
             if acl.service_principal_name is not None:
