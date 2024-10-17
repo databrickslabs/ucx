@@ -10661,26 +10661,6 @@
     "mlflow.data.schema": [],
     "mlflow.data.sources": [],
     "mlflow.data.spark_dataset": [],
-    "mlflow.data.spark_dataset_source": [
-      {
-        "code": "cannot-autofix-table-reference",
-        "message": "Can't migrate 'spark.read.table(self._table_name)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "cannot-autofix-table-reference",
-        "message": "Can't migrate table_name argument in 'self._sql' because its value cannot be computed"
-      },
-      {
-        "code": "default-format-changed-in-dbr8",
-        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
-      }
-    ],
-    "mlflow.data.spark_delta_utils": [
-      {
-        "code": "sql-parse-error",
-        "message": "SQL expression is not supported yet: DESCRIBE DETAIL Uninferable"
-      }
-    ],
     "mlflow.data.tensorflow_dataset": [],
     "mlflow.data.uc_volume_dataset_source": [],
     "mlflow.db": [],
@@ -10848,19 +10828,7 @@
     "mlflow.models.model_config": [],
     "mlflow.models.python_api": [],
     "mlflow.models.rag_signatures": [],
-    "mlflow.models.resources": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "mlflow.models.signature": [],
-    "mlflow.models.utils": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "mlflow.models.wheeled_model": [],
     "mlflow.onnx": [],
     "mlflow.openai": [],
@@ -10947,12 +10915,6 @@
     "mlflow.recipes.steps.evaluate": [],
     "mlflow.recipes.steps.ingest": [],
     "mlflow.recipes.steps.ingest.datasets": [],
-    "mlflow.recipes.steps.predict": [
-      {
-        "code": "cannot-autofix-table-reference",
-        "message": "Can't migrate 'spark._jsparkSession.catalog().tableExists(output_location)' because its table name argument cannot be computed"
-      }
-    ],
     "mlflow.recipes.steps.register": [],
     "mlflow.recipes.steps.split": [],
     "mlflow.recipes.steps.train": [],
@@ -11013,12 +10975,6 @@
     "mlflow.store.artifact.artifact_repo": [],
     "mlflow.store.artifact.artifact_repository_registry": [],
     "mlflow.store.artifact.azure_blob_artifact_repo": [],
-    "mlflow.store.artifact.azure_data_lake_artifact_repo": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "mlflow.store.artifact.cli": [],
     "mlflow.store.artifact.cloud_artifact_repo": [],
     "mlflow.store.artifact.databricks_artifact_repo": [],
@@ -11203,16 +11159,6 @@
     "mlflow.utils.conda": [],
     "mlflow.utils.credentials": [],
     "mlflow.utils.data_utils": [],
-    "mlflow.utils.databricks_utils": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /databricks/DBR_VERSION"
-      },
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /var/credentials-secret/model-dependencies-oauth-token"
-      }
-    ],
     "mlflow.utils.docstring_utils": [],
     "mlflow.utils.doctor": [],
     "mlflow.utils.download_cloud_file_chunk": [],
@@ -11228,12 +11174,6 @@
     "mlflow.utils.logging_utils": [],
     "mlflow.utils.mime_type_utils": [],
     "mlflow.utils.mlflow_tags": [],
-    "mlflow.utils.model_utils": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "The use of direct filesystem references is deprecated: /"
-      }
-    ],
     "mlflow.utils.name_utils": [],
     "mlflow.utils.nfs_on_spark": [],
     "mlflow.utils.openai_utils": [],
