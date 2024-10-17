@@ -119,7 +119,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 return True
             logger.info(f"{schema}.{table} is set as not migrated")
         except NotFound:
-            # If the source table doesn't exist, it will not be shown as migrated
+            # If the source table doesn't exist anymore, we mark it as migrated to avoid trying to migrate it again and
+            # for views that have the table as dependency
             logger.warning(f"failed-to-migrate: {schema}.{table} set as a source does no longer exist")
             return True
         return False
