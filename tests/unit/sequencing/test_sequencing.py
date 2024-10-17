@@ -14,6 +14,13 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 
 
+def admin_locator(ws, user_name: str):
+    admin_finder = create_autospec(AdministratorFinder)
+    admin_user = iam.User(user_name=user_name, active=True, roles=[iam.ComplexValue(value="account_admin")])
+    admin_finder.find_admin_users.return_value = (admin_user,)
+    return AdministratorLocator(ws, finders=[lambda _ws: admin_finder])
+
+
 def test_sequencer_builds_cluster_and_children_from_task(ws, simple_dependency_resolver, mock_path_lookup):
     ws.clusters.get.return_value = ClusterDetails(cluster_name="my-cluster", creator_user_name="John Doe")
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
@@ -22,10 +29,7 @@ def test_sequencer_builds_cluster_and_children_from_task(ws, simple_dependency_r
     ws.jobs.get.return_value = job
     dependency = WorkflowTask(ws, task, job)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    admin_finder = create_autospec(AdministratorFinder)
-    admin_user = iam.User(user_name="John Doe", active=True, roles=[iam.ComplexValue(value="account_admin")])
-    admin_finder.find_admin_users.return_value = (admin_user,)
-    sequencer = MigrationSequencer(ws, AdministratorLocator(ws, finders=[lambda _ws: admin_finder]))
+    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
     step = steps[-1]
@@ -53,7 +57,7 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     problems = container.build_dependency_graph(graph)
     assert not problems
-    sequencer = MigrationSequencer(ws, mock_path_lookup)
+    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
     names = {step.object_name for step in steps}
