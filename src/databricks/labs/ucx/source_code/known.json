@@ -5650,6 +5650,9 @@
   "gunicorn": {
     "gunicorn": []
   },
+  "gviz-api": {
+    "gviz_api": []
+  },
   "gymnasium": {
     "gymnasium": [],
     "gymnasium.core": [],
@@ -5806,9 +5809,6 @@
     "gymnasium.wrappers.transform_observation": [],
     "gymnasium.wrappers.transform_reward": [],
     "gymnasium.wrappers.vector_list_info": []
-  },
-  "gviz-api": {
-    "gviz_api": []
   },
   "h11": {
     "h11": [],
@@ -10685,6 +10685,15 @@
     "msal.token_cache": [],
     "msal.wstrust_request": [],
     "msal.wstrust_response": []
+  },
+  "msal-extensions": {
+    "msal_extensions": [],
+    "msal_extensions.cache_lock": [],
+    "msal_extensions.libsecret": [],
+    "msal_extensions.osx": [],
+    "msal_extensions.persistence": [],
+    "msal_extensions.token_cache": [],
+    "msal_extensions.windows": []
   },
   "msgpack": {
     "msgpack": [],
@@ -25976,6 +25985,14 @@
     "pooch.hashes": [],
     "pooch.processors": [],
     "pooch.utils": []
+  },
+  "portalocker": {
+    "portalocker": [],
+    "portalocker.constants": [],
+    "portalocker.exceptions": [],
+    "portalocker.portalocker": [],
+    "portalocker.redis": [],
+    "portalocker.utils": []
   },
   "prometheus_client": {
     "prometheus_client": [],
