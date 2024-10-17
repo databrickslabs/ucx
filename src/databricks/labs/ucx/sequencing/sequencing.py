@@ -25,6 +25,10 @@ class MigrationStep:
     object_owner: str
     required_step_ids: list[int]
 
+    @property
+    def key(self) -> tuple[str, str]:
+        return self.object_type, self.object_id
+
 
 @dataclass
 class MigrationNode:
@@ -86,7 +90,7 @@ class MigrationSequencer:
                 # also make the cluster dependent on the job
                 self._incoming[cluster_node.key].add(job_node.key)
                 self._outgoing[job_node.key].add(cluster_node.key)
-        # TODO register dependency graph
+        graph.visit(self._visit_dependency, None)
         return task_node
 
     def _visit_dependency(self, graph: DependencyGraph) -> bool | None:

@@ -60,9 +60,14 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
-    names = {step.object_name for step in steps}
-    assert notebook_path.as_posix() in names
-    notebook_path = Path("parent_that_magic_runs_child_that_uses_value_from_parent.py")
-    assert notebook_path.as_posix() in names
-    notebook_path = Path("_child_that_uses_value_from_parent.py")
-    assert notebook_path.as_posix() in names
+    step0 = next((step for step in steps if step.object_type == "TASK"), None)
+    assert step0
+    step1 = next((step for step in steps if step.object_name == notebook_path.as_posix()), None)
+    assert step1
+    assert step1.step_number > step0.step_number
+    step2 = next((step for step in steps if step.object_name == "parent_that_magic_runs_child_that_uses_value_from_parent.py"), None)
+    assert step2
+    assert step2.step_number > step1.step_number
+    step3 = next((step for step in steps if step.object_name == "_child_that_uses_value_from_parent.py"), None)
+    assert step3
+    assert step3.step_number > step2.step_number
