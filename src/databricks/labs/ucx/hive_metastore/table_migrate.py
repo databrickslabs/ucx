@@ -129,7 +129,7 @@ class TablesMigrator:
         if managed_table_external_storage == 'CLONE':
             return self._migrate_table_create_ctas(src_table.src, src_table.rule)
         logger.warning(f"failed-to-migrate: unknown managed_table_external_storage: {managed_table_external_storage}")
-        return True
+        return False
 
     def _migrate_table(
         self,
