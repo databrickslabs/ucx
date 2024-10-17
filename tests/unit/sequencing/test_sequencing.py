@@ -8,6 +8,7 @@ from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.jobs import NotebookTask
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
+from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph
@@ -52,7 +53,9 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
     ws.jobs.get.return_value = job
-    dependency = WorkflowTask(ws, task, job)
+    ws_cache = create_autospec(WorkspaceCache)
+    ws_cache.get_workspace_path.side_effect = lambda path: Path(path)
+    dependency = WorkflowTask(ws, task, job, ws_cache)
     container = dependency.load(mock_path_lookup)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     problems = container.build_dependency_graph(graph)
