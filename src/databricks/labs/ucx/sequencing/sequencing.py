@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
 
-from databricks.labs.ucx.assessment.clusters import ClusterDetailsOwnership
-from databricks.labs.ucx.assessment.jobs import JobOwnership
+from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 
@@ -97,7 +97,7 @@ class MigrationSequencer:
             object_type="JOB",
             object_id=str(job.job_id),
             object_name=job_name,
-            object_owner=JobOwnership(self._admin_locator).owner_of(job),
+            object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
         )
         self._nodes[job_node.key] = job_node
         if job.settings and job.settings.job_clusters:
@@ -125,7 +125,7 @@ class MigrationSequencer:
             object_type="CLUSTER",
             object_id=cluster_id,
             object_name=object_name,
-            object_owner=ClusterDetailsOwnership(self._admin_locator).owner_of(details),
+            object_owner=ClusterOwnership(self._admin_locator).owner_of(ClusterInfo.from_cluster_details(details)),
         )
         self._nodes[cluster_node.key] = cluster_node
         # TODO register warehouses and policies
