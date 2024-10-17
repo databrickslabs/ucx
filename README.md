@@ -430,28 +430,71 @@ The UCX assessment workflow is intended to only run once; re-running it is not s
 
 ## Group migration workflow
 
-You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
-See the [migration process diagram](#migration-process) to understand the role of the group migration workflow in the migration process.
+> You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
 
-See the [detailed design](docs/local-group-migration.md) of this workflow. It helps you to upgrade all Databricks workspace assets:
-Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
-Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
-SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
-Directories, Repos, and Files.
+**The group migration workflow does NOT CREATE account groups.** In contrast to account groups, [the (legacy)
+workspace-local groups cannot be assigned to additional workspaces or granted access to data in a Unity Catalog
+metastore](https://docs.databricks.com/en/admin/users-groups/groups.html#difference-between-account-groups-and-workspace-local-groups).
+A Databricks admin [assigns account groups to workspaces](https://docs.databricks.com/en/admin/users-groups/index.html#assign-users-to-workspaces)
+using [identity federation](https://docs.databricks.com/en/admin/users-groups/index.html#enable-identity-federation)
+to manage groups from a single place: your Databricks account. We expect UCX users to create account groups
+centrally while most other Databricks resources that UCX touches are scoped to a single workspace.
+If you do not have account groups matching the workspace in which UCX is installed, please
+run [`create-account-groups` command](#create-account-groups-command) before running the group migration workflow.
 
-Once done with the group migration, proceed to [table migration process](#Table-Migration).
+The group migration workflow is designed to migrate workspace-local groups to account-level groups. It ensures that all
+the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and
+permissions. The tasks in the group migration workflow depend on the
+output of the assessment workflow and should only be executed after a successful run of the assessment workflow. The
+output of each [inventory database](#installation-resources) to be used for further analysis and decision-making.
+The group migration workflow can be executed multiple times to ensure that all groups are migrated successfully and that
+all the necessary permissions are assigned.
 
-Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
-If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
+1. `verify_metastore_attached`: Verifies if a metastore is attached. Account level groups are only available when a
+    a metastore is attached. [See `assign-metastore` command.](#assign-metastore-command)
+2. `rename_workspace_local_groups`: This task renames workspace-local groups by adding a `ucx-renamed-` prefix. This
+   step is taken to avoid conflicts with account groups that may have the same name as workspace-local groups.
+3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account
+   groups must exist for this step to be successful. This step is necessary to ensure that the account groups
+   are available in the workspace for assigning permissions.
+4. `apply_permissions_to_account_groups`: This task assigns the full set of permissions of the original group to the
+   account-level one. This step is necessary to ensure that the account-level groups have the necessary permissions to
+   manage the entities in the workspace. It covers workspace-local permissions for all entities including:
+   - Legacy Table ACLs
+   - Entitlements
+   - AWS instance profiles
+   - Clusters
+   - Cluster policies
+   - Instance Pools
+   - Databricks SQL warehouses
+   - Delta Live Tables
+   - Jobs
+   - MLflow experiments
+   - MLflow registry
+   - SQL Dashboards & Queries
+   - SQL Alerts
+   - Token and Password usage permissions
+   - Secret Scopes
+   - Notebooks
+   - Directories
+   - Repos
+   - Files
+5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the
+   destination groups.
 
-The group migration workflow is designed to migrate workspace-local groups to account-level groups in the Unity Catalog (UC) environment. It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
+After successfully running the group migration workflow:
+1. Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence the newly created
+   account level groups are considered to be valid.
+2. Run the [`remove-workspace-local-backup-grups`](#validate-groups-membership-command) to remove workspace-level backup
+   groups, along with their permissions. This should only be executed after confirming that the workspace-local
+   migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and
+   remove any unnecessary groups and permissions.
+3. Proceed to the [table migration process](#Table-Migration).
 
-1. `crawl_groups`: This task scans all groups for the local group migration scope.
-2. `rename_workspace_local_groups`: This task renames workspace local groups by adding a `ucx-renamed-` prefix. This step is taken to avoid conflicts with account-level groups that may have the same name as workspace-local groups.
-3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this step to be successful. This step is necessary to ensure that the account-level groups are available in the workspace for assigning permissions.
-4. `apply_permissions_to_account_groups`: This task assigns the full set of permissions of the original group to the account-level one. It covers local workspace-local permissions for all entities, including Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage permissions, Secret Scopes, Notebooks, Directories, Repos, Files. This step is necessary to ensure that the account-level groups have the necessary permissions to manage the entities in the workspace.
-5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the destination groups.
-6. `delete_backup_groups`: This task removes all workspace-level backup groups, along with their permissions. This should only be executed after confirming that the workspace-local migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and remove any unnecessary groups and permissions.
+For additional information see:
+- The [detailed design](docs/local-group-migration.md) of thie group migration workflow.
+- The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
+  migration process.
 
 [[back to top](#databricks-labs-ucx)]
 
