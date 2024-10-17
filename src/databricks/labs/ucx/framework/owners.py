@@ -2,17 +2,13 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
-from typing import ClassVar, Generic, Protocol, TypeVar, final
+from typing import Generic, TypeVar, final
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.iam import User
 
 logger = logging.getLogger(__name__)
-
-
-class DataclassInstance(Protocol):
-    __dataclass_fields__: ClassVar[dict]
 
 
 Record = TypeVar("Record")
