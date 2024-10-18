@@ -1,15 +1,19 @@
 import dataclasses
 import logging
+from collections.abc import Sequence
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.core import Row
 
+from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
@@ -654,3 +658,199 @@ def test_grant_owner() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "grant_record,history_record",
+    (
+        (
+            Grant(principal="user@domain", action_type="SELECT", catalog="main", database="foo", table="bar"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["TABLE", "main.foo.bar", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "catalog": "main",
+                    "database": "foo",
+                    "table": "bar",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="SELECT", catalog="main", database="foo", view="bar"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["VIEW", "main.foo.bar", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "catalog": "main",
+                    "database": "foo",
+                    "view": "bar",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="SELECT", catalog="main", database="foo", udf="bar"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["FUNCTION", "main.foo.bar", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "catalog": "main",
+                    "database": "foo",
+                    "udf": "bar",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="SELECT", catalog="main", database="foo", udf="bar"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["FUNCTION", "main.foo.bar", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "catalog": "main",
+                    "database": "foo",
+                    "udf": "bar",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="ALL_PRIVILEGES", catalog="main", database="foo"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["DATABASE", "main.foo", "ALL_PRIVILEGES", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "ALL_PRIVILEGES",
+                    "catalog": "main",
+                    "database": "foo",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="ALL_PRIVILEGES", catalog="main"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["CATALOG", "main", "ALL_PRIVILEGES", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "ALL_PRIVILEGES",
+                    "catalog": "main",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="SELECT", any_file=True),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["ANY FILE", "", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "any_file": "true",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="SELECT", anonymous_function=True),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["ANONYMOUS FUNCTION", "", "SELECT", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "SELECT",
+                    "any_file": "false",
+                    "anonymous_function": "true",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Grant(principal="user@domain", action_type="ALL_PRIVILEGES", database="foo"),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Grant",
+                object_id=["DATABASE", "hive_metastore.foo", "ALL_PRIVILEGES", "user@domain"],
+                data={
+                    "principal": "user@domain",
+                    "action_type": "ALL_PRIVILEGES",
+                    "database": "foo",
+                    "any_file": "false",
+                    "anonymous_function": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_grant_supports_history(mock_backend, grant_record: Sequence[Grant], history_record: Sequence[Row]) -> None:
+    """Verify that Grant records are written to the history log as expected."""
+    mock_ownership = create_autospec(GrantOwnership)
+    mock_ownership.owner_of.return_value = "the_admin"
+    history_log = HistoryLog(mock_backend, mock_ownership, Grant, run_id=1, workspace_id=2, catalog="a_catalog")
+
+    history_log.append_inventory_snapshot([grant_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+
+    assert rows == [history_record]

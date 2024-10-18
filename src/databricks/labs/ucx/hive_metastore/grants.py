@@ -1,9 +1,9 @@
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from functools import partial, cached_property
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -66,6 +66,8 @@ class Grant:
     any_file: bool = False
     anonymous_function: bool = False
 
+    __id_attributes__: ClassVar[Sequence[str]] = ("object_type", "object_key", "action_type", "principal")
+
     @staticmethod
     def type_and_key(
         *,
@@ -104,6 +106,11 @@ class Grant:
             f"any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
+
+    @property
+    def object_type(self) -> str:
+        this_type, _ = self.this_type_and_key()
+        return this_type
 
     @property
     def object_key(self) -> str:
