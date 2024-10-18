@@ -41,7 +41,6 @@ def table_migration_statuses(tables):
 
 @pytest.fixture
 def schema_populated(
-    ws: WorkspaceClient,
     sql_backend: SqlBackend,
     make_catalog,
     make_schema,
@@ -52,7 +51,7 @@ def schema_populated(
     # not from the Hive metastore
     catalog = make_catalog()
     schema = make_schema(catalog_name=catalog.name)
-    workspace_id = ws.get_workspace_id()
+    workspace_id = 1
     historicals = []
     for table_name, id_, instance, failures in tables + table_migration_statuses:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
@@ -102,9 +101,18 @@ def test_migration_progress_dashboard(
     "query_name, rows",
     [
         ("01_0_percentage_migration_readiness", [Row(percentage=75.0)]),
-    ]
+        (
+            "02_0_migration_status_by_owner",
+            [Row(owner="Cor", percentage=50.0, total=4, total_migrated=2, total_to_be_migrated=2)],
+        ),
+    ],
 )
-def test_percentage_migration_readiness(dashboard_metadata: DashboardMetadata, sql_backend: SqlBackend, query_name, rows) -> None:
+def test_percentage_migration_readiness(
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+    query_name,
+    rows,
+) -> None:
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
