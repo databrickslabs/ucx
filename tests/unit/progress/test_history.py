@@ -9,7 +9,7 @@ from databricks.labs.lsql.core import Row
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import Ownership
-from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog
+from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog, Record
 from databricks.labs.ucx.progress.install import Historical
 
 
@@ -19,7 +19,7 @@ class _TestRecord:
     b_field: int
     failures: list[str]
 
-    __id_fields__: ClassVar[tuple[str]] = ("a_field",)
+    __id_attributes__: ClassVar[tuple[str]] = ("a_field",)
 
 
 @pytest.fixture
@@ -118,37 +118,127 @@ def test_historical_encoder_object_id(ownership) -> None:
         b_field: str = "field-b"
         c_field: str = "field-c"
 
-        __id_fields__: ClassVar = ("a_field", "c_field", "b_field")
+        @property
+        def d_property(self) -> str:
+            return "property-d"
+
+        __id_attributes__: ClassVar = ("a_field", "c_field", "b_field", "d_property")
 
     encoder2 = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_CompoundKey)
     historical2 = encoder2.to_historical(_CompoundKey())
 
     # Note: order matters
-    assert historical2.object_id == ["field-a", "field-c", "field-b"]
+    assert historical2.object_id == ["field-a", "field-c", "field-b", "property-d"]
 
 
-def test_historical_encoder_object_id_verification(ownership) -> None:
-    """Check the __id_fields__ class property is verified during init: it must be present and refer only to strings."""
+def test_historical_encoder_object_id_verification_no_id(ownership) -> None:
+    """Check that during initialization we fail if there is no __id_attributes__ defined."""
 
     @dataclass
-    class _NoIdFields:
+    class _NoId:
         pass
 
-    @dataclass
-    class _WrongTypeIdFields:
-        ok: str
-        not_ok: int
+    with pytest.raises(AttributeError) as excinfo:
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_NoId)
 
-        __id_fields__: ClassVar = ["ok", "not_ok"]
+    assert excinfo.value.obj == _NoId
+    assert excinfo.value.name == "__id_attributes__"
+
+
+@dataclass
+class _WrongTypeIdFields:
+    ok: str
+    not_ok: int
+
+    __id_attributes__: ClassVar = ["ok", "not_ok"]
+
+
+@dataclass
+class _WrongTypeIdProperty:
+    ok: str
+
+    @property
+    def not_ok(self) -> int:
+        return 0
+
+    __id_attributes__: ClassVar = ["ok", "not_ok"]
+
+
+@pytest.mark.parametrize("wrong_id_type_class", (_WrongTypeIdFields, _WrongTypeIdProperty))
+def test_historical_encoder_object_id_verification_wrong_type(ownership, wrong_id_type_class: type[Record]) -> None:
+    """Check that during initialization we fail if the id attributes are declared but are not strings."""
+
+    expected_msg = r"^Historical record <class '.*'> has a non-string id attribute: not_ok \(type=<class 'int'>\)$"
+    with pytest.raises(TypeError, match=expected_msg):
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=wrong_id_type_class)
+
+
+def test_historical_encoder_object_id_verification_no_property_type(ownership) -> None:
+    """Check that during initialization we fail if the id attributes are declared but are not strings."""
+
+    @dataclass
+    class _NoTypeIdProperty:
+        ok: str
+
+        @property
+        def not_ok(self):
+            return 0
+
+        __id_attributes__: ClassVar = ["ok", "not_ok"]
+
+    expected_msg = "^Historical record <class '.*'> has a property with no type as an id attribute: not_ok$"
+    with pytest.raises(TypeError, match=expected_msg):
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_NoTypeIdProperty)
+
+
+def test_historical_encoder_object_id_verification_non_readable_property(ownership) -> None:
+    """Check that during initialization we fail if an id attribute refers to a non-readable property."""
+
+    @dataclass
+    class _NonReadableIdProperty:
+        ok: str
+
+        __id_attributes__: ClassVar = ["ok", "not_ok"]
+
+    # Has to be injected after class declaration to avoid being treated as a field.
+    _NonReadableIdProperty.not_ok = property(doc="A non-readable-property")  # type: ignore[attr-defined]
+
+    expected_msg = r"^Historical record <class '.*'> has a non-readable property as an id attribute: not_ok$"
+    with pytest.raises(TypeError, match=expected_msg):
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_NonReadableIdProperty)
+
+
+def test_historical_encoder_object_id_verification_missing_attribute(ownership) -> None:
+    """Check that during initialization we fail if an id attribute refers to an attribute that does not exist."""
+
+    @dataclass
+    class _MissingAttribute:
+        ok: str
+
+        __id_attributes__: ClassVar = ["ok", "not_ok"]
 
     with pytest.raises(AttributeError) as excinfo:
-        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_NoIdFields)
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_MissingAttribute)
 
-    assert excinfo.value.obj == _NoIdFields
-    assert excinfo.value.name == "__id_fields__"
+    assert excinfo.value.obj == _MissingAttribute
+    assert excinfo.value.name == "not_ok"
 
-    with pytest.raises(TypeError, match="Historical record class id field is not a string: not_ok"):
-        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_WrongTypeIdFields)
+
+def test_historical_encoder_object_id_verification_not_field_or_property(ownership) -> None:
+    """Check that during initialization we fail if an id attribute refers an attribute that isn't a field or property."""
+
+    @dataclass
+    class _NotFieldOrProperty:
+        ok: str
+
+        def not_ok(self) -> str:
+            return ""
+
+        __id_attributes__: ClassVar = ["ok", "not_ok"]
+
+    expected_msg = r"^Historical record <class '.*'> declares an id attribute that is not a field or property: not_ok \(type=<.*>\)$"
+    with pytest.raises(TypeError, match=expected_msg):
+        HistoricalEncoder(job_run_id=1, workspace_id=1, ownership=ownership, klass=_NotFieldOrProperty)
 
 
 def test_historical_encoder_object_data(ownership) -> None:
@@ -165,7 +255,7 @@ def test_historical_encoder_object_data(ownership) -> None:
         field_3: str = "baz"
         field_4: str = "daz"
 
-        __id_fields__: ClassVar = ("field_1",)
+        __id_attributes__: ClassVar = ("field_1",)
 
     encoder2 = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AnotherClass)
     historical2 = encoder2.to_historical(_AnotherClass())
@@ -181,7 +271,7 @@ def test_historical_encoder_object_data_values_strings_as_is(ownership) -> None:
         existing_json_field: str = "[1, 2, 3]"
         optional_string_field: str | None = "value"
 
-        __id_fields__: ClassVar = ("a_field",)
+        __id_attributes__: ClassVar = ("a_field",)
 
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
     historical = encoder.to_historical(_AClass())
@@ -201,7 +291,7 @@ def test_historical_encoder_object_data_missing_optional_values(ownership) -> No
         optional_field: str | None = None
         nested: _InnerClass = _InnerClass()
 
-        __id_fields__: ClassVar = ("a_field",)
+        __id_attributes__: ClassVar = ("a_field",)
 
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
     historical = encoder.to_historical(_AClass())
@@ -233,7 +323,7 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
         array_field: list[str] = field(default_factory=lambda: ["foo", "bar", "baz"])
         nested_dataclass: list[_InnerClass] = field(default_factory=lambda: [_InnerClass(x) for x in range(2)])
 
-        __id_fields__: ClassVar = ("str_field",)
+        __id_attributes__: ClassVar = ("str_field",)
 
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
     historical = encoder.to_historical(_AClass())
@@ -258,7 +348,7 @@ class _OuterclassWithTimestamps:
     a_field: dt.datetime | None = None
     inner: _InnerClassWithTimestamp | None = None
 
-    __id_fields__: ClassVar = ("object_id",)
+    __id_attributes__: ClassVar = ("object_id",)
 
 
 @pytest.mark.parametrize(
@@ -288,7 +378,7 @@ class _OuterclassWithUnserializable:
     a_field: object | None = None
     inner: _InnerClassWithUnserializable | None = None
 
-    __id_fields__: ClassVar = ("object_id",)
+    __id_attributes__: ClassVar = ("object_id",)
 
 
 @pytest.mark.parametrize(
@@ -326,9 +416,10 @@ def test_historical_encoder_failures_verification(ownership) -> None:
         a_field: str = "a_field"
         failures: list[int] = field(default_factory=list)
 
-        __id_fields__: ClassVar = ("a_field",)
+        __id_attributes__: ClassVar = ("a_field",)
 
-    with pytest.raises(TypeError, match=re.escape("Historical record class has invalid failures type: list[int]")):
+    expected_msg = r"^Historical record <class '.*'> has invalid 'failures' attribute of type: list\[int\]$"
+    with pytest.raises(TypeError, match=expected_msg):
         _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_BrokenFailures)
 
 

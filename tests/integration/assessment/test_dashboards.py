@@ -68,7 +68,7 @@ def _populate_directfs_problems(installation_ctx):
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
@@ -84,7 +84,7 @@ def _populate_directfs_problems(installation_ctx):
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
@@ -107,7 +107,7 @@ def _populate_used_tables(installation_ctx):
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]
@@ -125,7 +125,7 @@ def _populate_used_tables(installation_ctx):
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=(datetime.now(timezone.utc) - timedelta(minutes=5.0)),
+            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
             assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
         )
     ]

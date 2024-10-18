@@ -4,7 +4,7 @@ import datetime as dt
 import json
 import logging
 from collections.abc import Sequence
-from typing import ClassVar, Protocol, TypeVar, Generic, Any
+from typing import ClassVar, Protocol, TypeVar, Generic, Any, get_type_hints
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -15,45 +15,96 @@ from databricks.labs.ucx.progress.install import Historical
 logger = logging.getLogger(__name__)
 
 
-class DataclassInstance(Protocol):
+class DataclassWithIdAttributes(Protocol):
     __dataclass_fields__: ClassVar[dict[str, Any]]
 
-    __id_fields__: ClassVar[Sequence[str]]
+    __id_attributes__: ClassVar[Sequence[str]]
+    """The names of attributes (can be dataclass fields or ordinary properties) that make up the object identifier.
+
+    All attributes must be (non-optional) strings.
+    """
 
 
-Record = TypeVar("Record", bound=DataclassInstance)
+Record = TypeVar("Record", bound=DataclassWithIdAttributes)
 
 
 class HistoricalEncoder(Generic[Record]):
+    _job_run_id: int
+    """The identifier of the current job run, with which these records are associated."""
+
+    _workspace_id: int
+    """The identifier of the current workspace, for identifying where these records came from."""
+
+    _ownership: Ownership[Record]
+    """Used to determine the owner for each record."""
+
+    _object_type: str
+    """The name of the record class being encoded by this instance."""
+
+    _field_types: dict[str, type]
+    """A map of the fields on instances of the record class (and their types); these will appear in the object data."""
+
+    _has_failures: bool
+    """Whether this record has a failures attribute that should be included in historical records."""
+
+    _id_attribute_names: Sequence[str]
+    """The names of the record attributes that are used to produce the identifier for each record.
+
+    Attributes can be either a dataclass field or a property, for which the type must be a (non-optional) string.
+    """
+
     def __init__(self, job_run_id: int, workspace_id: int, ownership: Ownership[Record], klass: type[Record]) -> None:
         self._job_run_id = job_run_id
         self._workspace_id = workspace_id
         self._ownership = ownership
         self._object_type = self._get_object_type(klass)
         self._field_types, self._has_failures = self._get_field_types(klass)
-        self._id_field_names = self._get_id_fieldnames(klass)
+        self._id_attribute_names = self._get_id_attribute_names(klass)
 
     @classmethod
     def _get_field_types(cls, klass: type[Record]) -> tuple[dict[str, type], bool]:
+        """Return the dataclass-defined fields that the record type declares, and their associated types.
+
+        If the record has a "failures" attribute this is treated specially: it is removed but we signal that it was
+        present.
+        """
         field_types = {field.name: field.type for field in dataclasses.fields(klass)}
         failures_type = field_types.pop("failures", None)
         has_failures = failures_type is not None
         if has_failures and failures_type != list[str]:
-            msg = f"Historical record class has invalid failures type: {failures_type}"
+            msg = f"Historical record {klass} has invalid 'failures' attribute of type: {failures_type}"
             raise TypeError(msg)
         return field_types, has_failures
 
-    def _get_id_fieldnames(self, klazz: type[Record]) -> Sequence[str]:
-        id_field_names = tuple(klazz.__id_fields__)
+    def _get_id_attribute_names(self, klazz: type[Record]) -> Sequence[str]:
+        id_attribute_names = tuple(klazz.__id_attributes__)
         all_fields = self._field_types
-        for field in id_field_names:
-            id_field_type = all_fields.get(field, None)
-            if id_field_type is None:
-                raise AttributeError(name=field, obj=klazz)
-            if id_field_type != str:
-                msg = f"Historical record class id field is not a string: {field}"
+        for name in id_attribute_names:
+            id_attribute_type = all_fields.get(name, None) or self._detect_property_type(klazz, name)
+            if id_attribute_type is None:
+                raise AttributeError(name=name, obj=klazz)
+            if id_attribute_type != str:
+                msg = f"Historical record {klazz} has a non-string id attribute: {name} (type={id_attribute_type})"
                 raise TypeError(msg)
-        return id_field_names
+        return id_attribute_names
+
+    def _detect_property_type(self, klazz: type[Record], name: str) -> str | None:
+        maybe_property = getattr(klazz, name, None)
+        if maybe_property is None:
+            return None
+        if not isinstance(maybe_property, property):
+            msg = f"Historical record {klazz} declares an id attribute that is not a field or property: {name} (type={maybe_property})"
+            raise TypeError(msg)
+        property_getter = maybe_property.fget
+        if not property_getter:
+            msg = f"Historical record {klazz} has a non-readable property as an id attribute: {name}"
+            raise TypeError(msg)
+        type_hints = get_type_hints(property_getter) or {}
+        try:
+            return type_hints["return"]
+        except KeyError as e:
+            msg = f"Historical record {klazz} has a property with no type as an id attribute: {name}"
+            raise TypeError(msg) from e
 
     @classmethod
     def _get_object_type(cls, klass: type[Record]) -> str:
@@ -64,7 +115,7 @@ class HistoricalEncoder(Generic[Record]):
         return dataclasses.asdict(record)
 
     def _object_id(self, record: Record) -> list[str]:
-        return [getattr(record, field) for field in self._id_field_names]
+        return [getattr(record, field) for field in self._id_attribute_names]
 
     @classmethod
     def _encode_non_serializable(cls, name: str, value: Any) -> Any:
