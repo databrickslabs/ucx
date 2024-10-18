@@ -85,15 +85,16 @@ def test_migration_progress_dashboard(
     dashboard_metadata,
     schema_populated: SchemaInfo,
 ) -> None:
-    """Check the dashboard visually."""
+    """Inspect the dashboard visually."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     directory = make_directory()
     dashboard = Dashboards(ws).create_dashboard(
         dashboard_metadata,
         parent_path=str(directory),
         warehouse_id=warehouse_id,
+        publish=True,
     )
-    dashboard_url = f"{ws.config.host}/sql/dashboardsv3/{dashboard.dashboard_id}"
+    dashboard_url = f"{ws.config.host}/dashboardsv3/{dashboard.dashboard_id}/published"
     webbrowser.open(dashboard_url)
     assert True, "Dashboard deployment successful"
 
