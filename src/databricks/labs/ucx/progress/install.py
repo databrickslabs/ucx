@@ -14,7 +14,7 @@ from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class Historical:
     workspace_id: int
     """The identifier of the workspace where this historical record was generated."""
