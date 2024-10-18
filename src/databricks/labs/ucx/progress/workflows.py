@@ -28,7 +28,9 @@ class MigrationProgress(Workflow):
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
         `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
-        ctx.tables_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_tables_log
+        tables_snapshot = ctx.tables_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(tables_snapshot)
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext) -> None:
@@ -50,7 +52,9 @@ class MigrationProgress(Workflow):
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        ctx.grants_crawler.snapshot(force_refresh=True)
+        grants_log = ctx.historical_grants_log
+        grants_snapshot = ctx.grants_crawler.snapshot(force_refresh=True)
+        grants_log.append_inventory_snapshot(grants_snapshot)
 
     @job_task
     def assess_jobs(self, ctx: RuntimeContext) -> None:

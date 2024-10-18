@@ -3,6 +3,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
@@ -14,8 +15,9 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table, TableOwnership
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 
@@ -116,10 +118,38 @@ class RuntimeContext(GlobalContext):
         return WorkflowRunRecorder(
             self.sql_backend,
             self.config.ucx_catalog,
-            workspace_id=self.workspace_client.get_workspace_id(),
+            workspace_id=self.workspace_id,
             workflow_name=self.named_parameters["workflow"],
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
             workflow_start_time=self.named_parameters["start_time"],
+        )
+
+    @cached_property
+    def workspace_id(self) -> int:
+        return self.workspace_client.get_workspace_id()
+
+    @cached_property
+    def historical_tables_log(self) -> HistoryLog[Table]:
+        table_owner = TableOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            table_owner,
+            Table,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_grants_log(self) -> HistoryLog[Grant]:
+        grant_owner = GrantOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            grant_owner,
+            Grant,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
         )

@@ -1,6 +1,7 @@
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
@@ -17,27 +18,47 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 
 @pytest.mark.parametrize(
-    "task, crawler, crawler_class",
+    "task, crawler, crawler_class, history_log",
     [
-        (MigrationProgress.crawl_tables, RuntimeContext.tables_crawler, TablesCrawler),
-        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, UdfsCrawler),
-        (MigrationProgress.crawl_grants, RuntimeContext.grants_crawler, GrantsCrawler),
-        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, JobsCrawler),
-        (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, ClustersCrawler),
-        (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, PipelinesCrawler),
-        (MigrationProgress.crawl_cluster_policies, RuntimeContext.policies_crawler, PoliciesCrawler),
+        (
+            MigrationProgress.crawl_tables,
+            RuntimeContext.tables_crawler,
+            TablesCrawler,
+            RuntimeContext.historical_tables_log,
+        ),
+        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, UdfsCrawler, None),
+        (
+            MigrationProgress.crawl_grants,
+            RuntimeContext.grants_crawler,
+            GrantsCrawler,
+            RuntimeContext.historical_grants_log,
+        ),
+        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, JobsCrawler, None),
+        (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, ClustersCrawler, None),
+        (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, PipelinesCrawler, None),
+        (MigrationProgress.crawl_cluster_policies, RuntimeContext.policies_crawler, PoliciesCrawler, None),
         (
             MigrationProgress.refresh_table_migration_status,
             RuntimeContext.migration_status_refresher,
             TableMigrationStatusRefresher,
+            None,
         ),
     ],
 )
-def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler_class) -> None:
+@pytest.mark.xfail(raises=AttributeError, reason="Work in progress.")
+def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler_class, history_log) -> None:
     mock_crawler = create_autospec(crawler_class)
+    mock_history_log = create_autospec(HistoryLog)
     crawler_name = crawler.attrname
-    run_workflow(task, **{crawler_name: mock_crawler})
+    history_log_name = history_log.attrname
+    context_replacements = {
+        crawler_name: mock_crawler,
+        history_log_name: mock_history_log,
+        "named_parameters": {"parent_run_id": 53},
+    }
+    run_workflow(task, **context_replacements)
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
+    mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
