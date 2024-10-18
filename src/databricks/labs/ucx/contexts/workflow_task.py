@@ -3,6 +3,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationOwnership, TableMigrationStatus
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
@@ -99,6 +100,10 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def tables_crawler(self) -> FasterTableScanCrawler:
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+
+    @cached_property
+    def tables_ownership(self) -> TableOwnership:
+        return TableOwnership(self.administrator_locator)
 
     @cached_property
     def tables_in_mounts(self) -> TablesInMounts:
@@ -203,11 +208,22 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_tables_log(self) -> HistoryLog[Table]:
-        table_owner = TableOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            table_owner,
+            self.tables_ownership,
             Table,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_table_migration_log(self) -> HistoryLog[TableMigrationStatus]:
+        table_migration_owner = TableMigrationOwnership(self.tables_crawler, self.tables_ownership)
+        return HistoryLog(
+            self.sql_backend,
+            table_migration_owner,
+            TableMigrationStatus,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
             self.config.ucx_catalog,

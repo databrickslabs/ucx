@@ -134,7 +134,9 @@ class MigrationProgress(Workflow):
 
         The results of the scan are stored in the `$inventory.migration_status` inventory table.
         """
-        ctx.migration_status_refresher.snapshot(force_refresh=True)
+        history_log = ctx.historical_table_migration_log
+        migration_status_snapshot = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(migration_status_snapshot)
 
     @job_task(
         depends_on=[

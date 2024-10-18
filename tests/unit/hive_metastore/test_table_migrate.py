@@ -7,10 +7,12 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from databricks.labs.lsql.core import Row
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
@@ -37,6 +39,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
+from databricks.labs.ucx.progress.history import HistoryLog
 
 from .. import mock_table_mapping, mock_workspace_client
 
@@ -1537,6 +1540,81 @@ def test_table_migration_status_source_table_unknown() -> None:
 
     assert owner == "an_admin"
     table_ownership.owner_of.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "table_migration_status_record,history_record",
+    (
+        (
+            TableMigrationStatus(
+                src_schema="foo",
+                src_table="bar",
+                dst_catalog="main",
+                dst_schema="fu",
+                dst_table="baz",
+                update_ts="2024-10-18T16:34:00Z",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="TableMigrationStatus",
+                object_id=["foo", "bar"],
+                data={
+                    "src_schema": "foo",
+                    "src_table": "bar",
+                    "dst_catalog": "main",
+                    "dst_schema": "fu",
+                    "dst_table": "baz",
+                    "update_ts": "2024-10-18T16:34:00Z",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            TableMigrationStatus(
+                src_schema="foo",
+                src_table="bar",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="TableMigrationStatus",
+                object_id=["foo", "bar"],
+                data={
+                    "src_schema": "foo",
+                    "src_table": "bar",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_table_migration_status_supports_history(
+    mock_backend,
+    table_migration_status_record: TableMigrationStatus,
+    history_record: Row,
+) -> None:
+    """Verify that TableMigrationStatus records are written as expected to the history log."""
+    table_migration_ownership = create_autospec(TableMigrationOwnership)
+    table_migration_ownership.owner_of.return_value = "the_admin"
+    history_log = HistoryLog[TableMigrationStatus](
+        mock_backend,
+        table_migration_ownership,
+        TableMigrationStatus,
+        run_id=1,
+        workspace_id=2,
+        catalog="a_catalog",
+    )
+
+    history_log.append_inventory_snapshot([table_migration_status_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+
+    assert rows == [history_record]
 
 
 class MockBackendWithGeneralException(MockBackend):

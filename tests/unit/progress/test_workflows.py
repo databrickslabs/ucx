@@ -67,11 +67,10 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
             MigrationProgress.refresh_table_migration_status,
             RuntimeContext.migration_status_refresher,
             TableMigrationStatusRefresher,
-            None,
+            RuntimeContext.historical_table_migration_log,
         ),
     ],
 )
-@pytest.mark.xfail(raises=AttributeError, reason="Work in progress.")
 def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler_class, history_log) -> None:
     mock_crawler = create_autospec(crawler_class)
     mock_history_log = create_autospec(HistoryLog)
