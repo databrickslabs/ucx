@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from typing import ClassVar, Protocol, TypeVar, Generic, Any
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -121,9 +120,8 @@ class HistoricalEncoder(Generic[Record]):
 
 
 class HistoryLog(Generic[Record]):
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
-        ws: WorkspaceClient,
         sql_backend: SqlBackend,
         ownership: Ownership[Record],
         klass: type[Record],
@@ -133,7 +131,6 @@ class HistoryLog(Generic[Record]):
         schema: str = "ucx",
         table: str = "history",
     ) -> None:
-        self._ws = ws
         self._sql_backend = sql_backend
         self._klass = klass
         self._catalog = catalog

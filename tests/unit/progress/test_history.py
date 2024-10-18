@@ -332,7 +332,7 @@ def test_historical_encoder_failures_verification(ownership) -> None:
         _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_BrokenFailures)
 
 
-def test_history_log_appends_historical_records(ws, mock_backend, ownership) -> None:
+def test_history_log_appends_historical_records(mock_backend, ownership) -> None:
     """Verify that we can journal a snapshot of records to the historical log."""
     ownership.owner_of.side_effect = lambda o: f"owner-{o.a_field}"
 
@@ -375,7 +375,6 @@ def test_history_log_appends_historical_records(ws, mock_backend, ownership) -> 
     )
 
     history_log = HistoryLog(
-        ws,
         mock_backend,
         ownership,
         _TestRecord,
@@ -391,11 +390,11 @@ def test_history_log_appends_historical_records(ws, mock_backend, ownership) -> 
     assert rows_appended == list(expected_historical_entries)
 
 
-def test_history_log_default_location(ws, mock_backend, ownership) -> None:
+def test_history_log_default_location(mock_backend, ownership) -> None:
     """Verify that the history log defaults to the ucx.history in the configured catalog."""
 
     record = _TestRecord(a_field="foo", b_field=1, failures=[])
-    history_log = HistoryLog(ws, mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
+    history_log = HistoryLog(mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
     history_log.append_inventory_snapshot([record])
 
     assert history_log.full_name == "the_catalog.ucx.history"
