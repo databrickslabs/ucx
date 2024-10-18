@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from unittest.mock import create_autospec
 
 import pytest
@@ -156,11 +155,11 @@ def test_udf_owner() -> None:
         ),
     ),
 )
-def test_udf_supports_history(mock_backend, udf_record, history_record: Sequence[Row]) -> None:
+def test_udf_supports_history(mock_backend, udf_record: Udf, history_record: Row) -> None:
     """Verify that Udf records are written as expected to the history log."""
     mock_ownership = create_autospec(UdfOwnership)
     mock_ownership.owner_of.return_value = "the_admin"
-    history_log = HistoryLog(mock_backend, mock_ownership, Udf, run_id=1, workspace_id=2, catalog="a_catalog")
+    history_log = HistoryLog[Udf](mock_backend, mock_ownership, Udf, run_id=1, workspace_id=2, catalog="a_catalog")
 
     history_log.append_inventory_snapshot([udf_record])
 

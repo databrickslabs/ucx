@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from unittest.mock import create_autospec
 
 import pytest
@@ -209,12 +208,19 @@ def test_pipeline_owner_creator_unknown() -> None:
         ),
     ),
 )
-def test_pipeline_supports_history(mock_backend, job_info_record, history_record: Sequence[Row]) -> None:
+def test_pipeline_supports_history(mock_backend, job_info_record: JobInfo, history_record: Row) -> None:
     """Verify that JobInfo records are written as expected to the history log."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     job_ownership = JobOwnership(admin_locator)
-    history_log = HistoryLog(mock_backend, job_ownership, JobInfo, run_id=1, workspace_id=2, catalog="a_catalog")
+    history_log = HistoryLog[JobInfo](
+        mock_backend,
+        job_ownership,
+        JobInfo,
+        run_id=1,
+        workspace_id=2,
+        catalog="a_catalog",
+    )
 
     history_log.append_inventory_snapshot([job_info_record])
 

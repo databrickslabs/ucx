@@ -1,6 +1,5 @@
 import dataclasses
 import logging
-from collections.abc import Sequence
 from unittest.mock import create_autospec
 
 import pytest
@@ -843,11 +842,11 @@ def test_grant_owner() -> None:
         ),
     ),
 )
-def test_grant_supports_history(mock_backend, grant_record: Sequence[Grant], history_record: Sequence[Row]) -> None:
+def test_grant_supports_history(mock_backend, grant_record: Grant, history_record: Row) -> None:
     """Verify that Grant records are written to the history log as expected."""
     mock_ownership = create_autospec(GrantOwnership)
     mock_ownership.owner_of.return_value = "the_admin"
-    history_log = HistoryLog(mock_backend, mock_ownership, Grant, run_id=1, workspace_id=2, catalog="a_catalog")
+    history_log = HistoryLog[Grant](mock_backend, mock_ownership, Grant, run_id=1, workspace_id=2, catalog="a_catalog")
 
     history_log.append_inventory_snapshot([grant_record])
 
