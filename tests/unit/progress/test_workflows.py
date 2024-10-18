@@ -47,7 +47,12 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
             PipelinesCrawler,
             RuntimeContext.historical_pipelines_log,
         ),
-        (MigrationProgress.crawl_cluster_policies, RuntimeContext.policies_crawler, PoliciesCrawler, None),
+        (
+            MigrationProgress.crawl_cluster_policies,
+            RuntimeContext.policies_crawler,
+            PoliciesCrawler,
+            RuntimeContext.historical_cluster_policies_log,
+        ),
         (
             MigrationProgress.refresh_table_migration_status,
             RuntimeContext.migration_status_refresher,

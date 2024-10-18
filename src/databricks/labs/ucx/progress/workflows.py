@@ -112,7 +112,9 @@ class MigrationProgress(Workflow):
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        ctx.policies_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_cluster_policies_log
+        cluster_policies_snapshot = ctx.policies_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(cluster_policies_snapshot)
 
     @job_task(job_cluster="table_migration")
     def setup_table_migration(self, ctx: RuntimeContext) -> None:

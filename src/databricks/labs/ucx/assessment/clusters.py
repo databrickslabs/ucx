@@ -206,6 +206,8 @@ class PolicyInfo:
     creator: str | None = None
     """User-name of the creator of the cluster policy, if known."""
 
+    __id_attributes__: ClassVar[Sequence[str]] = ("policy_id",)
+
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):

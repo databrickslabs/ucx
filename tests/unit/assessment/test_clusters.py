@@ -365,3 +365,79 @@ def test_cluster_policy_owner_creator_unknown() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "policy_info_record,history_record",
+    (
+        (
+            PolicyInfo(
+                policy_id="1234",
+                policy_name="the_policy",
+                success=1,
+                failures="[]",
+                spark_version="3.5.3",
+                policy_description="a description of the policy",
+                creator="user@domain",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="PolicyInfo",
+                object_id=["1234"],
+                data={
+                    "policy_id": "1234",
+                    "policy_name": "the_policy",
+                    "success": "1",
+                    "spark_version": "3.5.3",
+                    "policy_description": "a description of the policy",
+                    "creator": "user@domain",
+                },
+                failures=[],
+                owner="user@domain",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            PolicyInfo(
+                policy_id="1234",
+                policy_name="the_policy",
+                success=0,
+                failures='["a_failure", "another_failure"]',
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="PolicyInfo",
+                object_id=["1234"],
+                data={
+                    "policy_id": "1234",
+                    "policy_name": "the_policy",
+                    "success": "0",
+                },
+                failures=["a_failure", "another_failure"],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_cluster_policy_supports_history(mock_backend, policy_info_record: PolicyInfo, history_record: Row) -> None:
+    """Verify that ClusterInfo records are written as expected to the history log."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "the_admin"
+    cluster_policy_ownership = ClusterPolicyOwnership(admin_locator)
+    history_log = HistoryLog[PolicyInfo](
+        mock_backend,
+        cluster_policy_ownership,
+        PolicyInfo,
+        run_id=1,
+        workspace_id=2,
+        catalog="a_catalog",
+    )
+
+    history_log.append_inventory_snapshot([policy_info_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+
+    assert rows == [history_record]

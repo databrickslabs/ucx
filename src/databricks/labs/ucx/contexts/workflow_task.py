@@ -6,7 +6,14 @@ from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler, ClusterOwnership, ClusterInfo
+from databricks.labs.ucx.assessment.clusters import (
+    ClustersCrawler,
+    PoliciesCrawler,
+    ClusterOwnership,
+    ClusterInfo,
+    ClusterPolicyOwnership,
+    PolicyInfo,
+)
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
@@ -141,6 +148,18 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             cluster_owner,
             ClusterInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_cluster_policies_log(self) -> HistoryLog[PolicyInfo]:
+        cluster_policy_owner = ClusterPolicyOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            cluster_policy_owner,
+            PolicyInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
             self.config.ucx_catalog,
