@@ -157,7 +157,7 @@ def test_udf_owner() -> None:
     ),
 )
 def test_udf_supports_history(mock_backend, udf_record, history_record: Sequence[Row]) -> None:
-    """Verify that Table records are written as expected to the history log."""
+    """Verify that Udf records are written as expected to the history log."""
     mock_ownership = create_autospec(UdfOwnership)
     mock_ownership.owner_of.return_value = "the_admin"
     history_log = HistoryLog(mock_backend, mock_ownership, Udf, run_id=1, workspace_id=2, catalog="a_catalog")
