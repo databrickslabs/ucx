@@ -14,26 +14,28 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 
 
 @pytest.fixture
-def tables() -> list[tuple[str, Table, list[str]]]:
+def tables():
     tables_without_id = [
         Table("hive_metastore", "schema1", "table1", "MANAGED", "delta"),
         Table("hive_metastore", "schema1", "table2", "MANAGED", "delta", location="s3://test_location/test1/table1"),
         Table("hive_metastore", "schema2", "table1", "EXTERNAL", "delta", location="s3://test_location/test2/table2"),
         Table("hive_metastore", "schema2", "table2", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
     ]
-    return [("tables", table, [table.catalog, table.database, table.name]) for table in tables_without_id]
+    return [("tables", [table.catalog, table.database, table.name], table, []) for table in tables_without_id]
 
 
 @pytest.fixture
-def table_migration_statuses(tables) -> list[tuple[str, TableMigrationStatus, list[str]]]:
+def table_migration_statuses(tables):
     statuses = []
-    for _, table, id_ in tables:
+    for _, id_, table, _ in tables:
         table_migration_status = TableMigrationStatus(table.catalog, table.database, table.name)
+        failures = ["not migrated"]
         if table.database == "schema1":  # Simulate one schema being migrated
             table_migration_status.dst_catalog = "catalog1"
             table_migration_status.dst_schema = table.database
             table_migration_status.dst_table = table.name
-        statuses.append(("migration_status", table_migration_status, id_))
+            failures = []
+        statuses.append(("migration_status", id_, table_migration_status, failures))
     return statuses
 
 
@@ -52,14 +54,14 @@ def schema_populated(
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    for table_name, instance, id_ in tables + table_migration_statuses:
+    for table_name, id_, instance, failures in tables + table_migration_statuses:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
             field.name: str(getattr(instance, field.name))
             for field in dataclasses.fields(instance)
             if getattr(instance, field.name) is not None
         }
-        historical = Historical(workspace_id, 1, table_name, id_, data, [], "Cor")
+        historical = Historical(workspace_id, 1, table_name, id_, data, failures, "Cor")
         historicals.append(historical)
     sql_backend.save_table(f"{schema.full_name}.historical", historicals, Historical, mode="overwrite")
     return schema
