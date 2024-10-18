@@ -37,7 +37,9 @@ class MigrationProgress(Workflow):
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
         table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
         issues with grants that cannot be migrated to Unit Catalog."""
-        ctx.udfs_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_udfs_log
+        udfs_snapshot = ctx.udfs_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(udfs_snapshot)
 
     @job_task(job_cluster="tacl")
     def setup_tacl(self, ctx: RuntimeContext) -> None:

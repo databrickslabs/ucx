@@ -4,6 +4,7 @@ from pathlib import Path
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
+from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfOwnership
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
@@ -131,6 +132,18 @@ class RuntimeContext(GlobalContext):
         return self.workspace_client.get_workspace_id()
 
     @cached_property
+    def historical_grants_log(self) -> HistoryLog[Grant]:
+        grant_owner = GrantOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            grant_owner,
+            Grant,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
     def historical_tables_log(self) -> HistoryLog[Table]:
         table_owner = TableOwnership(self.administrator_locator)
         return HistoryLog(
@@ -143,12 +156,12 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def historical_grants_log(self) -> HistoryLog[Grant]:
-        grant_owner = GrantOwnership(self.administrator_locator)
+    def historical_udfs_log(self) -> HistoryLog[Udf]:
+        udf_owner = UdfOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            grant_owner,
-            Grant,
+            udf_owner,
+            Udf,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
             self.config.ucx_catalog,

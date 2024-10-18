@@ -27,7 +27,7 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
             TablesCrawler,
             RuntimeContext.historical_tables_log,
         ),
-        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, UdfsCrawler, None),
+        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, UdfsCrawler, RuntimeContext.historical_udfs_log),
         (
             MigrationProgress.crawl_grants,
             RuntimeContext.grants_crawler,
