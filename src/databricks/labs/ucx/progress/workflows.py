@@ -84,7 +84,9 @@ class MigrationProgress(Workflow):
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.clusters_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_clusters_log
+        clusters_snapshot = ctx.clusters_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(clusters_snapshot)
 
     @job_task
     def assess_pipelines(self, ctx: RuntimeContext) -> None:

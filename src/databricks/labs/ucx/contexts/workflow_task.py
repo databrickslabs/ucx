@@ -6,7 +6,7 @@ from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler, ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -133,6 +133,18 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def workspace_id(self) -> int:
         return self.workspace_client.get_workspace_id()
+
+    @cached_property
+    def historical_clusters_log(self) -> HistoryLog[ClusterInfo]:
+        cluster_owner = ClusterOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            cluster_owner,
+            ClusterInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
 
     @cached_property
     def historical_grants_log(self) -> HistoryLog[Grant]:

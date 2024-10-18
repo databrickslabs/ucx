@@ -1,8 +1,9 @@
 import base64
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -45,6 +46,8 @@ class ClusterInfo:
     cluster_name: str | None = None
     creator: str | None = None
     """User-name of the creator of the cluster, if known."""
+
+    __id_attributes__: ClassVar[Sequence[str]] = ("cluster_id",)
 
 
 class CheckClusterMixin(CheckInitScriptMixin):
