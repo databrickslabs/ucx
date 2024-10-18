@@ -65,7 +65,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks():
     assert result_set[0].success == 1
 
 
-def test_pipeline_crawler_creator():
+def test_job_crawler_creator():
     ws = mock_workspace_client()
     ws.jobs.list.return_value = (
         BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
@@ -138,7 +138,7 @@ def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
     assert result[0].failures == failures
 
 
-def test_pipeline_owner_creator() -> None:
+def test_job_owner_creator() -> None:
     admin_locator = create_autospec(AdministratorLocator)
 
     ownership = JobOwnership(admin_locator)
@@ -148,7 +148,7 @@ def test_pipeline_owner_creator() -> None:
     admin_locator.get_workspace_administrator.assert_not_called()
 
 
-def test_pipeline_owner_creator_unknown() -> None:
+def test_job_owner_creator_unknown() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
@@ -208,7 +208,7 @@ def test_pipeline_owner_creator_unknown() -> None:
         ),
     ),
 )
-def test_pipeline_supports_history(mock_backend, job_info_record: JobInfo, history_record: Row) -> None:
+def test_job_supports_history(mock_backend, job_info_record: JobInfo, history_record: Row) -> None:
     """Verify that JobInfo records are written as expected to the history log."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
