@@ -5,6 +5,9 @@ WITH migration_statuses AS (
     WHERE object_type = "migration_status"
 )
 
-SELECT owner, 100 * COUNT(*) / SUM(count(*)) OVER (partition by owner) AS percentage, COUNT(*) AS total
+SELECT
+    owner,
+    100 * COUNT(*) / SUM(COUNT_IF(SIZE(failures) = 0)) OVER (partition by owner) AS percentage,
+    COUNT(*) AS total
 FROM migration_statuses
 GROUP BY owner
