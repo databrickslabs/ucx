@@ -181,7 +181,7 @@ class MigrationSequencer:
         return cluster_node
 
     def generate_steps(self) -> Iterable[MigrationStep]:
-        """ The below algo is adapted from Kahn's topological sort.
+        """The below algo is adapted from Kahn's topological sort.
         The main differences are as follows:
         1) we want the same step number for all nodes with same dependency depth
             so instead of pushing 'leaf' nodes to a queue, we fetch them again once all current 'leaf' nodes are processed
@@ -190,7 +190,7 @@ class MigrationSequencer:
             so when fetching 'leaf' nodes, we relax the 0-incoming-vertex rule in order
             to avoid an infinite loop. We also avoid side effects (such as negative counts).
             This algo works correctly for simple cases, but is not tested on large trees.
-         """
+        """
         incoming_counts = self._populate_incoming_counts()
         step_number = 1
         sorted_steps: list[MigrationStep] = []
