@@ -55,7 +55,7 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     job = jobs.Job(job_id=1234, settings=settings)
     ws.jobs.get.return_value = job
     ws_cache = create_autospec(WorkspaceCache)
-    ws_cache.get_workspace_path.side_effect = lambda path: Path(path)
+    ws_cache.get_workspace_path.side_effect = Path
     dependency = WorkflowTask(ws, task, job, ws_cache)
     container = dependency.load(mock_path_lookup)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
@@ -63,21 +63,19 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     assert not problems
     sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
     sequencer.register_workflow_task(task, job, graph)
-    steps = list(sequencer.generate_steps())
-    step0 = next((step for step in steps if step.object_type == "TASK"), None)
-    assert step0
-    step1 = next((step for step in steps if step.object_name == notebook_path.as_posix()), None)
-    assert step1
-    assert step1.step_number < step0.step_number
-    step2 = next(
-        (step for step in steps if step.object_name == "parent_that_magic_runs_child_that_uses_value_from_parent.py"),
-        None,
-    )
-    assert step2
-    assert step2.step_number < step1.step_number
-    step3 = next((step for step in steps if step.object_name == "_child_that_uses_value_from_parent.py"), None)
-    assert step3
-    assert step3.step_number < step2.step_number
+    all_steps = list(sequencer.generate_steps())
+    # ensure steps have a consistent step_number: TASK > grand-parent > parent > child
+    parent_name = "parent_that_magic_runs_child_that_uses_value_from_parent.py"
+    steps = [
+        next((step for step in all_steps if step.object_name == "_child_that_uses_value_from_parent.py"), None),
+        next((step for step in all_steps if step.object_name == parent_name), None),
+        next((step for step in all_steps if step.object_name == notebook_path.as_posix()), None),
+        next((step for step in all_steps if step.object_type == "TASK"), None),
+    ]
+    # ensure steps have a consistent step_number
+    for i in range(0, len(steps) - 1):
+        assert steps[i]
+        assert steps[i].step_number < steps[i + 1].step_number
 
 
 class _DependencyGraph(DependencyGraph):

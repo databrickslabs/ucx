@@ -199,15 +199,18 @@ class MigrationSequencer:
             for leaf_key in leaf_keys:
                 del incoming_counts[leaf_key]
                 sorted_steps.append(self._nodes[leaf_key].as_step(step_number, list(self._required_step_ids(leaf_key))))
-                for dependency_key in self._outgoing[leaf_key]:
-                    # prevent re-instantiation of already deleted keys
-                    if dependency_key not in incoming_counts:
-                        continue
-                    # prevent negative count with cyclic dependencies
-                    if incoming_counts[dependency_key] > 0:
-                        incoming_counts[dependency_key] -= 1
+                self._on_leaf_key_processed(leaf_key, incoming_counts)
             step_number += 1
         return sorted_steps
+
+    def _on_leaf_key_processed(self, leaf_key: tuple[str, str], incoming_counts: dict[tuple[str, str], int]):
+        for dependency_key in self._outgoing[leaf_key]:
+            # prevent re-instantiation of already deleted keys
+            if dependency_key not in incoming_counts:
+                continue
+            # prevent negative count with cyclic dependencies
+            if incoming_counts[dependency_key] > 0:
+                incoming_counts[dependency_key] -= 1
 
     def _required_step_ids(self, node_key: tuple[str, str]) -> Iterable[int]:
         for leaf_key in self._incoming[node_key]:
