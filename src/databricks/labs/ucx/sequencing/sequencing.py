@@ -11,8 +11,10 @@ from databricks.sdk.service import jobs
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspaceObjectOwnership
+from databricks.labs.ucx.hive_metastore.tables import TableOwnership, Table
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 @dataclass
@@ -56,10 +58,17 @@ class MigrationNode:
 
 class MigrationSequencer:
 
-    def __init__(self, ws: WorkspaceClient, path_lookup: PathLookup, admin_locator: AdministratorLocator):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        path_lookup: PathLookup,
+        admin_locator: AdministratorLocator,
+        used_tables_crawler: UsedTablesCrawler,
+    ):
         self._ws = ws
         self._path_lookup = path_lookup
         self._admin_locator = admin_locator
+        self._used_tables_crawler = used_tables_crawler
         self._last_node_id = 0
         self._nodes: dict[tuple[str, str], MigrationNode] = {}
         self._incoming: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
@@ -102,10 +111,11 @@ class MigrationSequencer:
             # TODO tables and dfsas
         return False
 
-    def register_dependency(self, parent_node: MigrationNode, object_type: str, object_id: str) -> MigrationNode:
+    def register_dependency(self, parent_node: MigrationNode | None, object_type: str, object_id: str) -> MigrationNode:
         dependency_node = self._nodes.get((object_type, object_id), None)
         if not dependency_node:
             dependency_node = self._create_dependency_node(object_type, object_id)
+            list(self._register_used_tables_for(dependency_node))
         if parent_node:
             self._incoming[parent_node.key].add(dependency_node.key)
             self._outgoing[dependency_node.key].add(parent_node.key)
@@ -134,6 +144,24 @@ class MigrationSequencer:
         )
         self._nodes[dependency_node.key] = dependency_node
         return dependency_node
+
+    def _register_used_tables_for(self, parent_node: MigrationNode) -> Iterable[MigrationNode]:
+        if parent_node.object_type not in {"NOTEBOOK", "FILE"}:
+            return
+        used_tables = self._used_tables_crawler.for_lineage(parent_node.object_type, parent_node.object_id)
+        for used_table in used_tables:
+            self._last_node_id += 1
+            table_node = MigrationNode(
+                node_id=self._last_node_id,
+                object_type="TABLE",
+                object_id=used_table.fullname,
+                object_name=used_table.fullname,
+                object_owner=TableOwnership(self._admin_locator).owner_of(Table.from_used_table(used_table)),
+            )
+            self._nodes[table_node.key] = table_node
+            self._incoming[parent_node.key].add(table_node.key)
+            self._outgoing[table_node.key].add(parent_node.key)
+            yield table_node
 
     def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
         job_node = self._nodes.get(("WORKFLOW", str(job.job_id)), None)
