@@ -103,7 +103,7 @@ def test_migration_progress_dashboard(
         ("01_0_percentage_migration_readiness", [Row(percentage=75.0)]),
         (
             "02_0_migration_status_by_owner_bar_graph",
-            [Row(owner="Cor", total_not_migrated=2)],
+            [Row(owner="Cor", count=2)],
         ),
         (
             "02_1_migration_status_by_owner_overview",
