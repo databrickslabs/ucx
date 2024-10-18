@@ -190,3 +190,10 @@ class Ownership(ABC, Generic[Record]):
     def _maybe_direct_owner(self, record: Record) -> str | None:
         """Obtain the record-specific user-name associated with the given record, if any."""
         return None
+
+
+class WorkspaceObjectOwnership(Ownership[tuple[str, str]]):
+
+    def _maybe_direct_owner(self, record: tuple[str, str]) -> str | None:
+        # TODO: tuple[0] = object_type, tuple[1] = object_id
+        return None
