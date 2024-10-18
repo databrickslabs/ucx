@@ -104,10 +104,16 @@ class MigrationSequencer:
 
     def register_dependency(self, parent_node: MigrationNode, object_type: str, object_id: str) -> MigrationNode:
         dependency_node = self._nodes.get((object_type, object_id), None)
-        if dependency_node:
-            return dependency_node
+        if not dependency_node:
+            dependency_node = self._create_dependency_node(object_type, object_id)
+        if parent_node:
+            self._incoming[parent_node.key].add(dependency_node.key)
+            self._outgoing[dependency_node.key].add(parent_node.key)
+        return dependency_node
+
+    def _create_dependency_node(self, object_type: str, object_id: str) -> MigrationNode:
         object_name: str = "<ANONYMOUS>"
-        object_owner: str = "<UNKNOWN>"
+        _object_owner: str = "<UNKNOWN>"
         if object_type in {"NOTEBOOK", "FILE"}:
             path = Path(object_id)
             for library_root in self._path_lookup.library_roots:
@@ -127,8 +133,6 @@ class MigrationSequencer:
             object_owner=object_owner,
         )
         self._nodes[dependency_node.key] = dependency_node
-        self._incoming[dependency_node.key].add(parent_node.key)
-        self._outgoing[parent_node.key].add(dependency_node.key)
         return dependency_node
 
     def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
