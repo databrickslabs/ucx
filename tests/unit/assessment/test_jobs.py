@@ -1,9 +1,13 @@
+from collections.abc import Sequence
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.core import Row
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.sdk.service.jobs import BaseJob, JobSettings
 
+from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 
@@ -154,3 +158,66 @@ def test_pipeline_owner_creator_unknown() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "job_info_record,history_record",
+    (
+        (
+            JobInfo(
+                job_id="1234",
+                success=1,
+                failures="[]",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="JobInfo",
+                object_id=["1234"],
+                data={
+                    "job_id": "1234",
+                    "success": "1",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            JobInfo(
+                job_id="1234",
+                job_name="the_job",
+                creator="user@domain",
+                success=0,
+                failures='["first-failure", "second-failure"]',
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="JobInfo",
+                object_id=["1234"],
+                data={
+                    "job_id": "1234",
+                    "job_name": "the_job",
+                    "creator": "user@domain",
+                    "success": "0",
+                },
+                failures=["first-failure", "second-failure"],
+                owner="user@domain",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_pipeline_supports_history(mock_backend, job_info_record, history_record: Sequence[Row]) -> None:
+    """Verify that JobInfo records are written as expected to the history log."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "the_admin"
+    job_ownership = JobOwnership(admin_locator)
+    history_log = HistoryLog(mock_backend, job_ownership, JobInfo, run_id=1, workspace_id=2, catalog="a_catalog")
+
+    history_log.append_inventory_snapshot([job_info_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+
+    assert rows == [history_record]

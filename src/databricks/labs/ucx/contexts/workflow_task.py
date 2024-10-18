@@ -3,23 +3,26 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
-from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfOwnership
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table, TableOwnership
+from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfOwnership
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
+
+# As with GlobalContext, service factories unavoidably have a lot of public methods.
+# pylint: disable=too-many-public-methods
 
 
 class RuntimeContext(GlobalContext):
@@ -138,6 +141,18 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             grant_owner,
             Grant,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_jobs_log(self) -> HistoryLog[JobInfo]:
+        job_owner = JobOwnership(self.administrator_locator)
+        return HistoryLog(
+            self.sql_backend,
+            job_owner,
+            JobInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
             self.config.ucx_catalog,
