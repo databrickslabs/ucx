@@ -10,43 +10,56 @@ from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 
 
 @pytest.fixture
-def tables() -> list[Table]:
-    return [
-        Table("hive_metastore", "foo", "bar", "MANAGED", "delta"),
-        Table("hive_metastore", "foo", "bar", "MANAGED", "delta", location="s3://test_location/test1/table1"),
-        Table("hive_metastore", "foo", "bar", "EXTERNAL", "delta", location="s3://test_location/test2/table2"),
-        Table("hive_metastore", "foo", "bar", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
+def tables() -> list[tuple[str, Table, list[str]]]:
+    tables_without_id = [
+        Table("hive_metastore", "schema1", "table1", "MANAGED", "delta"),
+        Table("hive_metastore", "schema1", "table2", "MANAGED", "delta", location="s3://test_location/test1/table1"),
+        Table("hive_metastore", "schema2", "table1", "EXTERNAL", "delta", location="s3://test_location/test2/table2"),
+        Table("hive_metastore", "schema2", "table2", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
     ]
+    return [("tables", table, [table.catalog, table.database, table.name]) for table in tables_without_id]
 
 
 @pytest.fixture
-def schema_populated(ws: WorkspaceClient, sql_backend: SqlBackend, make_catalog, make_schema, tables) -> SchemaInfo:
+def table_migration_statuses(tables) -> list[tuple[str, TableMigrationStatus, list[str]]]:
+    statuses = []
+    for _, table, id_ in tables:
+        table_migration_status = TableMigrationStatus(table.catalog, table.database, table.name)
+        if table.database == "schema1":  # Simulate one schema being migrated
+            table_migration_status.dst_catalog = "catalog1"
+            table_migration_status.dst_schema = table.database
+            table_migration_status.dst_table = table.name
+        statuses.append(("migration_status", table_migration_status, id_))
+    return statuses
+
+
+@pytest.fixture
+def schema_populated(
+    ws: WorkspaceClient,
+    sql_backend: SqlBackend,
+    make_catalog,
+    make_schema,
+    tables,
+    table_migration_statuses,
+) -> SchemaInfo:
     # Different to the other dashboards, the migration process dashboard uses data from a UC catalog,
     # not from the Hive metastore
     catalog = make_catalog()
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    for table in tables:
+    for table_name, instance, id_ in tables + table_migration_statuses:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
-            field.name: str(getattr(table, field.name))
-            for table in tables
-            for field in dataclasses.fields(table)
-            if getattr(table, field.name) is not None
+            field.name: str(getattr(instance, field.name))
+            for field in dataclasses.fields(instance)
+            if getattr(instance, field.name) is not None
         }
-        historical = Historical(
-            workspace_id,
-            1,
-            "tables",
-            [table.catalog, table.database, table.name],
-            data,
-            [],
-            "Cor",
-        )
+        historical = Historical(workspace_id, 1, table_name, id_, data, [], "Cor")
         historicals.append(historical)
     sql_backend.save_table(f"{schema.full_name}.historical", historicals, Historical, mode="overwrite")
     return schema
@@ -88,6 +101,4 @@ def test_percentage_migration_readiness(dashboard_metadata: DashboardMetadata, s
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == [
-        Row(percentage=100.0)
-    ]
+    assert query_results == [Row(percentage=100.0)]
