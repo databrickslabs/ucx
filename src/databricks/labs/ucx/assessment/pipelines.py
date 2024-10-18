@@ -1,7 +1,8 @@
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -22,6 +23,8 @@ class PipelineInfo:
     pipeline_name: str | None = None
     creator_name: str | None = None
     """User-name of the creator of the pipeline, if known."""
+
+    __id_attributes__: ClassVar[Sequence[str]] = ("pipeline_id",)
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):

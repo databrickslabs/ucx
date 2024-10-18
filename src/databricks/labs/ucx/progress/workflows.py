@@ -28,14 +28,18 @@ class MigrationProgress(Workflow):
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
         `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
-        ctx.tables_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_tables_log
+        tables_snapshot = ctx.tables_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(tables_snapshot)
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext) -> None:
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
         table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
         issues with grants that cannot be migrated to Unit Catalog."""
-        ctx.udfs_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_udfs_log
+        udfs_snapshot = ctx.udfs_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(udfs_snapshot)
 
     @job_task(job_cluster="tacl")
     def setup_tacl(self, ctx: RuntimeContext) -> None:
@@ -50,7 +54,9 @@ class MigrationProgress(Workflow):
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        ctx.grants_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_grants_log
+        grants_snapshot = ctx.grants_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(grants_snapshot)
 
     @job_task
     def assess_jobs(self, ctx: RuntimeContext) -> None:
@@ -63,7 +69,9 @@ class MigrationProgress(Workflow):
           - Clusters with incompatible Spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.jobs_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_jobs_log
+        jobs_snapshot = ctx.jobs_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(jobs_snapshot)
 
     @job_task
     def assess_clusters(self, ctx: RuntimeContext) -> None:
@@ -76,7 +84,9 @@ class MigrationProgress(Workflow):
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.clusters_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_clusters_log
+        clusters_snapshot = ctx.clusters_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(clusters_snapshot)
 
     @job_task
     def assess_pipelines(self, ctx: RuntimeContext) -> None:
@@ -89,7 +99,9 @@ class MigrationProgress(Workflow):
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        ctx.pipelines_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_pipelines_log
+        pipelines_snapshot = ctx.pipelines_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(pipelines_snapshot)
 
     @job_task
     def crawl_cluster_policies(self, ctx: RuntimeContext) -> None:
@@ -100,7 +112,9 @@ class MigrationProgress(Workflow):
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        ctx.policies_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_cluster_policies_log
+        cluster_policies_snapshot = ctx.policies_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(cluster_policies_snapshot)
 
     @job_task(job_cluster="table_migration")
     def setup_table_migration(self, ctx: RuntimeContext) -> None:
@@ -120,7 +134,9 @@ class MigrationProgress(Workflow):
 
         The results of the scan are stored in the `$inventory.migration_status` inventory table.
         """
-        ctx.migration_status_refresher.snapshot(force_refresh=True)
+        history_log = ctx.historical_table_migration_log
+        migration_status_snapshot = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(migration_status_snapshot)
 
     @job_task(
         depends_on=[
