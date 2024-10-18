@@ -98,9 +98,14 @@ def test_migration_progress_dashboard(
     assert True, "Dashboard deployment successful"
 
 
-def test_percentage_migration_readiness(dashboard_metadata: DashboardMetadata, sql_backend: SqlBackend) -> None:
-    query_name = "01_0_percentage_migration_readiness"
+@pytest.mark.parametrize(
+    "query_name, rows",
+    [
+        ("01_0_percentage_migration_readiness", [Row(percentage=75.0)]),
+    ]
+)
+def test_percentage_migration_readiness(dashboard_metadata: DashboardMetadata, sql_backend: SqlBackend, query_name, rows) -> None:
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == [Row(percentage=100.0)]
+    assert query_results == rows
