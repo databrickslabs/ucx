@@ -423,7 +423,7 @@ def test_cluster_policy_owner_creator_unknown() -> None:
     ),
 )
 def test_cluster_policy_supports_history(mock_backend, policy_info_record: PolicyInfo, history_record: Row) -> None:
-    """Verify that ClusterInfo records are written as expected to the history log."""
+    """Verify that PolicyInfo records are written as expected to the history log."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     cluster_policy_ownership = ClusterPolicyOwnership(admin_locator)
