@@ -1,3 +1,4 @@
+import datetime as dt
 from unittest.mock import create_autospec
 
 import pytest
@@ -82,3 +83,38 @@ def test_migration_progress_with_invalid_prerequisites(run_workflow) -> None:
     task = MigrationProgress.verify_prerequisites
     with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace."):
         run_workflow(task, workspace_client=ws)
+
+
+def test_migration_progress_record_workflow_run(run_workflow, mock_backend) -> None:
+    """Verify that we log the workflow run."""
+    task = MigrationProgress.record_workflow_run
+    start_time = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+    context_replacements = {
+        "sql_backend": mock_backend,
+        "named_parameters": {
+            "workflow": "test",
+            "job_id": "123456",
+            "parent_run_id": "456",
+            "attempt": "0",
+            "start_time": start_time.isoformat(),
+        },
+    }
+
+    run_workflow(task, **context_replacements)
+
+    rows = mock_backend.rows_written_for("ucx.multiworkspace.workflow_runs", "append")
+
+    rows_as_dict = [{k: v for k, v in rows.as_dict().items() if k != 'finished_at'} for rows in rows]
+    assert rows_as_dict == [
+        {
+            "started_at": start_time,
+            # finished_at: checked below.
+            "workspace_id": 123,
+            "workflow_name": "test",
+            "workflow_id": 123456,
+            "workflow_run_id": 456,
+            "workflow_run_attempt": 0,
+        }
+    ]
+    # Finish-time must be indistinguishable from or later than the start time.
+    assert all(row["started_at"] <= row["finished_at"] for row in rows)
