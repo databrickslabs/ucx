@@ -24,8 +24,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 <!-- TOC -->
 * [Databricks Labs UCX](#databricks-labs-ucx)
 * [Installation](#installation)
+  * [Installation requirements](#installation-requirements)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
+  * [Installation resources](#installation-resources)
   * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
   * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
