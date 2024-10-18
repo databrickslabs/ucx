@@ -221,18 +221,18 @@ class MigrationSequencer:
 
     @classmethod
     def _get_leaf_keys(cls, incoming_counts: dict[tuple[str, str], int]) -> Iterable[tuple[str, str]]:
-        count = 0
-        leaf_keys = list(cls._yield_leaf_keys(incoming_counts, count))
+        max_count = 0
+        leaf_keys = list(cls._yield_leaf_keys(incoming_counts, max_count))
         # if we're not finding nodes with 0 incoming counts, it's likely caused by cyclic dependencies
         # in which case it's safe to process nodes with a higher incoming count
         while not leaf_keys:
-            count += 1
-            leaf_keys = list(cls._yield_leaf_keys(incoming_counts, count))
+            max_count += 1
+            leaf_keys = list(cls._yield_leaf_keys(incoming_counts, max_count))
         return leaf_keys
 
     @classmethod
-    def _yield_leaf_keys(cls, incoming_counts: dict[tuple[str, str], int], level: int) -> Iterable[tuple[str, str]]:
+    def _yield_leaf_keys(cls, incoming_counts: dict[tuple[str, str], int], max_count: int) -> Iterable[tuple[str, str]]:
         for node_key, incoming_count in incoming_counts.items():
-            if incoming_count > level:
+            if incoming_count > max_count:
                 continue
             yield node_key
