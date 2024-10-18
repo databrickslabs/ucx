@@ -11,8 +11,9 @@ from databricks.labs.ucx.framework.owners import AdministratorLocator, Administr
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyGraph
+from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
+from databricks.labs.ucx.source_code.linters.files import FileLoader
 
 
 def admin_locator(ws, user_name: str):
@@ -67,13 +68,14 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     assert step0
     step1 = next((step for step in steps if step.object_name == notebook_path.as_posix()), None)
     assert step1
-    assert step1.step_number > step0.step_number
+    assert step1.step_number < step0.step_number
     step2 = next(
         (step for step in steps if step.object_name == "parent_that_magic_runs_child_that_uses_value_from_parent.py"),
         None,
     )
     assert step2
-    assert step2.step_number > step1.step_number
+    assert step2.step_number < step1.step_number
     step3 = next((step for step in steps if step.object_name == "_child_that_uses_value_from_parent.py"), None)
     assert step3
-    assert step3.step_number > step2.step_number
+    assert step3.step_number < step2.step_number
+
