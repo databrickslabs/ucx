@@ -60,6 +60,47 @@ def test_table_migration_job_refreshes_migration_status(
     assert len(asserts) == 0, assert_message
 
 
+@pytest.mark.parametrize(
+    "prepare_tables_for_migration,workflow",
+    [
+        ("regularmanaged", "migrate-tables"),
+    ],
+    indirect=("prepare_tables_for_migration",),
+)
+def test_table_migration_for_managed_tabl(
+    ws,
+    installation_ctx,
+    prepare_tables_for_migration,
+    workflow,
+    sql_backend
+):
+    """The migration status should be refreshed after the migration job."""
+    tables, _ = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r"If hive_metastore contains managed table with external.*": "0",
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow(workflow)
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_external_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = list(runtime_ctx.migration_status_refresher.snapshot())
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_external_table.schema_name
+    assert migration_status[0].src_table == src_external_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_external_table.name
+
+
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_tables_for_migration):
     tables, dst_schema = prepare_tables_for_migration

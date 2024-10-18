@@ -611,6 +611,9 @@ class MockRuntimeContext(
                 continue
             table_type = table.table_type.value if table.table_type else ""
             table_format = table.data_source_format.value if table.data_source_format else default_table_format
+            storage_location = table.storage_location
+            if table_type == "MANAGED":
+                storage_location = ""
             tables_to_save.append(
                 Table(
                     catalog=table.catalog_name,
@@ -618,7 +621,7 @@ class MockRuntimeContext(
                     name=table.name,
                     object_type=table_type,
                     table_format=table_format,
-                    location=str(table.storage_location or ""),
+                    location=str(storage_location or ""),
                     view_text=table.view_definition,
                 )
             )
@@ -1205,13 +1208,19 @@ def prepare_tables_for_migration(
     is_hiveserde = scenario == "hiveserde"
     random = make_random(5).lower()
     # create external and managed tables to be migrated
-    if is_hiveserde:
+    if scenario == "hiveserde":
         schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
         table_base_dir = make_storage_dir(
             path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
         )
         tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
-    else:
+    elif scenario == "regularmanaged":
+        schema_name = f"managed_{random}"
+        #schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{schema_name}"
+        schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
+        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+    elif scenario == "regular":
         schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
         tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
 

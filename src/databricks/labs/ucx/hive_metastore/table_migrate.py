@@ -74,6 +74,7 @@ class TablesMigrator:
         managed_table_external_storage: str = "CLONE",
     ):
         if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
+            logger.info("initializing spark")
             self._spark = self._spark_session
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
@@ -130,9 +131,11 @@ class TablesMigrator:
     @cached_property
     def _spark_session(self):
         # pylint: disable-next=import-error,import-outside-toplevel
+        #from databricks.connect import DatabricksSession
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         return SparkSession.builder.getOrCreate()
+        #return DatabricksSession.builder.profile("labs-azure-ucws-july").getOrCreate()
 
     def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
         if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
@@ -153,6 +156,7 @@ class TablesMigrator:
         managed_table_external_storage: str,
         hiveserde_in_place_migrate: bool = False,
     ):
+        logger.info(managed_table_external_storage)
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
