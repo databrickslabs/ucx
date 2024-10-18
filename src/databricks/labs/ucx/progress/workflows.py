@@ -99,7 +99,9 @@ class MigrationProgress(Workflow):
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        ctx.pipelines_crawler.snapshot(force_refresh=True)
+        history_log = ctx.historical_pipelines_log
+        pipelines_snapshot = ctx.pipelines_crawler.snapshot(force_refresh=True)
+        history_log.append_inventory_snapshot(pipelines_snapshot)
 
     @job_task
     def crawl_cluster_policies(self, ctx: RuntimeContext) -> None:
