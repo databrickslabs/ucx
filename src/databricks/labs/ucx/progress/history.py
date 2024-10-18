@@ -3,7 +3,7 @@ import dataclasses
 import datetime as dt
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import ClassVar, Protocol, TypeVar, Generic, Any, get_type_hints
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -194,7 +194,7 @@ class HistoryLog(Generic[Record]):
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    def append_inventory_snapshot(self, snapshot: Sequence[Record]) -> None:
+    def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
         history_records = [self._encoder.to_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
         # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
