@@ -255,3 +255,10 @@ class LegacyQueryOwnership(Ownership[str]):
             return None
         except InternalError:  # redash is very naughty and throws 500s instead of proper 404s
             return None
+
+
+class WorkspaceObjectOwnership(Ownership[tuple[str, str]]):
+
+    def _maybe_direct_owner(self, record: tuple[str, str]) -> str | None:
+        # TODO: tuple[0] = object_type, tuple[1] = object_id
+        return None
