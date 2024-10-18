@@ -79,3 +79,37 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     assert step3
     assert step3.step_number < step2.step_number
 
+
+class _DependencyGraph(DependencyGraph):
+
+    def add_dependency(self, graph: DependencyGraph):
+        self._dependencies[graph.dependency] = graph
+
+
+class _MigrationSequencer(MigrationSequencer):
+
+    def visit_graph(self, graph: DependencyGraph):
+        graph.visit(self._visit_dependency, None)
+
+
+def test_sequencer_supports_cyclic_dependencies(ws, simple_dependency_resolver, mock_path_lookup):
+    root = Dependency(FileLoader(), Path("root.py"))
+    root_graph = _DependencyGraph(root, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    child_a = Dependency(FileLoader(), Path("a.py"))
+    child_graph_a = _DependencyGraph(child_a, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    child_b = Dependency(FileLoader(), Path("b.py"))
+    child_graph_b = _DependencyGraph(child_b, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    # root imports a and b
+    root_graph.add_dependency(child_graph_a)
+    root_graph.add_dependency(child_graph_b)
+    # a imports b
+    child_graph_a.add_dependency(child_graph_b)
+    # b imports a (using local import)
+    child_graph_b.add_dependency(child_graph_a)
+    sequencer = _MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
+    sequencer.register_dependency(None, root.lineage[-1].object_type, root.lineage[-1].object_id)
+    sequencer.visit_graph(root_graph)
+    steps = list(sequencer.generate_steps())
+    assert len(steps) == 3
+    assert steps[2].object_id == "root.py"
+

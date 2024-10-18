@@ -181,20 +181,31 @@ class MigrationSequencer:
         return cluster_node
 
     def generate_steps(self) -> Iterable[MigrationStep]:
-        # algo adapted from Kahn topological sort. The main differences is that
-        # we want the same step number for all nodes with same dependency depth
-        # so instead of pushing to a queue, we rebuild it once all leaf nodes are processed
-        # (these are transient leaf nodes i.e. they only become leaf during processing)
+        """ The below algo is adapted from Kahn's topological sort.
+        The main differences are as follows:
+        1) we want the same step number for all nodes with same dependency depth
+            so instead of pushing 'leaf' nodes to a queue, we fetch them again once all current 'leaf' nodes are processed
+            (these are transient 'leaf' nodes i.e. they only become 'leaf' during processing)
+        2) Kahn only supports DAGs but python code allows cyclic dependencies i.e. A -> B -> C -> A is not a DAG
+            so when fetching 'leaf' nodes, we relax the 0-incoming-vertex rule in order
+            to avoid an infinite loop. We also avoid side effects (such as negative counts).
+            This algo works correctly for simple cases, but is not tested on large trees.
+         """
         incoming_counts = self._populate_incoming_counts()
         step_number = 1
         sorted_steps: list[MigrationStep] = []
         while len(incoming_counts) > 0:
-            leaf_keys = list(self._get_leaf_keys(incoming_counts))
+            leaf_keys = self._get_leaf_keys(incoming_counts)
             for leaf_key in leaf_keys:
                 del incoming_counts[leaf_key]
                 sorted_steps.append(self._nodes[leaf_key].as_step(step_number, list(self._required_step_ids(leaf_key))))
                 for dependency_key in self._outgoing[leaf_key]:
-                    incoming_counts[dependency_key] -= 1
+                    # prevent re-instantiation of already deleted keys
+                    if dependency_key not in incoming_counts:
+                        continue
+                    # prevent negative count with cyclic dependencies
+                    if incoming_counts[dependency_key] > 0:
+                        incoming_counts[dependency_key] -= 1
             step_number += 1
         return sorted_steps
 
@@ -208,9 +219,20 @@ class MigrationSequencer:
             result[node_key] = len(self._incoming[node_key])
         return result
 
-    @staticmethod
-    def _get_leaf_keys(incoming_counts: dict[tuple[str, str], int]) -> Iterable[tuple[str, str]]:
+    @classmethod
+    def _get_leaf_keys(cls, incoming_counts: dict[tuple[str, str], int]) -> Iterable[tuple[str, str]]:
+        count = 0
+        leaf_keys = list(cls._yield_leaf_keys(incoming_counts, count))
+        # if we're not finding nodes with 0 incoming counts, it's likely caused by cyclic dependencies
+        # in which case it's safe to process nodes with a higher incoming count
+        while not leaf_keys:
+            count += 1
+            leaf_keys = list(cls._yield_leaf_keys(incoming_counts, count))
+        return leaf_keys
+
+    @classmethod
+    def _yield_leaf_keys(cls, incoming_counts: dict[tuple[str, str], int], level: int) -> Iterable[tuple[str, str]]:
         for node_key, incoming_count in incoming_counts.items():
-            if incoming_count > 0:
+            if incoming_count > level:
                 continue
             yield node_key
