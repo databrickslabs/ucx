@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import re
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -398,13 +399,33 @@ def test_historical_encoder_unserializable_values(ownership, field_name, record:
 
 
 @pytest.mark.parametrize("failures", (["failures-1", "failures-2"], []))
-def test_historical_encoder_failures(ownership, failures: list[str]) -> None:
-    """Verify an encoder places failures on the top-level field instead of within the object data."""
+def test_historical_encoder_failures_list(ownership, failures: list[str]) -> None:
+    """Verify an encoder places a failures list on the top-level field instead of within the object data."""
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_TestRecord)
 
     historical = encoder.to_historical(_TestRecord(a_field="foo", b_field=10, failures=list(failures)))
 
     assert historical.failures == failures
+    assert "failures" not in historical.data
+
+
+@pytest.mark.parametrize("failures", ('["failures-1", "failures-2"]', '[]', ''))
+def test_historical_encoder_json_encoded_failures_list(ownership, failures: str) -> None:
+    """Verify an encoder places a pre-encoded JSON list of failures on the top-level field instead of within the object data."""
+
+    @dataclass
+    class _FailuresEncodedJson:
+        failures: str
+        an_id: str = "the_id"
+
+        __id_attributes__: ClassVar = ("an_id",)
+
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_FailuresEncodedJson)
+
+    historical = encoder.to_historical(_FailuresEncodedJson(failures=failures))
+
+    expected_failures = json.loads(failures) if failures else []
+    assert historical.failures == expected_failures
     assert "failures" not in historical.data
 
 
