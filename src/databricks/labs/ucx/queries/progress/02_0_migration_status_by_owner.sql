@@ -7,7 +7,9 @@ WITH migration_statuses AS (
 
 SELECT
     owner,
-    100 * COUNT(*) / SUM(COUNT_IF(SIZE(failures) = 0)) OVER (partition by owner) AS percentage,
-    COUNT(*) AS total
+    100 * COUNT_IF(SIZE(failures) = 0) / SUM(COUNT(*)) OVER (partition by owner) AS percentage,
+    COUNT(*) AS total,
+    COUNT_IF(SIZE(failures) = 0) AS total_migrated,
+    COUNT_IF(SIZE(failures) > 0) AS total_to_be_migrated
 FROM migration_statuses
 GROUP BY owner
