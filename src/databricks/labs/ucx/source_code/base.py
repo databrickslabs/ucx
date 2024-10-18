@@ -249,6 +249,10 @@ class UsedTable(SourceInfo):
     is_read: bool = True
     is_write: bool = False
 
+    @property
+    def fullname(self) -> str:
+        return f"{self.catalog_name}.{self.schema_name}.{self.table_name}"
+
 
 class TableCollector(ABC):
 

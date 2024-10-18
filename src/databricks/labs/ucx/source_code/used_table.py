@@ -52,3 +52,10 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
     def _crawl(self) -> Iterable[UsedTable]:
         return []
         # TODO raise NotImplementedError() once CrawlerBase supports empty snapshots
+
+    def for_lineage(self, object_type: str, object_id: str):
+        sql = f"SELECT * FROM ( \
+            SELECT *, explode(source_lineage) as lineage FROM {escape_sql_identifier(self.full_name)} \
+            ) where lineage.object_type = '{object_type}' and lineage.object_id = '{object_id}'"
+        for row in self._backend.fetch(sql):
+            yield self._klass.from_dict(row.as_dict())

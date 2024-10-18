@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import create_autospec
 
 from pathlib import Path
@@ -10,10 +11,11 @@ from databricks.sdk.service.jobs import NotebookTask
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
 from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, UsedTable, LineageAtom
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 def admin_locator(ws, user_name: str):
@@ -31,7 +33,9 @@ def test_sequencer_builds_cluster_and_children_from_task(ws, simple_dependency_r
     ws.jobs.get.return_value = job
     dependency = WorkflowTask(ws, task, job)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    used_tables_crawler.assert_not_called()
+    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"), used_tables_crawler)
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
     step = steps[-1]
@@ -49,8 +53,11 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     mock_path_lookup.append_path(functional)
     mock_path_lookup = mock_path_lookup.change_directory(functional)
     notebook_path = Path("grand_parent_that_imports_parent_that_magic_runs_child.py")
-    notebook_task = NotebookTask(notebook_path=notebook_path.as_posix())
-    task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123", notebook_task=notebook_task)
+    task = jobs.Task(
+        task_key="test-task",
+        existing_cluster_id="cluster-123",
+        notebook_task=NotebookTask(notebook_path=notebook_path.as_posix()),
+    )
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
     ws.jobs.get.return_value = job
@@ -61,7 +68,9 @@ def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_reso
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     problems = container.build_dependency_graph(graph)
     assert not problems
-    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    used_tables_crawler.assert_not_called()
+    sequencer = MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"), used_tables_crawler)
     sequencer.register_workflow_task(task, job, graph)
     all_steps = list(sequencer.generate_steps())
     # ensure steps have a consistent step_number: TASK > grand-parent > parent > child
@@ -108,9 +117,42 @@ def test_sequencer_supports_cyclic_dependencies(ws, simple_dependency_resolver, 
     child_graph_a.add_dependency(child_graph_b)
     # b imports a (using local import)
     child_graph_b.add_dependency(child_graph_a)
-    sequencer = _MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"))
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    used_tables_crawler.assert_not_called()
+    sequencer = _MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"), used_tables_crawler)
     sequencer.register_dependency(None, root.lineage[-1].object_type, root.lineage[-1].object_id)
     sequencer.visit_graph(root_graph)
     steps = list(sequencer.generate_steps())
     assert len(steps) == 3
     assert steps[2].object_id == "root.py"
+
+
+def test_sequencer_builds_steps_from_used_tables(ws, simple_dependency_resolver, mock_path_lookup):
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    used_tables_crawler.for_lineage.side_effect = lambda object_type, object_id: (
+        []
+        if object_id != "/some-folder/some-notebook"
+        else [
+            UsedTable(
+                source_id="/some-folder/some-notebook",
+                source_timestamp=datetime.now(),
+                source_lineage=[LineageAtom(object_type="NOTEBOOK", object_id="/some-folder/some-notebook")],
+                catalog_name="my-catalog",
+                schema_name="my-schema",
+                table_name="my-table",
+                is_read=False,
+                is_write=False,
+            )
+        ]
+    )
+    sequencer = _MigrationSequencer(ws, mock_path_lookup, admin_locator(ws, "John Doe"), used_tables_crawler)
+    sequencer.register_dependency(None, object_type="FILE", object_id="/some-folder/some-file")
+    all_steps = list(sequencer.generate_steps())
+    assert len(all_steps) == 1
+    sequencer.register_dependency(None, object_type="NOTEBOOK", object_id="/some-folder/some-notebook")
+    all_steps = list(sequencer.generate_steps())
+    assert len(all_steps) == 3
+    step = next((step for step in all_steps if step.object_type == "TABLE"), None)
+    assert step
+    assert step.step_number == 1
+    assert step.object_id == "my-catalog.my-schema.my-table"
