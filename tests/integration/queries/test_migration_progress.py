@@ -51,20 +51,26 @@ def schema_populated(ws: WorkspaceClient, sql_backend, make_catalog, make_schema
     return schema
 
 
+@pytest.fixture()
+def dashboard_metadata(schema_populated: SchemaInfo) -> DashboardMetadata:
+    migration_progress_dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
+    dashboard_metadata = DashboardMetadata.from_path(migration_progress_dashboard_path).replace_database(
+        database=schema_populated.full_name, database_to_replace="inventory"
+    )
+    return dashboard_metadata
+
+
 def test_migration_progress_dashboard(
     ws: WorkspaceClient,
     is_in_debug,
     env_or_skip,
     make_directory,
+    dashboard_metadata,
     schema_populated: SchemaInfo,
 ) -> None:
     """Check the dashboard visually."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     directory = make_directory()
-    migration_progress_dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
-    dashboard_metadata = DashboardMetadata.from_path(migration_progress_dashboard_path).replace_database(
-        database=schema_populated.full_name, database_to_replace="inventory"
-    )
     dashboard = Dashboards(ws).create_dashboard(
         dashboard_metadata,
         parent_path=str(directory),
