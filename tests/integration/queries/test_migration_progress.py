@@ -5,6 +5,7 @@ import pytest
 from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk import WorkspaceClient
 from databricks.labs.blueprint.wheels import find_project_root
+from databricks.labs.lsql.backends import SqlBackend, Row
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 
 from databricks.labs.ucx.progress.install import Historical
@@ -22,7 +23,7 @@ def tables() -> list[Table]:
 
 
 @pytest.fixture
-def schema_populated(ws: WorkspaceClient, sql_backend, make_catalog, make_schema, tables) -> SchemaInfo:
+def schema_populated(ws: WorkspaceClient, sql_backend: SqlBackend, make_catalog, make_schema, tables) -> SchemaInfo:
     # Different to the other dashboards, the migration process dashboard uses data from a UC catalog,
     # not from the Hive metastore
     catalog = make_catalog()
@@ -57,6 +58,7 @@ def dashboard_metadata(schema_populated: SchemaInfo) -> DashboardMetadata:
     dashboard_metadata = DashboardMetadata.from_path(migration_progress_dashboard_path).replace_database(
         database=schema_populated.full_name, database_to_replace="inventory"
     )
+    dashboard_metadata.validate()
     return dashboard_metadata
 
 
@@ -79,3 +81,13 @@ def test_migration_progress_dashboard(
     dashboard_url = f"{ws.config.host}/sql/dashboardsv3/{dashboard.dashboard_id}"
     webbrowser.open(dashboard_url)
     assert True, "Dashboard deployment successful"
+
+
+def test_percentage_migration_readiness(dashboard_metadata: DashboardMetadata, sql_backend: SqlBackend) -> None:
+    query_name = "01_0_percentage_migration_readiness"
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == [
+        Row(percentage=100.0)
+    ]
