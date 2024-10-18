@@ -15,32 +15,33 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 
 @pytest.fixture
 def tables():
-    tables_without_id = [
-        Table("hive_metastore", "schema1", "table1", "MANAGED", "delta"),
-        Table("hive_metastore", "schema1", "table2", "MANAGED", "delta", location="s3://test_location/test1/table1"),
-        Table("hive_metastore", "schema2", "table1", "EXTERNAL", "delta", location="s3://test_location/test2/table2"),
-        Table("hive_metastore", "schema2", "table2", "EXTERNAL", "delta", location="dbfs:/mnt/foo/test3/table3"),
+    tables_ = [
+        Table("hive_metastore", schema, table, "MANAGED", "delta")
+        for schema in ("schema1", "schema2")
+        for table in ("table1", "table2", "table3", "table4", "table5")
     ]
-    return [("tables", [table.catalog, table.database, table.name], table, []) for table in tables_without_id]
+    return [("tables", [table.catalog, table.database, table.name], table, [], "Cor") for table in tables_]
 
 
 @pytest.fixture
 def table_migration_statuses(tables):
     statuses = []
-    for _, id_, table, _ in tables:
+    for _, id_, table, _, owner in tables:
         table_migration_status = TableMigrationStatus(table.catalog, table.database, table.name)
         failures = ["not migrated"]
+        owner = "Andrew" if table.name == "table1" else "Cor"
         if table.database == "schema1":  # Simulate one schema being migrated
             table_migration_status.dst_catalog = "catalog1"
             table_migration_status.dst_schema = table.database
             table_migration_status.dst_table = table.name
             failures = []
-        statuses.append(("migration_status", id_, table_migration_status, failures))
+        statuses.append(("migration_status", id_, table_migration_status, failures, owner))
     return statuses
 
 
 @pytest.fixture
 def schema_populated(
+    ws: WorkspaceClient,
     sql_backend: SqlBackend,
     make_catalog,
     make_schema,
@@ -51,16 +52,16 @@ def schema_populated(
     # not from the Hive metastore
     catalog = make_catalog()
     schema = make_schema(catalog_name=catalog.name)
-    workspace_id = 1
+    workspace_id = ws.get_workspace_id()
     historicals = []
-    for table_name, id_, instance, failures in tables + table_migration_statuses:
+    for table_name, id_, instance, failures, owner in tables + table_migration_statuses:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
             field.name: str(getattr(instance, field.name))
             for field in dataclasses.fields(instance)
             if getattr(instance, field.name) is not None
         }
-        historical = Historical(workspace_id, 1, table_name, id_, data, failures, "Cor")
+        historical = Historical(workspace_id, 1, table_name, id_, data, failures, owner)
         historicals.append(historical)
     sql_backend.save_table(f"{schema.full_name}.historical", historicals, Historical, mode="overwrite")
     return schema
@@ -103,11 +104,14 @@ def test_migration_progress_dashboard(
         ("01_0_percentage_migration_readiness", [Row(percentage=75.0)]),
         (
             "02_0_migration_status_by_owner_bar_graph",
-            [Row(owner="Cor", count=2)],
+            [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
         ),
         (
             "02_1_migration_status_by_owner_overview",
-            [Row(owner="Cor", percentage=50.0, total=4, total_migrated=2, total_not_migrated=2)],
+            [
+                Row(owner="Andrew", percentage=50.0, total=2, total_migrated=1, total_not_migrated=1),
+                Row(owner="Cor", percentage=50.0, total=8, total_migrated=4, total_not_migrated=4)
+            ],
         ),
     ],
 )
