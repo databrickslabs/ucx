@@ -200,6 +200,7 @@ class WorkspaceContext(CliContext):
             self.workspace_client,
             self.external_locations,
             self.workspace_info,
+            self.catalog_schema,
             self.config.enable_hms_federation,
         )
 
