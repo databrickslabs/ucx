@@ -27,14 +27,24 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
             TablesCrawler,
             RuntimeContext.historical_tables_log,
         ),
-        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, UdfsCrawler, RuntimeContext.historical_udfs_log),
+        (
+            MigrationProgress.crawl_udfs,
+            RuntimeContext.udfs_crawler,
+            UdfsCrawler,
+            RuntimeContext.historical_udfs_log,
+        ),
         (
             MigrationProgress.crawl_grants,
             RuntimeContext.grants_crawler,
             GrantsCrawler,
             RuntimeContext.historical_grants_log,
         ),
-        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, JobsCrawler, RuntimeContext.historical_jobs_log),
+        (
+            MigrationProgress.assess_jobs,
+            RuntimeContext.jobs_crawler,
+            JobsCrawler,
+            RuntimeContext.historical_jobs_log,
+        ),
         (
             MigrationProgress.assess_clusters,
             RuntimeContext.clusters_crawler,
