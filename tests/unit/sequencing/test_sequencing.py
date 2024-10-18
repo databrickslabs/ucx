@@ -96,9 +96,13 @@ def test_sequencer_supports_cyclic_dependencies(ws, simple_dependency_resolver, 
     root = Dependency(FileLoader(), Path("root.py"))
     root_graph = _DependencyGraph(root, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     child_a = Dependency(FileLoader(), Path("a.py"))
-    child_graph_a = _DependencyGraph(child_a, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    child_graph_a = _DependencyGraph(
+        child_a, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState()
+    )
     child_b = Dependency(FileLoader(), Path("b.py"))
-    child_graph_b = _DependencyGraph(child_b, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    child_graph_b = _DependencyGraph(
+        child_b, root_graph, simple_dependency_resolver, mock_path_lookup, CurrentSessionState()
+    )
     # root imports a and b
     root_graph.add_dependency(child_graph_a)
     root_graph.add_dependency(child_graph_b)
@@ -112,4 +116,3 @@ def test_sequencer_supports_cyclic_dependencies(ws, simple_dependency_resolver, 
     steps = list(sequencer.generate_steps())
     assert len(steps) == 3
     assert steps[2].object_id == "root.py"
-
