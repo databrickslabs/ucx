@@ -160,10 +160,11 @@ class CatalogSchema:
             properties : (dict[str, str] | None), default None
                 The properties to pass to the catalog. If None, no properties are passed.
         """
-        if properties is None:
-            properties = {}
-        properties["authorized_paths"] = authorized_paths
-        self._create_catalog_validate(Catalog(catalog_name, connection_name), prompts, properties=properties)
+
+        options = {}
+        options["authorized_paths"] = authorized_paths
+        self._create_catalog_validate(Catalog(catalog_name, connection_name), prompts, options=options,
+                                      properties=properties)
 
     def create_all_catalogs_schemas(self, prompts: Prompts, *, properties: dict[str, str] | None = None) -> None:
         """Create all UC catalogs and schemas reference by the table mapping file.
@@ -207,6 +208,7 @@ class CatalogSchema:
         prompts: Prompts,
         *,
         properties: dict[str, str] | None,
+        options: dict[str, str] | None,
     ) -> Catalog:
         catalog_existing = self._get_catalog(catalog)
         if catalog_existing:
@@ -223,7 +225,8 @@ class CatalogSchema:
             attempts -= 1
             if attempts == 0:
                 raise NotFound(f"Failed to validate location for catalog: {catalog.name}")
-        return self._create_catalog(catalog, catalog_storage, properties=properties)
+        return self._create_catalog(catalog, catalog_storage, connection_name=catalog.connection_name,
+                                    properties=properties, options=options)
 
     def _validate_location(self, location: str) -> bool:
         if location == "metastore":
@@ -267,7 +270,9 @@ class CatalogSchema:
         catalog: Catalog,
         catalog_storage: str,
         *,
+        connection_name: str | None = None,
         properties: dict[str, str] | None,
+        options: dict[str, str] | None,
     ) -> Catalog:
         logger.info(f"Creating UC catalog: {catalog.name}")
         if catalog_storage == "metastore":
@@ -276,8 +281,10 @@ class CatalogSchema:
             self._ws.catalogs.create(
                 catalog.name,
                 storage_root=catalog_storage,
+                connection_name=connection_name,
                 comment="Created by UCX",
                 properties=properties,
+                options=options
             )
         catalog_created = self._get_catalog(catalog)
         if catalog_created is None:
