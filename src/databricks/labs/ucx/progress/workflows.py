@@ -54,9 +54,9 @@ class MigrationProgress(Workflow):
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        grants_log = ctx.historical_grants_log
+        history_log = ctx.historical_grants_log
         grants_snapshot = ctx.grants_crawler.snapshot(force_refresh=True)
-        grants_log.append_inventory_snapshot(grants_snapshot)
+        history_log.append_inventory_snapshot(grants_snapshot)
 
     @job_task
     def assess_jobs(self, ctx: RuntimeContext) -> None:
