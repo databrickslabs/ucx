@@ -6,31 +6,48 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import SchemaInfo
 from databricks.sdk.service.marketplace import Installation
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class PipelineRule:
+    workspace_name: str
     src_pipeline_id: str
     target_catalog_name: str
-    # target_schema_name: str | None
-    # target_pipeline_name: str | None
-
+    target_schema_name: str | None
+    target_pipeline_name: str | None
 
     @classmethod
-    def from_src_dst(cls, src_pipeline_id, target_catalog_name: str,
-                     # target_schema_name: str | None, target_pipeline_name:str | None
-                     ) -> "PipelineRule":
+    def from_src_dst(
+        cls,
+        workspace_name: str,
+        src_pipeline_id: str,
+        target_catalog_name: str,
+        target_schema_name: str | None,
+        target_pipeline_name: str | None,
+    ) -> "PipelineRule":
         return cls(
-            src_pipeline_id = src_pipeline_id,
+            workspace_name=workspace_name,
+            src_pipeline_id=src_pipeline_id,
             target_catalog_name=target_catalog_name,
-            # target_schema_name=target_schema_name,
-            # target_pipeline_name=target_pipeline_name,
+            target_schema_name=target_schema_name,
+            target_pipeline_name=target_pipeline_name,
         )
+
+    @classmethod
+    def initial(cls, workspace_name: str, catalog_name: str, pipeline: PipelineInfo) -> "PipelineRule":
+        return cls(
+            workspace_name=workspace_name,
+            target_catalog_name=catalog_name,
+            src_pipeline_id=pipeline.pipeline_id,
+            target_pipeline_name=pipeline.pipeline_name,
+            target_schema_name=None,
+        )
+
 
 @dataclass
 class PipelineToMigrate:
@@ -43,28 +60,27 @@ class PipelineToMigrate:
     def __eq__(self, other):
         return isinstance(other, PipelineToMigrate) and self.src == other.src
 
+
 class PipelineMapping:
     FILENAME = "pipeline_mapping.csv"
 
-    def __init__(self,
-                 installation: Installation,
-                 ws: WorkspaceClient,
-                 sql_backend: SqlBackend,
-                 ):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+    ):
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
 
-    def current_pipelines(self,
-                          pipelines: PipelinesCrawler,
-                          workspace_name: str,
-                          catalog_name: str):
+    def current_pipelines(self, pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str):
         pipeline_snapshot = list(pipelines.snapshot())
         if not pipeline_snapshot:
             msg = "No pipelines found."
             raise ValueError(msg)
-        for pipelines in pipeline_snapshot:
-            yield PipelineRule.initial()
+        for pipeline in pipeline_snapshot:
+            yield PipelineRule.initial(workspace_name, catalog_name, pipeline)
 
         return self._pc.snapshot()
 
@@ -89,11 +105,9 @@ class PipelineMapping:
 
         return pipelines_to_migrate
 
+
 class PipelinesMigrator:
-    def __init__(self,
-                 ws: WorkspaceClient,
-                 pipeline_crawler: PipelinesCrawler,
-                 pipeline_mapping: PipelineMapping):
+    def __init__(self, ws: WorkspaceClient, pipeline_crawler: PipelinesCrawler, pipeline_mapping: PipelineMapping):
         self._ws = ws
         self._pc = pipeline_crawler
         self._pm = pipeline_mapping
@@ -113,7 +127,7 @@ class PipelinesMigrator:
             tasks.append(partial(self._migrate_pipeline, pipeline))
         Threads.strict("migrate pipelines", tasks)
         if not tasks:
-            logger.info(f"No pipelines found to migrate")
+            logger.info("No pipelines found to migrate")
         return tasks
 
     def _migrate_pipeline(self, pipeline: PipelineToMigrate):
@@ -125,13 +139,18 @@ class PipelinesMigrator:
 
     def _clone_pipeline(self, pipeline: PipelineToMigrate):
         # TODO: implement this in sdk
-        headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
-        body = {'catalog': pipeline.rule.target_catalog_name, 'clone_mode': 'MIGRATE_TO_UC', 'configuration': {
-            'pipelines.migration.ignoreExplicitPath': 'true'
-        }}
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+        body = {
+            'catalog': pipeline.rule.target_catalog_name,
+            'clone_mode': 'MIGRATE_TO_UC',
+            'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
+        }
         # if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
         # if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
-        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers)
+        res = self._ws.api_client.do(
+            'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
+        )
         return res
-
-
