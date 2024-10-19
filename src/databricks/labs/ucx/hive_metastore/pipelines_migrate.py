@@ -126,14 +126,11 @@ class PipelinesMigrator:
     def _clone_pipeline(self, pipeline: PipelineToMigrate):
         # TODO: implement this in sdk
         headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
-        body = {}
-        body['catalog'] = pipeline.rule.target_catalog_name
+        body = {'catalog': pipeline.rule.target_catalog_name, 'clone_mode': 'MIGRATE_TO_UC', 'configuration': {
+            'pipelines.migration.ignoreExplicitPath': 'true'
+        }}
         # if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
         # if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
-        body['clone_mode'] = 'MIGRATE_TO_UC'
-        body['configuration'] = {
-            'pipelines.migration.ignoreExplicitPath': 'true'
-        }
         res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers)
         return res
 
