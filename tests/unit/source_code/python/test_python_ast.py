@@ -1,12 +1,14 @@
 import pytest
-from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+from astroid import Assign, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_extracts_root() -> None:
-    tree = Tree.parse("o.m1().m2().m3()")
+    maybe_tree = Tree.maybe_parse("o.m1().m2().m3()")
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     stmt = tree.first_statement()
     root = Tree(stmt).root
     assert root == tree.node
@@ -14,12 +16,13 @@ def test_extracts_root() -> None:
 
 
 def test_no_first_statement() -> None:
-    tree = Tree.parse("")
-    assert not tree.first_statement()
+    maybe_tree = Tree.maybe_parse("")
+    assert maybe_tree.tree is not None
+    assert maybe_tree.tree.first_statement() is None
 
 
 def test_extract_call_by_name() -> None:
-    tree = Tree.parse("o.m1().m2().m3()")
+    tree = Tree.maybe_parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -30,7 +33,7 @@ def test_extract_call_by_name() -> None:
 
 
 def test_extract_call_by_name_none() -> None:
-    tree = Tree.parse("o.m1().m2().m3()")
+    tree = Tree.maybe_parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -56,7 +59,7 @@ def test_extract_call_by_name_none() -> None:
     ],
 )
 def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
-    tree = Tree.parse(code)
+    tree = Tree.maybe_parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -81,7 +84,7 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
     ],
 )
 def test_args_count(code, expected) -> None:
-    tree = Tree.parse(code)
+    tree = Tree.maybe_parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -92,7 +95,7 @@ def test_args_count(code, expected) -> None:
 def test_tree_walks_nodes_once() -> None:
     nodes = set()
     count = 0
-    tree = Tree.parse("o.m1().m2().m3()")
+    tree = Tree.maybe_parse("o.m1().m2().m3()")
     for node in tree.walk():
         nodes.add(node)
         count += 1
@@ -119,10 +122,10 @@ def test_parses_incorrectly_indented_code() -> None:
   )
 """
     # ensure it would fail if not normalized
-    with pytest.raises(AstroidSyntaxError):
-        Tree.parse(source)
-    Tree.normalize_and_parse(source)
-    assert True
+    maybe_tree = Tree.maybe_parse(source)
+    assert maybe_tree.failure is not None
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.failure is None
 
 
 def test_ignores_magic_marker_in_multiline_comment() -> None:
@@ -132,15 +135,19 @@ name="name"
 version="version"
 formatted=message_unformatted % (name, version)
 """
-    Tree.normalize_and_parse(source)
+    Tree.maybe_normalized_parse(source)
     assert True
 
 
 def test_appends_statements() -> None:
     source_1 = "a = 'John'"
-    tree_1 = Tree.normalize_and_parse(source_1)
+    maybe_tree_1 = Tree.maybe_normalized_parse(source_1)
+    assert maybe_tree_1.tree is not None, maybe_tree_1.failure
+    tree_1 = maybe_tree_1.tree
     source_2 = 'b = f"Hello {a}!"'
-    tree_2 = Tree.normalize_and_parse(source_2)
+    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
+    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
+    tree_2 = maybe_tree_2.tree
     tree_3 = tree_1.append_tree(tree_2)
     nodes = tree_3.locate(Assign, [])
     tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
@@ -154,7 +161,9 @@ def test_is_from_module() -> None:
 df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     save_call = tree.locate(
         Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)]
     )[0]
@@ -163,7 +172,9 @@ df.write.format("delta").saveAsTable("old.things")
 
 @pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
 def test_is_instance_of(source, name, class_name) -> None:
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     assert isinstance(tree.node, Module)
     module = tree.node
     var = module.globals.get(name, None)
@@ -181,11 +192,18 @@ def test_supports_recursive_refs_when_checking_module() -> None:
     source_3 = """
     df = df.withColumn(stuff2)
     """
-    main_tree = Tree.normalize_and_parse(source_1)
-    main_tree.append_tree(Tree.normalize_and_parse(source_2))
-    tree = Tree.normalize_and_parse(source_3)
-    main_tree.append_tree(tree)
-    assign = tree.locate(Assign, [])[0]
+    maybe_tree = Tree.maybe_normalized_parse(source_1)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    main_tree = maybe_tree.tree
+    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
+    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
+    tree_2 = maybe_tree_2.tree
+    main_tree.append_tree(tree_2)
+    maybe_tree_3 = Tree.maybe_normalized_parse(source_3)
+    assert maybe_tree_3.tree is not None, maybe_tree_3.failure
+    tree_3 = maybe_tree_3.tree
+    main_tree.append_tree(tree_3)
+    assign = tree_3.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
 
 
@@ -193,7 +211,9 @@ def test_renumbers_positively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     assert len(nodes) == 2
     assert nodes[0].lineno == 1
@@ -209,7 +229,9 @@ def test_renumbers_negatively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     assert len(nodes) == 2
     assert nodes[0].lineno == 1
@@ -231,7 +253,9 @@ df.write.format("delta").saveAsTable("old.things")
     ],
 )
 def test_counts_lines(source: str, line_count: int) -> None:
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     assert tree.line_count() == line_count
 
 
@@ -251,7 +275,9 @@ x = stuff()""",
     ],
 )
 def test_is_builtin(source, name, is_builtin) -> None:
-    tree = Tree.normalize_and_parse(source)
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     for node in nodes:
         if isinstance(node, Assign):

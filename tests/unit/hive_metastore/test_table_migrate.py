@@ -1,6 +1,7 @@
 import datetime
 import logging
 import sys
+from collections.abc import Generator
 from itertools import cycle
 from unittest.mock import create_autospec
 
@@ -11,6 +12,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -908,14 +910,36 @@ def test_is_upgraded(ws, mock_pyspark):
     external_locations.resolve_mount.assert_not_called()
 
 
-def test_table_status():
-    class FakeDate(datetime.datetime):
+@pytest.fixture
+def datetime_with_epoch_timestamp(monkeypatch) -> Generator[None, None, None]:
+    # The timestamp() method on datetime() is immutable, so we can't just patch/mock it. Rather we need to substitute
+    # the entire class, which the normal mocking/patching routines don't seem to support.
+    # Note: this will not affect any modules that have already initialized and imported the class directly. Similarly,
+    # the effect cannot be unwound if this test triggers initializing of modules that import the class directly instead
+    # of the module.
+    # If you find yourself here debugging an issue, please be aware that the following can be problematic:
+    # >>> from datetime import datetime
+    # (Why? It's reference to the class directly, and having the name of the module makes inspection tedious.)
+    # Prefer instead:
+    # >>> import datetime
+    # Or even better:
+    # >>> import datetime as dt
+
+    class FakeDateTime(datetime.datetime):
 
         def timestamp(self):
             return 0
 
-    datetime.datetime = FakeDate
-    errors = {}
+    _original_datetime = datetime.datetime
+    try:
+        datetime.datetime = FakeDateTime  # type: ignore[misc]
+        yield
+    finally:
+        datetime.datetime = _original_datetime  # type: ignore[misc]
+
+
+def test_table_status(datetime_with_epoch_timestamp) -> None:
+    errors: dict[str, str] = {}
     rows = {
         "SHOW TBLPROPERTIES `schema1`.`table1`": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]
     }
@@ -1080,10 +1104,11 @@ def test_table_status_seen_tables(caplog):
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
 
 
-def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark):
+def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark) -> None:
     # all grants succeed except for one
     table_crawler = create_autospec(TablesCrawler)
     src = Table('hive_metastore', 'db1_src', 'managed_dbfs', 'TABLE', 'DELTA', "/foo/bar/test")
+    dst = Table('ucx_default', 'db1_dst', 'managed_dbfs', 'MANAGED', 'DELTA')
     table_crawler.snapshot.return_value = [src]
     table_mapping = mock_table_mapping(["managed_dbfs"])
     migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
@@ -1107,7 +1132,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog, mock_pyspark):
 
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
-    migrate_grants.apply.assert_called_with(src, 'ucx_default.db1_dst.managed_dbfs')
+    migrate_grants.apply.assert_called_with(src, dst)
     external_locations.resolve_mount.assert_not_called()
     assert sql_backend.queries == [
         'CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE `hive_metastore`.`db1_src`.`managed_dbfs`;',
@@ -1512,3 +1537,60 @@ def test_table_migration_status_source_table_unknown() -> None:
 
     assert owner == "an_admin"
     table_ownership.owner_of.assert_not_called()
+
+
+class MockBackendWithGeneralException(MockBackend):
+    """Mock backend that allows raising a general exception.
+
+    Note: we want to raise a Spark AnalysisException, for which we do not have the dependency to raise explicitly.
+    """
+
+    @staticmethod
+    def _api_error_from_message(error_message: str):  # No return type to avoid mypy complains on different return type
+        return Exception(error_message)
+
+
+def test_migrate_tables_handles_table_with_empty_column(caplog) -> None:
+    table_crawler = create_autospec(TablesCrawler)
+    table = Table("hive_metastore", "schema", "table", "MANAGED", "DELTA")
+
+    error_message = (
+        "INVALID_PARAMETER_VALUE: Invalid input: RPC CreateTable Field managedcatalog.ColumnInfo.name: "
+        'At columns.21: name "" is not a valid name`'
+    )
+    query = f"ALTER TABLE {escape_sql_identifier(table.full_name)} SET TBLPROPERTIES ('upgraded_to' = 'catalog.schema.table');"
+    backend = MockBackendWithGeneralException(fails_on_first={query: error_message})
+
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = 123456789
+
+    table_mapping = create_autospec(TableMapping)
+    rule = Rule("workspace", "catalog", "schema", "schema", "table", "table")
+    table_to_migrate = TableToMigrate(table, rule)
+    table_mapping.get_tables_to_migrate.return_value = [table_to_migrate]
+
+    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
+    migration_status_refresher.get_seen_tables.return_value = {}
+    migration_status_refresher.index.return_value = []
+
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrator = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+
+    with caplog.at_level(logging.WARN, logger="databricks.labs.ucx.hive_metastore"):
+        table_migrator.migrate_tables(table.what)
+    assert "failed-to-migrate: Table with empty column name 'hive_metastore.schema.table'" in caplog.messages
+
+    table_crawler.snapshot.assert_not_called()  # Mocking table mapping instead
+    ws.get_workspace_id.assert_not_called()  # Errors before getting here
+    migration_status_refresher.index.assert_not_called()  # Only called when migrating view
+    migrate_grants.apply.assert_not_called()  # Errors before getting here
+    external_locations.resolve_mount.assert_not_called()  # Only called when migrating external table

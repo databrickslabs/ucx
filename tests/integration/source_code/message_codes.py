@@ -11,7 +11,10 @@ def main():
     product_info = ProductInfo.from_class(Advice)
     source_code = product_info.version_file().parent
     for file in source_code.glob("**/*.py"):
-        tree = Tree.parse(file.read_text())
+        maybe_tree = Tree.maybe_parse(file.read_text())
+        if not maybe_tree.tree:
+            continue
+        tree = maybe_tree.tree
         # recursively detect values of "code" kwarg in calls
         for node in tree.walk():
             if not isinstance(node, astroid.Call):

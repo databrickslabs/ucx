@@ -60,11 +60,12 @@ class PythonCodeAnalyzer:
         return problems
 
     def build_inherited_context(self, child_path: Path) -> InheritedContext:
-        try:
-            tree, nodes, _ = self._parse_and_extract_nodes()
-        except AstroidSyntaxError:
-            logger.debug(f"Could not parse Python code: {self._python_code}", exc_info=True)
+        tree, nodes, problems = self._parse_and_extract_nodes()
+        if problems:
+            # TODO: bubble up problems via InheritedContext
+            logger.warning(f"Failed to parse: {problems}")
             return InheritedContext(None, False)
+        assert tree is not None, "no problems should yield a tree"
         if len(nodes) == 0:
             return InheritedContext(tree, False)
         context = InheritedContext(Tree.new_module(), False)
@@ -92,9 +93,13 @@ class PythonCodeAnalyzer:
             context.tree.append_globals(globs)
         return context
 
-    def _parse_and_extract_nodes(self) -> tuple[Tree, list[NodeBase], Iterable[DependencyProblem]]:
+    def _parse_and_extract_nodes(self) -> tuple[Tree | None, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
-        tree = Tree.normalize_and_parse(self._python_code)
+        maybe_tree = Tree.maybe_normalized_parse(self._python_code)
+        if maybe_tree.failure:
+            return None, [], [DependencyProblem(maybe_tree.failure.code, maybe_tree.failure.message)]
+        assert maybe_tree.tree is not None
+        tree = maybe_tree.tree
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
         run_calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
         import_sources: list[ImportSource]

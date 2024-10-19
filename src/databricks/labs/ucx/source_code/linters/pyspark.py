@@ -11,20 +11,24 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Deprecation,
     CurrentSessionState,
-    PythonLinter,
     SqlLinter,
     Fixer,
     UsedTable,
     UsedTableNode,
-    TablePyCollector,
     TableSqlCollector,
-    DfsaPyCollector,
     DfsaSqlCollector,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS, DirectFsAccessNode
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
-from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper, MatchingVisitor
+from databricks.labs.ucx.source_code.python.python_ast import (
+    Tree,
+    TreeHelper,
+    MatchingVisitor,
+    PythonLinter,
+    TablePyCollector,
+    DfsaPyCollector,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +412,12 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
     def apply(self, code: str) -> str:
-        tree = Tree.parse(code)
+        maybe_tree = Tree.maybe_parse(code)
+        if not maybe_tree.tree:
+            assert maybe_tree.failure is not None
+            logger.warning(maybe_tree.failure.message)
+            return code
+        tree = maybe_tree.tree
         # we won't be doing it like this in production, but for the sake of the example
         for node in tree.walk():
             matcher = self._find_matcher(node)
@@ -477,7 +486,12 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
             return code
-        tree = Tree.normalize_and_parse(code)
+        maybe_tree = Tree.maybe_normalized_parse(code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return code
+        assert maybe_tree.tree is not None
+        tree = maybe_tree.tree
         for _call_node, query in self._visit_call_nodes(tree):
             if not isinstance(query, Const) or not isinstance(query.value, str):
                 continue

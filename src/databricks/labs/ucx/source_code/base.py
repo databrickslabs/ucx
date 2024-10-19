@@ -12,15 +12,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO, TextIO
 
-from astroid import AstroidSyntaxError, NodeNG  # type: ignore
-from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
+from astroid import NodeNG  # type: ignore
+from sqlglot import Expression, parse as parse_sql
+from sqlglot.errors import SqlglotError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -137,12 +137,13 @@ class SqlLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
         try:
+            # TODO: unify with SqlParser.walk_expressions(...)
             expressions = parse_sql(code, read='databricks')
             for expression in expressions:
                 if not expression:
                     continue
                 yield from self.lint_expression(expression)
-        except SqlParseError as e:
+        except SqlglotError as e:
             logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
             yield self.sql_parse_failure(code)
 
@@ -160,16 +161,6 @@ class SqlLinter(Linter):
 
     @abstractmethod
     def lint_expression(self, expression: Expression) -> Iterable[Advice]: ...
-
-
-class PythonLinter(Linter):
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        tree = Tree.normalize_and_parse(code)
-        yield from self.lint_tree(tree)
-
-    @abstractmethod
-    def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
 class Fixer(ABC):
@@ -271,20 +262,6 @@ class UsedTableNode:
     node: NodeNG
 
 
-class TablePyCollector(TableCollector, ABC):
-
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        try:
-            tree = Tree.normalize_and_parse(source_code)
-            for table_node in self.collect_tables_from_tree(tree):
-                yield table_node.table
-        except AstroidSyntaxError as e:
-            logger.warning('syntax-error', exc_info=e)
-
-    @abstractmethod
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...
-
-
 class TableSqlCollector(TableCollector, ABC): ...
 
 
@@ -307,17 +284,6 @@ class DfsaCollector(ABC):
 
     @abstractmethod
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]: ...
-
-
-class DfsaPyCollector(DfsaCollector, ABC):
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        tree = Tree.normalize_and_parse(source_code)
-        for dfsa_node in self.collect_dfsas_from_tree(tree):
-            yield dfsa_node.dfsa
-
-    @abstractmethod
-    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
 
 
 class DfsaSqlCollector(DfsaCollector, ABC): ...
@@ -393,83 +359,6 @@ class SqlSequentialLinter(SqlLinter, DfsaCollector, TableCollector):
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         for collector in self._table_collectors:
             yield from collector.collect_tables(source_code)
-
-
-class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
-
-    def __init__(
-        self,
-        linters: list[PythonLinter],
-        dfsa_collectors: list[DfsaPyCollector],
-        table_collectors: list[TablePyCollector],
-    ):
-        self._linters = linters
-        self._dfsa_collectors = dfsa_collectors
-        self._table_collectors = table_collectors
-        self._tree: Tree | None = None
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            tree = self._parse_and_append(code)
-            yield from self.lint_tree(tree)
-        except AstroidSyntaxError as e:
-            yield Failure('syntax-error', str(e), 0, 0, 0, 0)
-
-    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-        for linter in self._linters:
-            yield from linter.lint_tree(tree)
-
-    def _parse_and_append(self, code: str) -> Tree:
-        tree = Tree.normalize_and_parse(code)
-        self.append_tree(tree)
-        return tree
-
-    def append_tree(self, tree: Tree) -> None:
-        self._make_tree().append_tree(tree)
-
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().append_nodes(nodes)
-
-    def append_globals(self, globs: dict) -> None:
-        self._make_tree().append_globals(globs)
-
-    def process_child_cell(self, code: str) -> None:
-        try:
-            this_tree = self._make_tree()
-            tree = Tree.normalize_and_parse(code)
-            this_tree.append_tree(tree)
-        except AstroidSyntaxError as e:
-            # error already reported when linting enclosing notebook
-            logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        try:
-            tree = self._parse_and_append(source_code)
-            for dfsa_node in self.collect_dfsas_from_tree(tree):
-                yield dfsa_node.dfsa
-        except AstroidSyntaxError as e:
-            logger.warning('syntax-error', exc_info=e)
-
-    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
-        for collector in self._dfsa_collectors:
-            yield from collector.collect_dfsas_from_tree(tree)
-
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        try:
-            tree = self._parse_and_append(source_code)
-            for table_node in self.collect_tables_from_tree(tree):
-                yield table_node.table
-        except AstroidSyntaxError as e:
-            logger.warning('syntax-error', exc_info=e)
-
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
-        for collector in self._table_collectors:
-            yield from collector.collect_tables_from_tree(tree)
-
-    def _make_tree(self) -> Tree:
-        if self._tree is None:
-            self._tree = Tree.new_module()
-        return self._tree
 
 
 SUPPORTED_EXTENSION_LANGUAGES = {

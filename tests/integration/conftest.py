@@ -1237,7 +1237,7 @@ def prepare_tables_for_migration(
 
 
 @pytest.fixture
-def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
+def prepared_principal_acl(runtime_ctx, make_mounted_location, make_catalog, make_schema):
     src_schema = make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name,
