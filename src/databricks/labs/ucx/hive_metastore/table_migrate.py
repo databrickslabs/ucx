@@ -72,6 +72,7 @@ class TablesMigrator:
         what: What,
         hiveserde_in_place_migrate: bool = False,
         managed_table_external_storage: str = "CLONE",
+        inventory_table: str | None = None,
     ):
         if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
             self._spark = self._spark_session
@@ -84,6 +85,7 @@ class TablesMigrator:
         return self._migrate_tables(
             what,
             managed_table_external_storage.upper(),
+            inventory_table,
             hiveserde_in_place_migrate,
         )
 
@@ -91,6 +93,7 @@ class TablesMigrator:
         self,
         what: What,
         managed_table_external_storage: str,
+        inventory_table: str | None = None,
         hiveserde_in_place_migrate: bool = False,
     ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
@@ -102,6 +105,7 @@ class TablesMigrator:
                     self._safe_migrate_table,
                     table,
                     managed_table_external_storage,
+                    inventory_table,
                     hiveserde_in_place_migrate,
                 )
             )
@@ -134,12 +138,17 @@ class TablesMigrator:
 
         return SparkSession.builder.getOrCreate()
 
-    def _migrate_managed_table(self, managed_table_external_storage: str, src_table: TableToMigrate):
+    def _migrate_managed_table(
+        self,
+        managed_table_external_storage: str,
+        src_table: TableToMigrate,
+        inventory_table: str | None = None,
+    ):
         if managed_table_external_storage == 'CONVERT_TO_EXTERNAL':
-            if self._convert_hms_table_to_external(src_table.src):
-                return self._migrate_external_table(
-                    src_table.src, src_table.rule
-                )  # _migrate_external_table remains unchanged
+            assert inventory_table is not None
+            return self._convert_hms_table_to_external(
+                src_table.src, inventory_table
+            )  # _migrate_external_table remains unchanged
         if managed_table_external_storage == 'SYNC_AS_EXTERNAL':
             return self._migrate_managed_as_external_table(src_table.src, src_table.rule)  # new method
         if managed_table_external_storage == 'CLONE':
@@ -151,13 +160,16 @@ class TablesMigrator:
         self,
         src_table: TableToMigrate,
         managed_table_external_storage: str,
+        inventory_table: str | None = None,
         hiveserde_in_place_migrate: bool = False,
     ) -> bool:
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
         try:
-            return self._migrate_table(src_table, managed_table_external_storage, hiveserde_in_place_migrate)
+            return self._migrate_table(
+                src_table, managed_table_external_storage, inventory_table, hiveserde_in_place_migrate
+            )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # Catching a Spark AnalysisException here, for which we do not have the dependency to catch explicitly
             pattern = (  # See https://github.com/databrickslabs/ucx/issues/2891
@@ -174,6 +186,7 @@ class TablesMigrator:
         self,
         src_table: TableToMigrate,
         managed_table_external_storage: str,
+        inventory_table: str | None = None,
         hiveserde_in_place_migrate: bool = False,
     ) -> bool:
         if src_table.src.what == What.DBFS_ROOT_DELTA:
@@ -181,7 +194,7 @@ class TablesMigrator:
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
             return self._migrate_table_create_ctas(src_table.src, src_table.rule)
         if src_table.src.is_managed:
-            return self._migrate_managed_table(managed_table_external_storage, src_table)
+            return self._migrate_managed_table(managed_table_external_storage, src_table, inventory_table)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule)
         if src_table.src.what == What.TABLE_IN_MOUNT:
@@ -261,9 +274,9 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
-    def _convert_hms_table_to_external(self, src_table: Table):
+    def _convert_hms_table_to_external(self, src_table: Table, inventory_table: str):
+        logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         try:
-            logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
             database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
@@ -290,11 +303,16 @@ class TablesMigrator:
                 old_table.viewOriginalText(),
             )
             self._catalog.alterTable(new_table)
+            self._update_table_status(src_table, inventory_table)
             logger.info(f"Converted {src_table.name} to External Table type.")
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
             return False
         return True
+
+    def _update_table_status(self, src_table: Table, inventory_table: str):
+        update_sql = f"update {escape_sql_identifier(inventory_table)} set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='{src_table.database}' and table='{src_table.name}';"
+        self._backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key

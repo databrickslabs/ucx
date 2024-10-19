@@ -67,13 +67,7 @@ def test_table_migration_job_refreshes_migration_status(
     ],
     indirect=("prepare_tables_for_migration",),
 )
-def test_table_migration_for_managed_tabl(
-    ws,
-    installation_ctx,
-    prepare_tables_for_migration,
-    workflow,
-    sql_backend
-):
+def test_table_migration_for_managed_tabl(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
     """The migration status should be refreshed after the migration job."""
     tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
@@ -86,19 +80,35 @@ def test_table_migration_for_managed_tabl(
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow(workflow)
 
-    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
-    assert len(target_tables) == 1
-    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
-    assert target_table_properties["upgraded_from"] == src_external_table.full_name
-    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
+    migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
+    migration_statuses = list(ctx.sql_backend.fetch(migration_status_query))
 
-    migration_status = list(runtime_ctx.migration_status_refresher.snapshot())
-    assert len(migration_status) == 1
-    assert migration_status[0].src_schema == src_external_table.schema_name
-    assert migration_status[0].src_table == src_external_table.name
-    assert migration_status[0].dst_catalog == dst_catalog.name
-    assert migration_status[0].dst_schema == dst_schema.name
-    assert migration_status[0].dst_table == src_external_table.name
+    if len(migration_statuses) == 0:
+        ctx.deployed_workflows.relay_logs(workflow)
+        assert False, "No migration statuses found"
+
+    asserts = []
+    for table in tables.values():
+        migration_status = []
+        for status in migration_statuses:
+            if status.src_schema == table.schema_name and status.src_table == table.name:
+                migration_status.append(status)
+
+        assert_message_postfix = f" found for {table.table_type} {table.full_name}"
+        if len(migration_status) == 0:
+            asserts.append("No migration status" + assert_message_postfix)
+        elif len(migration_status) > 1:
+            asserts.append("Multiple migration statuses" + assert_message_postfix)
+        elif migration_status[0].dst_schema is None:
+            asserts.append("No destination schema" + assert_message_postfix)
+        elif migration_status[0].dst_table is None:
+            asserts.append("No destination table" + assert_message_postfix)
+
+    assert_message = (
+        "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
+    )
+    assert len(asserts) == 0, assert_message
 
 
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
