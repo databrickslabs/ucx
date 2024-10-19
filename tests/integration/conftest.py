@@ -47,7 +47,7 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
