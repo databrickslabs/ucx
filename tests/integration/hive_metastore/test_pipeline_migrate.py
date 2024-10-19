@@ -24,9 +24,11 @@ _PIPELINE_CONF_WITH_SECRET = {
 def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
                           sql_backend, runtime_ctx):
 
-        created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
-        pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
-        pipelines = pipeline_crawler.snapshot()
+    target_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+
+    created_pipeline = make_pipeline(configuration=_PIPELINE_CONF, target=target_schema.name)
+    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    pipelines = pipeline_crawler.snapshot()
 
         results = []
         for pipeline in pipelines:
@@ -35,19 +37,19 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema,
             if pipeline.pipeline_id == created_pipeline.pipeline_id:
                 results.append(pipeline)
 
-        assert len(results) >= 1
-        assert results[0].pipeline_id == created_pipeline.pipeline_id
+    assert len(results) >= 1
+    assert results[0].pipeline_id == created_pipeline.pipeline_id
 
-        pipeline_rules = [
-            PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog")
-        ]
-        runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
-        pipeline_mapping = PipelineMapping(
-            runtime_ctx.installation,
-            ws,
-            sql_backend
-        )
+    pipeline_rules = [
+        PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog")
+    ]
+    runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
+    pipeline_mapping = PipelineMapping(
+        runtime_ctx.installation,
+        ws,
+        sql_backend
+    )
 
-        pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler, pipeline_mapping)
-        pipelines_migrator.migrate_pipelines()
+    pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler, pipeline_mapping)
+    pipelines_migrator.migrate_pipelines()
 
