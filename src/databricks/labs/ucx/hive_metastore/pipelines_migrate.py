@@ -6,7 +6,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.marketplace import Installation
+from databricks.labs.blueprint.installation import Installation
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 
@@ -82,8 +82,6 @@ class PipelineMapping:
         for pipeline in pipeline_snapshot:
             yield PipelineRule.initial(workspace_name, catalog_name, pipeline)
 
-        return self._pc.snapshot()
-
     def load(self) -> list[PipelineRule]:
         try:
             return self._installation.load(list[PipelineRule], filename=self.FILENAME)
@@ -135,7 +133,6 @@ class PipelinesMigrator:
             self._clone_pipeline(pipeline)
         except Exception as e:
             logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
-        pass
 
     def _clone_pipeline(self, pipeline: PipelineToMigrate):
         # TODO: implement this in sdk
@@ -148,8 +145,10 @@ class PipelinesMigrator:
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
         }
-        # if pipeline.rule.target_schema_name is not None: body['target'] = pipeline.rule.target_schema_name
-        # if pipeline.rule.target_pipeline_name is not None: body['name'] = pipeline.rule.target_pipeline_name
+        if pipeline.rule.target_schema_name is not None:
+            body['target'] = pipeline.rule.target_schema_name
+        if pipeline.rule.target_pipeline_name is not None:
+            body['name'] = pipeline.rule.target_pipeline_name
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
         )
