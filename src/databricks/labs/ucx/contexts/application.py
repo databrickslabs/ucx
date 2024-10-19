@@ -13,7 +13,7 @@ from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineMapping
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -451,6 +451,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def table_mapping(self) -> TableMapping:
         return TableMapping(self.installation, self.workspace_client, self.sql_backend)
+
+    @cached_property
+    def pipeline_mapping(self) -> PipelineMapping:
+        return PipelineMapping(self.installation, self.workspace_client, self.sql_backend)
 
     @cached_property
     def catalog_schema(self) -> CatalogSchema:
