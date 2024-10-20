@@ -17,35 +17,35 @@ logger = logging.getLogger(__name__)
 class PipelineRule:
     workspace_name: str
     src_pipeline_id: str
-    # target_catalog_name: str | None
-    # target_schema_name: str | None
-    # target_pipeline_name: str | None
+    target_catalog_name: str | None = None,
+    target_schema_name: str | None = None,
+    target_pipeline_name: str | None = None,
 
     @classmethod
     def from_src_dst(
         cls,
         workspace_name: str,
         src_pipeline_id: str,
-        # target_catalog_name: str | None,
-        # target_schema_name: str | None,
-        # target_pipeline_name: str | None,
+        target_catalog_name: str | None = None,
+        target_schema_name: str | None = None,
+        target_pipeline_name: str | None = None,
     ) -> "PipelineRule":
         return cls(
             workspace_name=workspace_name,
             src_pipeline_id=src_pipeline_id,
-            # target_catalog_name=target_catalog_name,
-            # target_schema_name=target_schema_name,
-            # target_pipeline_name=target_pipeline_name,
+            target_catalog_name=target_catalog_name,
+            target_schema_name=target_schema_name,
+            target_pipeline_name=target_pipeline_name,
         )
 
     @classmethod
     def initial(cls, workspace_name: str, catalog_name: str, pipeline: PipelineInfo) -> "PipelineRule":
         return cls(
             workspace_name=workspace_name,
-            # target_catalog_name=catalog_name,
+            target_catalog_name=catalog_name,
             src_pipeline_id=pipeline.pipeline_id,
-            # target_pipeline_name=pipeline.pipeline_name,
-            # target_schema_name=None,
+            target_pipeline_name=pipeline.pipeline_name,
+            target_schema_name=None,
         )
 
 
