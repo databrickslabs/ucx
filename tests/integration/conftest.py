@@ -950,11 +950,12 @@ class MockInstallationContext(MockRuntimeContext):
         return ws_group, acc_group
 
     @cached_property
-    def running_clusters(self) -> tuple[str, str, str]:
+    def running_clusters(self) -> tuple[str, str, str, str]:
         logger.debug("Waiting for clusters to start...")
         default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         table_migration_cluster_id = self._env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        table_assigned_cluster_id = self._env_or_skip("TEST_ASSIGNED_CLUSTER_ID")
         ensure_cluster_is_running = self.workspace_client.clusters.ensure_cluster_is_running
         Threads.strict(
             "ensure clusters running",
@@ -962,10 +963,11 @@ class MockInstallationContext(MockRuntimeContext):
                 functools.partial(ensure_cluster_is_running, default_cluster_id),
                 functools.partial(ensure_cluster_is_running, tacl_cluster_id),
                 functools.partial(ensure_cluster_is_running, table_migration_cluster_id),
+                functools.partial(ensure_cluster_is_running, table_assigned_cluster_id),
             ],
         )
         logger.debug("Waiting for clusters to start...")
-        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
+        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id, table_assigned_cluster_id
 
     @cached_property
     def installation(self) -> Installation:
@@ -1001,13 +1003,16 @@ class MockInstallationContext(MockRuntimeContext):
     @cached_property
     def config(self) -> WorkspaceConfig:
         workspace_config = self.workspace_installer.configure()
-        default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
+        default_cluster_id, tacl_cluster_id, table_migration_cluster_id, table_assigned_cluster_id = (
+            self.running_clusters
+        )
         workspace_config = replace(
             workspace_config,
             override_clusters={
                 "main": default_cluster_id,
                 "tacl": tacl_cluster_id,
                 "table_migration": table_migration_cluster_id,
+                "table_migration_assigned_user": table_assigned_cluster_id,
             },
             workspace_start_path=self.installation.install_folder(),
             renamed_group_prefix=self.renamed_group_prefix,

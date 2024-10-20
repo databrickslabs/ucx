@@ -88,9 +88,7 @@ def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
     managed_table = tables["src_managed_table"]
 
-    for key, value, _ in sql_backend.fetch(
-        f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"
-    ):
+    for key, value, _ in sql_backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"):
         if key == "Type":
             assert value == "EXTERNAL"
 
