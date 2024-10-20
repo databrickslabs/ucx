@@ -311,7 +311,7 @@ class TablesMigrator:
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
-        update_sql = f"update {escape_sql_identifier(inventory_table)} set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='{src_table.database}' and table='{src_table.name}';"
+        update_sql = f"update {escape_sql_identifier(inventory_table)} set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='{src_table.database}' and name='{src_table.name}';"
         self._backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):

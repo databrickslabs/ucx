@@ -224,7 +224,7 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     external_locations.resolve_mount.assert_not_called()
     migrate_grants.apply.assert_not_called()
     assert backend.queries == [
-        "update `hive_metastore`.`inventory_database`.`tables` set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='db1_src' and table='managed_other';"
+        "update `hive_metastore`.`inventory_database`.`tables` set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='db1_src' and name='managed_other';"
     ]
 
 
