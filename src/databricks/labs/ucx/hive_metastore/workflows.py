@@ -19,7 +19,7 @@ class TableMigration(Workflow):
             inventory_table=ctx.tables_crawler.full_name,
         )
 
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables, convert_managed_table])
     def migrate_external_tables_sync(self, ctx: RuntimeContext):
         """This workflow task migrates the external tables that are supported by SYNC command from the Hive Metastore
         to the Unity Catalog.

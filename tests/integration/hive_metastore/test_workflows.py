@@ -69,8 +69,7 @@ def test_table_migration_job_refreshes_migration_status(
     ],
     indirect=("prepare_tables_for_migration",),
 )
-def test_table_migration_for_managed_tabl(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
-    """The migration status should be refreshed after the migration job."""
+def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
@@ -89,7 +88,7 @@ def test_table_migration_for_managed_tabl(ws, installation_ctx, prepare_tables_f
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
     managed_table = tables["src_managed_table"]
 
-    for key, value, _ in installation_ctx.sql_backend.fetch(
+    for key, value, _ in sql_backend.fetch(
         f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"
     ):
         if key == "Type":
