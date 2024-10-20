@@ -37,7 +37,11 @@ def test_pipeline_migrate(ws, make_pipeline, inventory_schema, sql_backend, runt
     assert len(results) >= 1
     assert results[0].pipeline_id == created_pipeline.pipeline_id
 
-    pipeline_rules = [PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog", None, None, None)]
+    pipeline_rules = [PipelineRule.from_src_dst(created_pipeline.pipeline_id, "test_catalog",
+                                                # None,
+                                                # None,
+                                                # None
+                                                )]
     runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
     pipeline_mapping = PipelineMapping(runtime_ctx.installation, ws, sql_backend)
 
