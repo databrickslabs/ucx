@@ -3,9 +3,11 @@ from unittest.mock import MagicMock, create_autospec, mock_open, patch
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.core import Row
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
 
+from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
@@ -17,6 +19,7 @@ from databricks.labs.ucx.assessment.clusters import (
 )
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.progress.history import HistoryLog
 
 from .. import mock_workspace_client
 
@@ -206,6 +209,76 @@ def test_cluster_owner_creator_unknown() -> None:
     admin_locator.get_workspace_administrator.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    "cluster_info_record,history_record",
+    (
+        (
+            ClusterInfo(
+                cluster_id="1234",
+                success=1,
+                failures="[]",
+                spark_version="3.5.3",
+                policy_id="4567",
+                cluster_name="the_cluster",
+                creator="user@domain",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="ClusterInfo",
+                object_id=["1234"],
+                data={
+                    "cluster_id": "1234",
+                    "success": "1",
+                    "spark_version": "3.5.3",
+                    "policy_id": "4567",
+                    "cluster_name": "the_cluster",
+                    "creator": "user@domain",
+                },
+                failures=[],
+                owner="user@domain",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            ClusterInfo(cluster_id="1234", success=0, failures='["a-failure", "another-failure"]'),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="ClusterInfo",
+                object_id=["1234"],
+                data={
+                    "cluster_id": "1234",
+                    "success": "0",
+                },
+                failures=["a-failure", "another-failure"],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_cluster_info_supports_history(mock_backend, cluster_info_record: ClusterInfo, history_record: Row) -> None:
+    """Verify that ClusterInfo records are written as expected to the history log."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "the_admin"
+    cluster_ownership = ClusterOwnership(admin_locator)
+    history_log = HistoryLog[ClusterInfo](
+        mock_backend,
+        cluster_ownership,
+        ClusterInfo,
+        run_id=1,
+        workspace_id=2,
+        catalog="a_catalog",
+    )
+
+    history_log.append_inventory_snapshot([cluster_info_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
+
+    assert rows == [history_record]
+
+
 def test_policy_crawler():
     ws = mock_workspace_client(
         policy_ids=['single-user-with-spn', 'single-user-with-spn-policyid', 'single-user-with-spn-no-sparkversion'],
@@ -292,3 +365,79 @@ def test_cluster_policy_owner_creator_unknown() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "policy_info_record,history_record",
+    (
+        (
+            PolicyInfo(
+                policy_id="1234",
+                policy_name="the_policy",
+                success=1,
+                failures="[]",
+                spark_version="3.5.3",
+                policy_description="a description of the policy",
+                creator="user@domain",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="PolicyInfo",
+                object_id=["1234"],
+                data={
+                    "policy_id": "1234",
+                    "policy_name": "the_policy",
+                    "success": "1",
+                    "spark_version": "3.5.3",
+                    "policy_description": "a description of the policy",
+                    "creator": "user@domain",
+                },
+                failures=[],
+                owner="user@domain",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            PolicyInfo(
+                policy_id="1234",
+                policy_name="the_policy",
+                success=0,
+                failures='["a_failure", "another_failure"]',
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="PolicyInfo",
+                object_id=["1234"],
+                data={
+                    "policy_id": "1234",
+                    "policy_name": "the_policy",
+                    "success": "0",
+                },
+                failures=["a_failure", "another_failure"],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_cluster_policy_supports_history(mock_backend, policy_info_record: PolicyInfo, history_record: Row) -> None:
+    """Verify that PolicyInfo records are written as expected to the history log."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "the_admin"
+    cluster_policy_ownership = ClusterPolicyOwnership(admin_locator)
+    history_log = HistoryLog[PolicyInfo](
+        mock_backend,
+        cluster_policy_ownership,
+        PolicyInfo,
+        run_id=1,
+        workspace_id=2,
+        catalog="a_catalog",
+    )
+
+    history_log.append_inventory_snapshot([policy_info_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
+
+    assert rows == [history_record]
