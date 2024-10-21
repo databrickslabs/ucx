@@ -1,5 +1,9 @@
+from databricks.sdk.service.pipelines import PipelineLibrary, NotebookLibrary
+
+from databricks.get_uninstalled_libraries import libraries
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule, PipelineMapping
+from integration.conftest import runtime_ctx
 
 _TEST_STORAGE_ACCOUNT = "storage_acct_1"
 _TEST_TENANT_ID = "directory_12345"
@@ -19,14 +23,23 @@ _PIPELINE_CONF_WITH_SECRET = {
 }
 
 
-def test_pipeline_migrate(ws, make_pipeline, inventory_schema, sql_backend, runtime_ctx):
+def test_pipeline_migrate(ws, make_pipeline, make_notebook, make_directory, inventory_schema, sql_backend, runtime_ctx):
 
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     target_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
 
-    created_pipeline = make_pipeline(configuration=_PIPELINE_CONF, target=target_schema.name)
+
+    dlt_notebook_path = f"{make_directory()}/dlt_notebook.py"
+    src_table = runtime_ctx.make_table(catalog_name="hive_metastore", schema_name=src_schema.name, non_delta=True)
+    dlt_notebook_text = f"""create streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_table.name})"""
+    dlt_notebook_source = dlt_notebook_text.encode("ASCII")
+    make_notebook(content=dlt_notebook_source, path=dlt_notebook_path)
+
+    created_pipeline = make_pipeline(configuration=_PIPELINE_CONF, target=target_schema.name, libraries=[
+        PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))
+    ])
     pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
-
     results = []
     for pipeline in pipelines:
         if pipeline.success != 0:
