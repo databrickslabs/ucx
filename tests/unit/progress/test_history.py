@@ -509,5 +509,5 @@ def test_history_log_default_location(mock_backend, ownership) -> None:
     history_log = HistoryLog(mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
     history_log.append_inventory_snapshot([record])
 
-    assert history_log.full_name == "the_catalog.ucx.history"
-    assert mock_backend.has_rows_written_for("`the_catalog`.`ucx`.`history`")
+    assert history_log.full_name == "the_catalog.multiworkspace.historical"
+    assert mock_backend.has_rows_written_for("`the_catalog`.`multiworkspace`.`historical`")

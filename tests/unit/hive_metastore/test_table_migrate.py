@@ -1612,7 +1612,7 @@ def test_table_migration_status_supports_history(
 
     history_log.append_inventory_snapshot([table_migration_status_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]
 

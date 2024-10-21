@@ -758,6 +758,6 @@ def test_table_supports_history(mock_backend, table_record: Table, history_recor
 
     history_log.append_inventory_snapshot([table_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]

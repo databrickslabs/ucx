@@ -163,6 +163,6 @@ def test_udf_supports_history(mock_backend, udf_record: Udf, history_record: Row
 
     history_log.append_inventory_snapshot([udf_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]

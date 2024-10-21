@@ -850,6 +850,6 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
 
     history_log.append_inventory_snapshot([grant_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]

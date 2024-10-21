@@ -191,8 +191,8 @@ class HistoryLog(Generic[Record]):
         run_id: int,
         workspace_id: int,
         catalog: str,
-        schema: str = "ucx",
-        table: str = "history",
+        schema: str = "multiworkspace",
+        table: str = "historical",
     ) -> None:
         self._sql_backend = sql_backend
         self._klass = klass

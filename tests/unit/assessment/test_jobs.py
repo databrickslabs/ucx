@@ -224,6 +224,6 @@ def test_job_supports_history(mock_backend, job_info_record: JobInfo, history_re
 
     history_log.append_inventory_snapshot([job_info_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]

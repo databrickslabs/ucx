@@ -149,6 +149,6 @@ def test_pipeline_info_supports_history(mock_backend, pipeline_info_record: Pipe
 
     history_log.append_inventory_snapshot([pipeline_info_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]

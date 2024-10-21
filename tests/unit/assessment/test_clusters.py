@@ -274,7 +274,7 @@ def test_cluster_info_supports_history(mock_backend, cluster_info_record: Cluste
 
     history_log.append_inventory_snapshot([cluster_info_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]
 
@@ -438,6 +438,6 @@ def test_cluster_policy_supports_history(mock_backend, policy_info_record: Polic
 
     history_log.append_inventory_snapshot([policy_info_record])
 
-    rows = mock_backend.rows_written_for("`a_catalog`.`ucx`.`history`", mode="append")
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]
