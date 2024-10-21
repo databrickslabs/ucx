@@ -66,10 +66,18 @@ def test_build_notebook_dependency_graphs_when_installing_pytest_twice(simple_ct
     assert not maybe.problems
 
 
-def test_build_notebook_dependency_graphs_when_installing_pytest_twice_alternative(simple_ctx):
+@pytest.mark.parametrize(
+    "notebook",
+    (
+        "pip_install_demo_wheel",
+        "pip_install_multiple_packages",
+        "pip_install_pytest_with_index_url",
+    ),
+)
+def test_build_notebook_dependency_graphs_when_installing_notebooks_twice(simple_ctx, notebook) -> None:
     ctx = simple_ctx.replace(path_lookup=MockPathLookup())
     for _ in range(2):
         maybe = ctx.dependency_resolver.build_notebook_dependency_graph(
-            Path("pip_install_pytest_with_index_url"), CurrentSessionState()
+            Path(notebook), CurrentSessionState()
         )
         assert not maybe.problems
