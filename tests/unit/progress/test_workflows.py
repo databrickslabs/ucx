@@ -3,6 +3,7 @@ from typing import get_type_hints
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
@@ -15,7 +16,6 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 @pytest.mark.parametrize(
     "task, crawler, history_log",
     (
-        (MigrationProgress.crawl_tables, RuntimeContext.tables_crawler, RuntimeContext.historical_tables_log),
         (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, RuntimeContext.historical_udfs_log),
         (MigrationProgress.crawl_grants, RuntimeContext.grants_crawler, RuntimeContext.historical_grants_log),
         (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, RuntimeContext.historical_jobs_log),
@@ -46,6 +46,28 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history
     }
     run_workflow(task, **context_replacements)
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
+    mock_history_log.append_inventory_snapshot.assert_called_once()
+
+
+def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
+    """Ensure that the split crawl and update-history-log tasks perform their part of the refresh process."""
+    mock_tables_crawler = create_autospec(TablesCrawler)
+    mock_history_log = create_autospec(HistoryLog)
+    context_replacements = {
+        "tables_crawler": mock_tables_crawler,
+        "historical_tables_log": mock_history_log,
+        "named_parameters": {"parent_run_id": 53},
+    }
+
+    # The first part of a 2-step update: the crawl without updating the history log.
+    run_workflow(MigrationProgress.crawl_tables, **context_replacements)
+    mock_tables_crawler.snapshot.assert_called_once_with(force_refresh=True)
+    mock_history_log.append_inventory_snapshot.assert_not_called()
+
+    mock_tables_crawler.snapshot.reset_mock()
+    # The second part of the 2-step update: updating the history log (without a forced crawl).
+    run_workflow(MigrationProgress.update_tables_history_log, **context_replacements)
+    mock_tables_crawler.snapshot.assert_called_once_with()
     mock_history_log.append_inventory_snapshot.assert_called_once()
 
 

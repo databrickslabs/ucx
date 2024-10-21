@@ -31,14 +31,29 @@ class MigrationProgress(Workflow):
         """
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
-    @job_task(depends_on=[verify_prerequisites], job_cluster="table_migration")
+    @job_task(job_cluster="tacl")
+    def setup_tacl(self, ctx: RuntimeContext):
+        """(Optimization) Allow the TACL job cluster to be started while we're verifying the prerequisites for
+        refreshing everything."""
+
+    @job_task(depends_on=[verify_prerequisites, setup_tacl], job_cluster="tacl")
     def crawl_tables(self, ctx: RuntimeContext) -> None:
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
         `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
+        # The TACL cluster is not UC-enabled, so the snapshot cannot be written immediately to the history log.
+        # Step 1 of 2: Just refresh the inventory.
+        ctx.tables_crawler.snapshot(force_refresh=True)
+
+    @job_task(depends_on=[verify_prerequisites, crawl_tables], job_cluster="table_migration")
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory snapshot."""
+        # The table migration cluster is not legacy-ACL enabled, so we can't crawl from here.
+        # Step 2 of 2: Assuming the inventory was refreshed, capture into the history log.
+        # WARNING: this will fail if the inventory is empty, because it will then try to perform a crawl.
         history_log = ctx.historical_tables_log
-        tables_snapshot = ctx.tables_crawler.snapshot(force_refresh=True)
+        tables_snapshot = ctx.tables_crawler.snapshot()
         history_log.append_inventory_snapshot(tables_snapshot)
 
     @job_task(depends_on=[verify_prerequisites], job_cluster="table_migration")
