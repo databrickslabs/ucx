@@ -228,12 +228,12 @@ def schema_populated(
 
 @pytest.fixture()
 def dashboard_metadata(schema_populated: SchemaInfo) -> DashboardMetadata:
-    migration_progress_dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
-    dashboard_metadata = DashboardMetadata.from_path(migration_progress_dashboard_path).replace_database(
+    dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
+    metadata = DashboardMetadata.from_path(dashboard_path).replace_database(
         database=schema_populated.full_name, database_to_replace="multiworkspace"
     )
-    dashboard_metadata.validate()
-    return dashboard_metadata
+    metadata.validate()
+    return metadata
 
 
 def test_migration_progress_dashboard(
