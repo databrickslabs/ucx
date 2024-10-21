@@ -1,4 +1,4 @@
-/* --title 'Table migration readiness (%)' --description 'Ready to be migrated' */
+/* --title 'Table migration readiness (%)' */
 SELECT
     100 * COUNT_IF(size(failures) = 0) / COUNT(*) AS percentage
 FROM multiworkspace.historical

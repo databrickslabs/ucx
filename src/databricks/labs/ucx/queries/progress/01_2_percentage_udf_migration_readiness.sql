@@ -1,4 +1,4 @@
-/* --title 'UDF migration readiness (%)' --description 'Ready to be migrated' */
+/* --title 'UDF migration readiness (%)' */
 SELECT
     100 * COUNT_IF(size(failures) = 0) / COUNT(*) AS percentage
 FROM multiworkspace.historical
