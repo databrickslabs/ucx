@@ -21,7 +21,11 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
         (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, RuntimeContext.historical_jobs_log),
         (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, RuntimeContext.historical_clusters_log),
         (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, RuntimeContext.historical_pipelines_log),
-        (MigrationProgress.crawl_cluster_policies, RuntimeContext.policies_crawler, RuntimeContext.historical_cluster_policies_log),
+        (
+            MigrationProgress.crawl_cluster_policies,
+            RuntimeContext.policies_crawler,
+            RuntimeContext.historical_cluster_policies_log,
+        ),
         (
             MigrationProgress.refresh_table_migration_status,
             RuntimeContext.migration_status_refresher,
