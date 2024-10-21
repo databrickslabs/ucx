@@ -12,6 +12,7 @@ from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -139,6 +140,25 @@ def clusters():
     ]
 
 
+@pytest.fixture
+def pipelines():
+    pipelines_ = [
+        PipelineInfo("1", success=1, failures=""),
+        PipelineInfo(
+            "2", success=0, failures="Uses passthrough config: spark.databricks.passthrough.enabled in pipeline"
+        ),
+    ]
+    return [
+        (
+            "pipelines",
+            [pipeline.pipeline_id],
+            pipeline,
+            pipeline.failures.split("\n") if pipeline.failures else [],
+            "Cor",
+        )
+        for pipeline in pipelines_
+    ]
+
 
 @pytest.fixture
 def schema_populated(
@@ -152,6 +172,7 @@ def schema_populated(
     grants,
     jobs,
     clusters,
+    pipelines,
 ) -> SchemaInfo:
     """Populate the historical schema given the objects from the fixtures.
 
@@ -162,7 +183,7 @@ def schema_populated(
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    objects = tables + table_migration_statuses + udfs + grants + jobs + clusters
+    objects = tables + table_migration_statuses + udfs + grants + jobs + clusters + pipelines
     for table_name, id_, instance, failures, owner in objects:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
@@ -211,7 +232,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=78.94736842105263)]),
+        ("01_0_percentage_migration_readiness", [Row(percentage=76.19047619047619)]),
         ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
         ("01_2_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
         ("01_3_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
