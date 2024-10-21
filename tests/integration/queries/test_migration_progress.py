@@ -27,11 +27,42 @@ def tables():
 @pytest.fixture
 def udfs():
     udfs_ = [
-        Udf("hive_metastore", "schema1", "custom_function", func_type="UNKNOWN", func_input="UNKNOWN", func_returns="UNKNOWN", deterministic=True, data_access="UNKNOWN", body="UNKNOWN", comment="UNKNOWN"),
-        Udf("hive_metastore", "schema1", "invalid_function", func_type="UNKNOWN", func_input="UNKNOWN",
-            func_returns="UNKNOWN", deterministic=True, data_access="UNKNOWN", body="UNKNOWN", comment="UNKNOWN", failures="UDF not supported by UC"),
+        Udf(
+            "hive_metastore",
+            "schema1",
+            "custom_function",
+            func_type="UNKNOWN",
+            func_input="UNKNOWN",
+            func_returns="UNKNOWN",
+            deterministic=True,
+            data_access="UNKNOWN",
+            body="UNKNOWN",
+            comment="UNKNOWN",
+        ),
+        Udf(
+            "hive_metastore",
+            "schema1",
+            "invalid_function",
+            func_type="UNKNOWN",
+            func_input="UNKNOWN",
+            func_returns="UNKNOWN",
+            deterministic=True,
+            data_access="UNKNOWN",
+            body="UNKNOWN",
+            comment="UNKNOWN",
+            failures="UDF not supported by UC",
+        ),
     ]
-    return [("udfs", [udf.catalog, udf.database, udf.name], udf, udf.failures.split("\n"), "Cor") for udf in udfs_]
+    return [
+        (
+            "udfs",
+            [udf.catalog, udf.database, udf.name],
+            udf,
+            [] if not udf.failures else udf.failures.split("\n"),
+            "Cor",
+        )
+        for udf in udfs_
+    ]
 
 
 @pytest.fixture
@@ -114,8 +145,9 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=83.33333333333333)]),
+        ("01_0_percentage_migration_readiness", [Row(percentage=91.66666666666667)]),
         ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
+        ("01_2_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
         (
             "02_1_migration_status_by_owner_bar_graph",
             [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
