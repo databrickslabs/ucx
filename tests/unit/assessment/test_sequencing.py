@@ -25,14 +25,15 @@ def test_cluster_from_task_has_children(ws, simple_dependency_resolver, mock_pat
     sequencer = MigrationSequencer(ws, AdministratorLocator(ws, finders=[lambda _ws: admin_finder]))
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
-    step = dataclasses.replace(steps[-1], step_id=0)
-    # we don't know the exact ids of the required steps, se let's zero them
-    step.required_step_ids = [0 for id in step.required_step_ids]
+    step = steps[-1]
+    # we don't know the ids of the steps, se let's zero them
+    step = dataclasses.replace(step, step_id=0, required_step_ids=[0] * len(step.required_step_ids))
     assert step == MigrationStep(
         step_id=0,
-        step_number = 3,
-        object_type = "CLUSTER",
-        object_id = "cluster-123",
-        object_name = "my-cluster",
-        object_owner = "John Doe",
-        required_step_ids = [0, 0])
+        step_number=3,
+        object_type="CLUSTER",
+        object_id="cluster-123",
+        object_name="my-cluster",
+        object_owner="John Doe",
+        required_step_ids=[0, 0],
+    )
