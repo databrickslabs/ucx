@@ -187,11 +187,7 @@ def policies():
 
 
 @pytest.fixture
-def schema_populated(
-    ws: WorkspaceClient,
-    sql_backend: SqlBackend,
-    make_catalog,
-    make_schema,
+def historical_objects(
     tables,
     table_migration_statuses,
     udfs,
@@ -200,6 +196,13 @@ def schema_populated(
     clusters,
     pipelines,
     policies,
+):
+    return tables + table_migration_statuses + udfs + grants + jobs + clusters + pipelines + policies
+
+
+@pytest.fixture
+def schema_populated(
+    ws: WorkspaceClient, sql_backend: SqlBackend, make_catalog, make_schema, historical_objects
 ) -> SchemaInfo:
     """Populate the historical schema given the objects from the fixtures.
 
@@ -210,8 +213,7 @@ def schema_populated(
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    objects = tables + table_migration_statuses + udfs + grants + jobs + clusters + pipelines + policies
-    for table_name, id_, instance, failures, owner in objects:
+    for table_name, id_, instance, failures, owner in historical_objects:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
             field.name: str(getattr(instance, field.name))
