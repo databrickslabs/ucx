@@ -611,6 +611,9 @@ class MockRuntimeContext(
                 continue
             table_type = table.table_type.value if table.table_type else ""
             table_format = table.data_source_format.value if table.data_source_format else default_table_format
+            storage_location = table.storage_location
+            if table_type == "MANAGED":
+                storage_location = ""
             tables_to_save.append(
                 Table(
                     catalog=table.catalog_name,
@@ -618,7 +621,7 @@ class MockRuntimeContext(
                     name=table.name,
                     object_type=table_type,
                     table_format=table_format,
-                    location=str(table.storage_location or ""),
+                    location=str(storage_location or ""),
                     view_text=table.view_definition,
                 )
             )
@@ -947,11 +950,12 @@ class MockInstallationContext(MockRuntimeContext):
         return ws_group, acc_group
 
     @cached_property
-    def running_clusters(self) -> tuple[str, str, str]:
+    def running_clusters(self) -> tuple[str, str, str, str]:
         logger.debug("Waiting for clusters to start...")
         default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         table_migration_cluster_id = self._env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        table_assigned_cluster_id = self._env_or_skip("TEST_ASSIGNED_CLUSTER_ID")
         ensure_cluster_is_running = self.workspace_client.clusters.ensure_cluster_is_running
         Threads.strict(
             "ensure clusters running",
@@ -959,10 +963,11 @@ class MockInstallationContext(MockRuntimeContext):
                 functools.partial(ensure_cluster_is_running, default_cluster_id),
                 functools.partial(ensure_cluster_is_running, tacl_cluster_id),
                 functools.partial(ensure_cluster_is_running, table_migration_cluster_id),
+                functools.partial(ensure_cluster_is_running, table_assigned_cluster_id),
             ],
         )
         logger.debug("Waiting for clusters to start...")
-        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
+        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id, table_assigned_cluster_id
 
     @cached_property
     def installation(self) -> Installation:
@@ -998,13 +1003,16 @@ class MockInstallationContext(MockRuntimeContext):
     @cached_property
     def config(self) -> WorkspaceConfig:
         workspace_config = self.workspace_installer.configure()
-        default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
+        default_cluster_id, tacl_cluster_id, table_migration_cluster_id, table_assigned_cluster_id = (
+            self.running_clusters
+        )
         workspace_config = replace(
             workspace_config,
             override_clusters={
                 "main": default_cluster_id,
                 "tacl": tacl_cluster_id,
                 "table_migration": table_migration_cluster_id,
+                "table_migration_assigned_user": table_assigned_cluster_id,
             },
             workspace_start_path=self.installation.install_folder(),
             renamed_group_prefix=self.renamed_group_prefix,
@@ -1205,13 +1213,18 @@ def prepare_tables_for_migration(
     is_hiveserde = scenario == "hiveserde"
     random = make_random(5).lower()
     # create external and managed tables to be migrated
-    if is_hiveserde:
+    if scenario == "hiveserde":
         schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
         table_base_dir = make_storage_dir(
             path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
         )
         tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
-    else:
+    elif scenario == "regularmanaged":
+        schema_name = f"managed_{random}"
+        schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
+        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+    elif scenario == "regular":
         schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
         tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
 
