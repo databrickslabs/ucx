@@ -11,7 +11,7 @@
 */
 WITH migration_statuses AS (
     SELECT *
-    FROM inventory.historical
+    FROM multiworkspace.historical
     WHERE object_type = "migration_status"
 )
 

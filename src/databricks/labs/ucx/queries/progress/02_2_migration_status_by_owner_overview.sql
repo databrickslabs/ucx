@@ -1,7 +1,7 @@
 /* --title 'Tables and views migration completion (%)' --description 'Per owner' */
 WITH migration_statuses AS (
     SELECT *
-    FROM inventory.historical
+    FROM multiworkspace.historical
     WHERE object_type = "migration_status"
 )
 
