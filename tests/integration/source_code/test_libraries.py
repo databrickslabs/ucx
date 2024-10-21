@@ -81,3 +81,6 @@ def test_build_notebook_dependency_graphs_when_installing_notebooks_twice(simple
             Path(notebook), CurrentSessionState()
         )
         assert not maybe.problems
+        for _ in range(2):
+            maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path(notebook), CurrentSessionState())
+            assert not maybe.problems
