@@ -2,18 +2,22 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
 
 
-class ExperimentalWorkflowLinter(Workflow):
+class WorkflowLinter(Workflow):
     def __init__(self):
-        super().__init__('experimental-workflow-linter')
+        super().__init__('workflow-linter')
 
-    @job_task(job_cluster="table_migration")
-    def lint_all_workflows(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] Analyses all jobs for source code compatibility problems. This is an experimental feature,
-        that is not yet fully supported."""
+    @job_task
+    def assess_workflows(self, ctx: RuntimeContext):
+        """Scans all jobs for migration issues in notebooks jobs.
+
+        Also, stores direct filesystem accesses for display in the migration dashboard.
+        """
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
-    @job_task(job_cluster="table_migration")
-    def lint_all_queries(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] Analyses all jobs for source code compatibility problems. This is an experimental feature,
-        that is not yet fully supported."""
+    @job_task
+    def assess_dashboards(self, ctx: RuntimeContext):
+        """Scans all dashboards for migration issues in SQL code of embedded widgets.
+
+        Also, stores direct filesystem accesses for display in the migration dashboard.
+        """
         ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
