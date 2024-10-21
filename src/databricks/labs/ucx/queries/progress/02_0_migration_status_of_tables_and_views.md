@@ -1,4 +1,4 @@
-# 2. Tables and views
+# 2. Tables and Views
 
-This section shows the migration statuses of tables and views. It details how many of these objects are migrated
-and how many are pending to be migrated.
+This section presents the migration statuses of tables and views, detailing how many of these objects have been migrated
+and how many are still pending migration.
