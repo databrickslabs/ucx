@@ -7,11 +7,12 @@ from databricks.labs.ucx.framework.tasks import Workflow, job_task
 class MigrationProgress(Workflow):
     """Experimental workflow that rescans the environment to reflect and track progress that has been made.
 
-    This is a subset of the assessment workflow and covers:
+    It overlaps substantially with the assessment workflow, covering:
 
      - Clusters
+     - Dashboards
      - Grants
-     - Jobs
+     - Jobs (inventory & linting)
      - Pipelines
      - Policies
      - Tables
@@ -121,6 +122,18 @@ class MigrationProgress(Workflow):
         The results of the scan are stored in the `$inventory.migration_status` inventory table.
         """
         ctx.migration_status_refresher.snapshot(force_refresh=True)
+
+    @job_task
+    def assess_dashboards(self, ctx: RuntimeContext):
+        """Scans all dashboards for migration issues in SQL code of embedded widgets.
+        Also stores direct filesystem accesses for display in the migration dashboard."""
+        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
+    @job_task
+    def assess_workflows(self, ctx: RuntimeContext):
+        """Scans all jobs for migration issues in notebooks.
+        Also stores direct filesystem accesses for display in the migration dashboard."""
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
     @job_task(
         depends_on=[

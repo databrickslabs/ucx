@@ -31,6 +31,21 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler) -> None
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
 
 
+@pytest.mark.parametrize(
+    "task, linter",
+    (
+        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
+        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
+    ),
+)
+def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
+    linter_class = get_type_hints(linter.func)["return"]
+    mock_linter = create_autospec(linter_class)
+    linter_name = linter.attrname
+    ctx = run_workflow(task, **{linter_name: mock_linter})
+    mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
+
+
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.metastores.current.return_value = MetastoreAssignment(metastore_id="test", workspace_id=123456789)
