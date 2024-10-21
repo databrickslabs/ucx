@@ -20,7 +20,7 @@ from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawl
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
-from databricks.labs.ucx.hive_metastore import TablesInMounts
+from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table, TableOwnership
@@ -98,7 +98,7 @@ class RuntimeContext(GlobalContext):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def tables_crawler(self) -> FasterTableScanCrawler:
+    def tables_crawler(self) -> TablesCrawler:
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property

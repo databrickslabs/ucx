@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import get_type_hints
 from unittest.mock import create_autospec
 
 import pytest
@@ -7,71 +8,29 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
-from databricks.labs.ucx.assessment.jobs import JobsCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 
 @pytest.mark.parametrize(
-    "task, crawler, crawler_class, history_log",
-    [
-        (
-            MigrationProgress.crawl_tables,
-            RuntimeContext.tables_crawler,
-            TablesCrawler,
-            RuntimeContext.historical_tables_log,
-        ),
-        (
-            MigrationProgress.crawl_udfs,
-            RuntimeContext.udfs_crawler,
-            UdfsCrawler,
-            RuntimeContext.historical_udfs_log,
-        ),
-        (
-            MigrationProgress.crawl_grants,
-            RuntimeContext.grants_crawler,
-            GrantsCrawler,
-            RuntimeContext.historical_grants_log,
-        ),
-        (
-            MigrationProgress.assess_jobs,
-            RuntimeContext.jobs_crawler,
-            JobsCrawler,
-            RuntimeContext.historical_jobs_log,
-        ),
-        (
-            MigrationProgress.assess_clusters,
-            RuntimeContext.clusters_crawler,
-            ClustersCrawler,
-            RuntimeContext.historical_clusters_log,
-        ),
-        (
-            MigrationProgress.assess_pipelines,
-            RuntimeContext.pipelines_crawler,
-            PipelinesCrawler,
-            RuntimeContext.historical_pipelines_log,
-        ),
-        (
-            MigrationProgress.crawl_cluster_policies,
-            RuntimeContext.policies_crawler,
-            PoliciesCrawler,
-            RuntimeContext.historical_cluster_policies_log,
-        ),
+    "task, crawler, history_log",
+    (
+        (MigrationProgress.crawl_tables, RuntimeContext.tables_crawler, RuntimeContext.historical_tables_log),
+        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, RuntimeContext.historical_udfs_log),
+        (MigrationProgress.crawl_grants, RuntimeContext.grants_crawler, RuntimeContext.historical_grants_log),
+        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, RuntimeContext.historical_jobs_log),
+        (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, RuntimeContext.historical_clusters_log),
+        (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, RuntimeContext.historical_pipelines_log),
+        (MigrationProgress.crawl_cluster_policies, RuntimeContext.policies_crawler, RuntimeContext.historical_cluster_policies_log),
         (
             MigrationProgress.refresh_table_migration_status,
             RuntimeContext.migration_status_refresher,
-            TableMigrationStatusRefresher,
             RuntimeContext.historical_table_migration_log,
         ),
-    ],
+    ),
 )
-def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler_class, history_log) -> None:
+def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history_log) -> None:
+    crawler_class = get_type_hints(crawler.func)["return"]
     mock_crawler = create_autospec(crawler_class)
     mock_history_log = create_autospec(HistoryLog)
     crawler_name = crawler.attrname
@@ -84,6 +43,21 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, crawler
     run_workflow(task, **context_replacements)
     mock_crawler.snapshot.assert_called_once_with(force_refresh=True)
     mock_history_log.append_inventory_snapshot.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "task, linter",
+    (
+        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
+        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
+    ),
+)
+def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
+    linter_class = get_type_hints(linter.func)["return"]
+    mock_linter = create_autospec(linter_class)
+    linter_name = linter.attrname
+    ctx = run_workflow(task, **{linter_name: mock_linter})
+    mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
