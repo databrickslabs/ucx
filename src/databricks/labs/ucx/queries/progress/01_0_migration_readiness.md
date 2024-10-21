@@ -1,7 +1,3 @@
----
-width: 2
----
-
 # 1. Migration readiness
 
 The migration readiness percentages show the relative amount of resources that is ready **to be** migrated. For example,
