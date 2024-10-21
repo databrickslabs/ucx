@@ -195,7 +195,7 @@ def test_graph_builder_parse_error(
     problems = analyser.build_graph()
     codes = {_.code for _ in problems}
 
-    assert codes == {'syntax-error'}
+    assert codes == {'system-error'}
 
 
 def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup) -> None:
