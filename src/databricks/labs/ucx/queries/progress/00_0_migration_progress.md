@@ -1,3 +1,7 @@
+---
+height: 4
+---
+
 # Migration progress
 
 This dashboard shows the migration progress. The data visualized is updated by the `migration-progress-experimental`
