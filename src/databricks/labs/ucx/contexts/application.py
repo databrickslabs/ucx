@@ -274,6 +274,8 @@ class GlobalContext(abc.ABC):
             self.workspace_info,
             self.migration_status_refresher,
             self.migrate_grants,
+            self.sql_backend,
+            self.config.inventory_database,
         )
 
     @cached_property
