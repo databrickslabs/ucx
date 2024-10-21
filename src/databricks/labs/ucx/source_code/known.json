@@ -10726,10 +10726,7 @@
   },
   "murmurhash": {
     "murmurhash": [],
-    "murmurhash.about": [],
-    "murmurhash.tests": [],
-    "murmurhash.tests.test_hash": [],
-    "murmurhash.tests.test_import": []
+    "murmurhash.about": []
   },
   "mypy": {
     "mypy": [],
