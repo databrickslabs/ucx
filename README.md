@@ -827,9 +827,9 @@ in the Migration dashboard.
 - Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
-### [EXPERIMENTAL] Scan tables in mounts Workflow
+### [LEGACY] Scan tables in mounts Workflow
 #### <b>Always run this workflow AFTER the assessment has finished</b>
-- This experimental workflow attemps to find all Tables inside mount points that are present on your workspace.
+- This experimental workflow attempts to find all Tables inside mount points that are present on your workspace.
 - If you do not run this workflow, then `migrate-tables-in-mounts-experimental` won't do anything.
 - It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
 - This command is incremental, meaning that each time you run it, it will overwrite the previous tables in mounts found.
@@ -841,7 +841,7 @@ in the Migration dashboard.
   - exclude_paths_in_mount : A list of paths to exclude in all mount points
   - include_paths_in_mount : A list of paths to include in all mount points
 
-### [EXPERIMENTAL] Migrate tables in mounts Workflow
+### [LEGACY] Migrate tables in mounts Workflow
 - An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter.
 - You must do the following in order to make this work:
   - run the Assessment [workflow](#assessment-workflow)
