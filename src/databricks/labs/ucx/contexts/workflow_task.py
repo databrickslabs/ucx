@@ -3,7 +3,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationOwnership, TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
@@ -21,10 +21,10 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineI
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantOwnership
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table, TableOwnership
-from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfOwnership
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
+from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
@@ -69,6 +69,10 @@ class RuntimeContext(GlobalContext):
         return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def job_ownership(self) -> JobOwnership:
+        return JobOwnership(self.administrator_locator)
+
+    @cached_property
     def submit_runs_crawler(self) -> SubmitRunsCrawler:
         return SubmitRunsCrawler(
             self.workspace_client,
@@ -82,8 +86,16 @@ class RuntimeContext(GlobalContext):
         return ClustersCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def cluster_ownership(self) -> ClusterOwnership:
+        return ClusterOwnership(self.administrator_locator)
+
+    @cached_property
     def pipelines_crawler(self) -> PipelinesCrawler:
         return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def pipeline_ownership(self) -> PipelineOwnership:
+        return PipelineOwnership(self.administrator_locator)
 
     @cached_property
     def table_size_crawler(self) -> TableSizeCrawler:
@@ -94,6 +106,10 @@ class RuntimeContext(GlobalContext):
         return PoliciesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def cluster_policy_ownership(self) -> ClusterPolicyOwnership:
+        return ClusterPolicyOwnership(self.administrator_locator)
+
+    @cached_property
     def global_init_scripts_crawler(self) -> GlobalInitScriptCrawler:
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
@@ -102,10 +118,6 @@ class RuntimeContext(GlobalContext):
         # Warning: Not all runtime contexts support the fast-scan implementation; it requires the JVM bridge to Spark
         # and that's not always available.
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
-
-    @cached_property
-    def tables_ownership(self) -> TableOwnership:
-        return TableOwnership(self.administrator_locator)
 
     @cached_property
     def tables_in_mounts(self) -> TablesInMounts:
@@ -150,10 +162,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_clusters_log(self) -> HistoryLog[ClusterInfo]:
-        cluster_owner = ClusterOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            cluster_owner,
+            self.cluster_ownership,
             ClusterInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -162,10 +173,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_cluster_policies_log(self) -> HistoryLog[PolicyInfo]:
-        cluster_policy_owner = ClusterPolicyOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            cluster_policy_owner,
+            self.cluster_policy_ownership,
             PolicyInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -174,10 +184,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_grants_log(self) -> HistoryLog[Grant]:
-        grant_owner = GrantOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            grant_owner,
+            self.grant_ownership,
             Grant,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -186,10 +195,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_jobs_log(self) -> HistoryLog[JobInfo]:
-        job_owner = JobOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            job_owner,
+            self.job_ownership,
             JobInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -198,10 +206,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_pipelines_log(self) -> HistoryLog[PipelineInfo]:
-        pipeline_owner = PipelineOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            pipeline_owner,
+            self.pipeline_ownership,
             PipelineInfo,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -212,7 +219,7 @@ class RuntimeContext(GlobalContext):
     def historical_tables_log(self) -> HistoryLog[Table]:
         return HistoryLog(
             self.sql_backend,
-            self.tables_ownership,
+            self.table_ownership,
             Table,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -221,10 +228,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_table_migration_log(self) -> HistoryLog[TableMigrationStatus]:
-        table_migration_owner = TableMigrationOwnership(self.tables_crawler, self.tables_ownership)
         return HistoryLog(
             self.sql_backend,
-            table_migration_owner,
+            self.table_migration_ownership,
             TableMigrationStatus,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
@@ -233,10 +239,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_udfs_log(self) -> HistoryLog[Udf]:
-        udf_owner = UdfOwnership(self.administrator_locator)
         return HistoryLog(
             self.sql_backend,
-            udf_owner,
+            self.udf_ownership,
             Udf,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,

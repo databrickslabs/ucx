@@ -40,15 +40,17 @@ from databricks.labs.ucx.hive_metastore.grants import (
     GrantsCrawler,
     MigrateGrants,
     PrincipalACL,
+    GrantOwnership,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationOwnership
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.tables import TableOwnership
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler, UdfOwnership
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
@@ -244,12 +246,24 @@ class GlobalContext(abc.ABC):
         return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
 
     @cached_property
+    def grant_ownership(self) -> GrantOwnership:
+        return GrantOwnership(self.administrator_locator)
+
+    @cached_property
     def udfs_crawler(self) -> UdfsCrawler:
         return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
+    def udf_ownership(self) -> UdfOwnership:
+        return UdfOwnership(self.administrator_locator)
+
+    @cached_property
     def tables_crawler(self) -> TablesCrawler:
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+
+    @cached_property
+    def table_ownership(self) -> TableOwnership:
+        return TableOwnership(self.administrator_locator)
 
     @cached_property
     def tables_migrator(self) -> TablesMigrator:
@@ -362,6 +376,10 @@ class GlobalContext(abc.ABC):
             self.inventory_database,
             self.tables_crawler,
         )
+
+    @cached_property
+    def table_migration_ownership(self) -> TableMigrationOwnership:
+        return TableMigrationOwnership(self.tables_crawler, self.table_ownership)
 
     @cached_property
     def iam_credential_manager(self) -> CredentialManager:
