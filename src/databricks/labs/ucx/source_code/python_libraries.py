@@ -93,7 +93,8 @@ class PythonLibraryResolver(LibraryResolver):
             "--upgrade",  # Upgrades when library already installed
         ]
         return_code, stdout, stderr = self._runner(args)
-        logger.debug(f"pip output:\n{stdout}\n{stderr}")
+        if stdout or stderr:
+            logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
             command = " ".join(args)
             problem = DependencyProblem("library-install-failed", f"'{command}' failed with '{stderr}'")
