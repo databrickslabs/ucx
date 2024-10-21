@@ -1,10 +1,11 @@
+import dataclasses
 from unittest.mock import create_autospec
 
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 
+from databricks.labs.ucx.assessment.sequencing import MigrationSequencer, MigrationStep
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
-from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
