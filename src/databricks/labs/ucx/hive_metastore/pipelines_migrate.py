@@ -17,18 +17,18 @@ logger = logging.getLogger(__name__)
 class PipelineRule:
     workspace_name: str
     src_pipeline_id: str
-    target_catalog_name: str | None = None,
-    target_schema_name: str | None = None,
-    target_pipeline_name: str | None = None,
+    target_catalog_name: str = ""
+    target_schema_name: str = ""
+    target_pipeline_name: str = ""
 
     @classmethod
     def from_src_dst(
         cls,
         workspace_name: str,
         src_pipeline_id: str,
-        target_catalog_name: str | None = None,
-        target_schema_name: str | None = None,
-        target_pipeline_name: str | None = None,
+        target_catalog_name: str = "",
+        target_schema_name: str = "",
+        target_pipeline_name: str = "",
     ) -> "PipelineRule":
         return cls(
             workspace_name=workspace_name,
@@ -45,7 +45,7 @@ class PipelineRule:
             target_catalog_name=catalog_name,
             src_pipeline_id=pipeline.pipeline_id,
             target_pipeline_name=pipeline.pipeline_name,
-            target_schema_name=None,
+            target_schema_name="",
         )
 
 
@@ -145,9 +145,9 @@ class PipelinesMigrator:
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
         }
-        if pipeline.rule.target_schema_name is not None:
+        if pipeline.rule.target_schema_name is not "":
             body['target'] = pipeline.rule.target_schema_name
-        if pipeline.rule.target_pipeline_name is not None:
+        if pipeline.rule.target_pipeline_name is not "":
             body['name'] = pipeline.rule.target_pipeline_name
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
