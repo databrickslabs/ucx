@@ -20,12 +20,15 @@ from databricks.labs.ucx.hive_metastore.udfs import Udf
 
 @pytest.fixture
 def tables():
-    tables_ = [
+    records = []
+    for table in (
         Table("hive_metastore", schema, table, "MANAGED", "delta")
         for schema in ("schema1", "schema2")
         for table in ("table1", "table2", "table3", "table4", "table5")
-    ]
-    return [("tables", [table.catalog, table.database, table.name], table, [], "Cor") for table in tables_]
+    ):
+        record = ("tables", [table.catalog, table.database, table.name], table, [], "Cor")
+        records.append(record)
+    return records
 
 
 @pytest.fixture
@@ -46,7 +49,8 @@ def table_migration_statuses(tables):
 
 @pytest.fixture
 def udfs():
-    udfs_ = [
+    records = []
+    for udf in (
         Udf(
             "hive_metastore",
             "schema1",
@@ -72,112 +76,114 @@ def udfs():
             comment="UNKNOWN",
             failures="UDF not supported by UC",
         ),
-    ]
-    return [
-        (
+    ):
+        record = (
             "udfs",
             [udf.catalog, udf.database, udf.name],
             udf,
             [] if not udf.failures else udf.failures.split("\n"),
             "Cor",
         )
-        for udf in udfs_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
 def grants():
-    grants_ = [
+    records = []
+    for grant in (
         Grant("service_principal", "MODIFY", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
         Grant("Liran", "DENY", "hive_metastore", "sales"),
-    ]
-    return [
-        (
+    ):
+        record = (
             "grants",
             [grant.principal, grant.action_type],
             grant,
             ["DENY is not supported by UC"] if grant.action_type == "DENY" else [],
             "Cor",
         )
-        for grant in grants_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
 def jobs():
-    jobs_ = [
+    records = []
+    for job in (
         JobInfo("1", success=1, failures=""),
         JobInfo("2", success=0, failures="No isolation shared clusters not supported in UC"),
-    ]
-    return [
-        (
+    ):
+        record = (
             "jobs",
             [job.job_id],
             job,
             job.failures.split("\n") if job.failures else [],
             "Cor",
         )
-        for job in jobs_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
 def clusters():
-    clusters_ = [
+    records = []
+    for cluster in (
         ClusterInfo("1", success=1, failures=""),
         ClusterInfo("2", success=0, failures="Uses azure service principal credentials config in cluster"),
-    ]
-    return [
-        (
+    ):
+        record = (
             "clusters",
             [cluster.cluster_id],
             cluster,
             cluster.failures.split("\n") if cluster.failures else [],
             "Cor",
         )
-        for cluster in clusters_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
 def pipelines():
-    pipelines_ = [
+    records = []
+    for pipeline in (
         PipelineInfo("1", success=1, failures=""),
         PipelineInfo(
             "2", success=0, failures="Uses passthrough config: spark.databricks.passthrough.enabled in pipeline"
         ),
-    ]
-    return [
-        (
+    ):
+        record = (
             "pipelines",
             [pipeline.pipeline_id],
             pipeline,
             pipeline.failures.split("\n") if pipeline.failures else [],
             "Cor",
         )
-        for pipeline in pipelines_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
 def policies():
-    policies_ = [
+    records = []
+    for policy in (
         PolicyInfo("1", "policy1", success=1, failures=""),
         PolicyInfo(
-            "2", "policy2", success=0, failures="Uses azure service principal credentials config in policy",
+            "2",
+            "policy2",
+            success=0,
+            failures="Uses azure service principal credentials config in policy",
         ),
-    ]
-    return [
-        (
+    ):
+        record = (
             "policies",
             [policy.policy_id],
             policy,
             policy.failures.split("\n") if policy.failures else [],
             "Cor",
         )
-        for policy in policies_
-    ]
+        records.append(record)
+    return records
 
 
 @pytest.fixture
