@@ -56,3 +56,20 @@ def test_build_notebook_dependency_graphs_fails_installing_when_spaces(simple_ct
 
     assert not maybe.problems
     assert maybe.graph.all_relative_names() == {f"{notebook}.py", "thingy/__init__.py"}
+
+
+def test_build_notebook_dependency_graphs_when_installing_pytest_twice(simple_ctx) -> None:
+    ctx = simple_ctx.replace(path_lookup=MockPathLookup())
+    maybe = ctx.dependency_resolver.build_notebook_dependency_graph(
+        Path("pip_install_pytest_twice"), CurrentSessionState()
+    )
+    assert not maybe.problems
+
+
+def test_build_notebook_dependency_graphs_when_installing_pytest_twice_alternative(simple_ctx):
+    ctx = simple_ctx.replace(path_lookup=MockPathLookup())
+    for _ in range(2):
+        maybe = ctx.dependency_resolver.build_notebook_dependency_graph(
+            Path("pip_install_pytest_with_index_url"), CurrentSessionState()
+        )
+        assert not maybe.problems

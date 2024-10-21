@@ -2,11 +2,11 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pytest
+# MAGIC %pip install pytest --index-url https://pypi.python.org/simple
 
 # COMMAND ----------
 
-# MAGIC %pip install pytest
+# MAGIC %pip install pytest --index-url https://pypi.python.org/simple
 
 # COMMAND ----------
 
