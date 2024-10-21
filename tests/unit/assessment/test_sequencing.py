@@ -1,3 +1,4 @@
+import dataclasses
 from unittest.mock import create_autospec
 
 from pathlib import Path
@@ -7,9 +8,9 @@ from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 from databricks.sdk.service.jobs import NotebookTask
 
+from databricks.labs.ucx.assessment.sequencing import MigrationSequencer, MigrationStep
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
-from databricks.labs.ucx.sequencing.sequencing import MigrationSequencer
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
@@ -35,13 +36,17 @@ def test_sequencer_builds_cluster_and_children_from_task(ws, simple_dependency_r
     sequencer.register_workflow_task(task, job, graph)
     steps = list(sequencer.generate_steps())
     step = steps[-1]
-    assert step.step_id
-    assert step.object_type == "CLUSTER"
-    assert step.object_id == "cluster-123"
-    assert step.object_name == "my-cluster"
-    assert step.object_owner == "John Doe"
-    assert step.step_number == 3
-    assert len(step.required_step_ids) == 2
+    # we don't know the ids of the steps, se let's zero them
+    step = dataclasses.replace(step, step_id=0, required_step_ids=[0] * len(step.required_step_ids))
+    assert step == MigrationStep(
+        step_id=0,
+        step_number=3,
+        object_type="CLUSTER",
+        object_id="cluster-123",
+        object_name="my-cluster",
+        object_owner="John Doe",
+        required_step_ids=[0, 0],
+    )
 
 
 def test_sequencer_builds_steps_from_dependency_graph(ws, simple_dependency_resolver, mock_path_lookup):
