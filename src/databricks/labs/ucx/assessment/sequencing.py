@@ -55,7 +55,6 @@ class MigrationSequencer:
         self._admin_locator = admin_locator
         self._last_node_id = 0
         self._nodes: dict[tuple[str, str], MigrationNode] = {}
-        self._incoming: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
         self._outgoing: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
 
     def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
@@ -73,15 +72,12 @@ class MigrationSequencer:
             object_owner=job_node.object_owner,  # no task owner so use job one
         )
         self._nodes[task_node.key] = task_node
-        self._incoming[job_node.key].add(task_node.key)
         self._outgoing[task_node.key].add(job_node.key)
         if task.existing_cluster_id:
             cluster_node = self.register_cluster(task.existing_cluster_id)
             if cluster_node:
-                self._incoming[cluster_node.key].add(task_node.key)
                 self._outgoing[task_node.key].add(cluster_node.key)
                 # also make the cluster dependent on the job
-                self._incoming[cluster_node.key].add(job_node.key)
                 self._outgoing[job_node.key].add(cluster_node.key)
         # TODO register dependency graph
         return task_node
@@ -104,7 +100,6 @@ class MigrationSequencer:
             for job_cluster in job.settings.job_clusters:
                 cluster_node = self.register_job_cluster(job_cluster)
                 if cluster_node:
-                    self._incoming[cluster_node.key].add(job_node.key)
                     self._outgoing[job_node.key].add(cluster_node.key)
         return job_node
 
@@ -132,31 +127,47 @@ class MigrationSequencer:
         return cluster_node
 
     def generate_steps(self) -> Iterable[MigrationStep]:
-        # algo adapted from Kahn topological sort. The main differences is that
-        # we want the same step number for all nodes with same dependency depth
-        # so instead of pushing to a queue, we rebuild it once all leaf nodes are processed
-        # (these are transient leaf nodes i.e. they only become leaf during processing)
-        incoming_counts = self._populate_incoming_counts()
+        """algo adapted from Kahn topological sort. The differences are as follows:
+        - we want the same step number for all nodes with same dependency depth
+          so instead of pushing to a queue, we rebuild it once all leaf nodes are processed
+          (these are transient leaf nodes i.e. they only become leaf during processing)
+        - the inputs do not form a DAG so we need specialized handling of edge cases
+          (implemented in PR #3009)
+        """
+        # pre-compute incoming keys for best performance of self._required_step_ids
+        incoming_keys = self._collect_incoming_keys()
+        incoming_counts = self.compute_incoming_counts(incoming_keys)
         step_number = 1
         sorted_steps: list[MigrationStep] = []
         while len(incoming_counts) > 0:
             leaf_keys = list(self._get_leaf_keys(incoming_counts))
             for leaf_key in leaf_keys:
                 del incoming_counts[leaf_key]
-                sorted_steps.append(self._nodes[leaf_key].as_step(step_number, list(self._required_step_ids(leaf_key))))
+                sorted_steps.append(
+                    self._nodes[leaf_key].as_step(step_number, list(self._required_step_ids(incoming_keys[leaf_key])))
+                )
                 for dependency_key in self._outgoing[leaf_key]:
                     incoming_counts[dependency_key] -= 1
             step_number += 1
         return sorted_steps
 
-    def _required_step_ids(self, node_key: tuple[str, str]) -> Iterable[int]:
-        for leaf_key in self._incoming[node_key]:
-            yield self._nodes[leaf_key].node_id
+    def _collect_incoming_keys(self) -> dict[tuple[str, str], set[tuple[str, str]]]:
+        result: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
+        for source, outgoing in self._outgoing.items():
+            for target in outgoing:
+                result[target].add(source)
+        return result
 
-    def _populate_incoming_counts(self) -> dict[tuple[str, str], int]:
+    def _required_step_ids(self, required_step_keys: set[tuple[str, str]]) -> Iterable[int]:
+        for source_key in required_step_keys:
+            yield self._nodes[source_key].node_id
+
+    def compute_incoming_counts(
+        self, incoming: dict[tuple[str, str], set[tuple[str, str]]]
+    ) -> dict[tuple[str, str], int]:
         result = defaultdict(int)
         for node_key in self._nodes:
-            result[node_key] = len(self._incoming[node_key])
+            result[node_key] = len(incoming[node_key])
         return result
 
     @staticmethod
