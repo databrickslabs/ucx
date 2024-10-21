@@ -11,6 +11,7 @@ from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.udfs import Udf
 
 
 @pytest.fixture
@@ -21,6 +22,16 @@ def tables():
         for table in ("table1", "table2", "table3", "table4", "table5")
     ]
     return [("tables", [table.catalog, table.database, table.name], table, [], "Cor") for table in tables_]
+
+
+@pytest.fixture
+def udfs():
+    udfs_ = [
+        Udf("hive_metastore", "schema1", "custom_function", func_type="UNKNOWN", func_input="UNKNOWN", func_returns="UNKNOWN", deterministic=True, data_access="UNKNOWN", body="UNKNOWN", comment="UNKNOWN"),
+        Udf("hive_metastore", "schema1", "invalid_function", func_type="UNKNOWN", func_input="UNKNOWN",
+            func_returns="UNKNOWN", deterministic=True, data_access="UNKNOWN", body="UNKNOWN", comment="UNKNOWN", failures="UDF not supported by UC"),
+    ]
+    return [("udfs", [udf.catalog, udf.database, udf.name], udf, udf.failures.split("\n"), "Cor") for udf in udfs_]
 
 
 @pytest.fixture
@@ -47,6 +58,7 @@ def schema_populated(
     make_schema,
     tables,
     table_migration_statuses,
+    udfs,
 ) -> SchemaInfo:
     # Different to the other dashboards, the migration process dashboard uses data from a UC catalog,
     # not from the Hive metastore
@@ -54,7 +66,7 @@ def schema_populated(
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    for table_name, id_, instance, failures, owner in tables + table_migration_statuses:
+    for table_name, id_, instance, failures, owner in tables + table_migration_statuses + udfs:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
             field.name: str(getattr(instance, field.name))
@@ -102,7 +114,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=75.0)]),
+        ("01_0_percentage_migration_readiness", [Row(percentage=83.33333333333333)]),
         ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
         (
             "02_1_migration_status_by_owner_bar_graph",
