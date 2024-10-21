@@ -842,18 +842,22 @@ class MigrateGrants:
         return replace(grant, principal=target_principal)
 
 
-class ACLMigrator:
+class ACLMigrator(CrawlerBase[Grant]):
     def __init__(
         self,
         tables_crawler: TablesCrawler,
         workspace_info: WorkspaceInfo,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
+        backend: SqlBackend,
+        catalog: str,
+        schema: str,
     ):
         self._tables_crawler = tables_crawler
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
+        super().__init__(backend, catalog, schema, "acls", Grant)
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()
@@ -926,13 +930,13 @@ class ACLMigrator:
     def _migrate_acls(self, tables_in_scope: list[TableToMigrate]) -> None:
         tasks = []
         for table in tables_in_scope:
-            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table_key))
+            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table))
         Threads.strict("migrate grants", tasks)
 
     def _retrieve_acls(self, tables_in_scope: list[TableToMigrate]) -> Iterable[Grant]:
         tasks = []
         for table in tables_in_scope:
-            tasks.append(partial(self._migrate_grants.retrieve, table.src, table.rule.as_uc_table_key))
+            tasks.append(partial(self._migrate_grants.retrieve, table.src, table.rule.as_uc_table))
         grants, errors = Threads.gather("retrieve grants", tasks)
         if len(errors) > 0:
             logger.warning(f"Failed to retrieve grants for {len(errors)} tables")
@@ -943,14 +947,8 @@ class ACLMigrator:
         index = self._migration_status_refresher.index()
         return index.is_migrated(schema, table)
 
-
-class TACLCrawler(CrawlerBase[Grant]):
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, acl_migrator: ACLMigrator):
-        super().__init__(backend, catalog, schema, "acls", Grant)
-        self._acl_migrator = acl_migrator
-
     def _crawl(self) -> Iterable[Grant]:
-        return self._acl_migrator.retrieve_table_acls()
+        return self.retrieve_table_acls()
 
     def _try_fetch(self):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
