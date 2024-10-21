@@ -850,14 +850,13 @@ class ACLMigrator(CrawlerBase[Grant]):
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
         backend: SqlBackend,
-        catalog: str,
         schema: str,
     ):
         self._tables_crawler = tables_crawler
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
-        super().__init__(backend, catalog, schema, "acls", Grant)
+        super().__init__(backend, "hive_metastore", schema, "acls", Grant)
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()

@@ -35,7 +35,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, ws_info, mock_backend, c
 
     migrate_grants = create_autospec(MigrateGrants)
     acl_migrate = ACLMigrator(
-        table_crawler, workspace_info, migration_status_refresher, migrate_grants, mock_backend, "hive_metastore", "ucx"
+        table_crawler, workspace_info, migration_status_refresher, migrate_grants, mock_backend, "ucx"
     )
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.view_dst": "hive_metastore.db1_src.view_src",
@@ -68,7 +68,6 @@ def test_migrate_acls_hms_fed_proper_queries(ws, ws_info, mock_backend, caplog):
         migration_status_refresher,
         migrate_grants,
         mock_backend,
-        "hive_metastore",
         "ucx",
     )
     acl_migrate.migrate_acls(hms_fed=True, target_catalog='hms_fed')
@@ -123,10 +122,10 @@ def test_tacl_crawler(ws, ws_info, caplog):
     migration_status_refresher.index.return_value = migration_index
 
     acl_migrate = ACLMigrator(
-        table_crawler, workspace_info, migration_status_refresher, migrate_grants, sql_backend, "hive_metastore", "ucx"
+        table_crawler, workspace_info, migration_status_refresher, migrate_grants, sql_backend, "ucx"
     )
     tacls = acl_migrate.snapshot()
-    sql_backend.fetch.assert_called_with('SELECT * FROM `hive_metastore`.`ucx`.`ACLS`')
+    sql_backend.fetch.assert_called_with('SELECT * FROM `hive_metastore`.`ucx`.`acls`')
     for grant in user_grants:
         assert grant in tacls
     assert Grant('acc_group1', 'SELECT', database='db1_src', table='table1') in tacls
