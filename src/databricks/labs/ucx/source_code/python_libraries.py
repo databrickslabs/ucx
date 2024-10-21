@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class PythonLibraryResolver(LibraryResolver):
-    # TODO: https://github.com/databrickslabs/ucx/issues/1640
+    """Resolve python libraries by registering and installing Python libraries."""
 
     def __init__(
         self,
