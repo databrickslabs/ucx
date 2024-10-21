@@ -2,13 +2,12 @@
 height: 4
 ---
 
-# Migration progress
+# Migration Progress
 
-This dashboard shows the migration progress. The data visualized is updated by the `migration-progress-experimental`
-workflow. This workflow is expected to run regularly, like daily or weekly, to keep an up-to-date overview of how the
-migration is progressing.
+This dashboard displays the migration progress, with data visualized from the `migration-progress-experimental`
+workflow. This workflow is designed to run regularly — either daily or weekly — to provide an up-to-date overview of the
+migration status.
 
-Besides given an up-to-date status of the migration progress, the dashboards also facilitates
-planning and dividing the work. For example, one my can chose to migrate a single data workspace at a time. By making
-someone the migration `owner` of each workspace, the dashboards shows how the resources assigned to the owner are
-progressing.
+In addition to offering real-time insights into migration progress, the dashboard also facilitates planning and task
+division. For instance, you can choose to migrate one workspace or schema at a time. By assigning a migration owner to
+each workspace and schema, the dashboard shows how the resources allocated to that owner are progressing.
