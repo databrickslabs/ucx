@@ -11334,6 +11334,9 @@
   "multidict": {
     "multidict": []
   },
+  "multimethod": {
+    "multimethod": []
+  },
   "multiprocess": {
     "_multiprocess": [],
     "multiprocess.__info__": [],
