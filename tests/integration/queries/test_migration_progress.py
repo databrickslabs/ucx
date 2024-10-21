@@ -153,9 +153,7 @@ def schema_populated(
     jobs,
     clusters,
 ) -> SchemaInfo:
-    # Different to the other dashboards, the migration process dashboard uses data from a UC catalog,
-    # not from the Hive metastore
-    catalog = make_catalog()
+    catalog = make_catalog()  # The migration progress dashboard uses a UC catalog, not a database in the Hive metastore
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
