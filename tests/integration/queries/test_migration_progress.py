@@ -254,11 +254,11 @@ def test_migration_progress_dashboard(
     "query_name, rows",
     [
         ("01_0_percentage_migration_readiness", [Row(percentage=73.91304347826087)]),
-        ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
-        ("01_2_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
-        ("01_3_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
-        ("01_4_percentage_job_migration_readiness", [Row(percentage=50.0)]),
-        ("01_5_percentage_cluster_migration_readiness", [Row(percentage=50.0)]),
+        ("01_1_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
+        ("01_2_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
+        ("01_3_percentage_job_migration_readiness", [Row(percentage=50.0)]),
+        ("01_4_percentage_cluster_migration_readiness", [Row(percentage=50.0)]),
+        ("01_5_percentage_table_migration_readiness", [Row(percentage=100.0)]),
         ("01_6_percentage_pipeline_migration_readiness", [Row(percentage=50.0)]),
         ("01_7_percentage_policy_migration_readiness", [Row(percentage=50.0)]),
         (
