@@ -17,18 +17,18 @@ logger = logging.getLogger(__name__)
 class PipelineRule:
     workspace_name: str
     src_pipeline_id: str
-    target_catalog_name: str = ""
-    target_schema_name: str = ""
-    target_pipeline_name: str = ""
+    target_catalog_name: str | None = None
+    target_schema_name: str | None = None
+    target_pipeline_name: str | None = None
 
     @classmethod
     def from_src_dst(
         cls,
         workspace_name: str,
         src_pipeline_id: str,
-        target_catalog_name: str = "",
-        target_schema_name: str = "",
-        target_pipeline_name: str = "",
+        target_catalog_name: str | None = None,
+        target_schema_name: str | None = None,
+        target_pipeline_name: str | None = None,
     ) -> "PipelineRule":
         return cls(
             workspace_name=workspace_name,
@@ -45,7 +45,7 @@ class PipelineRule:
             target_catalog_name=catalog_name,
             src_pipeline_id=pipeline.pipeline_id,
             target_pipeline_name=pipeline.pipeline_name,
-            target_schema_name="",
+            target_schema_name=None,
         )
 
 
@@ -152,4 +152,8 @@ class PipelinesMigrator:
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
         )
+
+        # TODO:
+        # Check the error from UI
+        # BAD_REQUEST: Standard_D4pds_v6 is a Graviton instance and is not compatible with runtime dlt:14.1.21-delta-pipelines-dlt-release-2024.41-rc0-commit-f32d838-image-894c190.
         return res
