@@ -90,6 +90,7 @@ class PythonLibraryResolver(LibraryResolver):
             *libraries,
             "-t",
             str(self._temporary_virtual_environment),
+            "--upgrade",  # Upgrades when library already installed
         ]
         return_code, stdout, stderr = self._runner(args)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
