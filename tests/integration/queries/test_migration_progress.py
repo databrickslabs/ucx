@@ -153,6 +153,11 @@ def schema_populated(
     jobs,
     clusters,
 ) -> SchemaInfo:
+    """Populate the historical schema given the objects from the fixtures.
+
+    For optimization purposes, this fixture could be "module" (or "session") scoped. However, dependant fixtures are
+    "function" scoped, thus one should first evaluate if those can be changed.
+    """
     catalog = make_catalog()  # The migration progress dashboard uses a UC catalog, not a database in the Hive metastore
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
