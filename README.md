@@ -792,18 +792,19 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 ```
 This command will remove the upgraded table and reset the `upgraded_from` property. It will allow for upgrading the table again.
 
-### Post Migration Data Reconciliation Task
-UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
-- Compare the schema of the source and target tables. The result is `schema_matches`, and column by column comparison
-is stored as `column_comparison` struct.
-- Compare the row counts of the source and target tables. If the row count is within the reconciliation threshold
-(defaults to 5%), `data_matches` is True.
-- Compare the content of individual row between source and target tables to identify any discrepancies (when `compare_rows`
-flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
-and `target_missing_count`
+### Post Migration Data Reconciliation Workflow
 
-Once the workflow completes, the output will be stored in `$inventory_database.reconciliation_results` view, and displayed
-in the Migration dashboard.
+The `migrate-data-reconciliation` workflow validates the integrity of the migrated tables and persists its results in
+the `recon_results` table. The workflow compares the following between the migrated Hive metastore and its UC
+counterpart table:
+- `Schema` : See this result in the `schema_matches` column.
+- `Column by column` : See this result in the `column_comparison` column.
+- `Row counts` : If the row count is within the reconciliation threshold (defaults to 5%), the `data_matches` column is
+  set to `true`, otherwise it is set to `false`.
+- `Rows` : If the `compare_rows` flag is set to `true`, rows are compared using a hash comparison. Number of missing
+  rows are stored in the `source_missing_count` and `target_missing_count` column, respectively.
+
+The output is processed and displayed in the migration dashboard using the in `reconciliation_results` view.
 
 ![reconciliation results](docs/recon_results.png)
 
