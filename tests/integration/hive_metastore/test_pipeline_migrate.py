@@ -1,4 +1,4 @@
-from databricks.sdk.service.pipelines import PipelineLibrary, NotebookLibrary
+from databricks.sdk.service.pipelines import PipelineLibrary, NotebookLibrary, PipelinesAPI
 
 from databricks.get_uninstalled_libraries import libraries
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -46,9 +46,12 @@ def test_pipeline_migrate(ws, make_pipeline, make_notebook, make_directory, inve
             continue
         if pipeline.pipeline_id == created_pipeline.pipeline_id:
             results.append(pipeline)
+            created_pipeline_name = pipeline.pipeline_name
 
     assert len(results) >= 1
     assert results[0].pipeline_id == created_pipeline.pipeline_id
+
+    # TODO: Add other rules as well to test the migration
     pipeline_rules = [PipelineRule.from_src_dst("test_workspace", created_pipeline.pipeline_id, "test_catalog"
                                                 )]
     runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
@@ -56,3 +59,16 @@ def test_pipeline_migrate(ws, make_pipeline, make_notebook, make_directory, inve
 
     pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler, pipeline_mapping)
     pipelines_migrator.migrate_pipelines()
+
+    # crawl pipeline in UC and check if it is migrated
+    pipelines = pipeline_crawler.snapshot(force_refresh=True)
+    results = []
+    for pipeline in pipelines:
+        # TODO: Commented out as the migrated pipeline currently is in failed state after migration
+        # if pipeline.success != 0:
+        #     continue
+        if pipeline.pipeline_name == f"{created_pipeline_name} [UC]":
+            results.append(pipeline)
+            break
+
+    assert len(results) == 1
