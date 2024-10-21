@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -41,7 +41,7 @@ class JobInfo:
     creator: str | None = None
     """User-name of the creator of the pipeline, if known."""
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("job_id",)
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("job_id",)
 
 
 class JobsMixin:

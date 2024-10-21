@@ -1,7 +1,7 @@
 import logging
 import re
 import typing
-from collections.abc import Collection, Iterable, Iterator, Sequence
+from collections.abc import Collection, Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import cached_property, partial
@@ -64,7 +64,7 @@ class Table:  # pylint: disable=too-many-public-methods
     storage_properties: str | None = None
     is_partitioned: bool = False
 
-    __id_attributes__: typing.ClassVar[Sequence[str]] = ("catalog", "database", "name")
+    __id_attributes__: typing.ClassVar[tuple[str, ...]] = ("catalog", "database", "name")
 
     DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/",

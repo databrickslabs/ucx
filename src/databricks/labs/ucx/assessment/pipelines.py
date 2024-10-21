@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -24,7 +24,7 @@ class PipelineInfo:
     creator_name: str | None = None
     """User-name of the creator of the pipeline, if known."""
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("pipeline_id",)
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("pipeline_id",)
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):

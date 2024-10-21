@@ -1,7 +1,7 @@
 import datetime
 import logging
 from dataclasses import dataclass, replace
-from collections.abc import Iterable, KeysView, Sequence
+from collections.abc import Iterable, KeysView
 from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -26,7 +26,7 @@ class TableMigrationStatus:
     dst_table: str | None = None
     update_ts: str | None = None
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("src_schema", "src_table")
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("src_schema", "src_table")
 
     def destination(self):
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()

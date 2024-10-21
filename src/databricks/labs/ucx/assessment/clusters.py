@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -47,7 +47,7 @@ class ClusterInfo:
     creator: str | None = None
     """User-name of the creator of the cluster, if known."""
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("cluster_id",)
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("cluster_id",)
 
 
 class CheckClusterMixin(CheckInitScriptMixin):
@@ -206,7 +206,7 @@ class PolicyInfo:
     creator: str | None = None
     """User-name of the creator of the cluster policy, if known."""
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("policy_id",)
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("policy_id",)
 
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from functools import partial
 from typing import ClassVar
@@ -30,7 +30,7 @@ class Udf:  # pylint: disable=too-many-instance-attributes
     success: int = 1
     failures: str = ""
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("catalog", "database", "name")
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("catalog", "database", "name")
 
     @property
     def key(self) -> str:

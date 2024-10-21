@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from functools import partial, cached_property
 from typing import ClassVar, Protocol
@@ -66,7 +66,7 @@ class Grant:
     any_file: bool = False
     anonymous_function: bool = False
 
-    __id_attributes__: ClassVar[Sequence[str]] = ("object_type", "object_key", "action_type", "principal")
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("object_type", "object_key", "action_type", "principal")
 
     @staticmethod
     def type_and_key(

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class DataclassWithIdAttributes(Protocol):
     __dataclass_fields__: ClassVar[dict[str, Any]]
 
-    __id_attributes__: ClassVar[Sequence[str]]
+    __id_attributes__: ClassVar[tuple[str, ...]]
     """The names of attributes (can be dataclass fields or ordinary properties) that make up the object identifier.
 
     All attributes must be (non-optional) strings.
