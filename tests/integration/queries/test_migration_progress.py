@@ -11,6 +11,7 @@ from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.clusters import ClusterInfo
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -121,6 +122,25 @@ def jobs():
 
 
 @pytest.fixture
+def clusters():
+    clusters_ = [
+        ClusterInfo("1", success=1, failures=""),
+        ClusterInfo("2", success=0, failures="Uses azure service principal credentials config in cluster"),
+    ]
+    return [
+        (
+            "clusters",
+            [cluster.cluster_id],
+            cluster,
+            cluster.failures.split("\n") if cluster.failures else [],
+            "Cor",
+        )
+        for cluster in clusters_
+    ]
+
+
+
+@pytest.fixture
 def schema_populated(
     ws: WorkspaceClient,
     sql_backend: SqlBackend,
@@ -131,6 +151,7 @@ def schema_populated(
     udfs,
     grants,
     jobs,
+    clusters,
 ) -> SchemaInfo:
     # Different to the other dashboards, the migration process dashboard uses data from a UC catalog,
     # not from the Hive metastore
@@ -138,7 +159,7 @@ def schema_populated(
     schema = make_schema(catalog_name=catalog.name)
     workspace_id = ws.get_workspace_id()
     historicals = []
-    objects = tables + table_migration_statuses + udfs + grants + jobs
+    objects = tables + table_migration_statuses + udfs + grants + jobs + clusters
     for table_name, id_, instance, failures, owner in objects:
         # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
         data = {
@@ -187,7 +208,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=82.3529411764706)]),
+        ("01_0_percentage_migration_readiness", [Row(percentage=78.94736842105263)]),
         ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
         ("01_2_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
         ("01_3_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
