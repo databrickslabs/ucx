@@ -162,8 +162,11 @@ class HistoricalEncoder(Generic[Record]):
         if self._has_failures == list[str]:
             failures = record_values["failures"]
         elif self._has_failures == str:
-            encoded_failures = record_values["failures"]
-            failures = json.loads(encoded_failures) if encoded_failures else []
+            raw_failures = record_values["failures"]
+            try:
+                failures = json.loads(raw_failures) if raw_failures else []
+            except json.decoder.JSONDecodeError:
+                failures = [raw_failures]
         else:
             failures = []
 

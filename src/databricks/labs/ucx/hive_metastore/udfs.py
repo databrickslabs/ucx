@@ -29,6 +29,10 @@ class Udf:  # pylint: disable=too-many-instance-attributes
     comment: str
     success: int = 1
     failures: str = ""
+    """A string that represents a problem associated with this UDF.
+
+    Warning: unlike other inventory classes, this is not a JSON-encoded array but instead just a simple string.
+    """
 
     __id_attributes__: ClassVar[tuple[str, ...]] = ("catalog", "database", "name")
 

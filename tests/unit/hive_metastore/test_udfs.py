@@ -128,7 +128,8 @@ def test_udf_owner() -> None:
                 body="UNKNOWN-5",
                 comment="UNKNOWN-6",
                 success=0,
-                failures='["a_failure", "another_failures"]',
+                # Note: NOT json-encoded as is the convention elsewhere.
+                failures="something_is_wrong_with_this_udf",
             ),
             Row(
                 workspace_id=2,
@@ -148,7 +149,7 @@ def test_udf_owner() -> None:
                     "comment": "UNKNOWN-6",
                     "success": "0",
                 },
-                failures=["a_failure", "another_failures"],
+                failures=["something_is_wrong_with_this_udf"],
                 owner="the_admin",
                 ucx_version=ucx_version,
             ),
