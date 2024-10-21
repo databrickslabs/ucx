@@ -191,6 +191,7 @@ def test_migration_progress_dashboard(
         ("01_1_percentage_table_migration_readiness", [Row(percentage=100.0)]),
         ("01_2_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
         ("01_3_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
+        ("01_4_percentage_job_migration_readiness", [Row(percentage=50.0)]),
         (
             "02_1_migration_status_by_owner_bar_graph",
             [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
