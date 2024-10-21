@@ -871,14 +871,15 @@ class ACLMigrator(CrawlerBase[Grant]):
         self._migrate_acls(tables_to_migrate)
 
     def retrieve_table_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> Iterable[Grant]:
-        workspace_name = self._workspace_info.current()
         tables = list(self._table_crawler.snapshot())
         grants: list[Grant] = []
         if not tables:
             logger.info("No tables found to acl")
             return grants
         if hms_fed:
-            tables_to_migrate = self._get_hms_fed_tables(tables, target_catalog if target_catalog else workspace_name)
+            tables_to_migrate = self._get_hms_fed_tables(
+                tables, target_catalog if target_catalog else self._workspace_info.current()
+            )
         else:
             tables_to_migrate = self._get_migrated_tables(tables)
         return self._retrieve_acls(tables_to_migrate)
