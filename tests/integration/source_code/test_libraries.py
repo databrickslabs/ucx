@@ -3,6 +3,8 @@ These tests uses part of unit testing framework to mock the path lookup, and the
 because it uses the context and the time it takes to run the test.
 """
 
+import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -66,6 +68,11 @@ def test_build_notebook_dependency_graphs_when_installing_pytest_twice(simple_ct
     assert not maybe.problems
 
 
+PIP_ALREADY_EXISTS_WARNING = re.compile(
+    r".*WARNING: Target directory .+ already exists\. Specify --upgrade to force replacement.*"
+)
+
+
 @pytest.mark.parametrize(
     "notebook",
     (
@@ -74,13 +81,10 @@ def test_build_notebook_dependency_graphs_when_installing_pytest_twice(simple_ct
         "pip_install_pytest_with_index_url",
     ),
 )
-def test_build_notebook_dependency_graphs_when_installing_notebooks_twice(simple_ctx, notebook) -> None:
+def test_build_notebook_dependency_graphs_when_installing_notebooks_twice(caplog, simple_ctx, notebook) -> None:
     ctx = simple_ctx.replace(path_lookup=MockPathLookup())
-    for _ in range(2):
-        maybe = ctx.dependency_resolver.build_notebook_dependency_graph(
-            Path(notebook), CurrentSessionState()
-        )
-        assert not maybe.problems
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.source_code.python_libraries"):
         for _ in range(2):
             maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path(notebook), CurrentSessionState())
             assert not maybe.problems
+    assert not PIP_ALREADY_EXISTS_WARNING.match(caplog.text.replace("\n", " ")), "Pip already exists warning detected"
