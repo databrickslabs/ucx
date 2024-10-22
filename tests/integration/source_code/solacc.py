@@ -215,7 +215,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
 
 
 def _lint_repos(clone_urls, sol_to_lint: str | None):
-    solacc = _SolaccContext.create(sol_to_lint is None)
+    solacc = _SolaccContext.create(for_all_dirs=sol_to_lint is None)
     if sol_to_lint:
         sol_dir = _clone_repo(clone_urls[sol_to_lint], sol_to_lint)
         _lint_dir(solacc, sol_dir)
