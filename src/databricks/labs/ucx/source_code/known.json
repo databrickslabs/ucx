@@ -11363,6 +11363,10 @@
   "multitasking": {
     "multitasking": []
   },
+  "murmurhash": {
+    "murmurhash": [],
+    "murmurhash.about": []
+  },
   "mypy": {
     "mypy": [],
     "mypyc": []
