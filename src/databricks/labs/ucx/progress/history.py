@@ -162,7 +162,7 @@ class HistoricalEncoder(Generic[Record]):
         msg = f"Cannot encode {type(value)} value in or within field {name}: {value!r}"
         raise TypeError(msg)
 
-    def _encode_field_value(self, name: str, value: Any | None) -> str | None:
+    def _encode_field_value(self, name: str, value: Any) -> str | None:
         if value is None:
             return None
         value_type = self._field_names_with_types[name]
