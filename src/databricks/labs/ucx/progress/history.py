@@ -173,7 +173,7 @@ class HistoricalEncoder(Generic[Record]):
         encoded_value = json.dumps(
             value,
             allow_nan=False,
-            separators=(",", ":"),
+            separators=(",", ":"),  # More compact than default, which includes a space after the colon (:).
             default=lambda o: self._encode_non_serializable(name, o),
         )
         # Handle encoding substituted values that encode as just a string (eg. timestamps); we just return the string.
