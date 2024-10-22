@@ -50,7 +50,7 @@ class MigrationProgress(Workflow):
     def update_tables_history_log(self, ctx: RuntimeContext) -> None:
         """Update the history log with the latest tables inventory snapshot."""
         # The table migration cluster is not legacy-ACL enabled, so we can't crawl from here.
-        # Step 2 of 2: Assuming the inventory was refreshed, capture into the history log.
+        # Step 2 of 2: Assuming (due to depends-on) the inventory was refreshed, capture into the history log.
         # WARNING: this will fail if the inventory is empty, because it will then try to perform a crawl.
         history_log = ctx.historical_tables_log
         tables_snapshot = ctx.tables_crawler.snapshot()
