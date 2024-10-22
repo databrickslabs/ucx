@@ -146,14 +146,14 @@ class MigrationProgress(Workflow):
         migration_status_snapshot = ctx.migration_status_refresher.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(migration_status_snapshot)
 
-    @job_task
+    @job_task(depends_on=[verify_prerequisites])
     def assess_dashboards(self, ctx: RuntimeContext):
         """Scans all dashboards for migration issues in SQL code of embedded widgets.
         Also stores direct filesystem accesses for display in the migration dashboard."""
         # TODO: Ensure these are captured in the history log.
         ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
-    @job_task
+    @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):
         """Scans all jobs for migration issues in notebooks.
         Also stores direct filesystem accesses for display in the migration dashboard."""
