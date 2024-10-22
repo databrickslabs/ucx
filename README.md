@@ -238,6 +238,15 @@ The following resources are installed by UCX:
 | Lakeview dashboards     | |
 | Installation folder     | |
 
+### Readme notebook
+
+![readme](docs/readme-notebook.png)
+
+Every installation creates a `README` notebook with a detailed description of all deployed workflows and their tasks,
+providing quick links to the relevant workflows and dashboards.
+
+[[back to top](#databricks-labs-ucx)]
+
 ### Installation configuration
 
 In the installation folder, the UCX configuration is kept.
@@ -381,15 +390,6 @@ flowchart TD
 Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html).
 You can view the status of deployed workflows via the [`workflows` command](#workflows-command).
 Failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
-
-[[back to top](#databricks-labs-ucx)]
-
-## Readme notebook
-
-![readme](docs/readme-notebook.png)
-
-Every installation creates a `README` notebook with a detailed description of all deployed workflows and their tasks,
-providing quick links to the relevant workflows and dashboards.
 
 [[back to top](#databricks-labs-ucx)]
 
