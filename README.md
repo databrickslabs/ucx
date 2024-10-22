@@ -234,9 +234,9 @@ The following resources are installed by UCX:
 | Installed UCX resources | Description                                                                                      |
 |-------------------------|--------------------------------------------------------------------------------------------------|
 | Inventory database      | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| Jobs                    | |
-| Lakeview dashboards     | |
-| Installation folder     | |
+| Jobs                    | Jobs to execute UCX, see [workflows section](#workflows)                                         |
+| Lakeview dashboards     |                                                                                                  |
+| Installation folder     |                                                                                                  |
 
 ### Readme notebook
 
