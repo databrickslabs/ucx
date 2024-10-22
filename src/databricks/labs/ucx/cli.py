@@ -705,11 +705,9 @@ def migrate_acls(
         workspace_contexts = [ctx]
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
-    target_catalog, hms_fed, dry_run = (
-        named_parameters.get("target_catalog"),
-        named_parameters.get("hms_fed", False),
-        named_parameters.get("dry_run", False),
-    )
+    target_catalog = named_parameters.get("target_catalog")
+    hms_fed = named_parameters.get("hms_fed", False)
+    dry_run = named_parameters.get("dry_run", False)
     for workspace_context in workspace_contexts:
         if dry_run:
             workspace_context.acl_migrator.snapshot()
