@@ -76,10 +76,13 @@ class HistoricalEncoder(Generic[Record]):
                 - The type of the failures field, if present.
         """
         field_types = {field.name: field.type for field in dataclasses.fields(klass)}
-        failures_type = field_types.pop("failures", None)
-        if failures_type not in (None, str, list[str]):
-            msg = f"Historical record {klass} has invalid 'failures' attribute of type: {failures_type}"
-            raise TypeError(msg)
+        if "failures" not in field_types:
+            failures_type = None
+        else:
+            failures_type = field_types.pop("failures")
+            if failures_type not in (str, list[str]):
+                msg = f"Historical record {klass} has invalid 'failures' attribute of type: {failures_type}"
+                raise TypeError(msg)
         return field_types, failures_type
 
     def _get_id_attribute_names(self, klazz: type[Record]) -> Sequence[str]:

@@ -10,7 +10,7 @@ from databricks.labs.lsql.core import Row
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import Ownership
-from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog, Record
+from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog, Record, DataclassWithIdAttributes
 from databricks.labs.ucx.progress.install import Historical
 
 
@@ -429,19 +429,33 @@ def test_historical_encoder_json_encoded_failures_list(ownership, failures: str)
     assert "failures" not in historical.data
 
 
-def test_historical_encoder_failures_verification(ownership) -> None:
+@dataclass
+class _BrokenFailures1:
+    a_field: str = "a_field"
+    failures: list[int] = field(default_factory=list)
+
+    __id_attributes__: ClassVar = ("a_field",)
+
+
+@dataclass
+class _BrokenFailures2:
+    a_field: str = "a_field"
+    failures: None = None
+
+    __id_attributes__: ClassVar = ("a_field",)
+
+
+@pytest.mark.parametrize("klass,broken_type", ((_BrokenFailures1, list[int]), (_BrokenFailures2, None)))
+def test_historical_encoder_failures_verification(
+    ownership,
+    klass: type[DataclassWithIdAttributes],
+    broken_type: type,
+) -> None:
     """Verify that encoders checks the failures field type during initialization."""
 
-    @dataclass
-    class _BrokenFailures:
-        a_field: str = "a_field"
-        failures: list[int] = field(default_factory=list)
-
-        __id_attributes__: ClassVar = ("a_field",)
-
-    expected_msg = r"^Historical record <class '.*'> has invalid 'failures' attribute of type: list\[int\]$"
+    expected_msg = f"^Historical record {re.escape(str(klass))} has invalid 'failures' attribute of type: {re.escape(str(broken_type))}$"
     with pytest.raises(TypeError, match=expected_msg):
-        _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_BrokenFailures)
+        _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=klass)
 
 
 def test_history_log_appends_historical_records(mock_backend, ownership) -> None:
