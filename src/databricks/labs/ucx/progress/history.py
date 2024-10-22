@@ -38,13 +38,13 @@ class HistoricalEncoder(Generic[Record]):
      - Records will be shared (and queried) across workspaces with different versions of UCX installed.
 
     With this in mind:
-     - We have an 'object-type' (discriminator) field for holding the type of the record we're storing. This allows for
+     - We have an `object-type` (discriminator) field for holding the type of the record we're storing. This allows for
        type-specific logic when querying.
      - We have a (type-specific) field for storing the business key (identifier) of each record.
-     - We have special handling of the 'failures' attribute that is normally present in the types we are storing.
-     - The object-data is an unconstrained key-value map, allowing arbitrary attributes to be stored and (if top-level)
+     - We have special handling for the `failures` attribute that is often present on the types we are storing.
+     - The `object-data` is an unconstrained key-value map, allowing arbitrary attributes to be stored and (if top-level)
        queried directly. Complex values are JSON-encoded.
-     - The ownership mechanism is used to associate each record with a user.
+     - The :py:class:`Ownership` mechanism is used to associate each record with a user.
      - To help with forward and backward compatibility the UCX version used to encode a record is included in each
        record.
      - The associated workspace and job run is also included in each record.
