@@ -4,6 +4,9 @@ height: 4
 
 # Migration Progress
 
+> If widgets show `Unable to render visualization.` verify if
+> the [UCX catalog exists](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-ucx-catalog-command).
+
 This dashboard displays the migration progress, with data visualized from the `migration-progress-experimental`
 workflow. This workflow is designed to run regularly — either daily or weekly — to provide an up-to-date overview of the
 migration status.
