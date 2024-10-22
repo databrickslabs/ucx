@@ -856,7 +856,7 @@ class ACLMigrator(CrawlerBase[Grant]):
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
-        super().__init__(backend, "hive_metastore", schema, "acls", Grant)
+        super().__init__(backend, "hive_metastore", schema, "source_table_grants", Grant)
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()
@@ -870,7 +870,7 @@ class ACLMigrator(CrawlerBase[Grant]):
             tables_to_migrate = self._get_migrated_tables(tables)
         self._migrate_acls(tables_to_migrate)
 
-    def retrieve_table_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> Iterable[Grant]:
+    def _retrieve_table_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> Iterable[Grant]:
         tables = list(self._table_crawler.snapshot())
         grants: list[Grant] = []
         if not tables:
@@ -934,21 +934,17 @@ class ACLMigrator(CrawlerBase[Grant]):
         Threads.strict("migrate grants", tasks)
 
     def _retrieve_acls(self, tables_in_scope: list[TableToMigrate]) -> Iterable[Grant]:
-        tasks = []
+        grants = []
         for table in tables_in_scope:
-            tasks.append(partial(self._migrate_grants.retrieve, table.src, table.rule.as_uc_table))
-        grants, errors = Threads.gather("retrieve grants", tasks)
-        if len(errors) > 0:
-            logger.warning(f"Failed to retrieve grants for {len(errors)} tables")
-        # flatten the list of grants
-        return [grant for grants in grants for grant in grants]
+            grants += self._migrate_grants.retrieve(table.src, table.rule.as_uc_table)
+        return grants
 
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()
         return index.is_migrated(schema, table)
 
     def _crawl(self) -> Iterable[Grant]:
-        return self.retrieve_table_acls()
+        return self._retrieve_table_acls()
 
     def _try_fetch(self):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
