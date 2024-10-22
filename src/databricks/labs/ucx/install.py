@@ -634,9 +634,17 @@ class WorkspaceInstallation(InstallationMixin):
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
-        metadata = DashboardMetadata.from_path(folder).replace_database(
-            database=f"hive_metastore.{self._config.inventory_database}",
-            database_to_replace="inventory",
+        metadata = (
+            DashboardMetadata
+            .from_path(folder)
+            .replace_database(  # Assessment and migration dashboards
+                database=f"hive_metastore.{self._config.inventory_database}",
+                database_to_replace="inventory",
+            )
+            .replace_database(  # Migration progress dashboard:
+                catalog=self._config.ucx_catalog,
+                catalog_to_replace="ucx_catalog",
+            )
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
