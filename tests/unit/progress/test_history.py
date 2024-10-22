@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import re
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import ClassVar
 from unittest.mock import create_autospec
 
@@ -310,32 +311,51 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
         a_field: str = "bar"
         optional: str | None = None
 
-    # TODO: Expand to cover all lsql-supported types.
+    class _Suit(Enum):
+        HEARTS = 1
+        DIAMONDS = 2
+        CLUBS = 3
+        SPADES = 4
+
     @dataclass
     class _AClass:
         str_field: str = "foo"
         int_field: int = 23
         bool_field: bool = True
+        float_field: float = 2.3
+        enum_field: _Suit = _Suit.HEARTS
+        date_field: dt.date = field(default_factory=lambda: dt.date(year=2024, month=10, day=15))
         ts_field: dt.datetime = field(
             default_factory=lambda: dt.datetime(
                 year=2024, month=10, day=15, hour=12, minute=44, second=16, tzinfo=dt.timezone.utc
             )
         )
         array_field: list[str] = field(default_factory=lambda: ["foo", "bar", "baz"])
+        set_field: set[str] = field(default_factory=lambda: {"fu", "baa", "boz"})
+        dict_field: dict[int, str] = field(default_factory=lambda: {1000: "M", 100: "C"})
         nested_dataclass: list[_InnerClass] = field(default_factory=lambda: [_InnerClass(x) for x in range(2)])
 
         __id_attributes__: ClassVar = ("str_field",)
 
     encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
     historical = encoder.to_historical(_AClass())
+    # Python set iteration doesn't preserve order, so we need to check set_field separately.
+    set_field = historical.data.pop("set_field")
     assert historical.data == {
         "str_field": "foo",
         "int_field": "23",
         "bool_field": "true",
+        "float_field": "2.3",
+        "enum_field": "HEARTS",
+        "date_field": "2024-10-15",
         "ts_field": "2024-10-15T12:44:16Z",
         "array_field": '["foo","bar","baz"]',
+        "dict_field": '{"1000":"M","100":"C"}',
         "nested_dataclass": '[{"counter":0,"boolean":true,"a_field":"bar","optional":null},{"counter":1,"boolean":true,"a_field":"bar","optional":null}]',
     }
+    decoded_set_field = json.loads(set_field)
+    assert isinstance(decoded_set_field, list) and len(decoded_set_field) == 3
+    assert set(decoded_set_field) == {"fu", "baa", "boz"}
 
 
 def test_historical_encoder_object_data_imposter_string_values(ownership) -> None:

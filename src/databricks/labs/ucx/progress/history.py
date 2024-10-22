@@ -1,6 +1,7 @@
 from __future__ import annotations
 import dataclasses
 import datetime as dt
+from enum import Enum, EnumMeta
 import json
 import logging
 from collections.abc import Iterable, Sequence
@@ -26,6 +27,7 @@ class DataclassWithIdAttributes(Protocol):
 
 
 Record = TypeVar("Record", bound=DataclassWithIdAttributes)
+T = TypeVar("T")
 
 
 class HistoricalEncoder(Generic[Record]):
@@ -151,18 +153,44 @@ class HistoricalEncoder(Generic[Record]):
 
     @classmethod
     def _encode_non_serializable(cls, name: str, value: Any) -> Any:
+        if isinstance(type(value), EnumMeta):
+            return cls._encode_enum(value)
         if isinstance(value, dt.datetime):
-            # Only allow tz-aware timestamps.
-            if value.tzinfo is None:
-                # Name refers to the outermost field, not necessarily a field on a (nested) dataclass.
-                msg = f"Timestamp without timezone not supported in or within field {name}: {value}"
-                raise ValueError(msg)
-            # Always store with 'Z'.
-            ts_utc = value.astimezone(dt.timezone.utc)
-            return ts_utc.isoformat().replace("+00:00", "Z")
+            return cls._encode_datetime(name, value)
+        if isinstance(value, dt.date):
+            return cls._encode_date(value)
+        if isinstance(value, set):
+            return cls._encode_set(value)
 
         msg = f"Cannot encode {type(value)} value in or within field {name}: {value!r}"
         raise TypeError(msg)
+
+    @staticmethod
+    def _encode_enum(value: Enum) -> str:
+        """Enums are encoded as a string containing their name."""
+        return value.name
+
+    @staticmethod
+    def _encode_datetime(name, value: dt.datetime) -> str:
+        """Timestamps are encoded in ISO format, with a 'Z' timezone specifier. Naive timestamps aren't allowed."""
+        # Only allow tz-aware timestamps.
+        if value.tzinfo is None:
+            # Name refers to the outermost field, not necessarily a field on a (nested) dataclass.
+            msg = f"Timestamp without timezone not supported in or within field {name}: {value}"
+            raise ValueError(msg)
+        # Always store with 'Z'.
+        ts_utc = value.astimezone(dt.timezone.utc)
+        return ts_utc.isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _encode_date(value: dt.date) -> str:
+        """Dates are encoded in ISO format."""
+        return value.isoformat()
+
+    @staticmethod
+    def _encode_set(value: set[T]) -> list[T]:
+        """Sets are encoded as an array of the elements."""
+        return list(value)
 
     def _encode_field_value(self, name: str, value: Any) -> str | None:
         if value is None:
