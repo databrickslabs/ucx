@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -34,9 +35,6 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
 
     def _crawl(self) -> Iterable[PipelineInfo]:
         all_pipelines = list(self._ws.pipelines.list_pipelines())
-        return list(self._assess_pipelines(all_pipelines))
-
-    def _assess_pipelines(self, all_pipelines) -> Iterable[PipelineInfo]:
         for pipeline in all_pipelines:
             creator_name = pipeline.creator_user_name or None
             if not creator_name:
@@ -44,27 +42,28 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            pipeline_info = PipelineInfo(
-                pipeline_id=pipeline.pipeline_id,
-                pipeline_name=pipeline.name,
-                creator_name=creator_name,
-                success=1,
-                failures="[]",
-            )
-
-            failures = []
-            pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
+            try:
+                assert pipeline.pipeline_id is not None
+                pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
+            except NotFound:
+                logger.warning(f"Pipeline disappeared, cannot assess: {pipeline.name} (id={pipeline.pipeline_id})")
+                continue
             assert pipeline_response.spec is not None
             pipeline_config = pipeline_response.spec.configuration
+            failures = []
             if pipeline_config:
                 failures.extend(self._check_spark_conf(pipeline_config, "pipeline"))
             clusters = pipeline_response.spec.clusters
             if clusters:
                 self._pipeline_clusters(clusters, failures)
-            pipeline_info.failures = json.dumps(failures)
-            if len(failures) > 0:
-                pipeline_info.success = 0
-            yield pipeline_info
+            failures_as_json = json.dumps(failures)
+            yield PipelineInfo(
+                pipeline_id=pipeline.pipeline_id,
+                pipeline_name=pipeline.name,
+                creator_name=creator_name,
+                success=int(not failures),
+                failures=failures_as_json,
+            )
 
     def _pipeline_clusters(self, clusters, failures):
         for cluster in clusters:

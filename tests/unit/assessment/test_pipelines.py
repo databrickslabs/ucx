@@ -1,9 +1,11 @@
+import logging
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
-from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
+from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo, PipelineSpec
+from databricks.sdk.errors import ResourceDoesNotExist
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -49,6 +51,29 @@ def test_pipeline_list_with_no_config():
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx").snapshot()
 
     assert len(crawler) == 0
+
+
+def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
+    """Check that crawling doesn't fail if a pipeline is deleted after we list the pipelines but before we assess it."""
+    ws.pipelines.list_pipelines.return_value = (
+        PipelineStateInfo(pipeline_id="1", name="will_remain"),
+        PipelineStateInfo(pipeline_id="2", name="will_disappear"),
+    )
+
+    def mock_get(pipeline_id: str) -> GetPipelineResponse:
+        if pipeline_id == "2":
+            raise ResourceDoesNotExist("Simulated disappearance")
+        return GetPipelineResponse(pipeline_id=pipeline_id, spec=PipelineSpec(id=pipeline_id))
+
+    ws.pipelines.get = mock_get
+
+    with caplog.at_level(logging.WARNING):
+        results = PipelinesCrawler(ws, mock_backend, "a_schema").snapshot()
+
+    assert results == [
+        PipelineInfo(pipeline_id="1", pipeline_name="will_remain", creator_name=None, success=1, failures="[]")
+    ]
+    assert "Pipeline disappeared, cannot assess: will_disappear (id=2)" in caplog.messages
 
 
 def test_pipeline_crawler_creator():

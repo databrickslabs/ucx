@@ -11325,6 +11325,15 @@
     "msal.wstrust_request": [],
     "msal.wstrust_response": []
   },
+  "msal-extensions": {
+    "msal_extensions": [],
+    "msal_extensions.cache_lock": [],
+    "msal_extensions.libsecret": [],
+    "msal_extensions.osx": [],
+    "msal_extensions.persistence": [],
+    "msal_extensions.token_cache": [],
+    "msal_extensions.windows": []
+  },
   "msgpack": {
     "msgpack": [],
     "msgpack.exceptions": [],
@@ -11333,6 +11342,9 @@
   },
   "multidict": {
     "multidict": []
+  },
+  "multimethod": {
+    "multimethod": []
   },
   "multiprocess": {
     "_multiprocess": [],
@@ -11362,6 +11374,10 @@
   },
   "multitasking": {
     "multitasking": []
+  },
+  "murmurhash": {
+    "murmurhash": [],
+    "murmurhash.about": []
   },
   "mypy": {
     "mypy": [],
@@ -26615,6 +26631,14 @@
     "pooch.hashes": [],
     "pooch.processors": [],
     "pooch.utils": []
+  },
+  "portalocker": {
+    "portalocker": [],
+    "portalocker.constants": [],
+    "portalocker.exceptions": [],
+    "portalocker.portalocker": [],
+    "portalocker.redis": [],
+    "portalocker.utils": []
   },
   "prometheus_client": {
     "prometheus_client": [],
