@@ -247,6 +247,28 @@ providing quick links to the relevant workflows and dashboards.
 
 [[back to top](#databricks-labs-ucx)]
 
+### Debug notebook
+
+![debug](docs/debug-notebook.png)
+
+Every installation creates a `DEBUG` notebook, that initializes UCX as a library for you to execute interactively.
+
+[[back to top](#databricks-labs-ucx)]
+
+### Debug logs
+
+![debug](docs/debug-logs.png)
+
+The [workflow](#workflows) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed
+every minute in a separate file. Debug logs for [the command-line interface](#authenticate-databricks-cli) are shown
+by adding the `--debug` flag:
+
+```commandline
+databricks --debug labs ucx <command>
+```
+
+[[back to top](#databricks-labs-ucx)]
+
 ### Installation configuration
 
 In the installation folder, the UCX configuration is kept.
@@ -551,28 +573,6 @@ For additional information see:
 - The [detailed design](docs/local-group-migration.md) of thie group migration workflow.
 - The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
   migration process.
-
-[[back to top](#databricks-labs-ucx)]
-
-## Debug notebook
-
-![debug](docs/debug-notebook.png)
-
-Every [installation](#installation) creates a debug notebook, that initializes UCX as a library,
-so that you can implement missing features and
-
-[[back to top](#databricks-labs-ucx)]
-
-## Debug logs
-
-![debug](docs/debug-logs.png)
-
-Every workflow run stores debug logs in the `logs` folder of the [installation](#installation).
-For tasks shorter than 10 minutes, they appear after task finish, whereas longer-running tasks
-flush the logs every 10 minutes.
-
-To enable debug logs of [command-line interface](#authenticate-databricks-cli),
-simply add `--debug` flag to any command.
 
 [[back to top](#databricks-labs-ucx)]
 
