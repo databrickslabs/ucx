@@ -29,6 +29,27 @@ Record = TypeVar("Record", bound=DataclassWithIdAttributes)
 
 
 class HistoricalEncoder(Generic[Record]):
+    """An encoder for dataclasses that will be stored in our history log.
+
+    Our history records are designed with several goals in mind:
+     - Records can be of different types, meaning we have to store heterogenous types using a homogenous schema.
+     - We partially shred the records to allow for easier SQL-based querying.
+     - Flexibility from the start, because schema changes in the future will be very difficult.
+     - Records will be shared (and queried) across workspaces with different versions of UCX installed.
+
+    With this in mind:
+     - We have an 'object-type' (discriminator) field for holding the type of the record we're storing. This allows for
+       type-specific logic when querying.
+     - We have a (type-specific) field for storing the business key (identifier) of each record.
+     - We have special handling of the 'failures' attribute that is normally present in the types we are storing.
+     - The object-data is an unconstrained key-value map, allowing arbitrary attributes to be stored and (if top-level)
+       queried directly. Complex values are JSON-encoded.
+     - The ownership mechanism is used to associate each record with a user.
+     - To help with forward and backward compatibility the UCX version used to encode a record is included in each
+       record.
+     - The associated workspace and job run is also included in each record.
+    """
+
     _job_run_id: int
     """The identifier of the current job run, with which these records are associated."""
 
