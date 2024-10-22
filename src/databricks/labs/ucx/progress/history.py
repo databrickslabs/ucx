@@ -48,6 +48,8 @@ class HistoricalEncoder(Generic[Record]):
      - To help with forward and backward compatibility the UCX version used to encode a record is included in each
        record.
      - The associated workspace and job run is also included in each record.
+     - These records are currently stored in a (UC-based) table that is shared across workspaces attached to the same
+       metastore. They are used to help report on migration progress.
     """
 
     _job_run_id: int
