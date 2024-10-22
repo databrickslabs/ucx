@@ -338,6 +338,22 @@ def test_historical_encoder_object_data_values_non_strings_as_json(ownership) ->
     }
 
 
+def test_historical_encoder_object_data_imposter_string_values(ownership) -> None:
+    """Verify that string fields containing non-string values are handled as an error."""
+
+    @dataclass
+    class _AClass:
+        a_field: str = "value"
+        the_string_field: str | None = None
+
+        __id_attributes__: ClassVar = ("a_field",)
+
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
+    record_with_imposter = _AClass(the_string_field=2)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match=r"^Invalid value for field the_string_field, not a string: 2$"):
+        _ = encoder.to_historical(record_with_imposter)
+
+
 @dataclass(frozen=True, kw_only=True)
 class _InnerClassWithTimestamp:
     b_field: dt.datetime

@@ -169,7 +169,10 @@ class HistoricalEncoder(Generic[Record]):
             return None
         value_type = self._field_names_with_types[name]
         if value_type in (str, (str | None)):
-            return value
+            if isinstance(value, str):
+                return value
+            msg = f"Invalid value for field {name}, not a string: {value!r}"
+            raise ValueError(msg)
         encoded_value = json.dumps(
             value,
             allow_nan=False,
