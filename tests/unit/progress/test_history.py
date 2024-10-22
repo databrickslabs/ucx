@@ -118,7 +118,7 @@ def test_historical_encoder_object_id(ownership) -> None:
     class _CompoundKey:
         a_field: str = "field-a"
         b_field: str = "field-b"
-        c_field: str = "field-c"
+        c_field: "str" = "field-c"  # Annotations can be strings as well.
 
         @property
         def d_property(self) -> str:
@@ -270,7 +270,7 @@ def test_historical_encoder_object_data_values_strings_as_is(ownership) -> None:
     @dataclass
     class _AClass:
         a_field: str = "value"
-        existing_json_field: str = "[1, 2, 3]"
+        existing_json_field: "str" = "[1, 2, 3]"
         optional_string_field: str | None = "value"
 
         __id_attributes__: ClassVar = ("a_field",)
