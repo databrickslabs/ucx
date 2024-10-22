@@ -228,7 +228,7 @@ def catalog_populated(
 
 @pytest.fixture()
 def dashboard_metadata(catalog_populated: CatalogInfo) -> DashboardMetadata:
-    dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
+    dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress/main"
     metadata = DashboardMetadata.from_path(dashboard_path).replace_database(
         catalog=catalog_populated.name, catalog_to_replace="ucx_catalog"
     )
