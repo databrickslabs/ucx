@@ -481,7 +481,7 @@ class _BrokenFailures2:
     __id_attributes__: ClassVar = ("a_field",)
 
 
-@pytest.mark.parametrize("klass,broken_type", ((_BrokenFailures1, list[int]), (_BrokenFailures2, None)))
+@pytest.mark.parametrize("klass,broken_type", ((_BrokenFailures1, list[int]), (_BrokenFailures2, type(None))))
 def test_historical_encoder_failures_verification(
     ownership,
     klass: type[DataclassWithIdAttributes],

@@ -8,9 +8,9 @@ import sys
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import Any, BinaryIO, TextIO, ClassVar
 
 from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
@@ -192,13 +192,16 @@ class SourceInfo:
             data["source_lineage"] = lineage_atoms
         return cls(**data)
 
-    UNKNOWN = "unknown"
+    UNKNOWN: ClassVar[str] = "unknown"
+    NO_TS: ClassVar[datetime] = datetime.fromtimestamp(0, tz=timezone.utc)
 
     source_id: str = UNKNOWN
-    source_timestamp: datetime = datetime.fromtimestamp(0)
+    source_timestamp: datetime = NO_TS
     source_lineage: list[LineageAtom] = field(default_factory=list)
-    assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
-    assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
+    assessment_start_timestamp: datetime = NO_TS
+    assessment_end_timestamp: datetime = NO_TS
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("source_id",)
 
     def replace_source(
         self,
