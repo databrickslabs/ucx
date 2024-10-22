@@ -38,9 +38,9 @@ from databricks.labs.ucx.hive_metastore.grants import (
     ComputeLocations,
     Grant,
     GrantsCrawler,
+    GrantOwnership,
     MigrateGrants,
     PrincipalACL,
-    GrantOwnership,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationOwnership
