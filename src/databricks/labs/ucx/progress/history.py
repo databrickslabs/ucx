@@ -62,7 +62,7 @@ class HistoricalEncoder(Generic[Record]):
     _object_type: str
     """The name of the record class being encoded by this instance."""
 
-    _field_types: dict[str, type]
+    _field_names_with_types: dict[str, type]
     """A map of the fields on instances of the record class (and their types); these will appear in the object data."""
 
     _has_failures: type[str | list[str]] | None
@@ -79,11 +79,11 @@ class HistoricalEncoder(Generic[Record]):
         self._workspace_id = workspace_id
         self._ownership = ownership
         self._object_type = self._get_object_type(klass)
-        self._field_types, self._has_failures = self._get_field_types(klass)
+        self._field_names_with_types, self._has_failures = self._get_field_names_with_types(klass)
         self._id_attribute_names = self._get_id_attribute_names(klass)
 
     @classmethod
-    def _get_field_types(cls, klass: type[Record]) -> tuple[dict[str, type], type[str | list[str]] | None]:
+    def _get_field_names_with_types(cls, klass: type[Record]) -> tuple[dict[str, type], type[str | list[str]] | None]:
         """Return the dataclass-defined fields that the record type declares, and their associated types.
 
         If the record has a "failures" attribute this is treated specially: it is removed but we signal that it was
@@ -96,19 +96,19 @@ class HistoricalEncoder(Generic[Record]):
                 - A dictionary of fields to include in the object data, and their type.
                 - The type of the failures field, if present.
         """
-        field_types = {field.name: field.type for field in dataclasses.fields(klass)}
-        if "failures" not in field_types:
+        field_names_with_types = {field.name: field.type for field in dataclasses.fields(klass)}
+        if "failures" not in field_names_with_types:
             failures_type = None
         else:
-            failures_type = field_types.pop("failures")
+            failures_type = field_names_with_types.pop("failures")
             if failures_type not in (str, list[str]):
                 msg = f"Historical record {klass} has invalid 'failures' attribute of type: {failures_type}"
                 raise TypeError(msg)
-        return field_types, failures_type
+        return field_names_with_types, failures_type
 
     def _get_id_attribute_names(self, klazz: type[Record]) -> Sequence[str]:
         id_attribute_names = tuple(klazz.__id_attributes__)
-        all_fields = self._field_types
+        all_fields = self._field_names_with_types
         for name in id_attribute_names:
             id_attribute_type = all_fields.get(name, None) or self._detect_property_type(klazz, name)
             if id_attribute_type is None:
@@ -165,7 +165,7 @@ class HistoricalEncoder(Generic[Record]):
     def _encode_field_value(self, name: str, value: Any | None) -> str | None:
         if value is None:
             return None
-        value_type = self._field_types[name]
+        value_type = self._field_names_with_types[name]
         if value_type in (str, (str | None)):
             return value
         encoded_value = json.dumps(
@@ -179,7 +179,9 @@ class HistoricalEncoder(Generic[Record]):
 
     def _object_data_and_failures(self, record: Record) -> tuple[dict[str, str], list[str]]:
         record_values = self._as_dict(record)
-        encoded_fields = {field: self._encode_field_value(field, record_values[field]) for field in self._field_types}
+        encoded_fields = {
+            field: self._encode_field_value(field, record_values[field]) for field in self._field_names_with_types
+        }
         # We must return a value: strings are mandatory (not optional) as the type. As such, optional fields need to be
         # omitted from the data map if the value is None.
         data = {k: v for k, v in encoded_fields.items() if v is not None}
