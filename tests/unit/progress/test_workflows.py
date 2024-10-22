@@ -72,18 +72,42 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
 
 
 @pytest.mark.parametrize(
-    "task, linter",
+    "task, linter, crawler, history_log",
     (
-        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
-        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
+        (
+            MigrationProgress.assess_dashboards,
+            RuntimeContext.query_linter,
+            RuntimeContext.directfs_access_crawler_for_queries,
+            RuntimeContext.historical_directfs_access_log,
+        ),
+        (
+            MigrationProgress.assess_workflows,
+            RuntimeContext.workflow_linter,
+            RuntimeContext.directfs_access_crawler_for_paths,
+            RuntimeContext.historical_directfs_access_log,
+        ),
     ),
 )
-def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
+def test_linter_runtime_refresh(run_workflow, task, linter, crawler, history_log) -> None:
     linter_class = get_type_hints(linter.func)["return"]
+    crawler_class = get_type_hints(crawler.func)["return"]
     mock_linter = create_autospec(linter_class)
+    mock_crawler = create_autospec(crawler_class)
+    mock_history_log = create_autospec(HistoryLog)
     linter_name = linter.attrname
-    ctx = run_workflow(task, **{linter_name: mock_linter})
+    crawler_name = crawler.attrname
+    history_log_name = history_log.attrname
+    context_replacements = {
+        linter_name: mock_linter,
+        crawler_name: mock_crawler,
+        history_log_name: mock_history_log,
+        "named_parameters": {"parent_run_id": 53},
+    }
+    ctx = run_workflow(task, **context_replacements)
+
     mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
+    mock_crawler.snapshot.assert_called_once_with()
+    mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:

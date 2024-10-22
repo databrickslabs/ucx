@@ -1,6 +1,8 @@
 from functools import cached_property
 from pathlib import Path
 
+from databricks.labs.ucx.source_code.base import DirectFsAccess
+
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
@@ -177,6 +179,17 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.cluster_policy_ownership,
             PolicyInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_directfs_access_log(self) -> HistoryLog[DirectFsAccess]:
+        return HistoryLog(
+            self.sql_backend,
+            self.directfs_access_ownership,
+            DirectFsAccess,
             int(self.named_parameters["parent_run_id"]),
             self.workspace_id,
             self.config.ucx_catalog,

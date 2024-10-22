@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.directfs_access import (
 )
 
 
-def test_crawler_appends_dfsas() -> None:
+def test_crawler_replaces_dfsas() -> None:
     backend = MockBackend()
     crawler = DirectFsAccessCrawler.for_paths(backend, "schema")
     existing = list(crawler.snapshot())
@@ -37,7 +37,7 @@ def test_crawler_appends_dfsas() -> None:
         for path in ("a", "b", "c")
     )
     crawler.dump_all(dfsas)
-    rows = backend.rows_written_for(crawler.full_name, "append")
+    rows = backend.rows_written_for(crawler.full_name, "overwrite")
     assert len(rows) == 3
 
 

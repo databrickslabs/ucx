@@ -146,19 +146,25 @@ class MigrationProgress(Workflow):
         migration_status_snapshot = ctx.migration_status_refresher.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(migration_status_snapshot)
 
-    @job_task(depends_on=[verify_prerequisites])
+    @job_task(depends_on=[verify_prerequisites], job_cluster="table_migration")
     def assess_dashboards(self, ctx: RuntimeContext):
         """Scans all dashboards for migration issues in SQL code of embedded widgets.
         Also stores direct filesystem accesses for display in the migration dashboard."""
-        # TODO: Ensure these are captured in the history log.
+        history_log = ctx.historical_directfs_access_log
         ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        directfs_access_snapshot = ctx.directfs_access_crawler_for_queries.snapshot()
+        # Note: The object-type is DirectFsAccess, the same as the workflow version.
+        history_log.append_inventory_snapshot(directfs_access_snapshot)
 
-    @job_task(depends_on=[verify_prerequisites])
+    @job_task(depends_on=[verify_prerequisites], job_cluster="table_migration")
     def assess_workflows(self, ctx: RuntimeContext):
         """Scans all jobs for migration issues in notebooks.
         Also stores direct filesystem accesses for display in the migration dashboard."""
-        # TODO: Ensure these are captured in the history log.
+        history_log = ctx.historical_directfs_access_log
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        directfs_access_snapshot = ctx.directfs_access_crawler_for_paths.snapshot()
+        # Note: the object-type is DirectFsAccess, the same as the query version.
+        history_log.append_inventory_snapshot(directfs_access_snapshot)
 
     @job_task(
         depends_on=[
