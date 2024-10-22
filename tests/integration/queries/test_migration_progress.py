@@ -2,7 +2,7 @@ import dataclasses
 import webbrowser
 
 import pytest
-from databricks.sdk.service.catalog import SchemaInfo
+from databricks.sdk.service.catalog import CatalogInfo
 from databricks.sdk import WorkspaceClient
 from databricks.labs.blueprint.wheels import find_project_root
 from databricks.labs.lsql.backends import SqlBackend, Row
@@ -201,16 +201,16 @@ def historical_objects(
 
 
 @pytest.fixture
-def schema_populated(
+def catalog_populated(
     ws: WorkspaceClient, sql_backend: SqlBackend, make_catalog, make_schema, historical_objects
-) -> SchemaInfo:
-    """Populate the historical schema given the objects from the fixtures.
+) -> CatalogInfo:
+    """Populate the UCX catalog given the objects from the fixtures.
 
     For optimization purposes, this fixture could be "module" (or "session") scoped. However, dependant fixtures are
     "function" scoped, thus one should first evaluate if those can be changed.
     """
     catalog = make_catalog()  # The migration progress dashboard uses a UC catalog, not a database in the Hive metastore
-    schema = make_schema(catalog_name=catalog.name)
+    schema = make_schema(catalog_name=catalog.name, name="multiworkspace")
     workspace_id = ws.get_workspace_id()
     historicals = []
     for table_name, id_, instance, failures, owner in historical_objects:
@@ -223,14 +223,14 @@ def schema_populated(
         historical = Historical(workspace_id, 1, table_name, id_, data, failures, owner)
         historicals.append(historical)
     sql_backend.save_table(f"{schema.full_name}.historical", historicals, Historical, mode="overwrite")
-    return schema
+    return catalog
 
 
 @pytest.fixture()
-def dashboard_metadata(schema_populated: SchemaInfo) -> DashboardMetadata:
+def dashboard_metadata(catalog_populated: CatalogInfo) -> DashboardMetadata:
     dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress"
     metadata = DashboardMetadata.from_path(dashboard_path).replace_database(
-        database=schema_populated.full_name, database_to_replace="multiworkspace"
+        catalog=catalog_populated.name, catalog_to_replace="ucx_catalog"
     )
     metadata.validate()
     return metadata
@@ -242,7 +242,7 @@ def test_migration_progress_dashboard(
     env_or_skip,
     make_directory,
     dashboard_metadata,
-    schema_populated: SchemaInfo,
+    catalog_populated: CatalogInfo,
 ) -> None:
     """Inspect the dashboard visually."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
