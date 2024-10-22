@@ -39,6 +39,8 @@ def table_migration_statuses(tables):
         failures = ["not migrated"]
         owner = "Andrew" if table.name == "table1" else "Cor"
         if table.database == "schema1":  # Simulate one schema being migrated
+            if table.name == "table2":  # An owner with only migrated objects
+                owner = "Eric"
             table_migration_status.dst_catalog = "catalog1"
             table_migration_status.dst_schema = table.database
             table_migration_status.dst_table = table.name

@@ -9,14 +9,14 @@
     }
 }}'
 */
-WITH migration_statuses AS (
-    SELECT *
+WITH owners_with_failures AS (
+    SELECT owner
     FROM ucx_catalog.multiworkspace.historical
-    WHERE object_type = "migration_status"
+    WHERE object_type = "migration_status" AND SIZE(failures) > 0
 )
 
 SELECT
     owner,
-    COUNT_IF(SIZE(failures) > 0) AS count
-FROM migration_statuses
+    COUNT(1) AS count
+FROM owners_with_failures
 GROUP BY owner
