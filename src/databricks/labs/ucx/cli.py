@@ -708,13 +708,15 @@ def migrate_acls(
     target_catalog = named_parameters.get("target_catalog")
     hms_fed = named_parameters.get("hms_fed", False)
     dry_run = named_parameters.get("dry_run", False)
-    for workspace_context in workspace_contexts:
-        if dry_run:
+    if dry_run:
+        for workspace_context in workspace_contexts:
             grants = workspace_context.acl_migrator.snapshot()
-            logger.info(
-                f"Dry run completed. Found {len(grants)} grants. The crawled grants can be found in the 'source_table_grants' table. "
-                "No changes were made."
-            )
+        logger.info(
+            f"Dry run completed. Found {len(grants)} grants. The crawled grants can be found in the 'hms_table_access' table. "
+            "No changes were made."
+        )
+        return
+    for workspace_context in workspace_contexts:
         workspace_context.acl_migrator.migrate_acls(target_catalog=target_catalog, hms_fed=hms_fed)
 
 
