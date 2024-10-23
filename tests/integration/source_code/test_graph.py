@@ -38,3 +38,24 @@ def test_graph_visits_package_with_recursive_imports():
     # visit the graph without a 'visited' set
     roots = graph.root_dependencies
     assert roots
+
+
+def test_graph_imports_dynamic_import():
+    allow_list = KnownList()
+    library_resolver = PythonLibraryResolver(allow_list)
+    notebook_resolver = NotebookResolver(NotebookLoader())
+    import_resolver = ImportFileResolver(FileLoader(), allow_list)
+    path_lookup = PathLookup.from_sys_path(Path(__file__).parent)
+    dependency_resolver = DependencyResolver(
+        library_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup
+    )
+    root_path = Path(__file__).parent.parent.parent / "unit" / "source_code" / "samples" / "import-module.py"
+    assert root_path.is_file()
+    maybe = dependency_resolver.resolve_file(path_lookup, root_path)
+    assert maybe.dependency
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup, CurrentSessionState())
+    container = maybe.dependency.load(path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    all_dependencies = [dep.path for dep in graph.all_dependencies]
+    assert "astroid" in all_dependencies
