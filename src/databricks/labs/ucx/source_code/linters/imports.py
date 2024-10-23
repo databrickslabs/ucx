@@ -9,7 +9,6 @@ from typing import TypeVar, cast
 from astroid import (  # type: ignore
     Attribute,
     Call,
-    Const,
     InferenceError,
     Import,
     ImportFrom,
