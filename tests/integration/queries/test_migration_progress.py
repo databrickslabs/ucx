@@ -273,13 +273,13 @@ def test_migration_progress_dashboard(
         ("01_7_percentage_policy_migration_readiness", [Row(percentage=50.0)]),
         (
             "02_1_migration_status_by_owner_bar_graph",
-            [Row(owner="Andrew", count=1), Row(owner="Cor", count=3)],
+            [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
         ),
         (
             "02_2_migration_status_by_owner_overview",
             [
                 Row(owner="Andrew", percentage=50.0, total=2, total_migrated=1, total_not_migrated=1),
-                Row(owner="Cor", percentage=50.0, total=7, total_migrated=3, total_not_migrated=4),
+                Row(owner="Cor", percentage=42.857142857142854, total=7, total_migrated=3, total_not_migrated=4),
                 Row(owner="Eric", percentage=100.0, total=1, total_migrated=1, total_not_migrated=0),
             ],
         ),
