@@ -27129,13 +27129,7 @@
   },
   "pyodbc": {},
   "pyopenssl": {
-    "OpenSSL.SSL": [],
-    "OpenSSL": [],
-    "OpenSSL._util": [],
-    "OpenSSL.crypto": [],
-    "OpenSSL.debug": [],
-    "OpenSSL.rand": [],
-    "OpenSSL.version": []
+    "OpenSSL": []
   },
   "pyparsing": {
     "pyparsing": [],
@@ -28096,9 +28090,7 @@
     "pylsp.workspace": []
   },
   "python-snappy": {
-    "snappy": [],
-    "snappy.snappy": [],
-    "snappy.snappy_formats": []
+    "snappy": []
   },
   "pytoolconfig": {
     "pytoolconfig": [],
