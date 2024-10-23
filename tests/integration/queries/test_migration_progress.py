@@ -247,7 +247,10 @@ def catalog_populated(
     installation_ctx.progress_tracking_installation.run()
     ucx_catalog = installation_ctx.ucx_catalog
     installation_ctx.sql_backend.save_table(
-        f"{ucx_catalog}.multiworkspace.workflow_runs", workflow_runs, WorkflowRun, mode="overwrite"
+        f"{ucx_catalog}.multiworkspace.workflow_runs",
+        workflow_runs,
+        WorkflowRun,
+        mode="overwrite",
     )
     workspace_id = installation_ctx.workspace_client.get_workspace_id()
     historicals = []
@@ -270,7 +273,10 @@ def catalog_populated(
             )
             historicals.append(historical)
     installation_ctx.sql_backend.save_table(
-        f"{ucx_catalog}.multiworkspace.historical", historicals, Historical, mode="overwrite"
+        f"{ucx_catalog}.multiworkspace.historical",
+        historicals,
+        Historical,
+        mode="overwrite",
     )
     return ucx_catalog
 
