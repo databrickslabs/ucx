@@ -320,16 +320,16 @@ def test_migration_progress_dashboard(
         ("01_6_percentage_pipeline_migration_readiness", [Row(percentage=50.0)]),
         ("01_7_percentage_policy_migration_readiness", [Row(percentage=50.0)]),
         (
-            "02_2_migrated_data_objects",
+            "02_1_pending_migration_data_objects",
             [Row(count=5)],
         ),
         (
-            "02_2_pending_migration_data_objects",
-            [Row(count=5)],
-        ),
-        (
-            "02_3_migration_status_by_owner_bar_graph",
+            "02_2_migration_status_by_owner_bar_graph",
             [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
+        ),
+        (
+            "02_3_migrated_data_objects",
+            [Row(count=5)],
         ),
         (
             "02_4_migration_status_by_owner_overview",
