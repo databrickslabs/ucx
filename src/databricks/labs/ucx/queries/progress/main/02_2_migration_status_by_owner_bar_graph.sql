@@ -1,5 +1,7 @@
 /*
---title 'Tables and views not migrated'
+--title 'Pending migration'
+--description 'Tables and views per owner'
+--width 5
 --overrides '{"spec": {
     "version": 3,
     "widgetType": "bar",

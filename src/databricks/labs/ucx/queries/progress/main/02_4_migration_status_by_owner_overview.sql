@@ -1,4 +1,4 @@
-/* --title 'Tables and views migration completion (%)' --description 'Per owner' */
+/* --title 'Overview' --description 'Tables and views migration' --width 5 */
 WITH migration_statuses AS (
     SELECT *
     FROM ucx_catalog.multiworkspace.latest_historical_per_workspace
