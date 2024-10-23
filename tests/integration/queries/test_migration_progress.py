@@ -259,7 +259,15 @@ def catalog_populated(
                 for field in dataclasses.fields(instance)
                 if getattr(instance, field.name) is not None
             }
-            historical = Historical(workspace_id, job_run_id, table_name, id_, data, failures, owner)
+            historical = Historical(
+                workspace_id=workspace_id,
+                job_run_id=job_run_id,
+                object_type=table_name,
+                object_id=id_,
+                data=data,
+                failures=failures,
+                owner=owner,
+            )
             historicals.append(historical)
     installation_ctx.sql_backend.save_table(
         f"{ucx_catalog}.multiworkspace.historical", historicals, Historical, mode="overwrite"
