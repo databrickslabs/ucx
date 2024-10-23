@@ -4,8 +4,11 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.core import Row
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations, MountsCrawler
 from databricks.labs.ucx.hive_metastore.tables import (
@@ -679,3 +682,82 @@ def test_table_owner() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "table_record,history_record",
+    (
+        (
+            Table(
+                catalog="hive_metastore",
+                database="foo",
+                name="bar",
+                object_type="TABLE",
+                table_format="DELTA",
+                location="/foo",
+                storage_properties="[foo=fu,bar=baz]",
+                is_partitioned=True,
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Table",
+                object_id=["hive_metastore", "foo", "bar"],
+                data={
+                    "catalog": "hive_metastore",
+                    "database": "foo",
+                    "name": "bar",
+                    "object_type": "TABLE",
+                    "table_format": "DELTA",
+                    "location": "/foo",
+                    "storage_properties": "[foo=fu,bar=baz]",
+                    "is_partitioned": "true",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+        (
+            Table(
+                catalog="hive_metastore",
+                database="foo",
+                name="baz",
+                object_type="VIEW",
+                table_format="UNKNOWN",
+                view_text="select 1",
+                upgraded_to="main.foo.baz",
+            ),
+            Row(
+                workspace_id=2,
+                job_run_id=1,
+                object_type="Table",
+                object_id=["hive_metastore", "foo", "baz"],
+                data={
+                    "catalog": "hive_metastore",
+                    "database": "foo",
+                    "name": "baz",
+                    "object_type": "VIEW",
+                    "table_format": "UNKNOWN",
+                    "view_text": "select 1",
+                    "upgraded_to": "main.foo.baz",
+                    "is_partitioned": "false",
+                },
+                failures=[],
+                owner="the_admin",
+                ucx_version=ucx_version,
+            ),
+        ),
+    ),
+)
+def test_table_supports_history(mock_backend, table_record: Table, history_record: Row) -> None:
+    """Verify that Table records are written as expected to the history log."""
+    mock_ownership = create_autospec(TableOwnership)
+    mock_ownership.owner_of.return_value = "the_admin"
+    history_log = HistoryLog[Table](mock_backend, mock_ownership, Table, run_id=1, workspace_id=2, catalog="a_catalog")
+
+    history_log.append_inventory_snapshot([table_record])
+
+    rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
+
+    assert rows == [history_record]

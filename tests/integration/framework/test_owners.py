@@ -2,8 +2,10 @@ import json
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
 
 
 def _find_admins_group_id(ws: WorkspaceClient) -> str:
@@ -51,3 +53,33 @@ def test_fallback_admin_user(ws, installation_ctx: RuntimeContext) -> None:
 
     assert an_admin == the_user.user_name and the_user.active
     assert _user_is_member_of_group(the_user, admins_group_id) or _user_has_role(the_user, "account_admin")
+
+
+def test_notebook_owner(make_notebook, make_notebook_permissions, make_group, ws):
+    notebook = make_notebook()
+    new_group = make_group()
+    make_notebook_permissions(
+        object_id=notebook,
+        permission_level=PermissionLevel.CAN_MANAGE,
+        group_name=new_group.display_name,
+    )
+
+    admin_locator = AdministratorLocator(ws)
+    notebook_ownership = WorkspacePathOwnership(admin_locator, ws)
+
+    name = notebook_ownership.owner_of(notebook)
+
+    my_user = ws.current_user.me()
+    assert name == my_user.user_name
+
+
+def test_file_owner(make_workspace_file, ws):
+    ws_file = make_workspace_file()
+
+    admin_locator = AdministratorLocator(ws)
+    notebook_ownership = WorkspacePathOwnership(admin_locator, ws)
+
+    name = notebook_ownership.owner_of(ws_file)
+
+    my_user = ws.current_user.me()
+    assert name == my_user.user_name

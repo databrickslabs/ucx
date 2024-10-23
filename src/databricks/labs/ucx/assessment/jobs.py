@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -40,6 +41,8 @@ class JobInfo:
     job_name: str | None = None
     creator: str | None = None
     """User-name of the creator of the pipeline, if known."""
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("job_id",)
 
     @classmethod
     def from_job(cls, job: Job):

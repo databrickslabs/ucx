@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class PythonLibraryResolver(LibraryResolver):
-    # TODO: https://github.com/databrickslabs/ucx/issues/1640
+    """Resolve python libraries by registering and installing Python libraries."""
 
     def __init__(
         self,
@@ -61,13 +61,22 @@ class PythonLibraryResolver(LibraryResolver):
             return self._install_egg(*resolved_libraries)
         return self._install_pip(*resolved_libraries)
 
-    @staticmethod
-    def _resolve_libraries(path_lookup: PathLookup, *libraries: str) -> list[str]:
-        # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
+    def _resolve_libraries(self, path_lookup: PathLookup, *libraries: str) -> list[str]:
+        """Resolve pip installs as library (pip install databricks-labs-ucx) or as path (pip install ../../ucx.whl).
+
+        A library is defined as library, i.e. *not* as path, when the library:
+        1. Is not found in the path lookup.
+        2. Is not located in the temporary virtual environment where this resolver install libraries. If this is the
+           case, it signals the library is installed for a second time.
+
+        Otherwise, we consider the library to be a path.
+
+        Note: The above works given our design choice to *only* build dependency graphs when all dependencies are found.
+        """
         libs = []
         for library in libraries:
             maybe_library = path_lookup.resolve(Path(library))
-            if maybe_library is None:
+            if maybe_library is None or maybe_library.is_relative_to(self._temporary_virtual_environment):
                 libs.append(library)
             else:
                 libs.append(maybe_library.as_posix())
@@ -81,9 +90,11 @@ class PythonLibraryResolver(LibraryResolver):
             *libraries,
             "-t",
             str(self._temporary_virtual_environment),
+            "--upgrade",  # Upgrades when library already installed
         ]
         return_code, stdout, stderr = self._runner(args)
-        logger.debug(f"pip output:\n{stdout}\n{stderr}")
+        if stdout or stderr:
+            logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
             command = " ".join(args)
             problem = DependencyProblem("library-install-failed", f"'{command}' failed with '{stderr}'")
