@@ -282,7 +282,7 @@ def test_migration_progress_dashboard(
     is_in_debug,
     env_or_skip,
     make_directory,
-    dashboard_metadata,
+    dashboard_metadata: DashboardMetadata,
     catalog_populated: str,
 ) -> None:
     """Inspect the dashboard visually."""
