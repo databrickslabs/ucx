@@ -1,7 +1,7 @@
 WITH last_workflow_run AS (
     SELECT
       workspace_id,
-      MAX(STRUCT(finished_at, attempt, started_at, workflow_run_id)) AS max_struct
+      MAX(STRUCT(finished_at, workflow_run_attempt, started_at, workflow_run_id)) AS max_struct
     FROM $inventory.workflow_runs  -- $inventory is a hardcoded name for replacing target schema in a view definition
     WHERE workflow_name = 'migration-progress-experimental'
     GROUP BY workspace_id
