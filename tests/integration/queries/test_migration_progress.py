@@ -52,13 +52,11 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 @pytest.fixture
 def tables():
     records = []
-    for table in (
-        Table("hive_metastore", schema, table, "MANAGED", "delta")
-        for schema in ("schema1", "schema2")
-        for table in ("table1", "table2", "table3", "table4", "table5")
-    ):
-        record = ("tables", [table.catalog, table.database, table.name], table, [], "Cor")
-        records.append(record)
+    for schema in "schema1", "schema2":
+        for table in "table1", "table2", "table3", "table4", "table5":
+            table = Table("hive_metastore", schema, table, "MANAGED", "delta")
+            record = ("tables", [table.catalog, table.database, table.name], table, [], "Cor")
+            records.append(record)
     return records
 
 
