@@ -218,8 +218,7 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     table_migrate = TablesMigrator(
         table_crawler, ws, backend, table_mapping, migration_status_refresher, migrate_grants, external_locations
     )
-    table_migrate.migrate_tables(
-        what=What.EXTERNAL_SYNC,
+    table_migrate.convert_managed_hms_to_external(
         managed_table_external_storage="CONVERT_TO_EXTERNAL",
         inventory_table="hive_metastore.inventory_database.tables",
     )
