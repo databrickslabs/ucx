@@ -17,7 +17,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessOwnership
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.sdk import AccountClient, WorkspaceClient, core
@@ -268,6 +268,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:
         return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
+    def directfs_access_ownership(self) -> DirectFsAccessOwnership:
+        return DirectFsAccessOwnership(self.administrator_locator, self.workspace_path_ownership, self.workspace_client,)
 
     @cached_property
     def tables_migrator(self) -> TablesMigrator:

@@ -3,11 +3,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence, Iterable
 
+from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator, WorkspacePathOwnership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
 
@@ -62,10 +65,25 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
 
      - For queries, the creator of the query (if known).
      - For jobs, the owner of the path for the notebook or source (if known).
-
-    At present this information is not gathered during the crawling process, so it can't be reported here.
     """
 
-    def _maybe_direct_owner(self, record: DirectFsAccess) -> None:
-        # TODO: Implement this once the creator/ownership information is exposed during crawling.
-        return None
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        workspace_path_ownership: WorkspacePathOwnership,
+        workspace_client: WorkspaceClient,
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._workspace_path_ownership = workspace_path_ownership
+        self._workspace_client = workspace_client
+
+    def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
+        if record.source_lineage and record.source_lineage[-1].object_type == 'QUERY':
+            query_id = record.source_lineage[-1].object_id.split('/')[1]
+            legacy_query = self._workspace_client.queries.get(query_id)
+            return legacy_query.owner_user_name
+        try:
+            workspace_path = WorkspacePath(self._workspace_client, record.path)
+            return self._workspace_path_ownership.owner_of(workspace_path)
+        except NotFound:
+            return None

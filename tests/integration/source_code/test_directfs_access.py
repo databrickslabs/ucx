@@ -29,8 +29,8 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
     query_record = next(record for record in records if record.source_id == f"{dashboard.id}/{query.id}")
 
     # Verify ownership can be made.
-    ownership = DirectFsAccessOwnership(runtime_ctx.administrator_locator)
-    assert ownership.owner_of(query_record) == runtime_ctx.workspace_client.current_user.me().user_name
+    owner = runtime_ctx.directfs_access_ownership.owner_of(query_record)
+    assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
 @pytest.mark.xfail(reason="DirectFS access records don't currently include creator/owner information.")
