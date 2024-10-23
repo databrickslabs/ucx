@@ -9,7 +9,6 @@ from typing import TypeVar, cast
 from astroid import (  # type: ignore
     Attribute,
     Call,
-    Const,
     InferenceError,
     Import,
     ImportFrom,
@@ -71,9 +70,18 @@ class ImportSource(NodeBase):
         problems: list[T],
     ) -> Iterable[ImportSource]:
         for node in nodes:
-            arg = node.args[0]
-            if isinstance(arg, Const):
-                yield ImportSource(node, arg.value)
+            yield from cls._make_sources_for_import_call_node(node, problem_factory, problems)
+
+    @classmethod
+    def _make_sources_for_import_call_node(
+        cls,
+        node: Call,
+        problem_factory: ProblemFactory,
+        problems: list[T],
+    ) -> Iterable[ImportSource]:
+        for inferred in InferredValue.infer_from_node(node.args[0]):
+            if inferred.is_inferred():
+                yield ImportSource(node, inferred.as_string())
                 continue
             problem = problem_factory(
                 'dependency-not-constant', "Can't check dependency not provided as a constant", node

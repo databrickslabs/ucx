@@ -3,6 +3,7 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -45,6 +46,8 @@ class ClusterInfo:
     cluster_name: str | None = None
     creator: str | None = None
     """User-name of the creator of the cluster, if known."""
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("cluster_id",)
 
 
 class CheckClusterMixin(CheckInitScriptMixin):
@@ -202,6 +205,8 @@ class PolicyInfo:
     policy_description: str | None = None
     creator: str | None = None
     """User-name of the creator of the cluster policy, if known."""
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("policy_id",)
 
 
 class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
