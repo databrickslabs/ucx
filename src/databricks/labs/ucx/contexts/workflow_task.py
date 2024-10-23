@@ -3,20 +3,34 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
+from databricks.labs.ucx.assessment.clusters import (
+    ClustersCrawler,
+    PoliciesCrawler,
+    ClusterOwnership,
+    ClusterInfo,
+    ClusterPolicyOwnership,
+    PolicyInfo,
+)
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
-from databricks.labs.ucx.hive_metastore import TablesInMounts
+from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
+from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
+
+# As with GlobalContext, service factories unavoidably have a lot of public methods.
+# pylint: disable=too-many-public-methods
 
 
 class RuntimeContext(GlobalContext):
@@ -55,6 +69,10 @@ class RuntimeContext(GlobalContext):
         return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def job_ownership(self) -> JobOwnership:
+        return JobOwnership(self.administrator_locator)
+
+    @cached_property
     def submit_runs_crawler(self) -> SubmitRunsCrawler:
         return SubmitRunsCrawler(
             self.workspace_client,
@@ -68,8 +86,16 @@ class RuntimeContext(GlobalContext):
         return ClustersCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def cluster_ownership(self) -> ClusterOwnership:
+        return ClusterOwnership(self.administrator_locator)
+
+    @cached_property
     def pipelines_crawler(self) -> PipelinesCrawler:
         return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def pipeline_ownership(self) -> PipelineOwnership:
+        return PipelineOwnership(self.administrator_locator)
 
     @cached_property
     def table_size_crawler(self) -> TableSizeCrawler:
@@ -80,11 +106,17 @@ class RuntimeContext(GlobalContext):
         return PoliciesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def cluster_policy_ownership(self) -> ClusterPolicyOwnership:
+        return ClusterPolicyOwnership(self.administrator_locator)
+
+    @cached_property
     def global_init_scripts_crawler(self) -> GlobalInitScriptCrawler:
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
-    def tables_crawler(self) -> FasterTableScanCrawler:
+    def tables_crawler(self) -> TablesCrawler:
+        # Warning: Not all runtime contexts support the fast-scan implementation; it requires the JVM bridge to Spark
+        # and that's not always available.
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
@@ -116,10 +148,102 @@ class RuntimeContext(GlobalContext):
         return WorkflowRunRecorder(
             self.sql_backend,
             self.config.ucx_catalog,
-            workspace_id=self.workspace_client.get_workspace_id(),
+            workspace_id=self.workspace_id,
             workflow_name=self.named_parameters["workflow"],
             workflow_id=int(self.named_parameters["job_id"]),
             workflow_run_id=int(self.named_parameters["parent_run_id"]),
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
             workflow_start_time=self.named_parameters["start_time"],
+        )
+
+    @cached_property
+    def workspace_id(self) -> int:
+        return self.workspace_client.get_workspace_id()
+
+    @cached_property
+    def historical_clusters_log(self) -> HistoryLog[ClusterInfo]:
+        return HistoryLog(
+            self.sql_backend,
+            self.cluster_ownership,
+            ClusterInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_cluster_policies_log(self) -> HistoryLog[PolicyInfo]:
+        return HistoryLog(
+            self.sql_backend,
+            self.cluster_policy_ownership,
+            PolicyInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_grants_log(self) -> HistoryLog[Grant]:
+        return HistoryLog(
+            self.sql_backend,
+            self.grant_ownership,
+            Grant,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_jobs_log(self) -> HistoryLog[JobInfo]:
+        return HistoryLog(
+            self.sql_backend,
+            self.job_ownership,
+            JobInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_pipelines_log(self) -> HistoryLog[PipelineInfo]:
+        return HistoryLog(
+            self.sql_backend,
+            self.pipeline_ownership,
+            PipelineInfo,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_tables_log(self) -> HistoryLog[Table]:
+        return HistoryLog(
+            self.sql_backend,
+            self.table_ownership,
+            Table,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_table_migration_log(self) -> HistoryLog[TableMigrationStatus]:
+        return HistoryLog(
+            self.sql_backend,
+            self.table_migration_ownership,
+            TableMigrationStatus,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def historical_udfs_log(self) -> HistoryLog[Udf]:
+        return HistoryLog(
+            self.sql_backend,
+            self.udf_ownership,
+            Udf,
+            int(self.named_parameters["parent_run_id"]),
+            self.workspace_id,
+            self.config.ucx_catalog,
         )

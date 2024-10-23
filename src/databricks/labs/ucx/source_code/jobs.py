@@ -4,7 +4,7 @@ import logging
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -651,14 +651,15 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
         path: Path,
         inherited_tree: Tree | None,
     ) -> Iterable[T]:
-        iterable: Iterable[T] | None = None
-        if language is CellLanguage.SQL:
-            iterable = self._collect_from_sql(source)
         if language is CellLanguage.PYTHON:
             iterable = self._collect_from_python(source, inherited_tree)
-        if iterable is None:
-            logger.warning(f"Language {language.name} not supported yet!")
-            return
+        else:
+            fn: Callable[[str], Iterable[T]] | None = getattr(self, f"_collect_from_{language.name.lower()}", None)
+            if not fn:
+                raise ValueError(f"Language {language.name} not supported yet!")
+            # the below is for disabling a false pylint positive
+            # pylint: disable=not-callable
+            iterable = fn(source)
         src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
         src_id = str(path)
         for item in iterable:
@@ -667,8 +668,28 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
     @abstractmethod
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[T]: ...
 
-    @abstractmethod
-    def _collect_from_sql(self, source: str) -> Iterable[T]: ...
+    def _collect_from_sql(self, _source: str) -> Iterable[T]:
+        return []
+
+    def _collect_from_r(self, _source: str) -> Iterable[T]:
+        logger.warning("Language R not supported yet!")
+        return []
+
+    def _collect_from_scala(self, _source: str) -> Iterable[T]:
+        logger.warning("Language scala not supported yet!")
+        return []
+
+    def _collect_from_shell(self, _source: str) -> Iterable[T]:
+        return []
+
+    def _collect_from_markdown(self, _source: str) -> Iterable[T]:
+        return []
+
+    def _collect_from_run(self, _source: str) -> Iterable[T]:
+        return []
+
+    def _collect_from_pip(self, _source: str) -> Iterable[T]:
+        return []
 
 
 class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):

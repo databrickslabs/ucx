@@ -25,7 +25,6 @@ from astroid import (  # type: ignore
     NodeNG,
     parse,
     Uninferable,
-    AstroidSyntaxError,
 )
 
 from databricks.labs.ucx.source_code.base import (
@@ -77,9 +76,7 @@ class Tree:
             root = parse(code)
             tree = Tree(root)
             return MaybeTree(tree, None)
-        except AstroidSyntaxError as e:
-            return cls._definitely_failure('syntax-error', code, e)
-        except SystemError as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
             return cls._definitely_failure('system-error', code, e)
 
@@ -89,7 +86,7 @@ class Tree:
             None,
             Failure(
                 code=message_code,
-                message=f"Failed to parse code `{source_code}`: {e}. Report this as an issue on UCX GitHub.",
+                message=f"Failed to parse code `{source_code}`: {type(e)}: {e}. Report this as an issue on UCX GitHub.",
                 # Lines and columns are both 0-based: the first line is line 0.
                 start_line=0,
                 start_col=0,
