@@ -164,11 +164,13 @@ class MigrationProgress(Workflow):
         depends_on=[
             verify_prerequisites,
             crawl_grants,
+            crawl_udfs,
             assess_jobs,
             assess_clusters,
             assess_pipelines,
             crawl_cluster_policies,
             refresh_table_migration_status,
+            update_tables_history_log,
         ],
         job_cluster="table_migration",
     )
