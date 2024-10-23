@@ -8,9 +8,11 @@ from pathlib import Path
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
 
+from databricks.labs.blueprint.paths import WorkspacePath
+
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspaceObjectOwnership
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -116,7 +118,8 @@ class MigrationSequencer:
                     continue
                 object_name = path.relative_to(library_root).as_posix()
                 break
-            object_owner = WorkspaceObjectOwnership(self._admin_locator).owner_of((object_type, object_id))
+            ws_path = WorkspacePath(self._ws, object_id)
+            object_owner = WorkspacePathOwnership(self._admin_locator, self._ws).owner_of(ws_path)
         else:
             raise ValueError(f"{object_type} not supported yet!")
         self._last_node_id += 1
