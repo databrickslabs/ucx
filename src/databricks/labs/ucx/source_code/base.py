@@ -190,6 +190,13 @@ class SourceInfo:
         if isinstance(source_lineage, list) and len(source_lineage) > 0 and isinstance(source_lineage[0], dict):
             lineage_atoms = [LineageAtom(**lineage) for lineage in source_lineage]
             data["source_lineage"] = lineage_atoms
+        # Some LSQL backends return naive datetime instances; work around downstream issues by attaching UTC.
+        for field in ("source_timestamp", "assessment_start_timestamp", "assessment_end_timestamp"):
+            value = data.get(field, None)
+            if value is None or value.tzinfo is not None:
+                continue
+            warnings.warn(f"Naive datetime detected; should have time-zone associated: {field}")
+            data[field] = value.replace(tzinfo=dt.timezone.utc)
         return cls(**data)
 
     UNKNOWN: ClassVar[str] = "unknown"
