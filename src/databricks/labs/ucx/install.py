@@ -640,7 +640,7 @@ class WorkspaceInstallation(InstallationMixin):
                 database=f"hive_metastore.{self._config.inventory_database}",
                 database_to_replace="inventory",
             )
-            .replace_database(  # Migration progress dashboard:
+            .replace_database(  # Migration progress dashboard
                 catalog=self._config.ucx_catalog,
                 catalog_to_replace="ucx_catalog",
             )
