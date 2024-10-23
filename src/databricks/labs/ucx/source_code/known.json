@@ -11648,9 +11648,7 @@
     "neuralforecast.utils": []
   },
   "ninja": {
-    "ninja": [],
-    "ninja._version": [],
-    "ninja.ninja_syntax": []
+    "ninja": []
   },
   "nltk": {
     "nltk": [],
