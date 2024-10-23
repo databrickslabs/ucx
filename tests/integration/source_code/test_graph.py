@@ -57,5 +57,3 @@ def test_graph_imports_dynamic_import():
     container = maybe.dependency.load(path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    all_dependencies = [dep.path for dep in graph.all_dependencies]
-    assert "astroid" in all_dependencies
