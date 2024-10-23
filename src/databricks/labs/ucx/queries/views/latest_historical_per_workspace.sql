@@ -7,7 +7,15 @@ WITH last_workflow_run AS (
     GROUP BY workspace_id
 )
 
-SELECT historical.*
+SELECT
+    historical.workspace_id,
+    historical.job_run_id,
+    historical.object_type,
+    historical.object_id,
+    historical.data,
+    historical.failures,
+    historical.owner,
+    historical.ucx_version
 FROM
     $inventory.historical AS historical  -- $inventory is a hardcoded name for replacing target schema in a view definition
   JOIN
