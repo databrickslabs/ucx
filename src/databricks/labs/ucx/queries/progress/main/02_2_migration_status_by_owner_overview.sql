@@ -1,7 +1,7 @@
 /* --title 'Tables and views migration completion (%)' --description 'Per owner' */
 WITH migration_statuses AS (
     SELECT *
-    FROM ucx_catalog.multiworkspace.historical
+    FROM ucx_catalog.multiworkspace.latest_historical_per_workspace
     WHERE object_type = "migration_status"
 )
 
