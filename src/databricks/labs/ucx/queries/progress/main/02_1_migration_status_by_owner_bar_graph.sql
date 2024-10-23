@@ -11,7 +11,7 @@
 */
 WITH owners_with_failures AS (
     SELECT owner
-    FROM ucx_catalog.multiworkspace.historical
+    FROM ucx_catalog.multiworkspace.latest_historical_per_workspace
     WHERE object_type = "migration_status" AND SIZE(failures) > 0
 )
 
