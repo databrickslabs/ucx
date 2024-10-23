@@ -114,11 +114,9 @@ class PipelinesMigrator:
         self._migrate_pipelines()
 
     def _migrate_pipelines(self):
-        pipelines = self._pc.snapshot()
-        logger.info(f"Found {len(pipelines)} pipelines to migrate")
-
         # get pipelines to migrate
         pipelines_to_migrate = self._pm.get_pipelines_to_migrate(self._pc)
+        logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
         for pipeline in pipelines_to_migrate:
@@ -130,9 +128,10 @@ class PipelinesMigrator:
 
     def _migrate_pipeline(self, pipeline: PipelineToMigrate):
         try:
-            self._clone_pipeline(pipeline)
+            return self._clone_pipeline(pipeline)
         except Exception as e:
             logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
+            return False
 
     def _clone_pipeline(self, pipeline: PipelineToMigrate):
         # TODO: implement this in sdk
@@ -145,9 +144,9 @@ class PipelinesMigrator:
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
         }
-        if pipeline.rule.target_schema_name is not "":
+        if pipeline.rule.target_schema_name != "":
             body['target'] = pipeline.rule.target_schema_name
-        if pipeline.rule.target_pipeline_name is not "":
+        if pipeline.rule.target_pipeline_name != "":
             body['name'] = pipeline.rule.target_pipeline_name
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
