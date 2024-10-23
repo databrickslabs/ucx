@@ -11333,13 +11333,7 @@
     "msal.wstrust_response": []
   },
   "msal-extensions": {
-    "msal_extensions": [],
-    "msal_extensions.cache_lock": [],
-    "msal_extensions.libsecret": [],
-    "msal_extensions.osx": [],
-    "msal_extensions.persistence": [],
-    "msal_extensions.token_cache": [],
-    "msal_extensions.windows": []
+    "msal_extensions": []
   },
   "msgpack": {
     "msgpack": [],
