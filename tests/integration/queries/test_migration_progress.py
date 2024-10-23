@@ -311,9 +311,9 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=73.91304347826087)]),
+        ("01_0_percentage_migration_readiness", [Row(percentage=73.91)]),
         ("01_1_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
-        ("01_2_percentage_grant_migration_readiness", [Row(percentage=66.66666666666667)]),
+        ("01_2_percentage_grant_migration_readiness", [Row(percentage=66.67)]),
         ("01_3_percentage_job_migration_readiness", [Row(percentage=50.0)]),
         ("01_4_percentage_cluster_migration_readiness", [Row(percentage=50.0)]),
         ("01_5_percentage_table_migration_readiness", [Row(percentage=100.0)]),
@@ -335,7 +335,7 @@ def test_migration_progress_dashboard(
             "02_4_migration_status_by_owner_overview",
             [
                 Row(owner="Andrew", percentage=50.0, total=2, total_migrated=1, total_not_migrated=1),
-                Row(owner="Cor", percentage=42.857142857142854, total=7, total_migrated=3, total_not_migrated=4),
+                Row(owner="Cor", percentage=42.86, total=7, total_migrated=3, total_not_migrated=4),
                 Row(owner="Eric", percentage=100.0, total=1, total_migrated=1, total_not_migrated=0),
             ],
         ),
