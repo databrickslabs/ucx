@@ -635,8 +635,7 @@ class WorkspaceInstallation(InstallationMixin):
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
         metadata = (
-            DashboardMetadata
-            .from_path(folder)
+            DashboardMetadata.from_path(folder)
             .replace_database(  # Assessment and migration dashboards
                 database=f"hive_metastore.{self._config.inventory_database}",
                 database_to_replace="inventory",
