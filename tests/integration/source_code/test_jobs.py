@@ -36,16 +36,22 @@ from tests.unit.source_code.test_graph import _TestDependencyGraph
 def test_linter_from_context(simple_ctx, make_job) -> None:
     # This code is similar to test_running_real_workflow_linter_job, but it's executed on the caller side and is easier
     # to debug.
-    # Ensure we have at least 1 job that fails
-    job = make_job(content="import xyz")
+    # Ensure we have at least 1 job that fails: "Deprecated file system path in call to: /mnt/things/e/f/g"
+    job = make_job(content="spark.read.table('a_table').write.csv('/mnt/things/e/f/g')\n")
     simple_ctx.config.include_job_ids = [job.job_id]
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
+    # Verify that the 'problems' table has content.
     cursor = simple_ctx.sql_backend.fetch(
         f"SELECT COUNT(*) AS count FROM {simple_ctx.inventory_database}.workflow_problems"
     )
     result = next(cursor)
     assert result['count'] > 0
+
+    # Verify that the other data produced snapshot can be loaded.
+    dfsa_records = simple_ctx.directfs_access_crawler_for_paths.snapshot()
+    used_table_records = simple_ctx.used_tables_crawler_for_paths.snapshot()
+    assert dfsa_records and used_table_records
 
 
 def test_job_linter_no_problems(simple_ctx, make_job) -> None:
