@@ -128,7 +128,7 @@ def test_migration_progress_record_workflow_run(run_workflow, mock_backend) -> N
 
     rows = mock_backend.rows_written_for("ucx.multiworkspace.workflow_runs", "append")
 
-    rows_as_dict = [{k: v for k, v in rows.as_dict().items() if k != 'finished_at'} for rows in rows]
+    rows_as_dict = [{k: v for k, v in rows.asDict().items() if k != 'finished_at'} for rows in rows]
     assert rows_as_dict == [
         {
             "started_at": start_time,
