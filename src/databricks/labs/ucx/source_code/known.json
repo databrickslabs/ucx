@@ -11647,6 +11647,11 @@
     "neuralforecast.tsdataset": [],
     "neuralforecast.utils": []
   },
+  "ninja": {
+    "ninja": [],
+    "ninja._version": [],
+    "ninja.ninja_syntax": []
+  },
   "nltk": {
     "nltk": [],
     "nltk.app": [],
