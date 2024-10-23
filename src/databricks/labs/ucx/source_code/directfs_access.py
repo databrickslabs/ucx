@@ -47,7 +47,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
     def _try_fetch(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
         for row in self._backend.fetch(sql):
-            yield self._klass.from_dict(row.as_dict())
+            yield self._klass.from_dict(row.asDict())
 
     def _crawl(self) -> Iterable[DirectFsAccess]:
         return []

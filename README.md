@@ -401,9 +401,8 @@ which can be used for further analysis and decision-making through the [assessme
 9. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
 10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
 11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
-12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration problems. It also collects direct filesystem access patterns that require attention.
-13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration problems. It also collects direct filesystem access patterns that require attention.
-
+12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration problems which it persists in `$inventory_database.query_problems`. It also collects direct filesystem access patterns that require attention which it persists in `$inventory_database.directfs_in_queries`.
+13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration problems which it persists in `$inventory_database.workflow_problems`. It also collects direct filesystem access patterns that require attention which it persists in `$inventory_database.directfs_in_paths`.
 
 ![report](docs/assessment-report.png)
 
@@ -726,26 +725,9 @@ in the Migration dashboard.
 
 [[back to top](#databricks-labs-ucx)]
 
-## Jobs Static Code Analysis Workflow
-
-> Please note that this is an experimental workflow.
-
-The `experimental-workflow-linter` workflow lints accessible code from 2 sources:
- - all workflows/jobs present in the workspace
- - all dashboards/queries present in the workspace
-The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
-The linting also locates direct filesystem access that need to be migrated.
-
-Once the workflow completes:
- - problems are stored in the `$inventory_database.workflow_problems`/`$inventory_database.query_problems` table
- - direct filesystem access are stored in the `$inventory_database.directfs_in_paths`/`$inventory_database.directfs_in_queries` table
- - all the above are displayed in the Migration dashboard.
+### Linter message codes
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
-
-[[back to top](#databricks-labs-ucx)]
-
-### Linter message codes
 
 Here's the detailed explanation of the linter message codes:
 

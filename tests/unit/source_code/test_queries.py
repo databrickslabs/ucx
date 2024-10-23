@@ -39,7 +39,7 @@ def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_re
     assert all(dfsa.is_write == is_write for dfsa in dfsas)
 
 
-def test_query_liner_refresh_report_writes_query_problems(migration_index, mock_backend) -> None:
+def test_query_linter_refresh_report_writes_query_problems(migration_index, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dfsa_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)

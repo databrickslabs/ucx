@@ -32,40 +32,26 @@ from databricks.sdk.service import jobs, compute, pipelines
 from tests.unit.source_code.test_graph import _TestDependencyGraph
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_running_real_workflow_linter_job(installation_ctx, make_job) -> None:
-    # Deprecated file system path in call to: /mnt/things/e/f/g
-    job = make_job(content="spark.read.table('a_table').write.csv('/mnt/things/e/f/g')\n")
-    ctx = installation_ctx.replace(config_transform=lambda wc: replace(wc, include_job_ids=[job.job_id]))
-    ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
-    ctx.deployed_workflows.validate_step("experimental-workflow-linter")
-
-    # This test merely tests that the workflows produces records of the expected types; record content is not checked.
-    cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
-    result = next(cursor)
-    if result['count'] == 0:
-        installation_ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
-        assert False, "No workflow problems found"
-    dfsa_records = installation_ctx.directfs_access_crawler_for_paths.snapshot()
-    used_table_records = installation_ctx.used_tables_crawler_for_paths.snapshot()
-    assert dfsa_records and used_table_records
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_linter_from_context(simple_ctx, make_job) -> None:
     # This code is similar to test_running_real_workflow_linter_job, but it's executed on the caller side and is easier
     # to debug.
-    # Ensure we have at least 1 job that fails
-    job = make_job(content="import xyz")
+    # Ensure we have at least 1 job that fails: "Deprecated file system path in call to: /mnt/things/e/f/g"
+    job = make_job(content="spark.read.table('a_table').write.csv('/mnt/things/e/f/g')\n")
     simple_ctx.config.include_job_ids = [job.job_id]
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
+    # Verify that the 'problems' table has content.
     cursor = simple_ctx.sql_backend.fetch(
         f"SELECT COUNT(*) AS count FROM {simple_ctx.inventory_database}.workflow_problems"
     )
     result = next(cursor)
     assert result['count'] > 0
+
+    # Verify that the other data produced snapshot can be loaded.
+    dfsa_records = simple_ctx.directfs_access_crawler_for_paths.snapshot()
+    used_table_records = simple_ctx.used_tables_crawler_for_paths.snapshot()
+    assert dfsa_records and used_table_records
 
 
 def test_job_linter_no_problems(simple_ctx, make_job) -> None:
