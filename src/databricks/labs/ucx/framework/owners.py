@@ -1,12 +1,16 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
+from datetime import timedelta
 from functools import cached_property
 from typing import Generic, TypeVar, final
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.iam import User
+from databricks.sdk.errors import NotFound, InternalError
+from databricks.sdk.retries import retried
+from databricks.sdk.service.iam import User, PermissionLevel
+from databricks.sdk.service.workspace import ObjectType
 
 logger = logging.getLogger(__name__)
 
@@ -189,4 +193,47 @@ class Ownership(ABC, Generic[Record]):
     @abstractmethod
     def _maybe_direct_owner(self, record: Record) -> str | None:
         """Obtain the record-specific user-name associated with the given record, if any."""
+        return None
+
+
+class WorkspacePathOwnership(Ownership[WorkspacePath]):
+    def __init__(self, administrator_locator: AdministratorLocator, ws: WorkspaceClient) -> None:
+        super().__init__(administrator_locator)
+        self._ws = ws
+
+    @retried(on=[InternalError], timeout=timedelta(minutes=1))
+    def _maybe_direct_owner(self, record: WorkspacePath) -> str | None:
+        maybe_type_and_id = self._maybe_type_and_id(record)
+        if not maybe_type_and_id:
+            return None
+        object_type, object_id = maybe_type_and_id
+        try:
+            object_permissions = self._ws.permissions.get(object_type, object_id)
+            return self._infer_from_first_can_manage(object_permissions)
+        except NotFound:
+            logger.warning(f"removed on backend: {object_type} {object_id}")
+            return None
+
+    @staticmethod
+    def _maybe_type_and_id(path: WorkspacePath) -> tuple[str, str] | None:
+        object_info = path._object_info  # pylint: disable=protected-access
+        object_id = str(object_info.object_id)
+        match object_info.object_type:
+            case ObjectType.NOTEBOOK:
+                return 'notebooks', object_id
+            case ObjectType.FILE:
+                return 'files', object_id
+        return None
+
+    @staticmethod
+    def _infer_from_first_can_manage(object_permissions):
+        for acl in object_permissions.access_control_list:
+            for permission in acl.all_permissions:
+                if permission.permission_level != PermissionLevel.CAN_MANAGE:
+                    continue
+                if acl.user_name:
+                    return acl.user_name
+                if acl.group_name:
+                    return acl.group_name
+                return acl.service_principal_name
         return None

@@ -28,7 +28,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -264,6 +264,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def table_ownership(self) -> TableOwnership:
         return TableOwnership(self.administrator_locator)
+
+    @cached_property
+    def workspace_path_ownership(self) -> WorkspacePathOwnership:
+        return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
 
     @cached_property
     def tables_migrator(self) -> TablesMigrator:
