@@ -3,7 +3,6 @@ import datetime as dt
 import webbrowser
 
 import pytest
-from databricks.sdk.service.catalog import CatalogInfo
 from databricks.sdk import WorkspaceClient
 from databricks.labs.blueprint.wheels import find_project_root
 from databricks.labs.lsql.backends import SqlBackend, Row
@@ -18,6 +17,8 @@ from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.udfs import Udf
+
+from ..conftest import MockInstallationContext
 
 
 @pytest.fixture
@@ -234,22 +235,21 @@ def historical_objects(
 
 @pytest.fixture
 def catalog_populated(
-    ws: WorkspaceClient,
-    sql_backend: SqlBackend,
-    make_catalog,
-    make_schema,
-    workflow_runs,
+    installation_ctx: MockInstallationContext,
+    workflow_runs: list[WorkflowRun],
     historical_objects,
-) -> CatalogInfo:
+) -> str:
     """Populate the UCX catalog given the objects from the fixtures.
 
     For optimization purposes, this fixture could be "module" (or "session") scoped. However, dependant fixtures are
     "function" scoped, thus one should first evaluate if those can be changed.
     """
-    catalog = make_catalog()  # The migration progress dashboard uses a UC catalog, not a database in the Hive metastore
-    schema = make_schema(catalog_name=catalog.name, name="multiworkspace")
-    sql_backend.save_table(f"{schema.full_name}.workflow_runs", workflow_runs, WorkflowRun, mode="overwrite")
-    workspace_id = ws.get_workspace_id()
+    installation_ctx.progress_tracking_installation.run()
+    ucx_catalog = installation_ctx.ucx_catalog
+    installation_ctx.sql_backend.save_table(
+        f"{ucx_catalog}.multiworkspace.workflow_runs", workflow_runs, WorkflowRun, mode="overwrite"
+    )
+    workspace_id = installation_ctx.workspace_client.get_workspace_id()
     historicals = []
     for job_run_id in range(1, 3):  # No changes between migration progress run
         for table_name, id_, instance, failures, owner in historical_objects:
@@ -261,15 +261,17 @@ def catalog_populated(
             }
             historical = Historical(workspace_id, job_run_id, table_name, id_, data, failures, owner)
             historicals.append(historical)
-    sql_backend.save_table(f"{schema.full_name}.historical", historicals, Historical, mode="overwrite")
-    return catalog
+    installation_ctx.sql_backend.save_table(
+        f"{ucx_catalog}.multiworkspace.historical", historicals, Historical, mode="overwrite"
+    )
+    return ucx_catalog
 
 
 @pytest.fixture()
-def dashboard_metadata(catalog_populated: CatalogInfo) -> DashboardMetadata:
+def dashboard_metadata(catalog_populated: str) -> DashboardMetadata:
     dashboard_path = find_project_root(__file__) / "src/databricks/labs/ucx/queries/progress/main"
     metadata = DashboardMetadata.from_path(dashboard_path).replace_database(
-        catalog=catalog_populated.name, catalog_to_replace="ucx_catalog"
+        catalog=catalog_populated, catalog_to_replace="ucx_catalog"
     )
     metadata.validate()
     return metadata
@@ -281,9 +283,10 @@ def test_migration_progress_dashboard(
     env_or_skip,
     make_directory,
     dashboard_metadata,
-    catalog_populated: CatalogInfo,
+    catalog_populated: str,
 ) -> None:
     """Inspect the dashboard visually."""
+    _ = catalog_populated  # Used implicitly by the dashboard
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     directory = make_directory()
     dashboard = Dashboards(ws).create_dashboard(
