@@ -19,7 +19,7 @@ from .test_assessment import _SPARK_CONF
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
     created_cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF)
-    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    cluster_crawler = ClustersCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
     results = []
     for cluster in clusters:
@@ -34,7 +34,7 @@ def test_cluster_crawler(ws, make_cluster, inventory_schema, sql_backend):
 
 def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_backend):
     created_cluster = make_cluster(data_security_mode=DataSecurityMode.NONE, num_workers=1)
-    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    cluster_crawler = ClustersCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
     results = []
     for cluster in clusters:
@@ -85,7 +85,7 @@ def test_cluster_crawler_mlr_no_isolation(ws, make_cluster, inventory_schema, sq
     created_cluster = make_cluster(
         data_security_mode=DataSecurityMode.NONE, spark_version='15.4.x-cpu-ml-scala2.12', num_workers=1
     )
-    cluster_crawler = ClustersCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    cluster_crawler = ClustersCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     clusters = cluster_crawler.snapshot()
     results = []
     for cluster in clusters:
@@ -113,7 +113,7 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, 
         "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": True},
     }
     created_policy_2 = make_cluster_policy(name=f"{policy_2}", definition=json.dumps(policy_definition))
-    policy_crawler = PoliciesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    policy_crawler = PoliciesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     policies = policy_crawler.snapshot()
     results = []
     for policy in policies:

@@ -21,12 +21,12 @@ ResultFn = Callable[[], Iterable[Result]]
 
 
 class CrawlerBase(ABC, Generic[Result]):
-    def __init__(self, backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]) -> None:
+    def __init__(self, sql_backend: SqlBackend, catalog: str, schema: str, table: str, klass: type[Result]) -> None:
         """
         Initializes a CrawlerBase instance.
 
         Args:
-            backend (SqlBackend): The backend that executes SQL queries:
+            sql_backend (SqlBackend): The backend that executes SQL queries:
                 Statement Execution API or Databricks Runtime.
             catalog (str): The catalog name for the inventory persistence.
             schema: The schema name for the inventory persistence.
@@ -35,9 +35,9 @@ class CrawlerBase(ABC, Generic[Result]):
         self._catalog = self._valid(catalog)
         self._schema = self._valid(schema)
         self._table = self._valid(table)
-        self._backend = backend
-        self._fetch = backend.fetch
-        self._exec = backend.execute
+        self._sql_backend = sql_backend
+        self._fetch = sql_backend.fetch
+        self._exec = sql_backend.execute
         self._klass = klass
 
     @property
@@ -161,4 +161,4 @@ class CrawlerBase(ABC, Generic[Result]):
 
     def _update_snapshot(self, items: Sequence[Result], *, mode: Literal["append", "overwrite"]) -> None:
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, self._klass, mode=mode)
+        self._sql_backend.save_table(self.full_name, items, self._klass, mode=mode)
