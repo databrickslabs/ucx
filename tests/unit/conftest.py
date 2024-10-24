@@ -10,13 +10,17 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
-from databricks.labs.ucx.source_code.graph import BaseNotebookResolver
+from databricks.labs.ucx.source_code.graph import BaseNotebookResolver, DependencyResolver
+from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import AccountClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 
 from . import mock_workspace_client
 
@@ -57,8 +61,10 @@ class CustomIterator:
     def __init__(self, values):
         self._values = iter(values)
         self._has_next = True
+        self._next_value = None
 
-    def hasNext(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def hasNext(self):
         try:
             self._next_value = next(self._values)
             self._has_next = True
@@ -150,9 +156,11 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listDatabases.return_value = (
                     mock_list_databases_iterator
                 )
+                # pylint: disable=protected-access
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().listTables.return_value = (
                     mock_list_tables_iterator
                 )
+                # pylint: disable=protected-access
                 ctx.tables_crawler._spark._jsparkSession.sharedState().externalCatalog().getTable.return_value = (
                     get_table_mock
                 )
@@ -165,8 +173,9 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
 
 @pytest.fixture
 def acc_client():
-    acc = create_autospec(AccountClient)  # pylint: disable=mock-no-usage
+    acc = create_autospec(AccountClient)
     acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+    acc.assert_not_called()
     return acc
 
 
@@ -201,3 +210,12 @@ def mock_backend() -> MockBackend:
 @pytest.fixture
 def ws():
     return mock_workspace_client()
+
+
+@pytest.fixture
+def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolver:
+    allow_list = KnownList()
+    library_resolver = PythonLibraryResolver(allow_list)
+    notebook_resolver = NotebookResolver(NotebookLoader())
+    import_resolver = ImportFileResolver(FileLoader(), allow_list)
+    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
