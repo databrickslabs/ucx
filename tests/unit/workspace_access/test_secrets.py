@@ -1,10 +1,13 @@
 import json
+import logging
+from collections.abc import Iterator
 from datetime import timedelta
 from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import workspace
+from databricks.sdk.errors import ResourceDoesNotExist
 
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import (
@@ -40,6 +43,36 @@ def test_secret_scopes_crawler():
     assert item.object_id == "test"
     assert item.object_type == "secrets"
     assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
+
+
+def test_secret_scopes_disappearing_during_crawl(ws, caplog) -> None:
+    """Verify that when crawling secret scopes we continue instead of failing when a secret scope disappears."""
+
+    ws.secrets.list_scopes.return_value = [
+        workspace.SecretScope(name="will_remain"),
+        workspace.SecretScope(name="will_disappear"),
+    ]
+
+    def mock_list_acls(scope: str) -> Iterator[workspace.AclItem]:
+        if scope == "will_disappear":
+            raise ResourceDoesNotExist("Simulated disappearance")
+        yield workspace.AclItem(principal="a_principal", permission=workspace.AclPermission.MANAGE)
+
+    ws.secrets.list_acls = mock_list_acls
+
+    sup = SecretScopesSupport(ws=ws)
+
+    tasks = list(sup.get_crawler_tasks())
+    with caplog.at_level(logging.WARNING):
+        task_results = [task() for task in tasks]
+
+    assert task_results == [
+        Permissions(
+            object_id="will_remain", object_type="secrets", raw='[{"permission": "MANAGE", "principal": "a_principal"}]'
+        ),
+        None,
+    ]
+    assert "Secret scope disappeared, cannot assess: will_disappear" in caplog.messages
 
 
 def test_secret_scopes_crawler_include():
