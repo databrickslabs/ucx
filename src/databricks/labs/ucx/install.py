@@ -127,6 +127,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "directfs_in_queries", DirectFsAccess),
             functools.partial(table, "used_tables_in_paths", UsedTable),
             functools.partial(table, "used_tables_in_queries", UsedTable),
+            functools.partial(table, "inferred_grants", Grant),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")

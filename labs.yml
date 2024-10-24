@@ -296,11 +296,17 @@ commands:
   - name: migrate-acls
     description: |
       Migrate access control lists from legacy metastore to UC metastore.
+      Use the --dry-run flag to populate the infered_grants table and skip the migration.
+      Use the hms-fed flag to migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
+
     flags:
       - name: target-catalog
         description: (Optional) Target catalog to migrate ACLs to. Used for HMS-FED ACLs migration.
       - name: hms-fed
         description: (Optional) Migrate HMS-FED ACLs. If not provided, HMS ACLs will be migrated for migrated tables.
+      - name: dry-run
+        description: (Optional) Dry run the migration. If set to true, acl table will be populated and acl migration will be skipped.
+          If not provided, the migration will be executed.
       - name: run-as-collection
         description: (Optional) Run the command for the collection of workspaces with ucx installed. Default is False.
 
