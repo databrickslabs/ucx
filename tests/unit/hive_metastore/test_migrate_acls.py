@@ -125,7 +125,7 @@ def test_tacl_crawler(ws, ws_info, caplog):
         table_crawler, workspace_info, migration_status_refresher, migrate_grants, sql_backend, "ucx"
     )
     tacls = acl_migrate.snapshot()
-    sql_backend.fetch.assert_called_with('SELECT * FROM `hive_metastore`.`ucx`.`hms_table_access`')
+    sql_backend.fetch.assert_called_with('SELECT * FROM `hive_metastore`.`ucx`.`inferred_grants`')
     for grant in user_grants:
         assert grant in tacls
     assert Grant('acc_group1', 'SELECT', database='db1_src', table='table1') in tacls
