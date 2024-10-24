@@ -27,6 +27,7 @@ from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Ta
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.history import ProgressEncoder
+from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -199,10 +200,10 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def jobs_progress(self) -> ProgressEncoder[JobInfo]:
-        return ProgressEncoder(
+        return JobsProgressEncoder(
             self.sql_backend,
             self.job_ownership,
-            JobInfo,
+            self.inventory_database,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
