@@ -2,17 +2,18 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import typing
-from enum import Enum, EnumMeta
 import json
 import logging
+from enum import Enum, EnumMeta
 from collections.abc import Iterable, Sequence
-from typing import ClassVar, Protocol, TypeVar, Generic, Any, get_type_hints
+from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints, final
 
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.progress.install import Historical
+
 
 logger = logging.getLogger(__name__)
 
@@ -275,8 +276,13 @@ class HistoryLog(Generic[Record]):
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
+    @final
     def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
-        history_records = [self._encoder.to_historical(record) for record in snapshot]
+        history_records = [self._encode_record_as_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
         # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
         self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
+
+    def _encode_record_as_historical(self, record: Record) -> Historical:
+        """Encode a snapshot record as a historical log entry."""
+        return self._encoder.to_historical(record)
