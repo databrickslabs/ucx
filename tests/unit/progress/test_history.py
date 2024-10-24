@@ -516,6 +516,31 @@ def test_historical_encoder_failures_from_property(ownership) -> None:
     assert historical.failures == ["Failure"]
 
 
+def test_historical_encoder_failures_from_json_encoded_property(ownership) -> None:
+    """Verify an encoder gets failures from a JSON encoded property.
+
+    We prefer `list[str]` of failures instead of a JSON encoded `str`. However, this test covers legacy failures.
+    """
+
+    @dataclass(frozen=True, kw_only=True)
+    class _AClass:
+        a_field: str
+        b_field: int
+
+        __id_attributes__: ClassVar[tuple[str]] = ("a_field",)
+
+        @property
+        def failures(self) -> str:  # We prefer `list[str]`
+            return '["Failure"]'
+
+
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
+
+    historical = encoder.to_historical(_AClass(a_field="foo", b_field=10))
+
+    assert historical.failures == ["Failure"]
+
+
 def test_history_log_appends_historical_records(mock_backend, ownership) -> None:
     """Verify that we can journal a snapshot of records to the historical log."""
     ownership.owner_of.side_effect = lambda o: f"owner-{o.a_field}"
