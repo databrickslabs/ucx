@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
@@ -754,7 +754,9 @@ def test_table_supports_history(mock_backend, table_record: Table, history_recor
     """Verify that Table records are written as expected to the history log."""
     mock_ownership = create_autospec(TableOwnership)
     mock_ownership.owner_of.return_value = "the_admin"
-    history_log = HistoryLog[Table](mock_backend, mock_ownership, Table, run_id=1, workspace_id=2, catalog="a_catalog")
+    history_log = ProgressEncoder[Table](
+        mock_backend, mock_ownership, Table, run_id=1, workspace_id=2, catalog="a_catalog"
+    )
 
     history_log.append_inventory_snapshot([table_record])
 
