@@ -27,7 +27,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
     def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
         return DirectFsAccessCrawler(backend, schema, "directfs_in_queries")
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+    def __init__(self, sql_backend: SqlBackend, schema: str, table: str):
         """
         Initializes a DFSACrawler instance.
 
@@ -35,7 +35,9 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
+        super().__init__(
+            sql_backend=sql_backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess
+        )
 
     def dump_all(self, dfsas: Sequence[DirectFsAccess]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
@@ -50,7 +52,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     def _try_fetch(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
-        for row in self._backend.fetch(sql):
+        for row in self._sql_backend.fetch(sql):
             yield self._klass.from_dict(row.asDict())
 
     def _crawl(self) -> Iterable[DirectFsAccess]:

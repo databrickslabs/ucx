@@ -150,12 +150,12 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def __init__(
         self,
         ws: WorkspaceClient,
-        sbe: SqlBackend,
+        sql_backend: SqlBackend,
         schema: str,
         tables_crawler: TablesCrawler,
         mounts_crawler: 'MountsCrawler',
     ):
-        super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
+        super().__init__(sql_backend, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
@@ -344,12 +344,12 @@ class Mount:
 class MountsCrawler(CrawlerBase[Mount]):
     def __init__(
         self,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         ws: WorkspaceClient,
         inventory_database: str,
         enable_hms_federation: bool = False,
     ):
-        super().__init__(backend, "hive_metastore", inventory_database, "mounts", Mount)
+        super().__init__(sql_backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
         self._enable_hms_federation = enable_hms_federation
 
@@ -445,7 +445,7 @@ class TablesInMounts(CrawlerBase[Table]):
 
     def __init__(
         self,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         ws: WorkspaceClient,
         inventory_database: str,
         mounts_crawler: MountsCrawler,
@@ -453,7 +453,7 @@ class TablesInMounts(CrawlerBase[Table]):
         exclude_paths_in_mount: list[str] | None = None,
         include_paths_in_mount: list[str] | None = None,
     ):
-        super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
+        super().__init__(sql_backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
         self._mounts_crawler = mounts_crawler
         self._include_mounts = include_mounts

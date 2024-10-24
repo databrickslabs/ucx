@@ -41,8 +41,8 @@ class CheckInitScriptMixin:
 
 
 class GlobalInitScriptCrawler(CrawlerBase[GlobalInitScriptInfo], CheckInitScriptMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "global_init_scripts", GlobalInitScriptInfo)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+        super().__init__(sql_backend, "hive_metastore", schema, "global_init_scripts", GlobalInitScriptInfo)
         self._ws = ws
 
     def _crawl(self) -> Iterable[GlobalInitScriptInfo]:
