@@ -5,7 +5,7 @@ from databricks.labs.ucx.hive_metastore.ownership import TableOwnership, TableOw
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 
-def test_table_ownership_grants():
+def test_table_ownership_grants() -> None:
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = [
         Table(
