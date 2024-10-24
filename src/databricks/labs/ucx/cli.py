@@ -19,7 +19,6 @@ from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 
-
 ucx = App(__file__)
 logger = get_logger(__file__)
 
@@ -705,7 +704,6 @@ def migrate_acls(
         workspace_contexts = [ctx]
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
-    current_ws_context = WorkspaceContext(w)
     target_catalog = named_parameters.get("target_catalog")
     hms_fed = named_parameters.get("hms_fed", False)
     dry_run = named_parameters.get("dry_run", False)
@@ -716,10 +714,15 @@ def migrate_acls(
             total_grants += len(grants)
         logger.info(
             f"Dry run completed. Found {total_grants} grants. The crawled grants can be found in the 'inferred_grants' table. "
-            f"The URL for the grants table: {w.config.host}/explore/data/hive_metastore/"
-            f"{current_ws_context.config.inventory_database}/inferred_grants "
             "No changes were made."
         )
+        urls: str = ""
+        for workspace_context in workspace_contexts:
+            urls += (
+                f"{workspace_context.connect_config.host}/explore/data/hive_metastore/"
+                f"{workspace_context.config.inventory_database}/inferred_grants\n"
+            )
+        logger.info(f"URLs to the inferred grants tables: \n{urls}")
         return
     for workspace_context in workspace_contexts:
         workspace_context.acl_migrator.migrate_acls(target_catalog=target_catalog, hms_fed=hms_fed)
