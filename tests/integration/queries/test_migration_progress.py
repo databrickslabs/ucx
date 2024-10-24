@@ -1,4 +1,3 @@
-import dataclasses
 import datetime as dt
 import webbrowser
 
@@ -8,17 +7,31 @@ from databricks.labs.blueprint.wheels import find_project_root
 from databricks.labs.lsql.backends import SqlBackend, Row
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 
+from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo
+from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, Record
+from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.udfs import Udf
+from databricks.labs.ucx.progress.history import HistoricalEncoder
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
-from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.assessment.jobs import JobInfo
-from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
-from databricks.labs.ucx.assessment.pipelines import PipelineInfo
-from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
-from databricks.labs.ucx.hive_metastore.udfs import Udf
 
 from ..conftest import MockInstallationContext
+
+
+class MockOwnership(Ownership):
+    """Mock ownership to control who the owner is for test predictability."""
+
+    def __init__(self, administrator_locator: AdministratorLocator, owner: str) -> None:
+        super().__init__(administrator_locator)
+        self._owner = owner
+
+    def _maybe_direct_owner(self, record: Record) -> str | None:
+        """Obtain the record-specific user-name associated with the given record, if any."""
+        return self._owner
 
 
 @pytest.fixture
@@ -254,22 +267,13 @@ def catalog_populated(
     historicals = []
     for job_run_id in range(1, 3):  # No changes between migration progress run
         for table_name, id_, instance, failures, owner in historical_objects:
-            # TODO: Use historical encoder from https://github.com/databrickslabs/ucx/pull/2743/
-            data = {
-                field.name: str(getattr(instance, field.name))
-                for field in dataclasses.fields(instance)
-                if getattr(instance, field.name) is not None
-            }
-            historical = Historical(
-                workspace_id=workspace_id,
-                job_run_id=job_run_id,
-                object_type=table_name,
-                object_id=id_,
-                data=data,
-                failures=failures,
-                owner=owner,
+            encoder = HistoricalEncoder(
+                job_run_id,
+                workspace_id,
+                MockOwnership(installation_ctx.administrator_locator, owner),
+                type(instance),
             )
-            historicals.append(historical)
+            historicals.append(encoder.to_historical(instance))
     installation_ctx.sql_backend.save_table(
         f"{ucx_catalog}.multiworkspace.historical",
         historicals,
