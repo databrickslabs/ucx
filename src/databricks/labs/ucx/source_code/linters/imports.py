@@ -79,6 +79,8 @@ class ImportSource(NodeBase):
         problem_factory: ProblemFactory,
         problems: list[T],
     ) -> Iterable[ImportSource]:
+        if not node.args:
+            return
         for inferred in InferredValue.infer_from_node(node.args[0]):
             if inferred.is_inferred():
                 yield ImportSource(node, inferred.as_string())
