@@ -11,7 +11,12 @@ from databricks.labs.lsql.core import Row
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import Ownership
-from databricks.labs.ucx.progress.history import HistoricalEncoder, HistoryLog, Record, DataclassWithIdAttributes
+from databricks.labs.ucx.progress.history import (
+    HistoricalEncoder,
+    ProgressEncoder,
+    Record,
+    DataclassWithIdAttributes,
+)
 from databricks.labs.ucx.progress.install import Historical
 
 
@@ -536,7 +541,7 @@ def test_history_log_appends_historical_records(mock_backend, ownership) -> None
         ),
     )
 
-    history_log = HistoryLog(
+    history_log = ProgressEncoder(
         mock_backend,
         ownership,
         _TestRecord,
@@ -556,7 +561,7 @@ def test_history_log_default_location(mock_backend, ownership) -> None:
     """Verify that the history log defaults to the ucx.history in the configured catalog."""
 
     record = _TestRecord(a_field="foo", b_field=1, failures=[])
-    history_log = HistoryLog(mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
+    history_log = ProgressEncoder(mock_backend, ownership, _TestRecord, run_id=1, workspace_id=2, catalog="the_catalog")
     history_log.append_inventory_snapshot([record])
 
     assert history_log.full_name == "the_catalog.multiworkspace.historical"

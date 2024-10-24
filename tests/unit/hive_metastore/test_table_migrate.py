@@ -39,7 +39,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 
 from .. import mock_table_mapping, mock_workspace_client
 
@@ -1601,7 +1601,7 @@ def test_table_migration_status_supports_history(
     """Verify that TableMigrationStatus records are written as expected to the history log."""
     table_migration_ownership = create_autospec(TableMigrationOwnership)
     table_migration_ownership.owner_of.return_value = "the_admin"
-    history_log = HistoryLog[TableMigrationStatus](
+    history_log = ProgressEncoder[TableMigrationStatus](
         mock_backend,
         table_migration_ownership,
         TableMigrationStatus,

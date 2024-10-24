@@ -4,7 +4,7 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
 from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
@@ -16,15 +16,15 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 @pytest.mark.parametrize(
     "task, crawler, history_log",
     (
-        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, RuntimeContext.historical_udfs_log),
-        (MigrationProgress.crawl_grants, RuntimeContext.grants_crawler, RuntimeContext.historical_grants_log),
-        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, RuntimeContext.historical_jobs_log),
-        (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, RuntimeContext.historical_clusters_log),
-        (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, RuntimeContext.historical_pipelines_log),
+        (MigrationProgress.crawl_udfs, RuntimeContext.udfs_crawler, RuntimeContext.udfs_progress),
+        (MigrationProgress.crawl_grants, RuntimeContext.grants_crawler, RuntimeContext.grants_progress),
+        (MigrationProgress.assess_jobs, RuntimeContext.jobs_crawler, RuntimeContext.jobs_progress),
+        (MigrationProgress.assess_clusters, RuntimeContext.clusters_crawler, RuntimeContext.clusters_progress),
+        (MigrationProgress.assess_pipelines, RuntimeContext.pipelines_crawler, RuntimeContext.pipelines_progress),
         (
             MigrationProgress.crawl_cluster_policies,
             RuntimeContext.policies_crawler,
-            RuntimeContext.historical_cluster_policies_log,
+            RuntimeContext.policies_progress,
         ),
         (
             MigrationProgress.refresh_table_migration_status,
@@ -36,7 +36,7 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history_log) -> None:
     crawler_class = get_type_hints(crawler.func)["return"]
     mock_crawler = create_autospec(crawler_class)
-    mock_history_log = create_autospec(HistoryLog)
+    mock_history_log = create_autospec(ProgressEncoder)
     crawler_name = crawler.attrname
     history_log_name = history_log.attrname
     context_replacements = {
@@ -52,7 +52,7 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history
 def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
     """Ensure that the split crawl and update-history-log tasks perform their part of the refresh process."""
     mock_tables_crawler = create_autospec(TablesCrawler)
-    mock_history_log = create_autospec(HistoryLog)
+    mock_history_log = create_autospec(ProgressEncoder)
     context_replacements = {
         "tables_crawler": mock_tables_crawler,
         "historical_tables_log": mock_history_log,
