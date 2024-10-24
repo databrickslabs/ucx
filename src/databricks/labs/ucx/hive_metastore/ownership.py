@@ -87,7 +87,7 @@ class TableOwnership(Ownership[Table]):
 
 
 class TableOwnershipGrantLoader:
-    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
+    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership):
         self._tables_crawler = tables_crawler
         self._table_ownership = table_ownership
 
