@@ -1,9 +1,10 @@
+from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
 from datetime import timedelta
 from functools import cached_property
-from typing import Generic, TypeVar, final
+from typing import Generic, TypeVar, final, cast
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
@@ -169,8 +170,15 @@ class AdministratorLocator:
 class Ownership(ABC, Generic[Record]):
     """Determine an owner for a given type of object."""
 
-    def __init__(self, administrator_locator: AdministratorLocator) -> None:
+    _factories: dict[type, Ownership] = {}
+
+    @classmethod
+    def for_record_type(cls, record_type: type) -> Ownership[Record]:
+        return cast(Ownership[Record], cls._factories[record_type])
+
+    def __init__(self, administrator_locator: AdministratorLocator, record_type: type) -> None:
         self._administrator_locator = administrator_locator
+        self._factories[record_type] = self
 
     @final
     def owner_of(self, record: Record) -> str:
@@ -198,7 +206,7 @@ class Ownership(ABC, Generic[Record]):
 
 class WorkspacePathOwnership(Ownership[WorkspacePath]):
     def __init__(self, administrator_locator: AdministratorLocator, ws: WorkspaceClient) -> None:
-        super().__init__(administrator_locator)
+        super().__init__(administrator_locator, WorkspacePath)
         self._ws = ws
 
     @retried(on=[InternalError], timeout=timedelta(minutes=1))
