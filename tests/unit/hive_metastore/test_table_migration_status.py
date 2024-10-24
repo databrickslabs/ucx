@@ -13,7 +13,10 @@ def test_table_migration_status_no_failures_when_destination_is_present() -> Non
     assert migration_status.failures == []
 
 
-@pytest.mark.parametrize("attribute", ["dst_catalog", "dst_schema", "dst_table"])
-def test_table_migration_status_failures_when_partial_destination(attribute: str) -> None:
-    migration_status = TableMigrationStatus("schema", "table", **{attribute: "test"})
+@pytest.mark.parametrize("attribute_one", ["dst_catalog", "dst_schema", "dst_table"])
+@pytest.mark.parametrize("attribute_two", ["dst_catalog", "dst_schema", "dst_table"])
+def test_table_migration_status_failures_when_partial_destination(attribute_one: str, attribute_two: str) -> None:
+    migration_status = TableMigrationStatus(
+        "schema", "table", **{attribute_one: attribute_one, attribute_two: attribute_two}
+    )
     assert migration_status.failures == ["[UCX INTERNAL] Object 'schema.table' has partially destination"]
