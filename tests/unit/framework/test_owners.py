@@ -23,7 +23,7 @@ class _OwnershipFixture(Ownership[Record]):
         owner_fn: Callable[[Record], str | None] = lambda _: None,
     ):
         mock_admin_locator = create_autospec(AdministratorLocator)  # pylint: disable=mock-no-usage
-        super().__init__(mock_admin_locator)
+        super().__init__(mock_admin_locator, object)
         self._owner_fn = owner_fn
         self.mock_admin_locator = mock_admin_locator
 

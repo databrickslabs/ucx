@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,9 @@ class UdfOwnership(Ownership[Udf]):
 
     At the present we don't determine a specific owner for UDFs.
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, Udf)
 
     def _maybe_direct_owner(self, record: Udf) -> None:
         return None

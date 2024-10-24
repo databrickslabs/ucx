@@ -171,7 +171,7 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
     """
 
     def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
-        super().__init__(table_ownership._administrator_locator)
+        super().__init__(table_ownership._administrator_locator, TableMigrationStatus)
         self._tables_crawler = tables_crawler
         self._table_ownership = table_ownership
         self._indexed_tables: dict[tuple[str, str], Table] | None = None
