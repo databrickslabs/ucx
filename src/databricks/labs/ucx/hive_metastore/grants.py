@@ -871,7 +871,7 @@ class ACLMigrator(CrawlerBase[Grant]):
         self._migrate_acls(tables_to_migrate)
 
     def _retrieve_table_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> Iterable[Grant]:
-        tables = list(self._table_crawler.snapshot())
+        tables = list(self._tables_crawler.snapshot())
         grants: list[Grant] = []
         if not tables:
             logger.info("No tables found to acl")
