@@ -35,6 +35,9 @@ class TableMigrationStatus:
     def failures(self) -> list[str]:
         if self.dst_table and self.dst_schema and self.dst_table:
             return []
+        if self.dst_catalog or self.dst_schema or self.dst_table:
+            # Signals we set the destination properties incorrectly
+            return [f"[UCX INTERNAL] Object '{self.src_schema}.{self.src_table}' has partially destination"]
         return [f"Object '{self.src_schema}.{self.src_table}' pending migration"]
 
     @classmethod
