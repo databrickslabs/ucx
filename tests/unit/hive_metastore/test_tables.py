@@ -6,19 +6,22 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
 from databricks.labs.ucx.progress.history import ProgressEncoder
+
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
-from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnership, WorkspacePathOwnership
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations, MountsCrawler
 from databricks.labs.ucx.hive_metastore.tables import (
     FasterTableScanCrawler,
     HiveSerdeType,
     Table,
-    TableOwnership,
     TablesCrawler,
     What,
 )
+from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 def test_is_delta_true():
@@ -676,12 +679,30 @@ def test_table_owner() -> None:
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
-    ownership = TableOwnership(admin_locator)
+    grants_crawler = create_autospec(GrantsCrawler)
+    grants_crawler.snapshot.return_value = []
+    used_tables_in_paths = create_autospec(UsedTablesCrawler)
+    used_tables_in_paths.snapshot.return_value = []
+    used_tables_in_queries = create_autospec(UsedTablesCrawler)
+    used_tables_in_queries.snapshot.return_value = []
+    legacy_query_ownership = create_autospec(LegacyQueryOwnership)
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+
+    ownership = TableOwnership(
+        admin_locator,
+        grants_crawler,
+        used_tables_in_paths,
+        used_tables_in_queries,
+        legacy_query_ownership,
+        workspace_path_ownership,
+    )
     table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
     owner = ownership.owner_of(table)
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+    legacy_query_ownership.owner_of.assert_not_called()
+    workspace_path_ownership.owner_of.assert_not_called()
 
 
 @pytest.mark.parametrize(

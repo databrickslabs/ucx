@@ -28,13 +28,12 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatusRefresher,
     TableMigrationIndex,
-    TableMigrationOwnership,
     TableMigrationStatus,
     TableView,
 )
+from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
 from databricks.labs.ucx.hive_metastore.tables import (
     Table,
-    TableOwnership,
     TablesCrawler,
     What,
 )
