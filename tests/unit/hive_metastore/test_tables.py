@@ -17,10 +17,10 @@ from databricks.labs.ucx.hive_metastore.tables import (
     FasterTableScanCrawler,
     HiveSerdeType,
     Table,
-    TableOwnership,
     TablesCrawler,
     What,
 )
+from databricks.labs.ucx.hive_metastore.ownerhsip import TableOwnership
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
