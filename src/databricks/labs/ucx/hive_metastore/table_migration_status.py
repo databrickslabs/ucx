@@ -29,6 +29,10 @@ class TableMigrationStatus:
     def destination(self):
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
+    @property
+    def failures(self) -> str:
+        return f"{self.src_schema}.{self.src_table} is not yet migrated"
+
     @classmethod
     def from_json(cls, raw: dict[str, str]) -> "TableMigrationStatus":
         return cls(
