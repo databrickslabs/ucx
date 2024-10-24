@@ -80,10 +80,10 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
+        super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
-        self._table_crawler = table_crawler
+        self._tables_crawler = tables_crawler
 
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
         return TableMigrationIndex(list(self.snapshot(force_refresh=force_refresh)))
@@ -112,7 +112,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def is_migrated(self, schema: str, table: str) -> bool:
         try:
-            results = self._backend.fetch(
+            results = self._sql_backend.fetch(
                 f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)} ('upgraded_to')"
             )
             for result in results:
@@ -129,7 +129,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         return False
 
     def _crawl(self) -> Iterable[TableMigrationStatus]:
-        all_tables = self._table_crawler.snapshot()
+        all_tables = self._tables_crawler.snapshot()
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:

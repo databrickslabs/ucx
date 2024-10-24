@@ -42,15 +42,15 @@ class Udf:  # pylint: disable=too-many-instance-attributes
 
 
 class UdfsCrawler(CrawlerBase[Udf]):
-    def __init__(self, backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
+    def __init__(self, sql_backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
         """
         Initializes a UdfsCrawler instance.
 
         Args:
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "udfs", Udf)
+        super().__init__(sql_backend, "hive_metastore", schema, "udfs", Udf)
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:

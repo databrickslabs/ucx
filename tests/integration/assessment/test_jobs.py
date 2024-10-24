@@ -15,7 +15,7 @@ from .test_assessment import _SPARK_CONF
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     new_job = make_job(spark_conf=_SPARK_CONF)
-    job_crawler = JobsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     jobs = job_crawler.snapshot()
     results = []
     for job in jobs:
@@ -53,7 +53,7 @@ pass
     assert run
     run_id = run.run_id
 
-    job_run_crawler = SubmitRunsCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema, num_days_history=1)
+    job_run_crawler = SubmitRunsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema, num_days_history=1)
     job_runs = job_run_crawler.snapshot()
 
     assert len(job_runs) >= 1

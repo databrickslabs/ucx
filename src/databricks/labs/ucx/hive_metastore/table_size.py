@@ -34,7 +34,7 @@ class TableSizeCrawler(CrawlerBase[TableSize]):
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         super().__init__(
-            tables_crawler._backend,
+            tables_crawler._sql_backend,
             "hive_metastore",
             tables_crawler._schema,
             "table_size",
@@ -65,7 +65,7 @@ class TableSizeCrawler(CrawlerBase[TableSize]):
         logger.debug(f"Evaluating {table.key} table size.")
         try:
             # refresh table statistics to avoid stale stats in HMS
-            self._backend.execute(f"ANALYZE table {table.safe_sql_key} compute STATISTICS NOSCAN")
+            self._sql_backend.execute(f"ANALYZE table {table.safe_sql_key} compute STATISTICS NOSCAN")
             jvm_df = self._spark._jsparkSession.table(table.safe_sql_key)  # pylint: disable=protected-access
             size_in_bytes = jvm_df.queryExecution().analyzed().stats().sizeInBytes()
             return TableSize(
