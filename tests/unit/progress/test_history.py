@@ -494,6 +494,28 @@ def test_historical_encoder_failures_verification(
         _ = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=klass)
 
 
+def test_historical_encoder_failures_from_property(ownership) -> None:
+    """Verify an encoder gets failures from a property."""
+
+    @dataclass(frozen=True, kw_only=True)
+    class _AClass:
+        a_field: str
+        b_field: int
+
+        __id_attributes__: ClassVar[tuple[str]] = ("a_field",)
+
+        @property
+        def failures(self) -> list[str]:
+            return ["Failure"]
+
+
+    encoder = HistoricalEncoder(job_run_id=1, workspace_id=2, ownership=ownership, klass=_AClass)
+
+    historical = encoder.to_historical(_AClass(a_field="foo", b_field=10))
+
+    assert historical.failures == ["Failure"]
+
+
 def test_history_log_appends_historical_records(mock_backend, ownership) -> None:
     """Verify that we can journal a snapshot of records to the historical log."""
     ownership.owner_of.side_effect = lambda o: f"owner-{o.a_field}"
