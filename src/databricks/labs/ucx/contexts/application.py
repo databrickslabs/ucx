@@ -50,7 +50,6 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.hive_metastore.ownerhsip import TableOwnership
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler, UdfOwnership
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
