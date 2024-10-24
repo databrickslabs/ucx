@@ -24,7 +24,7 @@ from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
-from databricks.labs.ucx.hive_metastore.udfs import Udf
+from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfHistoryLog
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.history import HistoryLog
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
@@ -238,8 +238,8 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def historical_udfs_log(self) -> HistoryLog[Udf]:
-        return HistoryLog(
+    def historical_udfs_log(self) -> UdfHistoryLog:
+        return UdfHistoryLog(
             self.sql_backend,
             self.udf_ownership,
             Udf,
