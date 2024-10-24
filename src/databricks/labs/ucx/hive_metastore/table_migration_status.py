@@ -33,7 +33,7 @@ class TableMigrationStatus:
 
     @property
     def failures(self) -> list[str]:
-        if self.dst_table and self.dst_schema and self.dst_table:
+        if self.dst_catalog and self.dst_schema and self.dst_table:
             return []
         if self.dst_catalog or self.dst_schema or self.dst_table:
             # Signals we set the destination properties incorrectly
