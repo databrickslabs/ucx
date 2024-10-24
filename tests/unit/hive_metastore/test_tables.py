@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     What,
 )
-from databricks.labs.ucx.hive_metastore.ownerhsip import TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
@@ -680,8 +680,11 @@ def test_table_owner() -> None:
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     grants_crawler = create_autospec(GrantsCrawler)
+    grants_crawler.snapshot.return_value = []
     used_tables_in_paths = create_autospec(UsedTablesCrawler)
+    used_tables_in_paths.snapshot.return_value = []
     used_tables_in_queries = create_autospec(UsedTablesCrawler)
+    used_tables_in_queries.snapshot.return_value = []
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
 
@@ -698,6 +701,8 @@ def test_table_owner() -> None:
 
     assert owner == "an_admin"
     admin_locator.get_workspace_administrator.assert_called_once()
+    legacy_query_ownership.owner_of.assert_not_called()
+    workspace_path_ownership.owner_of.assert_not_called()
 
 
 @pytest.mark.parametrize(

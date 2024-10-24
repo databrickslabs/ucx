@@ -2,10 +2,10 @@ import dataclasses
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
-    TableMigrationOwnership,
     TableMigrationStatus,
     TableMigrationStatusRefresher,
 )
+from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership
 
 
 def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
