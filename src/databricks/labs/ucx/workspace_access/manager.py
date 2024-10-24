@@ -31,6 +31,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
+        # Note: tasks can return Permissions | None, but threads.gather() filters out None results.
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         acute_errors = []
         for error in errors:
