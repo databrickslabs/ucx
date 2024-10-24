@@ -102,5 +102,6 @@ def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
     table_record = next(record for record in records if record.full_name == table.full_name)
 
     # Verify ownership can be made.
+    my_user = runtime_ctx.workspace_client.current_user.me()
     owner = runtime_ctx.table_ownership.owner_of(table_record)
-    assert owner == runtime_ctx.administrator_locator.get_workspace_administrator()
+    assert owner == my_user.user_name
