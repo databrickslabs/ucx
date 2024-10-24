@@ -8,7 +8,15 @@ class TableMigration(Workflow):
     def __init__(self):
         super().__init__('migrate-tables')
 
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    @job_task(job_cluster="main", depends_on=[Assessment.crawl_tables])
+    def convert_managed_table(self, ctx: RuntimeContext):
+        """This workflow task converts managed HMS tables to external table."""
+        ctx.tables_migrator.convert_managed_hms_to_external(
+            managed_table_external_storage=ctx.config.managed_table_external_storage,
+            inventory_table=ctx.tables_crawler.full_name,
+        )
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables, convert_managed_table])
     def migrate_external_tables_sync(self, ctx: RuntimeContext):
         """This workflow task migrates the external tables that are supported by SYNC command from the Hive Metastore
         to the Unity Catalog.
