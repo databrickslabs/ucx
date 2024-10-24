@@ -263,7 +263,12 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def table_ownership(self) -> TableOwnership:
-        return TableOwnership(self.administrator_locator)
+        return TableOwnership(
+            self.administrator_locator,
+            self.grants_crawler,
+            self.used_tables_crawler_for_paths,
+            self.used_tables_crawler_for_queries,
+        )
 
     @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:

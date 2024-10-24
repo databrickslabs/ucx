@@ -16,8 +16,11 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.source_code.base import UsedTable
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -668,5 +671,51 @@ class TableOwnership(Ownership[Table]):
     At the present we don't determine a specific owner for tables.
     """
 
-    def _maybe_direct_owner(self, record: Table) -> None:
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        grants_crawler: GrantsCrawler,
+        used_tables_in_paths: UsedTablesCrawler,
+        used_tables_in_queries: UsedTablesCrawler,
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._grants_crawler = grants_crawler
+        self._used_tables_in_paths = used_tables_in_paths
+        self._used_tables_in_queries = used_tables_in_queries
+
+    def _maybe_direct_owner(self, record: Table) -> str | None:
+        owner = self._maybe_from_grants(record)
+        if owner:
+            return owner
         return None
+
+    def _maybe_from_notebooks(self, record: Table) -> str | None:
+        for used_table in self._used_tables_snapshot:
+            if not used_table.is_write:
+                continue
+            if used_table.catalog_name != record.catalog:
+                continue
+            if used_table.schema_name != record.database:
+                continue
+            if used_table.table_name != record.name:
+                continue
+        return None
+
+    @cached_property
+    def _used_tables_snapshot(self) -> list[UsedTable]:
+        return self._used_tables_in_paths.snapshot() + self._used_tables_in_queries.snapshot()
+
+    def _maybe_from_grants(self, record: Table) -> str | None:
+        for grant in self._grants_snapshot:
+            if not grant.action_type == 'OWN':
+                continue
+            object_type, full_name = grant.this_type_and_key()
+            if object_type == 'TABLE' and full_name == record.key:
+                return grant.principal
+            if object_type in {'DATABASE', 'SCHEMA'} and full_name == f"{record.catalog}.{record.database}":
+                return grant.principal
+        return None
+
+    @cached_property
+    def _grants_snapshot(self):
+        return self._grants_crawler.snapshot()
