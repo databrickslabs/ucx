@@ -78,12 +78,22 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
         self._workspace_client = workspace_client
 
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
-        if record.source_lineage and record.source_lineage[-1].object_type == 'QUERY':
-            query_id = record.source_lineage[-1].object_id.split('/')[1]
-            legacy_query = self._workspace_client.queries.get(query_id)
-            return legacy_query.owner_user_name
+        if record.source_type == 'QUERY':
+            return self._query_owner(record)
+        if record.source_type == 'NOTEBOOK':
+            return self._notebook_owner(record)
+        logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
+        return None
+
+    def _notebook_owner(self, record):
         try:
-            workspace_path = WorkspacePath(self._workspace_client, record.path)
-            return self._workspace_path_ownership.owner_of(workspace_path)
+            workspace_path = WorkspacePath(self._workspace_client, record.source_id)
+            owner = self._workspace_path_ownership.owner_of(workspace_path)
+            return owner
         except NotFound:
             return None
+
+    def _query_owner(self, record):
+        query_id = record.source_lineage[-1].object_id.split('/')[1]
+        legacy_query = self._workspace_client.queries.get(query_id)
+        return legacy_query.owner_user_name

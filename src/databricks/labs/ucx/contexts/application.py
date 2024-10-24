@@ -271,7 +271,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def directfs_access_ownership(self) -> DirectFsAccessOwnership:
-        return DirectFsAccessOwnership(self.administrator_locator, self.workspace_path_ownership, self.workspace_client,)
+        return DirectFsAccessOwnership(
+            self.administrator_locator,
+            self.workspace_path_ownership,
+            self.workspace_client,
+        )
 
     @cached_property
     def tables_migrator(self) -> TablesMigrator:

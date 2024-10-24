@@ -2,8 +2,9 @@ import datetime as dt
 from unittest.mock import create_autospec
 
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.framework.owners import AdministratorLocator
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
 from databricks.labs.ucx.source_code.base import LineageAtom
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -38,12 +39,15 @@ def test_crawler_appends_dfsas() -> None:
 
 def test_directfs_access_ownership() -> None:
     """Verify that the owner for a direct-fs access record is an administrator."""
+    ws = create_autospec(WorkspaceClient)
     admin_locator = create_autospec(AdministratorLocator)
-    admin_locator.get_workspace_administrator.return_value = "an_admin"
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    workspace_path_ownership.owner_of.return_value = "other_admin"
 
-    ownership = DirectFsAccessOwnership(admin_locator)
+    ownership = DirectFsAccessOwnership(admin_locator, workspace_path_ownership, ws)
     dfsa = DirectFsAccess()
     owner = ownership.owner_of(dfsa)
 
-    assert owner == "an_admin"
-    admin_locator.get_workspace_administrator.assert_called_once()
+    assert owner == "other_admin"
+    ws.queries.get.assert_not_called()
+    admin_locator.get_workspace_administrator.assert_not_called()

@@ -1,12 +1,8 @@
-import pytest
-
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessOwnership
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
-@pytest.mark.xfail(reason="DirectFS access records don't currently include creator/owner information.")
 def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory_schema, sql_backend) -> None:
     """Verify the ownership of a direct-fs record for a query."""
 
@@ -33,9 +29,13 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
-@pytest.mark.xfail(reason="DirectFS access records don't currently include creator/owner information.")
 def test_path_dfsa_ownership(
-    runtime_ctx, make_notebook, make_job, make_directory, inventory_schema, sql_backend
+    runtime_ctx,
+    make_notebook,
+    make_job,
+    make_directory,
+    inventory_schema,
+    sql_backend,
 ) -> None:
     """Verify the ownership of a direct-fs record for a notebook/source path associated with a job."""
 
@@ -61,5 +61,5 @@ def test_path_dfsa_ownership(
     path_record = next(record for record in records if record.source_id == str(notebook))
 
     # Verify ownership can be made.
-    ownership = DirectFsAccessOwnership(runtime_ctx.administrator_locator)
-    assert ownership.owner_of(path_record) == runtime_ctx.workspace_client.current_user.me().user_name
+    owner = runtime_ctx.directfs_access_ownership.owner_of(path_record)
+    assert owner == runtime_ctx.workspace_client.current_user.me().user_name
