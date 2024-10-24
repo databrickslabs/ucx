@@ -11,6 +11,7 @@ from databricks.sdk.errors import Unknown, NotFound
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.progress.history import HistoryLog
 
 logger = logging.getLogger(__name__)
 
@@ -153,3 +154,12 @@ class UdfOwnership(Ownership[Udf]):
 
     def _maybe_direct_owner(self, record: Udf) -> None:
         return None
+
+
+class UdfHistoryLog(HistoryLog[Udf]):
+    """Encoder class:Udf to class:History.
+
+    The encoding of UDF is different as the failures are added during crawling the UDFs. For legacy reasons, we keep
+    this logic in the `Crawler`. This class is a placeholder for documenting this decision and maintaining a parallel
+    structure across modules with inventory data classes
+    """
