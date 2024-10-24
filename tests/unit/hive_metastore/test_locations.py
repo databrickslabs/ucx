@@ -1,5 +1,4 @@
 from unittest.mock import Mock, call, create_autospec
-import sys
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
@@ -837,15 +836,7 @@ def test_mount_dont_list_partitions():
     assert results[0].is_partitioned
 
 
-@pytest.fixture
-def set_recursion_limit():
-    original_limit = sys.getrecursionlimit()
-    sys.setrecursionlimit(150)
-    yield
-    sys.setrecursionlimit(original_limit)
-
-
-def test_mount_infinite_loop(set_recursion_limit):
+def test_mount_invalid_partition_char():
 
     client = create_autospec(WorkspaceClient)
 
