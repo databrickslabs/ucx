@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from functools import cached_property
 
 from databricks.labs.ucx.framework.owners import (
@@ -8,7 +9,7 @@ from databricks.labs.ucx.framework.owners import (
     WorkspacePathOwnership,
 )
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, Grant
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import UsedTable
@@ -83,6 +84,31 @@ class TableOwnership(Ownership[Table]):
     @cached_property
     def _grants_snapshot(self):
         return self._grants_crawler.snapshot()
+
+
+class TableOwnershipGrantLoader:
+    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
+        self._tables_crawler = tables_crawler
+        self._table_ownership = table_ownership
+
+    def load(self) -> Iterable[Grant]:
+        for table in self._tables_crawler.snapshot():
+            owner = self._table_ownership.owner_of(table)
+            table_name, view_name = self._names(table)
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=table.catalog,
+                database=table.database,
+                table=table_name,
+                view=view_name,
+            )
+
+    @staticmethod
+    def _names(table: Table) -> tuple[str | None, str | None]:
+        if table.view_text:
+            return None, table.name
+        return table.name, None
 
 
 class TableMigrationOwnership(Ownership[TableMigrationStatus]):
