@@ -55,7 +55,7 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
     mock_history_log = create_autospec(ProgressEncoder)
     context_replacements = {
         "tables_crawler": mock_tables_crawler,
-        "historical_tables_log": mock_history_log,
+        "tables_progress": mock_history_log,
         "named_parameters": {"parent_run_id": 53},
     }
 
