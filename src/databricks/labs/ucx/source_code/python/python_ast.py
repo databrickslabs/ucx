@@ -68,7 +68,7 @@ class MaybeTree:
         return self.tree.first_statement()
 
 
-class Tree:
+class Tree:  # pylint: disable=too-many-public-methods
 
     @classmethod
     def maybe_parse(cls, code: str) -> MaybeTree:
@@ -285,6 +285,11 @@ class Tree:
         self_module: Module = cast(Module, self.node)
         return self_module.globals.get(name, None) is not None
 
+    def get_global(self, name: str) -> list[NodeNG]:
+        if not self.has_global(name):
+            return []
+        return cast(Module, self.node).globals.get(name)
+
     def nodes_between(self, first_line: int, last_line: int) -> list[NodeNG]:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't extract nodes from {type(self.node).__name__}")
@@ -486,6 +491,7 @@ class MatchingVisitor(TreeVisitor):
         self._matched_nodes: list[NodeNG] = []
         self._node_type = node_type
         self._match_nodes = match_nodes
+        self._imports: dict[str, list[NodeNG]] = {}
 
     @property
     def matched_nodes(self) -> list[NodeNG]:
@@ -521,6 +527,7 @@ class MatchingVisitor(TreeVisitor):
         if isinstance(node, Call):
             return self._matches(node.func, depth)
         name, match_node = self._match_nodes[depth]
+        node = self._adjust_node_for_import_member(name, match_node, node)
         if not isinstance(node, match_node):
             return False
         next_node: NodeNG | None = None
@@ -537,6 +544,39 @@ class MatchingVisitor(TreeVisitor):
             # is this the last node to match ?
             return len(self._match_nodes) - 1 == depth
         return self._matches(next_node, depth + 1)
+
+    def _adjust_node_for_import_member(self, name: str, match_node: type, node: NodeNG) -> NodeNG:
+        if isinstance(node, match_node):
+            return node
+        # if we're looking for an attribute, it might be a global name
+        if match_node != Attribute or not isinstance(node, Name) or node.name != name:
+            return node
+        # in which case it could be an import member
+        module = Tree(Tree(node).root)
+        if not module.has_global(node.name):
+            return node
+        for import_from in module.get_global(node.name):
+            if not isinstance(import_from, ImportFrom):
+                continue
+            parent = Name(
+                name=import_from.modname,
+                lineno=import_from.lineno,
+                col_offset=import_from.col_offset,
+                end_lineno=import_from.end_lineno,
+                end_col_offset=import_from.end_col_offset,
+                parent=import_from.parent,
+            )
+            resolved = Attribute(
+                attrname=name,
+                lineno=import_from.lineno,
+                col_offset=import_from.col_offset,
+                end_lineno=import_from.end_lineno,
+                end_col_offset=import_from.end_col_offset,
+                parent=parent,
+            )
+            resolved.postinit(parent)
+            return resolved
+        return node
 
 
 class NodeBase(ABC):
