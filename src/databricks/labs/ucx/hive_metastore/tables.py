@@ -16,7 +16,11 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.source_code.base import UsedTable
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
 
