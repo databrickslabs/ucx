@@ -37,6 +37,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     What,
 )
+from databricks.labs.ucx.hive_metastore.ownerhsip import TableOwnership
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.progress.history import ProgressEncoder
 
