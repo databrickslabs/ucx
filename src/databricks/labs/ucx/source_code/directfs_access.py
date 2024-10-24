@@ -10,7 +10,12 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator, WorkspacePathOwnership
+from databricks.labs.ucx.framework.owners import (
+    Ownership,
+    AdministratorLocator,
+    WorkspacePathOwnership,
+    LegacyQueryOwnership,
+)
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
 
@@ -73,15 +78,17 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
         self,
         administrator_locator: AdministratorLocator,
         workspace_path_ownership: WorkspacePathOwnership,
+        legacy_query_ownership: LegacyQueryOwnership,
         workspace_client: WorkspaceClient,
     ) -> None:
         super().__init__(administrator_locator)
         self._workspace_path_ownership = workspace_path_ownership
+        self._legacy_query_ownership = legacy_query_ownership
         self._workspace_client = workspace_client
 
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
-        if record.source_type == 'QUERY':
-            return self._query_owner(record)
+        if record.source_type == 'QUERY' and record.query_id:
+            return self._legacy_query_ownership.owner_of(record.query_id)
         if record.source_type in {'NOTEBOOK', 'FILE'}:
             return self._notebook_owner(record)
         logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
@@ -94,8 +101,3 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
             return owner
         except NotFound:
             return None
-
-    def _query_owner(self, record):
-        query_id = record.source_lineage[-1].object_id.split('/')[1]
-        legacy_query = self._workspace_client.queries.get(query_id)
-        return legacy_query.owner_user_name

@@ -28,7 +28,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership, LegacyQueryOwnership
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -268,6 +268,8 @@ class GlobalContext(abc.ABC):
             self.grants_crawler,
             self.used_tables_crawler_for_paths,
             self.used_tables_crawler_for_queries,
+            self.legacy_query_ownership,
+            self.workspace_path_ownership,
         )
 
     @cached_property
@@ -275,10 +277,15 @@ class GlobalContext(abc.ABC):
         return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
 
     @cached_property
+    def legacy_query_ownership(self) -> LegacyQueryOwnership:
+        return LegacyQueryOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
     def directfs_access_ownership(self) -> DirectFsAccessOwnership:
         return DirectFsAccessOwnership(
             self.administrator_locator,
             self.workspace_path_ownership,
+            self.legacy_query_ownership,
             self.workspace_client,
         )
 
