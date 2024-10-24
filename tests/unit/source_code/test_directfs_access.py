@@ -45,7 +45,7 @@ def test_directfs_access_ownership() -> None:
     workspace_path_ownership.owner_of.return_value = "other_admin"
 
     ownership = DirectFsAccessOwnership(admin_locator, workspace_path_ownership, ws)
-    dfsa = DirectFsAccess()
+    dfsa = DirectFsAccess(source_lineage=[LineageAtom(object_type="NOTEBOOK", object_id="/x/y/z")])
     owner = ownership.owner_of(dfsa)
 
     assert owner == "other_admin"

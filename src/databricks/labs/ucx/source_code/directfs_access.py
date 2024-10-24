@@ -80,7 +80,7 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
         if record.source_type == 'QUERY':
             return self._query_owner(record)
-        if record.source_type == 'NOTEBOOK':
+        if record.source_type in {'NOTEBOOK', 'FILE'}:
             return self._notebook_owner(record)
         logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
         return None
