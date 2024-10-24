@@ -12284,6 +12284,10 @@
   "numpy": {
     "numpy": []
   },
+  "nvidia-ml-py": {
+    "example": [],
+    "pynvml": []
+  },
   "oauthlib": {
     "oauthlib": [],
     "oauthlib.common": [],
