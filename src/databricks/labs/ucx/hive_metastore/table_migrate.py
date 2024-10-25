@@ -79,7 +79,7 @@ class TablesMigrator:
             logger.info("Not required to convert managed hms table to external, Skipping this task...")
             return None
         self._spark = self._spark_session
-        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tc, False)
+        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler, False)
         tables_in_scope = filter(lambda t: t.src.what == What.EXTERNAL_SYNC, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
