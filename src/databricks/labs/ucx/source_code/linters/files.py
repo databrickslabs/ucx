@@ -1,5 +1,6 @@
 from __future__ import annotations  # for type hints
 
+import dataclasses
 import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
@@ -50,7 +51,11 @@ class LocalFile(SourceContainer):
         if self._language is CellLanguage.PYTHON:
             context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
-            return analyzer.build_graph()
+            problems = analyzer.build_graph()
+            for idx, problem in enumerate(problems):
+                if problem.is_path_missing():
+                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
+            return problems
         # supported language that does not generate dependencies
         if self._language is CellLanguage.SQL:
             return []
