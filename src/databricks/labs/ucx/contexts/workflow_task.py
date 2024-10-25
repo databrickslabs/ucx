@@ -28,6 +28,7 @@ from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
+from databricks.labs.ucx.progress.pipelines import PipelineProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -210,8 +211,8 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def pipelines_progress(self) -> ProgressEncoder[PipelineInfo]:
-        return ProgressEncoder(
+    def pipelines_progress(self) -> PipelineProgressEncoder:
+        return PipelineProgressEncoder(
             self.sql_backend,
             self.pipeline_ownership,
             PipelineInfo,
