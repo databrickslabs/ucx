@@ -215,11 +215,11 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         self._ws = ws
 
     def _crawl(self) -> Iterable[PolicyInfo]:
-        all_policices = list(self._ws.cluster_policies.list())
-        return list(self._assess_policies(all_policices))
+        all_policies = list(self._ws.cluster_policies.list())
+        return list(self._assess_policies(all_policies))
 
-    def _assess_policies(self, all_policices) -> Iterable[PolicyInfo]:
-        for policy in all_policices:
+    def _assess_policies(self, all_policies) -> Iterable[PolicyInfo]:
+        for policy in all_policies:
             failures: list[str] = []
             if policy.policy_id is None:
                 continue
