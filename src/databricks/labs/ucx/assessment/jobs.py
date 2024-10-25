@@ -27,7 +27,7 @@ from databricks.sdk.service.jobs import (
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -94,8 +94,8 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "jobs", JobInfo)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+        super().__init__(sql_backend, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
 
     def _crawl(self) -> Iterable[JobInfo]:
@@ -160,6 +160,9 @@ class JobOwnership(Ownership[JobInfo]):
     This is the job creator (if known).
     """
 
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, JobInfo)
+
     def _maybe_direct_owner(self, record: JobInfo) -> str | None:
         return record.creator
 
@@ -182,8 +185,8 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         "fs.adl",
     ]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str, num_days_history: int):
-        super().__init__(sbe, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, num_days_history: int):
+        super().__init__(sql_backend, "hive_metastore", schema, "submit_runs", SubmitRunInfo)
         self._ws = ws
         self._num_days_history = num_days_history
 

@@ -23,14 +23,15 @@ class PermissionManager(CrawlerBase[Permissions]):
 
     ERRORS_TO_IGNORE = ["FEATURE_DISABLED"]
 
-    def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
-        super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
+    def __init__(self, sql_backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
+        super().__init__(sql_backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
 
     def _crawl(self) -> Iterable[Permissions]:
         logger.debug("Crawling permissions")
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
+        # Note: tasks can return Permissions | None, but threads.gather() filters out None results.
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         acute_errors = []
         for error in errors:

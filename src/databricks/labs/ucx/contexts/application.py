@@ -17,7 +17,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessOwnership
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.sdk import AccountClient, WorkspaceClient, core
@@ -28,7 +28,11 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
+from databricks.labs.ucx.framework.owners import (
+    AdministratorLocator,
+    WorkspacePathOwnership,
+    Ownership,
+)
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -268,6 +272,14 @@ class GlobalContext(abc.ABC):
     @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:
         return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
+    def directfs_access_ownership(self) -> DirectFsAccessOwnership:
+        return DirectFsAccessOwnership(
+            self.administrator_locator,
+            self.workspace_path_ownership,
+            self.workspace_client,
+        )
 
     @cached_property
     def tables_migrator(self) -> TablesMigrator:
@@ -550,6 +562,19 @@ class GlobalContext(abc.ABC):
     @cached_property
     def administrator_locator(self) -> AdministratorLocator:
         return AdministratorLocator(self.workspace_client)
+
+    @cached_property
+    def ownership_factory(self) -> Callable[[type], Ownership]:
+        # ensure registration of Ownerships
+        names_with_ownership = [name for name in dir(GlobalContext) if "ownership" in name]
+        for name in names_with_ownership:
+            if name == "ownership_factory":
+                continue
+            prop = getattr(GlobalContext, name)
+            if not isinstance(prop, cached_property):
+                continue
+            _ = getattr(self, name)
+        return Ownership.for_record_type
 
 
 class CliContext(GlobalContext, abc.ABC):

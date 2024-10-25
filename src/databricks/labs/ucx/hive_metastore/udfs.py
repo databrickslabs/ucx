@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -42,15 +42,15 @@ class Udf:  # pylint: disable=too-many-instance-attributes
 
 
 class UdfsCrawler(CrawlerBase[Udf]):
-    def __init__(self, backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
+    def __init__(self, sql_backend: SqlBackend, schema: str, include_databases: list[str] | None = None):
         """
         Initializes a UdfsCrawler instance.
 
         Args:
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "udfs", Udf)
+        super().__init__(sql_backend, "hive_metastore", schema, "udfs", Udf)
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:
@@ -150,6 +150,9 @@ class UdfOwnership(Ownership[Udf]):
 
     At the present we don't determine a specific owner for UDFs.
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, Udf)
 
     def _maybe_direct_owner(self, record: Udf) -> None:
         return None

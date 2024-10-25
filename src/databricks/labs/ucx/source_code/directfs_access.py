@@ -3,11 +3,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence, Iterable
 
+from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.sdk import WorkspaceClient
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator, WorkspacePathOwnership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
 
@@ -24,7 +27,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
     def for_queries(cls, backend: SqlBackend, schema) -> DirectFsAccessCrawler:
         return DirectFsAccessCrawler(backend, schema, "directfs_in_queries")
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str):
+    def __init__(self, sql_backend: SqlBackend, schema: str, table: str):
         """
         Initializes a DFSACrawler instance.
 
@@ -32,7 +35,9 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess)
+        super().__init__(
+            sql_backend=sql_backend, catalog="hive_metastore", schema=schema, table=table, klass=DirectFsAccess
+        )
 
     def dump_all(self, dfsas: Sequence[DirectFsAccess]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 2 crawlers, not just one
@@ -47,7 +52,7 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
 
     def _try_fetch(self) -> Iterable[DirectFsAccess]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
-        for row in self._backend.fetch(sql):
+        for row in self._sql_backend.fetch(sql):
             yield self._klass.from_dict(row.asDict())
 
     def _crawl(self) -> Iterable[DirectFsAccess]:
@@ -62,10 +67,35 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
 
      - For queries, the creator of the query (if known).
      - For jobs, the owner of the path for the notebook or source (if known).
-
-    At present this information is not gathered during the crawling process, so it can't be reported here.
     """
 
-    def _maybe_direct_owner(self, record: DirectFsAccess) -> None:
-        # TODO: Implement this once the creator/ownership information is exposed during crawling.
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        workspace_path_ownership: WorkspacePathOwnership,
+        workspace_client: WorkspaceClient,
+    ) -> None:
+        super().__init__(administrator_locator, DirectFsAccess)
+        self._workspace_path_ownership = workspace_path_ownership
+        self._workspace_client = workspace_client
+
+    def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
+        if record.source_type == 'QUERY':
+            return self._query_owner(record)
+        if record.source_type in {'NOTEBOOK', 'FILE'}:
+            return self._notebook_owner(record)
+        logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
         return None
+
+    def _notebook_owner(self, record):
+        try:
+            workspace_path = WorkspacePath(self._workspace_client, record.source_id)
+            owner = self._workspace_path_ownership.owner_of(workspace_path)
+            return owner
+        except NotFound:
+            return None
+
+    def _query_owner(self, record):
+        query_id = record.source_lineage[-1].object_id.split('/')[1]
+        legacy_query = self._workspace_client.queries.get(query_id)
+        return legacy_query.owner_user_name

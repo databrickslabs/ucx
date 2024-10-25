@@ -332,7 +332,7 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
         Listing.__init__(self, lambda: [], "_", "_")
         CrawlerBase.__init__(
             self,
-            backend=sql_backend,
+            sql_backend=sql_backend,
             catalog="hive_metastore",
             schema=inventory_database,
             table="workspace_objects",

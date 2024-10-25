@@ -10,7 +10,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ class PipelineInfo:
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
-        super().__init__(sbe, "hive_metastore", schema, "pipelines", PipelineInfo)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+        super().__init__(sql_backend, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
 
     def _crawl(self) -> Iterable[PipelineInfo]:
@@ -85,6 +85,9 @@ class PipelineOwnership(Ownership[PipelineInfo]):
 
     This is the pipeline creator (if known).
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, PipelineInfo)
 
     def _maybe_direct_owner(self, record: PipelineInfo) -> str | None:
         return record.creator_name

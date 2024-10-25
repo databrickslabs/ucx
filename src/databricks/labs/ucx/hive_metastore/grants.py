@@ -32,7 +32,7 @@ from databricks.labs.ucx.azure.access import (
     StoragePermissionMapping,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -215,12 +215,12 @@ CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this clus
 class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
-        assert tc._backend == udf._backend
-        assert tc._catalog == udf._catalog
-        assert tc._schema == udf._schema
-        super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
-        self._tc = tc
+    def __init__(self, tables_crawler: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
+        assert tables_crawler._sql_backend == udf._sql_backend
+        assert tables_crawler._catalog == udf._catalog
+        assert tables_crawler._schema == udf._schema
+        super().__init__(tables_crawler._sql_backend, tables_crawler._catalog, tables_crawler._schema, "grants", Grant)
+        self._tables_crawler = tables_crawler
         self._udf = udf
         self._include_databases = include_databases
 
@@ -275,7 +275,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         else:
             for database in self._include_databases:
                 tasks.append(partial(self.grants, catalog=catalog, database=database))
-        for table in self._tc.snapshot():
+        for table in self._tables_crawler.snapshot():
             fn = partial(self.grants, catalog=catalog, database=table.database)
             # Views are treated as a type of table and enumerated by the table crawler.
             if table.view_text is None:
@@ -404,6 +404,9 @@ class GrantOwnership(Ownership[Grant]):
     At the present we can't determine a specific owner for grants.
     """
 
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, Grant)
+
     def _maybe_direct_owner(self, record: Grant) -> None:
         return None
 
@@ -412,10 +415,10 @@ class AwsACL:
     def __init__(
         self,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         installation: Installation,
     ):
-        self._backend = backend
+        self._sql_backend = sql_backend
         self._ws = ws
         self._installation = installation
 
@@ -521,12 +524,12 @@ class AzureACL:
     def __init__(
         self,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         spn_crawler: AzureServicePrincipalCrawler,
         installation: Installation,
     ):
-        self._backend = backend
         self._ws = ws
+        self._sql_backend = sql_backend
         self._spn_crawler = spn_crawler
         self._installation = installation
 
@@ -604,13 +607,13 @@ class PrincipalACL:
     def __init__(
         self,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         installation: Installation,
         tables_crawler: TablesCrawler,
         external_locations: ExternalLocations,
         cluster_locations: Callable[[], list[ComputeLocations]],
     ):
-        self._backend = backend
+        self._sql_backend = sql_backend
         self._ws = ws
         self._installation = installation
         self._tables_crawler = tables_crawler
@@ -836,14 +839,14 @@ class ACLMigrator:
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
     ):
-        self._table_crawler = tables_crawler
+        self._tables_crawler = tables_crawler
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()
-        tables = list(self._table_crawler.snapshot())
+        tables = list(self._tables_crawler.snapshot())
         if not tables:
             logger.info("No tables found to acl")
             return

@@ -17,7 +17,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -375,15 +375,15 @@ class MigrationCount:
 
 
 class TablesCrawler(CrawlerBase[Table]):
-    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    def __init__(self, sql_backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
 
         Args:
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        super().__init__(sql_backend, "hive_metastore", schema, "tables", Table)
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:
@@ -527,14 +527,14 @@ class FasterTableScanCrawler(TablesCrawler):
     Databricks workspace.
     """
 
-    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
-        self._backend = backend
+    def __init__(self, sql_backend: SqlBackend, schema, include_databases: list[str] | None = None):
+        self._sql_backend = sql_backend
         self._include_database = include_databases
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        super().__init__(backend, schema, include_databases)
+        super().__init__(sql_backend, schema, include_databases)
         self._spark = SparkSession.builder.getOrCreate()
 
     @cached_property
@@ -678,6 +678,9 @@ class TableOwnership(Ownership[Table]):
 
     At the present we don't determine a specific owner for tables.
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, Table)
 
     def _maybe_direct_owner(self, record: Table) -> None:
         return None

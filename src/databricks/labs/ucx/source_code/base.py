@@ -224,6 +224,13 @@ class SourceInfo:
             assessment_end_timestamp=assessment_end or self.assessment_end_timestamp,
         )
 
+    @property
+    def source_type(self) -> str | None:
+        if not self.source_lineage:
+            return None
+        last = self.source_lineage[-1]
+        return last.object_type
+
 
 @dataclass
 class UsedTable(SourceInfo):
