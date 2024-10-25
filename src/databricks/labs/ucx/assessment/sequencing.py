@@ -13,7 +13,6 @@ from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
-from databricks.labs.ucx.hive_metastore.tables import TableOwnership, Table
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -154,7 +153,7 @@ class MigrationSequencer:
                 object_type="TABLE",
                 object_id=used_table.fullname,
                 object_name=used_table.fullname,
-                object_owner=TableOwnership(self._admin_locator).owner_of(Table.from_used_table(used_table)),
+                object_owner="", # TODO
             )
             self._nodes[table_node.key] = table_node
             self._outgoing[table_node.key].add(parent_node.key)

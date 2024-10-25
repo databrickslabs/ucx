@@ -57,5 +57,5 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
         sql = f"SELECT * FROM ( \
             SELECT *, explode(source_lineage) as lineage FROM {escape_sql_identifier(self.full_name)} \
             ) where lineage.object_type = '{object_type}' and lineage.object_id = '{object_id}'"
-        for row in self._backend.fetch(sql):
+        for row in self._sql_backend.fetch(sql):
             yield self._klass.from_dict(row.as_dict())
