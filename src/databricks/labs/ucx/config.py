@@ -83,6 +83,12 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] If specified, the large-scale scanners will only list the specified number of objects.
     debug_listing_upper_limit: int | None = None
 
+    # Skip ACL Migration
+    skip_grant_migration: bool = False
+
+    # Default table owner
+    fixed_owner: str | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

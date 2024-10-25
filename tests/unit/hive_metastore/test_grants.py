@@ -589,6 +589,76 @@ def test_migrate_grants_applies_query(
     group_manager.assert_not_called()
 
 
+def test_migrate_grants_skip():
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
+    grant = Grant("user", "SELECT")
+    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
+
+    def grant_loader() -> list[Grant]:
+        catalog = src.catalog
+        database = src.database
+        table = src.name
+        return [
+            dataclasses.replace(
+                grant,
+                catalog=catalog,
+                database=database,
+                table=table,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+        skip_grant_migration=True,
+    )
+
+    migrate_grants.apply(src, dst)
+
+    for query in backend.queries:
+        assert not query.startswith("GRANT")
+    group_manager.assert_not_called()
+
+
+def test_migrate_grants_set_fixed_owner():
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
+    grant = Grant("user", "SELECT")
+    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
+
+    def grant_loader() -> list[Grant]:
+        catalog = src.catalog
+        database = src.database
+        table = src.name
+        return [
+            dataclasses.replace(
+                grant,
+                catalog=catalog,
+                database=database,
+                table=table,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+        fixed_owner="fake_owner",
+    )
+
+    migrate_grants.apply(src, dst)
+
+    # asserting it is the last query
+    assert 'ALTER TABLE catalog.database.table SET OWNER TO fake_owner' in backend.queries[-1]
+    group_manager.assert_not_called()
+
+
 def test_migrate_grants_alters_ownership_as_last() -> None:
     queries = [
         "GRANT USE SCHEMA ON DATABASE `catalog`.`schema` TO `user`",
