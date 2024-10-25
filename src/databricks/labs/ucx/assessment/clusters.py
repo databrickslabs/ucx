@@ -224,11 +224,13 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
             if policy.policy_id is None:
                 continue
             failures.extend(self._check_cluster_policy(policy.policy_id, "policy"))
-            try:
-                spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
-            except KeyError:
-                spark_version = None
-            policy_name = policy.name
+            spark_version = None
+            if policy.definition is not None:
+                try:
+                    spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
+                except KeyError:
+                    pass
+            policy_name = policy.name or "UNDEFINED"
             creator_name = policy.creator_user_name or None
 
             policy_info = PolicyInfo(
