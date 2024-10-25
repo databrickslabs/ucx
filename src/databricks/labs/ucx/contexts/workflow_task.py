@@ -233,7 +233,7 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def historical_table_migration_log(self) -> ProgressEncoder[TableMigrationStatus]:
-        # TODO: merge into tables_progress
+        # TODO: @JCZuurmond merge into tables_progress
         return ProgressEncoder(
             self.sql_backend,
             self.table_migration_ownership,
