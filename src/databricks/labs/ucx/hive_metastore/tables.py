@@ -15,6 +15,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
+from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
@@ -85,6 +86,16 @@ class Table:  # pylint: disable=too-many-public-methods
     def __post_init__(self) -> None:
         if isinstance(self.table_format, str):  # Should not happen according to type hint, still safer
             self.table_format = self.table_format.upper()
+
+    @staticmethod
+    def from_used_table(used_table: UsedTable):
+        return Table(
+            catalog=used_table.catalog_name,
+            database=used_table.table_name,
+            name=used_table.table_name,
+            object_type="UNKNOWN",
+            table_format="UNKNOWN",
+        )
 
     @property
     def is_delta(self) -> bool:
