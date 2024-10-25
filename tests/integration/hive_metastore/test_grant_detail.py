@@ -10,7 +10,7 @@ from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.install import deploy_schema
 
-from ..conftest import MockRuntimeContext
+from ..contexts.runtime import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, Optional
+from typing import Optional
 from urllib.parse import urlparse, ParseResult
 
 from databricks.labs.blueprint.installation import Installation
@@ -145,15 +145,13 @@ class LocationTrie:
 
 
 class ExternalLocations(CrawlerBase[ExternalLocation]):
-    _prefix_size: ClassVar[list[int]] = [1, 12]
-
     def __init__(
         self,
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
         schema: str,
         tables_crawler: TablesCrawler,
-        mounts_crawler: 'MountsCrawler',
+        mounts_crawler: CrawlerBase['Mount'],
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
@@ -448,7 +446,7 @@ class TablesInMounts(CrawlerBase[Table]):
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
         inventory_database: str,
-        mounts_crawler: MountsCrawler,
+        mounts_crawler: CrawlerBase[Mount],
         include_mounts: list[str] | None = None,
         exclude_paths_in_mount: list[str] | None = None,
         include_paths_in_mount: list[str] | None = None,

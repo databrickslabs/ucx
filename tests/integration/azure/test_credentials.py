@@ -21,7 +21,7 @@ from databricks.labs.ucx.azure.credentials import (
 from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations, MountsCrawler
-from tests.integration.conftest import StaticServicePrincipalCrawler
+from tests.integration.contexts.common import StaticServicePrincipalCrawler
 
 
 @dataclass
@@ -111,10 +111,14 @@ def run_migration(sql_backend, inventory_schema, env_or_skip):
                 "test",
             )
         ]
-        sp_crawler = StaticServicePrincipalCrawler(sp_infos, ws, sql_backend, "dont_need_a_schema")
+        sp_crawler = StaticServicePrincipalCrawler(sp_infos)
 
         spn_migration = ServicePrincipalMigration(
-            installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
+            installation,
+            ws,
+            resource_permissions,
+            sp_crawler,
+            StorageCredentialManager(ws),
         )
         return spn_migration.run(
             MockPrompts(

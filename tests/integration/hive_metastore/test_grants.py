@@ -11,7 +11,7 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, GrantOwnership
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from ..conftest import MockRuntimeContext
+from ..contexts.runtime import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from databricks.labs.ucx.source_code.redash import Redash
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
 
-from ..conftest import MockInstallationContext
+from ..contexts.installation import MockInstallationContext
 
 
 def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: MockInstallationContext, make_dashboard, make_query):

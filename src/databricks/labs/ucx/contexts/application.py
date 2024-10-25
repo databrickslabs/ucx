@@ -12,6 +12,8 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -331,7 +333,7 @@ class GlobalContext(abc.ABC):
         return TableMove(self.workspace_client, self.sql_backend)
 
     @cached_property
-    def mounts_crawler(self) -> MountsCrawler:
+    def mounts_crawler(self) -> CrawlerBase[Mount]:
         return MountsCrawler(
             self.sql_backend,
             self.workspace_client,

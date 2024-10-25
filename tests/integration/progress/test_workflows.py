@@ -3,7 +3,7 @@ import datetime as dt
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 
-from ..conftest import MockInstallationContext
+from ..contexts.installation import MockInstallationContext
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=dt.timedelta(minutes=12))

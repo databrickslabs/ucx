@@ -29,7 +29,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
-from ..conftest import MockInstallationContext
+from ..contexts.installation import MockInstallationContext
 
 logger = logging.getLogger(__name__)
 

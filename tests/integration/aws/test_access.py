@@ -78,8 +78,7 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster
     )
     # create a new uber instance profile
     aws_cli_ctx.save_tables()
-    aws_resource_permission = aws_cli_ctx.aws_resource_permissions()
-    aws_resource_permission.create_uber_principal(
+    aws_cli_ctx.aws_resource_permissions.create_uber_principal(
         MockPrompts(
             {
                 "Do you want to create new migration role*": "yes",
