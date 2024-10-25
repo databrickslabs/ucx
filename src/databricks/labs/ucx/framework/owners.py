@@ -209,6 +209,9 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         super().__init__(administrator_locator, WorkspacePath)
         self._ws = ws
 
+    def owner_of_path(self, path: str) -> str:
+        return self.owner_of(WorkspacePath(self._ws, path))
+
     @retried(on=[InternalError], timeout=timedelta(minutes=1))
     def _maybe_direct_owner(self, record: WorkspacePath) -> str | None:
         maybe_type_and_id = self._maybe_type_and_id(record)
@@ -245,3 +248,18 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
                     return acl.group_name
                 return acl.service_principal_name
         return None
+
+
+class LegacyQueryOwnership(Ownership[str]):
+    def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
+        super().__init__(administrator_locator, str)
+        self._workspace_client = workspace_client
+
+    def _maybe_direct_owner(self, record: str) -> str | None:
+        try:
+            legacy_query = self._workspace_client.queries.get(record)
+            return legacy_query.owner_user_name
+        except NotFound:
+            return None
+        except InternalError:  # redash is very naughty and throws 500s instead of proper 404s
+            return None
