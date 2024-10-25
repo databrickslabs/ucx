@@ -629,7 +629,6 @@ def test_migrate_grants_set_fixed_owner():
     backend = MockBackend()
 
     src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
-    grant = Grant("user", "SELECT")
     dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
 
     def grant_loader() -> list[Grant]:
@@ -638,7 +637,13 @@ def test_migrate_grants_set_fixed_owner():
         table = src.name
         return [
             dataclasses.replace(
-                grant,
+                Grant("user", "SELECT"),
+                catalog=catalog,
+                database=database,
+                table=table,
+            ),
+            dataclasses.replace(
+                Grant("user", "OWN"),
                 catalog=catalog,
                 database=database,
                 table=table,
@@ -655,6 +660,7 @@ def test_migrate_grants_set_fixed_owner():
     migrate_grants.apply(src, dst)
 
     # asserting it is the last query
+    assert 'ALTER TABLE catalog.database.table SET OWNER TO user' not in backend.queries
     assert 'ALTER TABLE catalog.database.table SET OWNER TO fake_owner' in backend.queries[-1]
     group_manager.assert_not_called()
 
