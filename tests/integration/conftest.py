@@ -1214,7 +1214,7 @@ def prepare_tables_for_migration(
             path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
         )
         tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
-    elif scenario == "regularmanaged":
+    elif scenario == "managed":
         schema_name = f"managed_{random}"
         schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
         schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)

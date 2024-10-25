@@ -65,11 +65,12 @@ def test_table_migration_job_refreshes_migration_status(
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
     [
-        ("regularmanaged", "migrate-tables"),
+        ("managed", "migrate-tables"),
     ],
     indirect=("prepare_tables_for_migration",),
 )
 def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
+    # This test cases test the CONVERT_TO_EXTERNAL scenario.
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={

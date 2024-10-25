@@ -10,10 +10,10 @@ class TableMigration(Workflow):
 
     @job_task(job_cluster="main", depends_on=[Assessment.crawl_tables])
     def convert_managed_table(self, ctx: RuntimeContext):
-        """This workflow task converts managed HMS tables to external table."""
+        """This workflow task converts managed HMS tables to external table if `managed_table_external_storage` is set to `CONVERT_TO_EXTERNAL
+        See documentation for more detail."""
         ctx.tables_migrator.convert_managed_hms_to_external(
-            managed_table_external_storage=ctx.config.managed_table_external_storage,
-            inventory_table=ctx.tables_crawler.full_name,
+            managed_table_external_storage=ctx.config.managed_table_external_storage
         )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables, convert_managed_table])
@@ -25,15 +25,18 @@ class TableMigration(Workflow):
             what=What.EXTERNAL_SYNC, managed_table_external_storage=ctx.config.managed_table_external_storage
         )
 
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables, convert_managed_table])
     def migrate_dbfs_root_delta_tables(self, ctx: RuntimeContext):
         """This workflow task migrates delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using deep clone.
         """
         ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
-    def migrate_dbfs_root_non_delta_tables(self, ctx: RuntimeContext):
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables, convert_managed_table])
+    def migrate_dbfs_root_non_delta_tables(
+        self,
+        ctx: RuntimeContext,
+    ):
         """This workflow task migrates non delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using CTAS.
         """

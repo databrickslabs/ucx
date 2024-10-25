@@ -196,7 +196,9 @@ class TableMapping:
             logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
 
     def get_tables_to_migrate(
-        self, tables_crawler: TablesCrawler, check_uc_table: bool = True
+        self,
+        tables_crawler: TablesCrawler,
+        check_uc_table: bool = True,
     ) -> Collection[TableToMigrate]:
         # the check_uc_table is added specifically for convert_managed_hms_to_external method
         # so that it doesn't invoke any UC api which are not supported in non uc cluster

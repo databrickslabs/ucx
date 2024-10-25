@@ -70,7 +70,6 @@ class TablesMigrator:
     def convert_managed_hms_to_external(
         self,
         managed_table_external_storage: str = "CLONE",
-        inventory_table: str | None = None,
     ):
         # This method contains some of the steps of migrate tables. this was done to separate out the
         # code for converting managed hms table to external, since this needs to run in non uc cluster,
@@ -88,7 +87,6 @@ class TablesMigrator:
                 partial(
                     self._convert_hms_table_to_external,
                     table.src,
-                    inventory_table,
                 )
             )
         Threads.strict("convert tables", tasks)
@@ -293,8 +291,9 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
-    def _convert_hms_table_to_external(self, src_table: Table, inventory_table: str):
+    def _convert_hms_table_to_external(self, src_table: Table):
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
+        inventory_table = self._tc.full_name
         try:
             database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
             table_identifier = self._table_identifier(src_table.name, database)
@@ -330,7 +329,7 @@ class TablesMigrator:
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
-        update_sql = f"update {escape_sql_identifier(inventory_table)} set object_type = 'EXTERNAL' where catalog='hive_metastore' and database='{src_table.database}' and name='{src_table.name}';"
+        update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET object_type = 'EXTERNAL' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
         self._backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
