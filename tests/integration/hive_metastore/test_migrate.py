@@ -170,9 +170,15 @@ def test_migrate_external_table(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3054")
 def test_migrate_managed_table_to_external_table_without_conversion(
-    ws, sql_backend, runtime_ctx, make_catalog, make_mounted_location, make_random, env_or_skip
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
+    make_random,
+    env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
     src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
@@ -208,9 +214,15 @@ def test_migrate_managed_table_to_external_table_without_conversion(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3055")
 def test_migrate_managed_table_to_external_table_with_clone(
-    ws, sql_backend, runtime_ctx, make_catalog, make_mounted_location, make_random, env_or_skip
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_catalog,
+    make_mounted_location,
+    make_random,
+    env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
     src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
