@@ -6,6 +6,7 @@ from functools import partial
 
 from databricks.labs.blueprint.limiter import rate_limited
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import AclItem
@@ -31,14 +32,19 @@ class SecretScopesSupport(AclSupport):
         self._verify_timeout = verify_timeout
         self._include_object_permissions = include_object_permissions
 
-    def get_crawler_tasks(self):
-        def _crawler_task(scope: workspace.SecretScope):
+    def get_crawler_tasks(self) -> Iterable[Callable[[], Permissions | None]]:
+        def _crawler_task(scope: workspace.SecretScope) -> Permissions | None:
             assert scope.name is not None
-            acl_items = self._ws.secrets.list_acls(scope.name)
+            try:
+                acl_items = self._ws.secrets.list_acls(scope.name)
+                acl_items_raw = [item.as_dict() for item in acl_items]
+            except NotFound:
+                logger.warning(f"Secret scope disappeared, cannot assess: {scope.name}")
+                return None
             return Permissions(
                 object_id=scope.name,
                 object_type="secrets",
-                raw=json.dumps([item.as_dict() for item in acl_items]),
+                raw=json.dumps(acl_items_raw),
             )
 
         if self._include_object_permissions:

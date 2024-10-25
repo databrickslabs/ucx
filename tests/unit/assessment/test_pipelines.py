@@ -11,7 +11,7 @@ from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineOwnership, PipelineInfo, PipelinesCrawler
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 
 from .. import mock_workspace_client
 
@@ -163,7 +163,7 @@ def test_pipeline_info_supports_history(mock_backend, pipeline_info_record: Pipe
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     pipeline_ownership = PipelineOwnership(admin_locator)
-    history_log = HistoryLog[PipelineInfo](
+    history_log = ProgressEncoder[PipelineInfo](
         mock_backend,
         pipeline_ownership,
         PipelineInfo,

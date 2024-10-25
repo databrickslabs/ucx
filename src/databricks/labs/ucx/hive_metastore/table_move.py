@@ -16,10 +16,10 @@ from databricks.labs.ucx.hive_metastore.table_migrate import logger
 
 
 class TableMove:
-    def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
-        self._backend = backend
-        self._fetch = backend.fetch
-        self._execute = backend.execute
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend):
+        self._sql_backend = sql_backend
+        self._fetch = sql_backend.fetch
+        self._execute = sql_backend.execute
         self._ws = ws
 
     def move(

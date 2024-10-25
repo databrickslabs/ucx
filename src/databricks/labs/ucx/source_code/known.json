@@ -11647,6 +11647,9 @@
     "neuralforecast.tsdataset": [],
     "neuralforecast.utils": []
   },
+  "ninja": {
+    "ninja": []
+  },
   "nltk": {
     "nltk": [],
     "nltk.app": [],
@@ -12283,6 +12286,10 @@
   },
   "numpy": {
     "numpy": []
+  },
+  "nvidia-ml-py": {
+    "example": [],
+    "pynvml": []
   },
   "oauthlib": {
     "oauthlib": [],
