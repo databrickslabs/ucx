@@ -23,11 +23,13 @@ from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
+from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -188,8 +190,8 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def grants_progress(self) -> ProgressEncoder[Grant]:
-        return ProgressEncoder(
+    def grants_progress(self) -> GrantsProgressEncoder:
+        return GrantsProgressEncoder(
             self.sql_backend,
             self.grant_ownership,
             Grant,
@@ -221,11 +223,12 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def tables_progress(self) -> ProgressEncoder[Table]:
-        return ProgressEncoder(
+    def tables_progress(self) -> TableProgressEncoder:
+        return TableProgressEncoder(
             self.sql_backend,
             self.table_ownership,
-            Table,
+            self.migration_status_refresher.index(force_refresh=False),
+            self.grants_progress,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
