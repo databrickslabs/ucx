@@ -32,7 +32,7 @@ class Bar:
 class _CrawlerFixture(CrawlerBase[Result]):
     def __init__(
         self,
-        backend: MockBackend,
+        sql_backend: MockBackend,
         catalog: str,
         schema: str,
         table: str,
@@ -41,7 +41,7 @@ class _CrawlerFixture(CrawlerBase[Result]):
         fetcher: ResultFn = lambda: [],
         loader: ResultFn = lambda: [],
     ):
-        super().__init__(backend, catalog, schema, table, klass)
+        super().__init__(sql_backend, catalog, schema, table, klass)
         self._fetcher = fetcher
         self._loader = loader
 

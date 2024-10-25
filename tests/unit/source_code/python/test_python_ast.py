@@ -170,6 +170,18 @@ df.write.format("delta").saveAsTable("old.things")
     assert Tree(save_call).is_from_module("spark")
 
 
+def test_locates_member_import() -> None:
+    source = """
+from importlib import import_module
+module = import_module("xyz")
+"""
+    maybe_tree = Tree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None, maybe_tree.failure
+    tree = maybe_tree.tree
+    import_calls = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
+    assert import_calls
+
+
 @pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
 def test_is_instance_of(source, name, class_name) -> None:
     maybe_tree = Tree.maybe_normalized_parse(source)

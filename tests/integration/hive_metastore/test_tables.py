@@ -5,7 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import What, TableOwnership
+from databricks.labs.ucx.hive_metastore.tables import What
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,6 @@ def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
 
 def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
     """Verify the ownership can be determined for crawled tables."""
-    # This currently isn't very useful: we don't currently locate specific owners for tables.
 
     # A table for which we'll determine the owner.
     table = runtime_ctx.make_table()
@@ -103,5 +102,6 @@ def test_table_ownership(runtime_ctx, inventory_schema, sql_backend) -> None:
     table_record = next(record for record in records if record.full_name == table.full_name)
 
     # Verify ownership can be made.
-    ownership = TableOwnership(runtime_ctx.administrator_locator)
-    assert ownership.owner_of(table_record) == runtime_ctx.administrator_locator.get_workspace_administrator()
+    my_user = runtime_ctx.workspace_client.current_user.me()
+    owner = runtime_ctx.table_ownership.owner_of(table_record)
+    assert owner == my_user.user_name
