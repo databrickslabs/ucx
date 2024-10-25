@@ -15,6 +15,7 @@ from databricks.labs.ucx.framework.owners import (
     AdministratorLocator,
     WorkspacePathOwnership,
     LegacyQueryOwnership,
+    LegacyQueryPath,
 )
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
@@ -88,7 +89,7 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
 
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
         if record.source_type == 'QUERY' and record.query_id:
-            return self._legacy_query_ownership.owner_of(record.query_id)
+            return self._legacy_query_ownership.owner_of(LegacyQueryPath(record.query_id))
         if record.source_type in {'NOTEBOOK', 'FILE'}:
             return self._notebook_owner(record)
         logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
