@@ -26,7 +26,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
-from databricks.labs.ucx.progress.clusters import ClusterPolicyProgressEncoder
+from databricks.labs.ucx.progress.clusters import ClusterProgressEncoder, ClusterPolicyProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
@@ -167,8 +167,8 @@ class RuntimeContext(GlobalContext):
         return int(self.named_parameters["parent_run_id"])
 
     @cached_property
-    def clusters_progress(self) -> ProgressEncoder[ClusterInfo]:
-        return ProgressEncoder(
+    def clusters_progress(self) -> ClusterProgressEncoder:
+        return ClusterProgressEncoder(
             self.sql_backend,
             self.cluster_ownership,
             ClusterInfo,
