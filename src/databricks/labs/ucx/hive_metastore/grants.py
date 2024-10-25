@@ -811,7 +811,7 @@ class MigrateGrants:
                     f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
                 )
         if self._fixed_owner:
-            self._apply_ownership(dst)
+            self._apply_ownership(dst, self._fixed_owner)
         return True
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
@@ -855,15 +855,17 @@ class MigrateGrants:
             return grant
         return replace(grant, principal=target_principal)
 
-    def _apply_ownership(self, dst: SecurableObject):
+    def _apply_ownership(self, dst: SecurableObject, owner: str):
         if dst.kind == "TABLE":
-            sql = f"ALTER TABLE {dst.full_name} SET OWNER TO {self._fixed_owner}"
+            sql = f"ALTER TABLE {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
         elif dst.kind == "VIEW":
-            sql = f"ALTER VIEW {dst.full_name} SET OWNER TO {self._fixed_owner}"
-        elif dst.kind == "SCHEMA":
-            sql = f"ALTER SCHEMA {dst.full_name} SET OWNER TO {self._fixed_owner}"
+            sql = f"ALTER VIEW {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
+        elif dst.kind in {"SCHEMA", "DATABASE"}:
+            sql = f"ALTER SCHEMA {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
         elif dst.kind == "CATALOG":
-            sql = f"ALTER CATALOG {dst.full_name} SET OWNER TO {self._fixed_owner}"
+            sql = (
+                f"ALTER CATALOG {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
+            )
         else:
             logger.warning(f"Unknown object type {dst.kind} for ownership migration")
             return
