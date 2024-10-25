@@ -78,6 +78,12 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     managed_table_external_storage: str = 'CLONE'
 
+    # Skip ACL Migration
+    skip_grant_migration: bool = False
+
+    # Default table owner
+    fixed_owner: str | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

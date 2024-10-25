@@ -326,6 +326,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.group_manager,
             grant_loaders,
+            skip_grant_migration=self.config.skip_grant_migration,
         )
 
     @cached_property

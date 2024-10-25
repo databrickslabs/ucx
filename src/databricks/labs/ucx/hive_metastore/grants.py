@@ -777,13 +777,25 @@ class MigrateGrants:
         sql_backend: SqlBackend,
         group_manager: GroupManager,
         grant_loaders: list[Callable[[], Iterable[Grant]]],
+        /,
+        skip_grant_migration: bool = False,
+        fixed_owner: str | None = None,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
         self._grant_loaders = grant_loaders
+        self._skip_grant_migration = skip_grant_migration
+        self._fixed_owner = fixed_owner
+        if self._skip_grant_migration:
+            logger.info("Skipping grant migration")
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
+        if self._skip_grant_migration:
+            return True
         for grant in self._match_grants(src):
+            # Skip ownership grants if fixed owner is set
+            if self._fixed_owner is not None and grant.action_type == "OWN":
+                continue
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -798,6 +810,8 @@ class MigrateGrants:
                 logger.warning(
                     f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
                 )
+        if self._fixed_owner:
+            self._apply_ownership(dst)
         return True
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
@@ -840,6 +854,24 @@ class MigrateGrants:
         if not target_principal:
             return grant
         return replace(grant, principal=target_principal)
+
+    def _apply_ownership(self, dst: SecurableObject):
+        if dst.kind == "TABLE":
+            sql = f"ALTER TABLE {dst.full_name} SET OWNER TO {self._fixed_owner}"
+        elif dst.kind == "VIEW":
+            sql = f"ALTER VIEW {dst.full_name} SET OWNER TO {self._fixed_owner}"
+        elif dst.kind == "SCHEMA":
+            sql = f"ALTER SCHEMA {dst.full_name} SET OWNER TO {self._fixed_owner}"
+        elif dst.kind == "CATALOG":
+            sql = f"ALTER CATALOG {dst.full_name} SET OWNER TO {self._fixed_owner}"
+        else:
+            logger.warning(f"Unknown object type {dst.kind} for ownership migration")
+            return
+        logger.debug(f"Applying ownership on {dst.full_name} using SQL query: {sql}")
+        try:
+            self._sql_backend.execute(sql)
+        except DatabricksError as e:
+            logger.warning(f"Failed to apply ownership on {dst.full_name}", exc_info=e)
 
 
 class ACLMigrator(CrawlerBase[Grant]):
