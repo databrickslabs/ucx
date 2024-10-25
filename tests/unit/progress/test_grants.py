@@ -15,6 +15,10 @@ from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
             Grant("principal", "DENY", "hive_metastore", "schema"),
             "Action 'DENY' on DATABASE 'hive_metastore.schema' unmappable to Unity Catalog",
         ),
+        (
+            Grant("principal", "READ_METADATA", "hive_metastore", "schema", "table"),
+            "Action 'READ_METADATA' on TABLE 'hive_metastore.schema.table' unmappable to Unity Catalog",
+        ),
     ],
 )
 def test_grants_progress_encoder_failures(mock_backend, grant: Grant, failure: str) -> None:
