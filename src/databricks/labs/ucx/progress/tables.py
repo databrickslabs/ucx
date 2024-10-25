@@ -47,5 +47,5 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         historical = super()._encode_record_as_historical(record)
         failures = []
         if not self._table_migration_index.is_migrated(record.database, record.name):
-            failures.append(["Pending migration"])
+            failures.append("Pending migration")
         return replace(historical, failures=historical.failures + failures)
