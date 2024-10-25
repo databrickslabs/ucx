@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property
 from typing import Generic, TypeVar, final, cast
@@ -250,14 +251,19 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         return None
 
 
-class LegacyQueryOwnership(Ownership[str]):
+@dataclass
+class LegacyQueryPath:
+    path: str
+
+
+class LegacyQueryOwnership(Ownership[LegacyQueryPath]):
     def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
-        super().__init__(administrator_locator, str)
+        super().__init__(administrator_locator, LegacyQueryPath)
         self._workspace_client = workspace_client
 
-    def _maybe_direct_owner(self, record: str) -> str | None:
+    def _maybe_direct_owner(self, record: LegacyQueryPath) -> str | None:
         try:
-            legacy_query = self._workspace_client.queries.get(record)
+            legacy_query = self._workspace_client.queries.get(record.path)
             return legacy_query.owner_user_name
         except NotFound:
             return None

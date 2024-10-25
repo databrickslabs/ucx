@@ -6,6 +6,7 @@ from databricks.labs.ucx.framework.owners import (
     AdministratorLocator,
     LegacyQueryOwnership,
     WorkspacePathOwnership,
+    LegacyQueryPath,
 )
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
@@ -54,7 +55,7 @@ class TableOwnership(Ownership[Table]):
         if not used_table.is_write:
             return None
         if used_table.source_type == 'QUERY' and used_table.query_id:
-            return self._legacy_query_ownership.owner_of(used_table.query_id)
+            return self._legacy_query_ownership.owner_of(LegacyQueryPath(used_table.query_id))
         if used_table.source_type in {'NOTEBOOK', 'FILE'}:
             return self._workspace_path_ownership.owner_of_path(used_table.source_id)
         logger.warning(f"Unknown source type {used_table.source_type} for {used_table.source_id}")
