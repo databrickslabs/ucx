@@ -624,31 +624,80 @@ def test_migrate_grants_skip():
     group_manager.assert_not_called()
 
 
-def test_migrate_grants_set_fixed_owner():
+@pytest.mark.parametrize(
+    "src, src_grants, dst, query",
+    [
+        (
+            Catalog("hive_metastore"),
+            [Grant("user", "USAGE"), Grant("user", "OWN")],
+            Catalog("catalog"),
+            "ALTER CATALOG `catalog` SET OWNER TO `fake_owner`",
+        ),
+        (
+            Schema("hive_metastore", "schema"),
+            [Grant("user", "USAGE"), Grant("user", "OWN")],
+            Schema("catalog", "schema"),
+            "ALTER SCHEMA `catalog`.`schema` SET OWNER TO `fake_owner`",
+        ),
+        (
+            Table("hive_metastore", "database", "table", "MANAGED", "DELTA"),
+            [Grant("user", "SELECT"), Grant("user", "OWN")],
+            Table("catalog", "database", "table", "MANAGED", "DELTA"),
+            "ALTER TABLE `catalog`.`database`.`table` SET OWNER TO `fake_owner`",
+        ),
+        (
+            Catalog("hive_metastore"),
+            [Grant("user", "OWN")],
+            Catalog("catalog"),
+            "ALTER CATALOG `catalog` SET OWNER TO `fake_owner`",
+        ),
+        (
+            Schema("hive_metastore", "schema"),
+            [Grant("user", "OWN")],
+            Schema("catalog", "schema"),
+            "ALTER SCHEMA `catalog`.`schema` SET OWNER TO `fake_owner`",
+        ),
+        (
+            Table("hive_metastore", "database", "table", "MANAGED", "DELTA"),
+            [Grant("user", "OWN")],
+            Table("catalog", "database", "table", "MANAGED", "DELTA"),
+            "ALTER TABLE `catalog`.`database`.`table` SET OWNER TO `fake_owner`",
+        ),
+    ],
+)
+def test_migrate_grants_set_fixed_owner(
+    src: Catalog | Schema | Table,
+    src_grants: list[Grant],
+    dst: Catalog | Schema | Table,
+    query: str,
+) -> None:
     group_manager = create_autospec(GroupManager)
     backend = MockBackend()
 
-    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
-    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
-
     def grant_loader() -> list[Grant]:
-        catalog = src.catalog
-        database = src.database
-        table = src.name
-        return [
-            dataclasses.replace(
-                Grant("user", "SELECT"),
-                catalog=catalog,
-                database=database,
-                table=table,
-            ),
-            dataclasses.replace(
-                Grant("user", "OWN"),
-                catalog=catalog,
-                database=database,
-                table=table,
-            ),
-        ]
+        grants = []
+        for grant in src_grants:
+            database = table = None
+            if isinstance(src, Catalog):
+                catalog = src.name
+            elif isinstance(src, Schema):
+                catalog = src.catalog
+                database = src.name
+            elif isinstance(src, Table):
+                catalog = src.catalog
+                database = src.database
+                table = src.name
+            else:
+                raise TypeError(f"Unsupported source type: {type(src)}")
+            grants.append(
+                dataclasses.replace(
+                    grant,
+                    catalog=catalog,
+                    database=database,
+                    table=table,
+                )
+            )
+        return grants
 
     migrate_grants = MigrateGrants(
         backend,
@@ -660,8 +709,7 @@ def test_migrate_grants_set_fixed_owner():
     migrate_grants.apply(src, dst)
 
     # asserting it is the last query
-    assert 'ALTER TABLE catalog.database.table SET OWNER TO user' not in backend.queries
-    assert 'ALTER TABLE catalog.database.table SET OWNER TO fake_owner' in backend.queries[-1]
+    assert query in backend.queries[-1]
     group_manager.assert_not_called()
 
 
