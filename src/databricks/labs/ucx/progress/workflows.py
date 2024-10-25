@@ -52,7 +52,7 @@ class MigrationProgress(Workflow):
         # The table migration cluster is not legacy-ACL enabled, so we can't crawl from here.
         # Step 2 of 2: Assuming (due to depends-on) the inventory was refreshed, capture into the history log.
         # WARNING: this will fail if the inventory is empty, because it will then try to perform a crawl.
-        history_log = ctx.historical_tables_log
+        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         history_log.append_inventory_snapshot(tables_snapshot)
 
@@ -61,7 +61,7 @@ class MigrationProgress(Workflow):
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
         table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
         issues with grants that cannot be migrated to Unit Catalog."""
-        history_log = ctx.historical_udfs_log
+        history_log = ctx.udfs_progress
         udfs_snapshot = ctx.udfs_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(udfs_snapshot)
 
@@ -74,7 +74,7 @@ class MigrationProgress(Workflow):
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        history_log = ctx.historical_grants_log
+        history_log = ctx.grants_progress
         grants_snapshot = ctx.grants_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(grants_snapshot)
 
@@ -89,7 +89,7 @@ class MigrationProgress(Workflow):
           - Clusters with incompatible Spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        history_log = ctx.historical_jobs_log
+        history_log = ctx.jobs_progress
         jobs_snapshot = ctx.jobs_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(jobs_snapshot)
 
@@ -104,7 +104,7 @@ class MigrationProgress(Workflow):
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        history_log = ctx.historical_clusters_log
+        history_log = ctx.clusters_progress
         clusters_snapshot = ctx.clusters_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(clusters_snapshot)
 
@@ -119,7 +119,7 @@ class MigrationProgress(Workflow):
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        history_log = ctx.historical_pipelines_log
+        history_log = ctx.pipelines_progress
         pipelines_snapshot = ctx.pipelines_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(pipelines_snapshot)
 
@@ -132,7 +132,7 @@ class MigrationProgress(Workflow):
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        history_log = ctx.historical_cluster_policies_log
+        history_log = ctx.policies_progress
         cluster_policies_snapshot = ctx.policies_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(cluster_policies_snapshot)
 

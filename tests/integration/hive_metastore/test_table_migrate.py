@@ -2,11 +2,10 @@ import dataclasses
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
-    TableMigrationOwnership,
     TableMigrationStatus,
     TableMigrationStatusRefresher,
 )
-from databricks.labs.ucx.hive_metastore.tables import TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership
 
 
 def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
@@ -32,7 +31,7 @@ def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backen
     synthetic_record = dataclasses.replace(table_migration_record, src_table="does_not_exist")
 
     # Verify for the table that the table owner and the migration status are a match.
-    table_ownership = TableOwnership(runtime_ctx.administrator_locator)
+    table_ownership = runtime_ctx.table_ownership
     table_migration_ownership = TableMigrationOwnership(tables_crawler, table_ownership)
     assert table_migration_ownership.owner_of(table_migration_record) == table_ownership.owner_of(table_record)
 

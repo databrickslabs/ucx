@@ -38,7 +38,7 @@ class ReconResult:
 class MigrationRecon(CrawlerBase[ReconResult]):
     def __init__(
         self,
-        sbe: SqlBackend,
+        sql_backend: SqlBackend,
         schema: str,
         migration_status_refresher: TableMigrationStatusRefresher,
         table_mapping: TableMapping,
@@ -46,7 +46,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         data_comparator: DataComparator,
         default_threshold: float,
     ):
-        super().__init__(sbe, "hive_metastore", schema, "recon_results", ReconResult)
+        super().__init__(sql_backend, "hive_metastore", schema, "recon_results", ReconResult)
         self._migration_status_refresher = migration_status_refresher
         self._table_mapping = table_mapping
         self._schema_comparator = schema_comparator

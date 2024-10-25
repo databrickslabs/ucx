@@ -13,7 +13,7 @@ def test_pipeline_crawler(ws, make_pipeline, inventory_schema, sql_backend):
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(configuration=_PIPELINE_CONF)
 
-    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
     results = []
     for pipeline in pipelines:
@@ -31,7 +31,7 @@ def test_pipeline_with_secret_conf_crawler(ws, make_pipeline, inventory_schema, 
     logger.info("setting up fixtures")
     created_pipeline = make_pipeline(configuration=_PIPELINE_CONF_WITH_SECRET)
 
-    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
     results = []
     for pipeline in pipelines:
