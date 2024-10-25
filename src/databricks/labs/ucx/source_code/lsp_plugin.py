@@ -15,6 +15,18 @@ from databricks.labs.ucx.source_code.lsp import Diagnostic
 logger = logging.getLogger(__name__)
 
 
+DEBUG_MESSAGE_CODES = {
+    'cannot-autofix-table-reference',
+    'default-format-changed-in-dbr8',
+    'dependency-not-found',
+    'not-supported',
+    'notebook-run-cannot-compute-value',
+    'sql-parse-error',
+    'sys-path-cannot-compute-value',
+    'unsupported-magic-line',
+}
+
+
 @hookimpl
 def pylsp_lint(config: Config, document: Document) -> list[dict]:
     cfg = config.plugin_settings('pylsp_ucx', document_path=document.uri)
@@ -29,7 +41,7 @@ def pylsp_lint(config: Config, document: Document) -> list[dict]:
     languages = LinterContext(index=migration_index, session_state=session_state)
     analyser = languages.linter(Language.PYTHON)
     code = document.source
-    diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code)]
+    diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code) if _.code not in DEBUG_MESSAGE_CODES]
     return [d.as_dict() for d in diagnostics]
 
 
