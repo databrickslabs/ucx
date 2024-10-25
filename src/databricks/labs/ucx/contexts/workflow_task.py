@@ -21,7 +21,6 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineI
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -194,7 +193,6 @@ class RuntimeContext(GlobalContext):
         return GrantProgressEncoder(
             self.sql_backend,
             self.grant_ownership,
-            Grant,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,

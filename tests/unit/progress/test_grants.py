@@ -23,7 +23,6 @@ def test_grants_progress_encoder_no_failures(mock_backend, grant: Grant) -> None
     encoder = GrantProgressEncoder(
         mock_backend,
         ownership,
-        Grant,
         run_id=1,
         workspace_id=123456789,
         catalog="test",
@@ -56,7 +55,6 @@ def test_grants_progress_encoder_failures(mock_backend, grant: Grant, failure: s
     encoder = GrantProgressEncoder(
         mock_backend,
         ownership,
-        Grant,
         run_id=1,
         workspace_id=123456789,
         catalog="test",
