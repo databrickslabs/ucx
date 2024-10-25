@@ -32,7 +32,7 @@ from databricks.labs.ucx.azure.access import (
     StoragePermissionMapping,
 )
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -403,6 +403,9 @@ class GrantOwnership(Ownership[Grant]):
 
     At the present we can't determine a specific owner for grants.
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, Grant)
 
     def _maybe_direct_owner(self, record: Grant) -> None:
         return None

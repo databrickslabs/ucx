@@ -27,7 +27,7 @@ from databricks.sdk.service.jobs import (
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -159,6 +159,9 @@ class JobOwnership(Ownership[JobInfo]):
 
     This is the job creator (if known).
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, JobInfo)
 
     def _maybe_direct_owner(self, record: JobInfo) -> str | None:
         return record.creator

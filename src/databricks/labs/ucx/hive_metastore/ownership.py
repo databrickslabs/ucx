@@ -33,7 +33,7 @@ class TableOwnership(Ownership[Table]):
         legacy_query_ownership: LegacyQueryOwnership,
         workspace_path_ownership: WorkspacePathOwnership,
     ) -> None:
-        super().__init__(administrator_locator)
+        super().__init__(administrator_locator, Table)
         self._grants_crawler = grants_crawler
         self._used_tables_in_paths = used_tables_in_paths
         self._used_tables_in_queries = used_tables_in_queries
@@ -92,7 +92,7 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
     """
 
     def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
-        super().__init__(table_ownership._administrator_locator)  # TODO: Fix this
+        super().__init__(table_ownership._administrator_locator, TableMigrationStatus)  # TODO: Fix this
         self._tables_crawler = tables_crawler
         self._table_ownership = table_ownership
         self._indexed_tables: dict[tuple[str, str], Table] | None = None

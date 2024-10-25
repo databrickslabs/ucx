@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.jobs import JobOwnership
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -28,7 +29,12 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership, LegacyQueryOwnership
+from databricks.labs.ucx.framework.owners import (
+    AdministratorLocator,
+    WorkspacePathOwnership,
+    Ownership,
+    LegacyQueryOwnership,
+)
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -279,6 +285,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def legacy_query_ownership(self) -> LegacyQueryOwnership:
         return LegacyQueryOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
+    def job_ownership(self) -> JobOwnership:
+        return JobOwnership(self.administrator_locator)
 
     @cached_property
     def directfs_access_ownership(self) -> DirectFsAccessOwnership:
@@ -570,6 +580,19 @@ class GlobalContext(abc.ABC):
     @cached_property
     def administrator_locator(self) -> AdministratorLocator:
         return AdministratorLocator(self.workspace_client)
+
+    @cached_property
+    def ownership_factory(self) -> Callable[[type], Ownership]:
+        # ensure registration of Ownerships
+        names_with_ownership = [name for name in dir(GlobalContext) if "ownership" in name]
+        for name in names_with_ownership:
+            if name == "ownership_factory":
+                continue
+            prop = getattr(GlobalContext, name)
+            if not isinstance(prop, cached_property):
+                continue
+            _ = getattr(self, name)
+        return Ownership.for_record_type
 
 
 class CliContext(GlobalContext, abc.ABC):

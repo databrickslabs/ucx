@@ -81,7 +81,7 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
         legacy_query_ownership: LegacyQueryOwnership,
         workspace_client: WorkspaceClient,
     ) -> None:
-        super().__init__(administrator_locator)
+        super().__init__(administrator_locator, DirectFsAccess)
         self._workspace_path_ownership = workspace_path_ownership
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_client = workspace_client

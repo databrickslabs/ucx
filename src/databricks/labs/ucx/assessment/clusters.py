@@ -30,7 +30,7 @@ from databricks.labs.ucx.assessment.crawlers import (
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import Ownership, AdministratorLocator
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
@@ -195,6 +195,9 @@ class ClusterOwnership(Ownership[ClusterInfo]):
     This is the cluster creator (if known).
     """
 
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, ClusterInfo)
+
     def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
         return record.creator
 
@@ -259,6 +262,9 @@ class ClusterPolicyOwnership(Ownership[PolicyInfo]):
 
     This is the creator of the cluster policy (if known).
     """
+
+    def __init__(self, administrator_locator: AdministratorLocator):
+        super().__init__(administrator_locator, PolicyInfo)
 
     def _maybe_direct_owner(self, record: PolicyInfo) -> str | None:
         return record.creator
