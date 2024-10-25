@@ -233,18 +233,6 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def historical_table_migration_log(self) -> ProgressEncoder[TableMigrationStatus]:
-        # TODO: @JCZuurmond merge into tables_progress
-        return ProgressEncoder(
-            self.sql_backend,
-            self.table_migration_ownership,
-            TableMigrationStatus,
-            self.parent_run_id,
-            self.workspace_id,
-            self.config.ucx_catalog,
-        )
-
-    @cached_property
     def udfs_progress(self) -> ProgressEncoder[Udf]:
         return ProgressEncoder(
             self.sql_backend,
