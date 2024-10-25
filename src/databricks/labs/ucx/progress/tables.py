@@ -4,7 +4,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
-from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
+from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 
 
 class TableProgressEncoder(ProgressEncoder[Table]):
@@ -20,7 +20,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         sql_backend: SqlBackend,
         ownership: TableOwnership,
         table_migration_index: TableMigrationIndex,
-        grants_progress_encoder: GrantsProgressEncoder,
+        grant_progress_encoder: GrantProgressEncoder,
         run_id: int,
         workspace_id: int,
         catalog: str,
@@ -38,4 +38,4 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             table,
         )
         self._table_migration_index = table_migration_index
-        self._grants_progress_encoder = grants_progress_encoder
+        self._grant_progress_encoder = grant_progress_encoder

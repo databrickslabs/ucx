@@ -5,7 +5,7 @@ from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
 
 
-class GrantsProgressEncoder(ProgressEncoder[Grant]):
+class GrantProgressEncoder(ProgressEncoder[Grant]):
     """Encoder class:Grant to class:History.
 
     A failure for a grants implies it cannot be mapped to Unity Catalog.

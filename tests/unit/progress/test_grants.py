@@ -5,7 +5,7 @@ import pytest
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
+from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 
 
 @pytest.mark.parametrize(
@@ -20,7 +20,7 @@ from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
 def test_grants_progress_encoder_no_failures(mock_backend, grant: Grant) -> None:
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
-    encoder = GrantsProgressEncoder(
+    encoder = GrantProgressEncoder(
         mock_backend,
         ownership,
         Grant,
@@ -53,7 +53,7 @@ def test_grants_progress_encoder_no_failures(mock_backend, grant: Grant) -> None
 def test_grants_progress_encoder_failures(mock_backend, grant: Grant, failure: str) -> None:
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
-    encoder = GrantsProgressEncoder(
+    encoder = GrantProgressEncoder(
         mock_backend,
         ownership,
         Grant,

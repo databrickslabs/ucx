@@ -26,7 +26,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
-from databricks.labs.ucx.progress.grants import GrantsProgressEncoder
+from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.tables import TableProgressEncoder
@@ -190,8 +190,8 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def grants_progress(self) -> GrantsProgressEncoder:
-        return GrantsProgressEncoder(
+    def grants_progress(self) -> GrantProgressEncoder:
+        return GrantProgressEncoder(
             self.sql_backend,
             self.grant_ownership,
             Grant,
