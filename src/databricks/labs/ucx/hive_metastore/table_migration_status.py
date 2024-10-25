@@ -9,10 +9,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import Table, TableOwnership
 
 logger = logging.getLogger(__name__)
 

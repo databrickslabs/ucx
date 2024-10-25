@@ -252,7 +252,7 @@ class HistoricalEncoder(Generic[Record]):
         )
 
 
-class HistoryLog(Generic[Record]):
+class ProgressEncoder(Generic[Record]):
     def __init__(
         self,
         sql_backend: SqlBackend,
@@ -269,8 +269,12 @@ class HistoryLog(Generic[Record]):
         self._catalog = catalog
         self._schema = schema
         self._table = table
-        encoder = HistoricalEncoder(job_run_id=run_id, workspace_id=workspace_id, ownership=ownership, klass=klass)
-        self._encoder = encoder
+        self._encoder = HistoricalEncoder(
+            job_run_id=run_id,
+            workspace_id=workspace_id,
+            ownership=ownership,
+            klass=klass,
+        )
 
     @property
     def full_name(self) -> str:

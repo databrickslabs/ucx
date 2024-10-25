@@ -19,7 +19,7 @@ from databricks.labs.ucx.assessment.clusters import (
 )
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 
 from .. import mock_workspace_client
 
@@ -263,7 +263,7 @@ def test_cluster_info_supports_history(mock_backend, cluster_info_record: Cluste
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     cluster_ownership = ClusterOwnership(admin_locator)
-    history_log = HistoryLog[ClusterInfo](
+    history_log = ProgressEncoder[ClusterInfo](
         mock_backend,
         cluster_ownership,
         ClusterInfo,
@@ -427,7 +427,7 @@ def test_cluster_policy_supports_history(mock_backend, policy_info_record: Polic
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     cluster_policy_ownership = ClusterPolicyOwnership(admin_locator)
-    history_log = HistoryLog[PolicyInfo](
+    history_log = ProgressEncoder[PolicyInfo](
         mock_backend,
         cluster_policy_ownership,
         PolicyInfo,

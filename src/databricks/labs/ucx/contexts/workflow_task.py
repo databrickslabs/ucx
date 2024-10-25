@@ -26,7 +26,8 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
+from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -137,7 +138,7 @@ class RuntimeContext(GlobalContext):
             self._config_path.parent,
             self.named_parameters["workflow"],
             int(self.named_parameters["job_id"]),
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.sql_backend,
             self.inventory_database,
             int(self.named_parameters.get("attempt", "0")),
@@ -151,7 +152,7 @@ class RuntimeContext(GlobalContext):
             workspace_id=self.workspace_id,
             workflow_name=self.named_parameters["workflow"],
             workflow_id=int(self.named_parameters["job_id"]),
-            workflow_run_id=int(self.named_parameters["parent_run_id"]),
+            workflow_run_id=self.parent_run_id,
             workflow_run_attempt=int(self.named_parameters.get("attempt", 0)),
             workflow_start_time=self.named_parameters["start_time"],
         )
@@ -161,89 +162,94 @@ class RuntimeContext(GlobalContext):
         return self.workspace_client.get_workspace_id()
 
     @cached_property
-    def historical_clusters_log(self) -> HistoryLog[ClusterInfo]:
-        return HistoryLog(
+    def parent_run_id(self) -> int:
+        return int(self.named_parameters["parent_run_id"])
+
+    @cached_property
+    def clusters_progress(self) -> ProgressEncoder[ClusterInfo]:
+        return ProgressEncoder(
             self.sql_backend,
             self.cluster_ownership,
             ClusterInfo,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_cluster_policies_log(self) -> HistoryLog[PolicyInfo]:
-        return HistoryLog(
+    def policies_progress(self) -> ProgressEncoder[PolicyInfo]:
+        return ProgressEncoder(
             self.sql_backend,
             self.cluster_policy_ownership,
             PolicyInfo,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_grants_log(self) -> HistoryLog[Grant]:
-        return HistoryLog(
+    def grants_progress(self) -> ProgressEncoder[Grant]:
+        return ProgressEncoder(
             self.sql_backend,
             self.grant_ownership,
             Grant,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_jobs_log(self) -> HistoryLog[JobInfo]:
-        return HistoryLog(
+    def jobs_progress(self) -> ProgressEncoder[JobInfo]:
+        return JobsProgressEncoder(
             self.sql_backend,
             self.job_ownership,
-            JobInfo,
-            int(self.named_parameters["parent_run_id"]),
+            self.inventory_database,
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_pipelines_log(self) -> HistoryLog[PipelineInfo]:
-        return HistoryLog(
+    def pipelines_progress(self) -> ProgressEncoder[PipelineInfo]:
+        return ProgressEncoder(
             self.sql_backend,
             self.pipeline_ownership,
             PipelineInfo,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_tables_log(self) -> HistoryLog[Table]:
-        return HistoryLog(
+    def tables_progress(self) -> ProgressEncoder[Table]:
+        return ProgressEncoder(
             self.sql_backend,
             self.table_ownership,
             Table,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_table_migration_log(self) -> HistoryLog[TableMigrationStatus]:
-        return HistoryLog(
+    def historical_table_migration_log(self) -> ProgressEncoder[TableMigrationStatus]:
+        # TODO: merge into tables_progress
+        return ProgressEncoder(
             self.sql_backend,
             self.table_migration_ownership,
             TableMigrationStatus,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )
 
     @cached_property
-    def historical_udfs_log(self) -> HistoryLog[Udf]:
-        return HistoryLog(
+    def udfs_progress(self) -> ProgressEncoder[Udf]:
+        return ProgressEncoder(
             self.sql_backend,
             self.udf_ownership,
             Udf,
-            int(self.named_parameters["parent_run_id"]),
+            self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
         )

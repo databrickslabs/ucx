@@ -12,7 +12,7 @@ from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
@@ -846,7 +846,9 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     """Verify that Grant records are written to the history log as expected."""
     mock_ownership = create_autospec(GrantOwnership)
     mock_ownership.owner_of.return_value = "the_admin"
-    history_log = HistoryLog[Grant](mock_backend, mock_ownership, Grant, run_id=1, workspace_id=2, catalog="a_catalog")
+    history_log = ProgressEncoder[Grant](
+        mock_backend, mock_ownership, Grant, run_id=1, workspace_id=2, catalog="a_catalog"
+    )
 
     history_log.append_inventory_snapshot([grant_record])
 
