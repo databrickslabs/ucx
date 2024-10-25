@@ -407,7 +407,7 @@ class StaticCrawler(crawlers.CrawlerBase[crawlers.Result]):
 
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
     def __init__(self, dummy: list[AzureServicePrincipalInfo]):
-        super().__init__(create_autospec(WorkspaceClient), create_autospec(SqlBackend), "...")
+        super().__init__(create_autospec(WorkspaceClient), create_autospec(SqlBackend), "dummy")
         self._dummy = dummy
 
     def _try_fetch(self) -> Iterable[AzureServicePrincipalInfo]:

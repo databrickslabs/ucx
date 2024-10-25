@@ -44,23 +44,25 @@ class Workflows:
 
     @classmethod
     def all(cls):
-        return cls(
-            [
-                Assessment(),
-                MigrationProgress(),
-                GroupMigration(),
-                TableMigration(),
-                MigrateHiveSerdeTablesInPlace(),
-                MigrateExternalTablesCTAS(),
-                ValidateGroupPermissions(),
-                RemoveWorkspaceLocalGroups(),
-                ScanTablesInMounts(),
-                MigrateTablesInMounts(),
-                PermissionsMigrationAPI(),
-                MigrationRecon(),
-                Failing(),
-            ]
-        )
+        return cls(Workflows.definitions())
+
+    @classmethod
+    def definitions(cls):
+        return [
+            Assessment(),
+            MigrationProgress(),
+            GroupMigration(),
+            TableMigration(),
+            MigrateHiveSerdeTablesInPlace(),
+            MigrateExternalTablesCTAS(),
+            ValidateGroupPermissions(),
+            RemoveWorkspaceLocalGroups(),
+            ScanTablesInMounts(),
+            MigrateTablesInMounts(),
+            PermissionsMigrationAPI(),
+            MigrationRecon(),
+            Failing(),
+        ]
 
     def tasks(self) -> list[Task]:
         return self._tasks
