@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,10 +10,10 @@ from databricks.sdk.service import jobs
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
-from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
-from databricks.labs.ucx.hive_metastore.tables import TableOwnership, Table
+from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.jobs import JobInfo
+from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -64,12 +64,12 @@ class MigrationSequencer:
         self,
         ws: WorkspaceClient,
         path_lookup: PathLookup,
-        admin_locator: AdministratorLocator,
+        ownership_factory: Callable[[type], Ownership],
         used_tables_crawler: UsedTablesCrawler,
     ):
         self._ws = ws
         self._path_lookup = path_lookup
-        self._admin_locator = admin_locator
+        self._ownership_factory = ownership_factory
         self._used_tables_crawler = used_tables_crawler
         self._last_node_id = 0
         self._nodes: dict[tuple[str, str], MigrationNode] = {}
@@ -129,7 +129,7 @@ class MigrationSequencer:
                 object_name = path.relative_to(library_root).as_posix()
                 break
             ws_path = WorkspacePath(self._ws, object_id)
-            object_owner = WorkspacePathOwnership(self._admin_locator, self._ws).owner_of(ws_path)
+            object_owner = self._ownership_factory(WorkspacePath).owner_of(ws_path)
         else:
             raise ValueError(f"{object_type} not supported yet!")
         self._last_node_id += 1
@@ -154,7 +154,7 @@ class MigrationSequencer:
                 object_type="TABLE",
                 object_id=used_table.fullname,
                 object_name=used_table.fullname,
-                object_owner=TableOwnership(self._admin_locator).owner_of(Table.from_used_table(used_table)),
+                object_owner=self._ownership_factory(Table).owner_of(Table.from_used_table(used_table)),
             )
             self._nodes[table_node.key] = table_node
             self._outgoing[table_node.key].add(parent_node.key)
@@ -171,7 +171,7 @@ class MigrationSequencer:
             object_type="WORKFLOW",
             object_id=str(job.job_id),
             object_name=job_name,
-            object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
+            object_owner=self._ownership_factory(JobInfo).owner_of(JobInfo.from_job(job)),
         )
         self._nodes[job_node.key] = job_node
         if job.settings and job.settings.job_clusters:
@@ -198,7 +198,7 @@ class MigrationSequencer:
             object_type="CLUSTER",
             object_id=cluster_id,
             object_name=object_name,
-            object_owner=ClusterOwnership(self._admin_locator).owner_of(ClusterInfo.from_cluster_details(details)),
+            object_owner=self._ownership_factory(ClusterInfo).owner_of(ClusterInfo.from_cluster_details(details)),
         )
         self._nodes[cluster_node.key] = cluster_node
         # TODO register warehouses and policies
