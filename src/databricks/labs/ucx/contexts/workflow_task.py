@@ -3,7 +3,6 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
