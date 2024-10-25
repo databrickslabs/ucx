@@ -17,7 +17,7 @@ from databricks.labs.ucx.progress.grants import GrantProgressEncoder
         Grant("principal", "USAGE", "catalog"),
     ],
 )
-def test_grants_progress_encoder_no_failures(mock_backend, grant: Grant) -> None:
+def test_grant_progress_encoder_no_failures(mock_backend, grant: Grant) -> None:
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     encoder = GrantProgressEncoder(
@@ -49,7 +49,7 @@ def test_grants_progress_encoder_no_failures(mock_backend, grant: Grant) -> None
         ),
     ],
 )
-def test_grants_progress_encoder_failures(mock_backend, grant: Grant, failure: str) -> None:
+def test_grant_progress_encoder_failures(mock_backend, grant: Grant, failure: str) -> None:
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     encoder = GrantProgressEncoder(
