@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class UsedTablesCrawler(CrawlerBase[UsedTable]):
 
-    def __init__(self, backend: SqlBackend, schema: str, table: str) -> None:
+    def __init__(self, sql_backend: SqlBackend, schema: str, table: str) -> None:
         """
         Initializes a DFSACrawler instance.
 
@@ -23,7 +23,7 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        super().__init__(backend=backend, catalog="hive_metastore", schema=schema, table=table, klass=UsedTable)
+        super().__init__(sql_backend=sql_backend, catalog="hive_metastore", schema=schema, table=table, klass=UsedTable)
 
     @classmethod
     def for_paths(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
@@ -46,7 +46,7 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
 
     def _try_fetch(self) -> Iterable[UsedTable]:
         sql = f"SELECT * FROM {escape_sql_identifier(self.full_name)}"
-        for row in self._backend.fetch(sql):
+        for row in self._sql_backend.fetch(sql):
             yield self._klass.from_dict(row.asDict())
 
     def _crawl(self) -> Iterable[UsedTable]:

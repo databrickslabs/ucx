@@ -9,10 +9,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.tables import Table, TableOwnership
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +78,10 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "migration_status", TableMigrationStatus)
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
+        super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
-        self._table_crawler = table_crawler
+        self._tables_crawler = tables_crawler
 
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
         return TableMigrationIndex(list(self.snapshot(force_refresh=force_refresh)))
@@ -112,7 +110,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def is_migrated(self, schema: str, table: str) -> bool:
         try:
-            results = self._backend.fetch(
+            results = self._sql_backend.fetch(
                 f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)} ('upgraded_to')"
             )
             for result in results:
@@ -129,7 +127,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         return False
 
     def _crawl(self) -> Iterable[TableMigrationStatus]:
-        all_tables = self._table_crawler.snapshot()
+        all_tables = self._tables_crawler.snapshot()
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
@@ -162,29 +160,3 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             except NotFound:
                 logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
                 continue
-
-
-class TableMigrationOwnership(Ownership[TableMigrationStatus]):
-    """Determine ownership of table migration records in the inventory.
-
-    This is the owner of the source table, if (and only if) the source table is present in the inventory.
-    """
-
-    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
-        super().__init__(table_ownership._administrator_locator)
-        self._tables_crawler = tables_crawler
-        self._table_ownership = table_ownership
-        self._indexed_tables: dict[tuple[str, str], Table] | None = None
-
-    def _tables_snapshot_index(self, reindex: bool = False) -> dict[tuple[str, str], Table]:
-        index = self._indexed_tables
-        if index is None or reindex:
-            snapshot = self._tables_crawler.snapshot()
-            index = {(table.database, table.name): table for table in snapshot}
-            self._indexed_tables = index
-        return index
-
-    def _maybe_direct_owner(self, record: TableMigrationStatus) -> str | None:
-        index = self._tables_snapshot_index()
-        source_table = index.get((record.src_schema, record.src_table), None)
-        return self._table_ownership.owner_of(source_table) if source_table is not None else None

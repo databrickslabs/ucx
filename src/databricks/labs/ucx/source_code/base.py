@@ -224,6 +224,23 @@ class SourceInfo:
             assessment_end_timestamp=assessment_end or self.assessment_end_timestamp,
         )
 
+    @property
+    def source_type(self) -> str | None:
+        if not self.source_lineage:
+            return None
+        last = self.source_lineage[-1]
+        return last.object_type
+
+    @property
+    def query_id(self) -> str | None:
+        if self.source_type != 'QUERY':
+            return None
+        last = self.source_lineage[-1]
+        parts = last.object_id.split('/')
+        if len(parts) < 2:
+            return None
+        return parts[1]
+
 
 @dataclass
 class UsedTable(SourceInfo):

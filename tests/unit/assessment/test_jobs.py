@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
-from databricks.labs.ucx.progress.history import HistoryLog
+from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.sdk.service.jobs import BaseJob, JobSettings
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
@@ -213,7 +213,7 @@ def test_job_supports_history(mock_backend, job_info_record: JobInfo, history_re
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "the_admin"
     job_ownership = JobOwnership(admin_locator)
-    history_log = HistoryLog[JobInfo](
+    history_log = ProgressEncoder[JobInfo](
         mock_backend,
         job_ownership,
         JobInfo,
