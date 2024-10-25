@@ -15,9 +15,6 @@ class GrantsProgressEncoder(ProgressEncoder[Grant]):
         historical = super()._encode_record_as_historical(record)
         failures = []
         if not record.uc_grant_sql():
-            type_, key = record.type_and_key()
-            failures = [
-                f"Hive metastore grant '{record.action_type}' on {type_} {key} "
-                "cannot be mapped to a Unity Catalog grant."
-            ]
+            type_, key = record.this_type_and_key()
+            failures = [f"Action '{record.action_type}' on {type_} '{key}' unmappable to Unity Catalog"]
         return replace(historical, failures=historical.failures + failures)
