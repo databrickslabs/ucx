@@ -480,8 +480,14 @@ def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo
 
 
 @pytest.fixture
-def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
+def prepare_tables_for_migration(  # TODO: make this a function, so that installation_ctx / runtime_ctx could be swapped
+    runtime_ctx,
+    make_catalog,
+    make_random,
+    make_mounted_location,
+    env_or_skip,
+    make_storage_dir,
+    request,
 ) -> tuple[dict[str, TableInfo], SchemaInfo]:
     # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
     # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
@@ -492,24 +498,24 @@ def prepare_tables_for_migration(
     random = make_random(5).lower()
     # create external and managed tables to be migrated
     if is_hiveserde:
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+        schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
         table_base_dir = make_storage_dir(
             path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
         )
-        tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
+        tables = prepare_hiveserde_tables(runtime_ctx, random, schema, table_base_dir)
     else:
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
-        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+        schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
+        tables = prepare_regular_tables(runtime_ctx, make_mounted_location, schema)
 
     # create destination catalog and schema
     dst_catalog = make_catalog()
-    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
     migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
-    installation_ctx.with_table_mapping_rules(migrate_rules)
-    installation_ctx.with_dummy_resource_permission()
-    installation_ctx.save_tables(is_hiveserde=is_hiveserde)
-    installation_ctx.save_mounts()
-    installation_ctx.with_dummy_grants_and_tacls()
+    runtime_ctx.with_table_mapping_rules(migrate_rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.save_tables(is_hiveserde=is_hiveserde)
+    runtime_ctx.save_mounts()
+    runtime_ctx.with_dummy_grants_and_tacls()
     return tables, dst_schema
 
 
