@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.jobs import JobOwnership
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -32,6 +33,7 @@ from databricks.labs.ucx.framework.owners import (
     AdministratorLocator,
     WorkspacePathOwnership,
     Ownership,
+    LegacyQueryOwnership,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -283,6 +285,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def legacy_query_ownership(self) -> LegacyQueryOwnership:
         return LegacyQueryOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
+    def job_ownership(self) -> JobOwnership:
+        return JobOwnership(self.administrator_locator)
 
     @cached_property
     def directfs_access_ownership(self) -> DirectFsAccessOwnership:

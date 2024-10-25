@@ -252,7 +252,7 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
 
 class LegacyQueryOwnership(Ownership[str]):
     def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
-        super().__init__(administrator_locator)
+        super().__init__(administrator_locator, str)
         self._workspace_client = workspace_client
 
     def _maybe_direct_owner(self, record: str) -> str | None:
