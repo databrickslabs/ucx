@@ -337,6 +337,7 @@ class GlobalContext(abc.ABC):
             self.group_manager,
             grant_loaders,
             skip_grant_migration=self.config.skip_grant_migration,
+            fixed_owner=self.config.fixed_owner,
         )
 
     @cached_property
