@@ -18,7 +18,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
     - the associated grants have a failure
     """
 
-    def __init__(  # pylint disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         sql_backend: SqlBackend,
         ownership: TableOwnership,
