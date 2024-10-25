@@ -37,19 +37,19 @@ logger = logging.getLogger(__name__)
 class TablesMigrator:
     def __init__(
         self,
-        table_crawler: TablesCrawler,
+        tables_crawler: TablesCrawler,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         table_mapping: TableMapping,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
         external_locations: ExternalLocations,
     ):
 
-        self._tc = table_crawler
-        self._backend = backend
+        self._tables_crawler = tables_crawler
+        self._sql_backend = sql_backend
         self._ws = ws
-        self._tm = table_mapping
+        self._table_mapping = table_mapping
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._migrate_grants = migrate_grants
@@ -58,7 +58,7 @@ class TablesMigrator:
     def get_remaining_tables(self) -> list[Table]:
         self.index(force_refresh=True)
         table_rows = []
-        for crawled_table in self._tc.snapshot():
+        for crawled_table in self._tables_crawler.snapshot():
             if not self._is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
@@ -79,7 +79,7 @@ class TablesMigrator:
             logger.info("Not required to convert managed hms table to external, Skipping this task...")
             return None
         self._spark = self._spark_session
-        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc, False)
+        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tc, False)
         tables_in_scope = filter(lambda t: t.src.what == What.EXTERNAL_SYNC, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
@@ -120,7 +120,7 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
         check_uc_table: bool = True,
     ):
-        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc, check_uc_table)
+        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler, check_uc_table)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
@@ -139,7 +139,7 @@ class TablesMigrator:
         return tasks
 
     def _migrate_views(self):
-        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler)
         all_tasks = []
         # Every batch of views to migrate needs an up-to-date table migration index
         # to determine if the dependencies have been migrated
@@ -255,9 +255,9 @@ class TablesMigrator:
         view_migrate_sql = self._sql_migrate_view(src_view)
         logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
         try:
-            self._backend.execute(view_migrate_sql)
-            self._backend.execute(self._sql_alter_to(src_view.src, src_view.rule.as_uc_table_key))
-            self._backend.execute(
+            self._sql_backend.execute(view_migrate_sql)
+            self._sql_backend.execute(self._sql_alter_to(src_view.src, src_view.rule.as_uc_table_key))
+            self._sql_backend.execute(
                 self._sql_alter_from(src_view.src, src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
             )
         except DatabricksError as e:
@@ -268,7 +268,7 @@ class TablesMigrator:
     def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
         # We have to fetch create statement this way because of columns in:
         # CREATE VIEW x.y (col1, col2) AS SELECT * FROM w.t
-        create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
+        create_statement = self._sql_backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
         src_view.src.view_text = next(iter(create_statement))["createtab_stmt"]
         # this does not require the index to be refreshed because the dependencies have already been validated
         return src_view.sql_migrate_view(self.index())
@@ -293,7 +293,7 @@ class TablesMigrator:
 
     def _convert_hms_table_to_external(self, src_table: Table):
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
-        inventory_table = self._tc.full_name
+        inventory_table = self._tables_crawler.full_name
         try:
             database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
             table_identifier = self._table_identifier(src_table.name, database)
@@ -330,21 +330,21 @@ class TablesMigrator:
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
         update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET object_type = 'EXTERNAL' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
-        self._backend.execute(update_sql)
+        self._sql_backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_as_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
         # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
-        sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
+        sync_result = next(iter(self._sql_backend.fetch(table_migrate_sql)))
         if sync_result.status_code != "SUCCESS":
             logger.warning(
                 f"failed-to-migrate: SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
                 f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
             )
             return False
-        self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._sql_backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table(self, src_table: Table, rule: Rule):
@@ -352,19 +352,19 @@ class TablesMigrator:
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
         # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
-        sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
+        sync_result = next(iter(self._sql_backend.fetch(table_migrate_sql)))
         if sync_result.status_code != "SUCCESS":
             logger.warning(
                 f"failed-to-migrate: SYNC command failed to migrate table {src_table.key} to {target_table_key}. "
                 f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
             )
             return False
-        self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._sql_backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
     def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule):
         # verify hive serde type
-        hiveserde_type = src_table.hiveserde_type(self._backend)
+        hiveserde_type = src_table.hiveserde_type(self._sql_backend)
         if hiveserde_type in [
             HiveSerdeType.NOT_HIVESERDE,
             HiveSerdeType.OTHER_HIVESERDE,
@@ -379,7 +379,7 @@ class TablesMigrator:
             dst_table_location = self._external_locations.resolve_mount(src_table.location)
 
         table_migrate_sql = src_table.sql_migrate_external_hiveserde_in_place(
-            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_type, dst_table_location
+            rule.catalog_name, rule.dst_schema, rule.dst_table, self._sql_backend, hiveserde_type, dst_table_location
         )
         if not table_migrate_sql:
             logger.error(
@@ -391,10 +391,12 @@ class TablesMigrator:
             f"Migrating external table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
         )
         try:
-            self._backend.execute(table_migrate_sql)
-            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._sql_backend.execute(table_migrate_sql)
+            self._sql_backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(
+                self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id())
+            )
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -407,10 +409,12 @@ class TablesMigrator:
             f"Migrating managed table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
         )
         try:
-            self._backend.execute(table_migrate_sql)
-            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._sql_backend.execute(table_migrate_sql)
+            self._sql_backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(
+                self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id())
+            )
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -431,10 +435,12 @@ class TablesMigrator:
             table_migrate_sql = src_table.sql_migrate_ctas_external(rule.as_uc_table_key, dst_table_location)
         logger.debug(f"Migrating table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}")
         try:
-            self._backend.execute(table_migrate_sql)
-            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
-            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._sql_backend.execute(table_migrate_sql)
+            self._sql_backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(self._sql_add_migrated_comment(src_table, rule.as_uc_table_key))
+            self._sql_backend.execute(
+                self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id())
+            )
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -443,13 +449,15 @@ class TablesMigrator:
     def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
         target_table_key = rule.as_uc_table_key
         try:
-            table_schema = self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
+            table_schema = self._sql_backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
             table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, table_schema)
             logger.info(
                 f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
             )
-            self._backend.execute(table_migrate_sql)
-            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._sql_backend.execute(table_migrate_sql)
+            self._sql_backend.execute(
+                self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id())
+            )
         except DatabricksError as e:
             logger.warning(f"failed-to-migrate: Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -465,7 +473,7 @@ class TablesMigrator:
         migrated_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
-        for cur_table in self._tc.snapshot():
+        for cur_table in self._tables_crawler.snapshot():
             if schema and cur_table.database != schema:
                 continue
             if table and cur_table.name != table:
@@ -498,8 +506,8 @@ class TablesMigrator:
             f"Reverting {table.object_type} table {table.database}.{table.name} upgraded_to {table.upgraded_to}"
         )
         try:
-            self._backend.execute(table.sql_unset_upgraded_to())
-            self._backend.execute(f"DROP {table.kind} IF EXISTS {escape_sql_identifier(target_table_key)}")
+            self._sql_backend.execute(table.sql_unset_upgraded_to())
+            self._sql_backend.execute(f"DROP {table.kind} IF EXISTS {escape_sql_identifier(target_table_key)}")
         except DatabricksError as e:
             logger.warning(f"Failed to revert table {table.key}: {e}")
 
