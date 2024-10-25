@@ -40,22 +40,25 @@ class InProcessDeployedWorkflows(DeployedWorkflows):
     def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)):
         workflow = self._workflows[step]
         incoming = {task.name: 0 for task in workflow.tasks()}
-        queue = []
+        downstreams = {task.name: [] for task in workflow.tasks()}
+        queue: list[str] = []
         for task in workflow.tasks():
             task.workflow = workflow.name
-            incoming[task.name] += len(task.depends_on)
+            for dep in task.depends_on:
+                downstreams[dep].append(task.name)
+                incoming[task.name] += 1
         for task in workflow.tasks():
             if incoming[task.name] == 0:
-                queue.append(task)
+                queue.append(task.name)
         while queue:
-            task = queue.pop(0)
-            fn = getattr(workflow, task.name)
+            task_name = queue.pop(0)
+            fn = getattr(workflow, task_name)
             # TODO: capture error logs and fail if there is ERROR event, to simulate parse_logs meta-task
             fn(self._ctx)
-            for dep in task.depends_on:
-                incoming[dep] -= 1
-                if incoming[dep] == 0:
-                    queue.append(dep)
+            for dep_name in downstreams[task_name]:
+                incoming[dep_name] -= 1
+                if incoming[dep_name] == 0:
+                    queue.append(dep_name)
 
     def relay_logs(self, workflow: str | None = None):
         pass  # noop
