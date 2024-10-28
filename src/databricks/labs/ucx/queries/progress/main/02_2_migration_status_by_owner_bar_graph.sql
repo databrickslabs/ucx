@@ -14,7 +14,7 @@
 WITH owners_with_failures AS (
     SELECT owner
     FROM ucx_catalog.multiworkspace.latest_historical_per_workspace
-    WHERE object_type = "migration_status" AND SIZE(failures) > 0
+    WHERE object_type = 'Table' AND array_contains(failures, 'Pending migration')
 )
 
 SELECT
