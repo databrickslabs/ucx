@@ -247,12 +247,13 @@ def dashboard_metadata(catalog_populated: str) -> DashboardMetadata:
 
 def test_migration_progress_dashboard(
     ws: WorkspaceClient,
-    is_in_debug,
+    is_in_debug,  # Skip test when not in debug
     env_or_skip,
     make_directory,
     dashboard_metadata: DashboardMetadata,
 ) -> None:
     """Inspect the dashboard visually."""
+    _ = is_in_debug
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     directory = make_directory()
     dashboard = Dashboards(ws).create_dashboard(
