@@ -116,7 +116,7 @@ def grants():
 def jobs():
     records = [
         JobInfo("1", success=1, failures=""),
-        JobInfo("2", success=0, failures="[No isolation shared clusters not supported in UC]"),
+        JobInfo("2", success=0, failures='["No isolation shared clusters not supported in UC"]'),
         JobInfo("3", success=0, failures=""),  #  Failure from workflow problems belwo
     ]
     return records
@@ -146,7 +146,7 @@ def workflow_problems(installation_ctx):
 def clusters():
     records = [
         ClusterInfo("1", success=1, failures=""),
-        ClusterInfo("2", success=0, failures="[Uses azure service principal credentials config in cluster]"),
+        ClusterInfo("2", success=0, failures='["Uses azure service principal credentials config in cluster"]'),
     ]
     return records
 
@@ -156,7 +156,7 @@ def pipelines():
     records = [
         PipelineInfo("1", success=1, failures=""),
         PipelineInfo(
-            "2", success=0, failures="[Uses passthrough config: spark.databricks.passthrough.enabled in pipeline]"
+            "2", success=0, failures='["Uses passthrough config: spark.databricks.passthrough.enabled in pipeline"]'
         ),
     ]
     return records
@@ -170,7 +170,7 @@ def policies():
             "2",
             "policy2",
             success=0,
-            failures="[Uses azure service principal credentials config in policy]",
+            failures='["Uses azure service principal credentials config in policy"]',
         ),
     ]
     return records
