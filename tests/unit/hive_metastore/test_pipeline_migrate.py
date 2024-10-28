@@ -39,7 +39,7 @@ def test_pipeline_rule():
     assert rule.target_schema_name is None
     assert rule.target_pipeline_name == "pipe"
 
-def test_current_pipelines(mock_installation, make_random):
+def test_current_pipelines(mock_installation):
     errors = {}
     rows = {
         "`hive_metastore`.`inventory_database`.`pipelines`": [
@@ -53,7 +53,6 @@ def test_current_pipelines(mock_installation, make_random):
 
     pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
     pipelines_crawler = PipelinesCrawler(workspace_client, sql_backend, "inventory_database")
-    something = pipelines_crawler.snapshot()
     pipelines = pipeline_mapping.current_pipelines(pipelines_crawler, "workspace_name", "catalog_name")
     assert isinstance(pipelines, Generator)
     assert len(list(pipelines)) == 3
