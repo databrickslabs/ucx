@@ -10,7 +10,6 @@ from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
-from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, Record
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
@@ -19,18 +18,6 @@ from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 from databricks.labs.ucx.source_code.jobs import JobProblem
 
 from ..conftest import MockRuntimeContext
-
-
-class MockOwnership(Ownership):
-    """Mock ownership to control who the owner is for test predictability."""
-
-    def __init__(self, administrator_locator: AdministratorLocator, owner: str) -> None:
-        super().__init__(administrator_locator)
-        self._owner = owner
-
-    def _maybe_direct_owner(self, record: Record) -> str | None:
-        """Obtain the record-specific user-name associated with the given record, if any."""
-        return self._owner
 
 
 @pytest.fixture
@@ -64,7 +51,6 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 @pytest.fixture
 def tables():
     # TODO: Let schema 1 be migrated and schema 2 not
-    # TODO: Set owners
     records = []
     for schema in "schema1", "schema2":
         for table in "table1", "table2", "table3", "table4", "table5":
@@ -111,6 +97,17 @@ def grants():
         Grant("service_principal", "MODIFY", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
         Grant("Liran", "DENY", "hive_metastore", "sales"),  # DENY creates a failure
+        # Set ownership of mocked tables above
+        Grant("Andrew", "OWN", "hive_metastore", "schema1", "table1"),
+        Grant("Eric", "OWN", "hive_metastore", "schema1", "table2"),
+        Grant("Cor", "OWN", "hive_metastore", "schema1", "table3"),
+        Grant("Cor", "OWN", "hive_metastore", "schema1", "table4"),
+        Grant("Cor", "OWN", "hive_metastore", "schema1", "table5"),
+        Grant("Andrew", "OWN", "hive_metastore", "schema2", "table1"),
+        Grant("Cor", "OWN", "hive_metastore", "schema2", "table2"),
+        Grant("Cor", "OWN", "hive_metastore", "schema2", "table3"),
+        Grant("Cor", "OWN", "hive_metastore", "schema2", "table4"),
+        Grant("Cor", "OWN", "hive_metastore", "schema2", "table5"),
     ]
     return records
 
@@ -208,6 +205,13 @@ def catalog_populated(
         f'hive_metastore.{runtime_ctx.inventory_database}.workflow_problems',
         workflow_problems,
         JobProblem,
+        mode='overwrite',
+    )
+    # Persists grant to propagate ownership to tables
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.grants',
+        grants,
+        Grant,
         mode='overwrite',
     )
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
