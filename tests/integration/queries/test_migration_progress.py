@@ -106,7 +106,7 @@ def udfs() -> list[Udf]:
 @pytest.fixture
 def grants() -> list[Grant]:
     records = [
-        Grant("service_principal", "MODIFY", "hive_metastore"),
+        Grant("service_principal", "USAGE", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
         Grant("Liran", "DENY", "hive_metastore", "sales"),  # DENY creates a failure
         # Set ownership of mocked tables above
