@@ -2,7 +2,7 @@
 WITH migration_statuses AS (
     SELECT *
     FROM ucx_catalog.multiworkspace.objects_snapshot
-    WHERE object_type = 'Table' AND SIZE(failures) == 0
+    WHERE object_type = 'Table'
 )
 
 SELECT
