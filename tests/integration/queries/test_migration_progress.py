@@ -306,6 +306,11 @@ def test_migration_progress_dashboard(
                     count=1,
                     failure="Uses azure service principal credentials config in cluster",
                 ),
+                Row(
+                    object_type="Grant",
+                    count=1,
+                    failure="Action DENY on DATABASE hive_metastore.sales unmappable to Unity Catalog",
+                ),
                 Row(object_type="JobInfo", count=1, failure="No isolation shared clusters not supported in UC"),
                 Row(
                     object_type="JobInfo",
