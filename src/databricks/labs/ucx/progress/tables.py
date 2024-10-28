@@ -5,7 +5,6 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
-from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
 
@@ -18,12 +17,11 @@ class TableProgressEncoder(ProgressEncoder[Table]):
     - the associated grants have a failure
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         sql_backend: SqlBackend,
         ownership: TableOwnership,
         table_migration_index: TableMigrationIndex,
-        grant_progress_encoder: GrantProgressEncoder,
         run_id: int,
         workspace_id: int,
         catalog: str,
@@ -41,7 +39,6 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             table,
         )
         self._table_migration_index = table_migration_index
-        self._grant_progress_encoder = grant_progress_encoder
 
     def _encode_record_as_historical(self, record: Table) -> Historical:
         historical = super()._encode_record_as_historical(record)

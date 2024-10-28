@@ -23,13 +23,7 @@ def test_table_progress_encoder_no_failures(mock_backend, table: Table) -> None:
     table_migration_index.is_migrated.return_value = True
     grant_progress_encoder = create_autospec(GrantProgressEncoder)
     encoder = TableProgressEncoder(
-        mock_backend,
-        ownership,
-        table_migration_index,
-        grant_progress_encoder,
-        run_id=1,
-        workspace_id=123456789,
-        catalog="test",
+        mock_backend, ownership, table_migration_index, run_id=1, workspace_id=123456789, catalog="test"
     )
 
     encoder.append_inventory_snapshot([table])
@@ -55,13 +49,7 @@ def test_table_progress_encoder_pending_migration_failure(mock_backend, table: T
     table_migration_index.is_migrated.return_value = False
     grant_progress_encoder = create_autospec(GrantProgressEncoder)
     encoder = TableProgressEncoder(
-        mock_backend,
-        ownership,
-        table_migration_index,
-        grant_progress_encoder,
-        run_id=1,
-        workspace_id=123456789,
-        catalog="test",
+        mock_backend, ownership, table_migration_index, run_id=1, workspace_id=123456789, catalog="test"
     )
 
     encoder.append_inventory_snapshot([table])
