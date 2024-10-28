@@ -74,7 +74,8 @@ class PipelineMapping:
         self._ws = ws
         self._sql_backend = sql_backend
 
-    def current_pipelines(self, pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str):
+    @staticmethod
+    def current_pipelines(pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str):
         pipeline_snapshot = list(pipelines.snapshot())
         if not pipeline_snapshot:
             msg = "No pipelines found."
