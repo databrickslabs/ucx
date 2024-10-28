@@ -310,7 +310,7 @@ def test_migration_progress_dashboard(
                 Row(
                     object_type="JobInfo",
                     count=1,
-                    failure="sql-parse-error: 23456 task: parent/child.py: Could not parse SQL",
+                    failure="sql-parse-error: 4 task: file.py: Could not parse SQL",
                 ),
                 Row(
                     object_type="PipelineInfo",
