@@ -251,10 +251,8 @@ def test_migration_progress_dashboard(
     env_or_skip,
     make_directory,
     dashboard_metadata: DashboardMetadata,
-    catalog_populated: str,
 ) -> None:
     """Inspect the dashboard visually."""
-    _ = catalog_populated  # Used implicitly by the dashboard
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
     directory = make_directory()
     dashboard = Dashboards(ws).create_dashboard(
