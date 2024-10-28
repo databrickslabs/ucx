@@ -178,6 +178,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             curr = queue.pop()
             num_children = len(curr.children)  # 0 - take parent
             if curr.location and (num_children > 1 or num_children == 0):
+                # Checking if the parent location is a valid location for external location.
+                # If the table is set to a root location, the root location will be used as the external location.
                 if (
                     curr.parent and curr.parent.is_valid() and num_children == 0 and not curr.is_jdbc()
                 ):  # one table having the prefix
