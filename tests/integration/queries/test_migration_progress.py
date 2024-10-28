@@ -63,12 +63,9 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 
 @pytest.fixture
 def tables():
+    # TODO: Let schema 1 be migrated and schema 2 not
     records = []
     for schema in "schema1", "schema2":
-        if schema == "schema1":
-            failures = []   # schema1 is migrated
-        else:
-            failures = ["Pending migration"]
         for table in "table1", "table2", "table3", "table4", "table5":
             if table == "table1":
                 owner = "Andrew"
@@ -77,7 +74,7 @@ def tables():
             else:
                 owner = "Cor"
             table = Table("hive_metastore", schema, table, "MANAGED", "delta")
-            record = ("tables", [table.catalog, table.database, table.name], table, failures, owner)
+            record = ("tables", [table.catalog, table.database, table.name], table, owner)
             records.append(record)
     return records
 
@@ -116,7 +113,6 @@ def udfs():
             "udfs",
             [udf.catalog, udf.database, udf.name],
             udf,
-            [] if not udf.failures else udf.failures.split("\n"),
             "Cor",
         )
         records.append(record)
@@ -129,13 +125,12 @@ def grants():
     for grant in (
         Grant("service_principal", "MODIFY", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
-        Grant("Liran", "DENY", "hive_metastore", "sales"),
+        Grant("Liran", "DENY", "hive_metastore", "sales"),  # DENY creates a failure
     ):
         record = (
             "grants",
             [grant.principal, grant.action_type],
             grant,
-            ["DENY is not supported by UC"] if grant.action_type == "DENY" else [],
             "Cor",
         )
         records.append(record)
@@ -147,13 +142,12 @@ def jobs():
     records = []
     for job in (
         JobInfo("1", success=1, failures=""),
-        JobInfo("2", success=0, failures="No isolation shared clusters not supported in UC"),
+        JobInfo("2", success=0, failures="[No isolation shared clusters not supported in UC]"),
     ):
         record = (
             "jobs",
             [job.job_id],
             job,
-            job.failures.split("\n") if job.failures else [],
             "Cor",
         )
         records.append(record)
@@ -165,13 +159,12 @@ def clusters():
     records = []
     for cluster in (
         ClusterInfo("1", success=1, failures=""),
-        ClusterInfo("2", success=0, failures="Uses azure service principal credentials config in cluster"),
+        ClusterInfo("2", success=0, failures="[Uses azure service principal credentials config in cluster]"),
     ):
         record = (
             "clusters",
             [cluster.cluster_id],
             cluster,
-            cluster.failures.split("\n") if cluster.failures else [],
             "Cor",
         )
         records.append(record)
@@ -184,14 +177,13 @@ def pipelines():
     for pipeline in (
         PipelineInfo("1", success=1, failures=""),
         PipelineInfo(
-            "2", success=0, failures="Uses passthrough config: spark.databricks.passthrough.enabled in pipeline"
+            "2", success=0, failures="[Uses passthrough config: spark.databricks.passthrough.enabled in pipeline]"
         ),
     ):
         record = (
             "pipelines",
             [pipeline.pipeline_id],
             pipeline,
-            pipeline.failures.split("\n") if pipeline.failures else [],
             "Cor",
         )
         records.append(record)
@@ -207,14 +199,13 @@ def policies():
             "2",
             "policy2",
             success=0,
-            failures="Uses azure service principal credentials config in policy",
+            failures="[Uses azure service principal credentials config in policy]",
         ),
     ):
         record = (
             "policies",
             [policy.policy_id],
             policy,
-            policy.failures.split("\n") if policy.failures else [],
             "Cor",
         )
         records.append(record)
@@ -256,7 +247,7 @@ def catalog_populated(
     workspace_id = installation_ctx.workspace_client.get_workspace_id()
     historicals = []
     for job_run_id in range(1, 3):  # No changes between migration progress run
-        for table_name, id_, instance, failures, owner in historical_objects:
+        for table_name, id_, instance, owner in historical_objects:
             encoder = HistoricalEncoder(
                 job_run_id,
                 workspace_id,
