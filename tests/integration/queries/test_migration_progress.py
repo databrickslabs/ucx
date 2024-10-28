@@ -14,11 +14,11 @@ from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
-from databricks.labs.ucx.progress.history import HistoricalEncoder
-from databricks.labs.ucx.progress.install import Historical
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
+from databricks.labs.ucx.source_code.jobs import JobProblem
 
-from ..conftest import MockInstallationContext
+from ..conftest import MockRuntimeContext
 
 
 class MockOwnership(Ownership):
@@ -64,25 +64,18 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 @pytest.fixture
 def tables():
     # TODO: Let schema 1 be migrated and schema 2 not
+    # TODO: Set owners
     records = []
     for schema in "schema1", "schema2":
         for table in "table1", "table2", "table3", "table4", "table5":
-            if table == "table1":
-                owner = "Andrew"
-            elif schema == "schema1" and table == "table2":
-                owner = "Eric"
-            else:
-                owner = "Cor"
             table = Table("hive_metastore", schema, table, "MANAGED", "delta")
-            record = ("tables", [table.catalog, table.database, table.name], table, owner)
-            records.append(record)
+            records.append(table)
     return records
 
 
 @pytest.fixture
 def udfs():
-    records = []
-    for udf in (
+    records = [
         Udf(
             "hive_metastore",
             "schema1",
@@ -108,92 +101,72 @@ def udfs():
             func_input="UNKNOWN",
             func_returns="UNKNOWN",
         ),
-    ):
-        record = (
-            "udfs",
-            [udf.catalog, udf.database, udf.name],
-            udf,
-            "Cor",
-        )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
 def grants():
-    records = []
-    for grant in (
+    records = [
         Grant("service_principal", "MODIFY", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
         Grant("Liran", "DENY", "hive_metastore", "sales"),  # DENY creates a failure
-    ):
-        record = (
-            "grants",
-            [grant.principal, grant.action_type],
-            grant,
-            "Cor",
-        )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
 def jobs():
-    records = []
-    for job in (
+    records = [
         JobInfo("1", success=1, failures=""),
         JobInfo("2", success=0, failures="[No isolation shared clusters not supported in UC]"),
-    ):
-        record = (
-            "jobs",
-            [job.job_id],
-            job,
-            "Cor",
+        JobInfo("3", success=0, failures=""),  #  Failure from workflow problems belwo
+    ]
+    return records
+
+@pytest.fixture
+def workflow_problems(installation_ctx):
+    """Workflow problems are detected by the linter"""
+    records = [
+        JobProblem(
+            job_id=3,
+            job_name="Peter the Job",
+            task_key="23456",
+            path="parent/child.py",
+            code="sql-parse-error",
+            message="Could not parse SQL",
+            start_line=1234,
+            start_col=22,
+            end_line=1234,
+            end_col=32,
         )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
 def clusters():
-    records = []
-    for cluster in (
+    records = [
         ClusterInfo("1", success=1, failures=""),
         ClusterInfo("2", success=0, failures="[Uses azure service principal credentials config in cluster]"),
-    ):
-        record = (
-            "clusters",
-            [cluster.cluster_id],
-            cluster,
-            "Cor",
-        )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
 def pipelines():
-    records = []
-    for pipeline in (
+    records = [
         PipelineInfo("1", success=1, failures=""),
         PipelineInfo(
             "2", success=0, failures="[Uses passthrough config: spark.databricks.passthrough.enabled in pipeline]"
         ),
-    ):
-        record = (
-            "pipelines",
-            [pipeline.pipeline_id],
-            pipeline,
-            "Cor",
-        )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
 def policies():
-    records = []
-    for policy in (
+    records = [
         PolicyInfo("1", "policy1", success=1, failures=""),
         PolicyInfo(
             "2",
@@ -201,19 +174,15 @@ def policies():
             success=0,
             failures="[Uses azure service principal credentials config in policy]",
         ),
-    ):
-        record = (
-            "policies",
-            [policy.policy_id],
-            policy,
-            "Cor",
-        )
-        records.append(record)
+    ]
     return records
 
 
 @pytest.fixture
-def historical_objects(
+def catalog_populated(
+    runtime_ctx: MockRuntimeContext,
+    workflow_runs,
+    workflow_problems,
     tables,
     udfs,
     grants,
@@ -222,47 +191,37 @@ def historical_objects(
     pipelines,
     policies,
 ):
-    return tables + udfs + grants + jobs + clusters + pipelines + policies
-
-
-@pytest.fixture
-def catalog_populated(
-    installation_ctx: MockInstallationContext,
-    workflow_runs: list[WorkflowRun],
-    historical_objects,
-) -> str:
-    """Populate the UCX catalog given the objects from the fixtures.
+    """Populate the UCX catalog with multiworkspace tables.
 
     For optimization purposes, this fixture could be "module" (or "session") scoped. However, dependant fixtures are
     "function" scoped, thus one should first evaluate if those can be changed.
     """
-    installation_ctx.progress_tracking_installation.run()
-    ucx_catalog = installation_ctx.ucx_catalog
-    installation_ctx.sql_backend.save_table(
-        f"{ucx_catalog}.multiworkspace.workflow_runs",
+    ProgressTrackingInstallation(runtime_ctx.sql_backend, runtime_ctx.ucx_catalog).run()
+    runtime_ctx.sql_backend.save_table(
+        f"{runtime_ctx.ucx_catalog}.multiworkspace.workflow_runs",
         workflow_runs,
         WorkflowRun,
         mode="overwrite",
     )
-    workspace_id = installation_ctx.workspace_client.get_workspace_id()
-    historicals = []
-    for job_run_id in range(1, 3):  # No changes between migration progress run
-        for table_name, id_, instance, owner in historical_objects:
-            encoder = HistoricalEncoder(
-                job_run_id,
-                workspace_id,
-                MockOwnership(installation_ctx.administrator_locator, owner),
-                type(instance),
-            )
-            historical = encoder.to_historical(instance)
-            historicals.append(historical)
-    installation_ctx.sql_backend.save_table(
-        f"{ucx_catalog}.multiworkspace.historical",
-        historicals,
-        Historical,
-        mode="overwrite",
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.workflow_problems',
+        workflow_problems,
+        JobProblem,
+        mode='overwrite',
     )
-    return ucx_catalog
+    for parent_run_id in range(1, 3):  # No changes in progress between the two runs
+        named_parameters = {
+            "parent_run_id": parent_run_id,
+        }
+        runtime_ctx = runtime_ctx.replace(named_parameters=named_parameters)
+        runtime_ctx.tables_progress.append_inventory_snapshot(tables)
+        runtime_ctx.udfs_progress.append_inventory_snapshot(udfs)
+        runtime_ctx.grants_progress.append_inventory_snapshot(grants)
+        runtime_ctx.jobs_progress.append_inventory_snapshot(jobs)
+        runtime_ctx.clusters_progress.append_inventory_snapshot(clusters)
+        runtime_ctx.pipelines_progress.append_inventory_snapshot(pipelines)
+        runtime_ctx.policies_progress.append_inventory_snapshot(policies)
+    return runtime_ctx.ucx_catalog
 
 
 @pytest.fixture()
