@@ -210,17 +210,22 @@ def catalog_populated(
         mode='overwrite',
     )
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
-        named_parameters = {
-            "parent_run_id": parent_run_id,
-        }
-        runtime_ctx = runtime_ctx.replace(named_parameters=named_parameters)
+        runtime_ctx = runtime_ctx.replace(parent_run_id=parent_run_id)
         runtime_ctx.tables_progress.append_inventory_snapshot(tables)
+        # The delets below reset the cached parent run ids on the encoders
+        del runtime_ctx.tables_progress
         runtime_ctx.udfs_progress.append_inventory_snapshot(udfs)
+        del runtime_ctx.udfs_progress
         runtime_ctx.grants_progress.append_inventory_snapshot(grants)
+        del runtime_ctx.grants_progress
         runtime_ctx.jobs_progress.append_inventory_snapshot(jobs)
+        del runtime_ctx.jobs_progress
         runtime_ctx.clusters_progress.append_inventory_snapshot(clusters)
+        del runtime_ctx.clusters_progress
         runtime_ctx.pipelines_progress.append_inventory_snapshot(pipelines)
+        del runtime_ctx.pipelines_progress
         runtime_ctx.policies_progress.append_inventory_snapshot(policies)
+        del runtime_ctx.policies_progress
     return runtime_ctx.ucx_catalog
 
 
