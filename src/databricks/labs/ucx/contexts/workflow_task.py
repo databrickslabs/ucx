@@ -3,7 +3,6 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
@@ -21,13 +20,14 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineI
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
+from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
+from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -188,11 +188,10 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def grants_progress(self) -> ProgressEncoder[Grant]:
-        return ProgressEncoder(
+    def grants_progress(self) -> GrantProgressEncoder:
+        return GrantProgressEncoder(
             self.sql_backend,
             self.grant_ownership,
-            Grant,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
@@ -221,23 +220,11 @@ class RuntimeContext(GlobalContext):
         )
 
     @cached_property
-    def tables_progress(self) -> ProgressEncoder[Table]:
-        return ProgressEncoder(
+    def tables_progress(self) -> TableProgressEncoder:
+        return TableProgressEncoder(
             self.sql_backend,
             self.table_ownership,
-            Table,
-            self.parent_run_id,
-            self.workspace_id,
-            self.config.ucx_catalog,
-        )
-
-    @cached_property
-    def historical_table_migration_log(self) -> ProgressEncoder[TableMigrationStatus]:
-        # TODO: merge into tables_progress
-        return ProgressEncoder(
-            self.sql_backend,
-            self.table_migration_ownership,
-            TableMigrationStatus,
+            self.migration_status_refresher.index(force_refresh=False),
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
