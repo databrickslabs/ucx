@@ -263,7 +263,8 @@ def catalog_populated(
                 MockOwnership(installation_ctx.administrator_locator, owner),
                 type(instance),
             )
-            historicals.append(encoder.to_historical(instance))
+            historical = encoder.to_historical(instance)
+            historicals.append(historical)
     installation_ctx.sql_backend.save_table(
         f"{ucx_catalog}.multiworkspace.historical",
         historicals,
