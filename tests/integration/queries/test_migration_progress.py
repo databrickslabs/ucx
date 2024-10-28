@@ -201,6 +201,7 @@ def catalog_populated(
         WorkflowRun,
         mode="overwrite",
     )
+    # Persist workflow problems to propagate failures to jobs
     runtime_ctx.sql_backend.save_table(
         f'hive_metastore.{runtime_ctx.inventory_database}.workflow_problems',
         workflow_problems,
