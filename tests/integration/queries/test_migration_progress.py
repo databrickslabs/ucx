@@ -117,7 +117,7 @@ def jobs():
     records = [
         JobInfo("1", success=1, failures=""),
         JobInfo("2", success=0, failures='["No isolation shared clusters not supported in UC"]'),
-        JobInfo("3", success=0, failures=""),  #  Failure from workflow problems belwo
+        JobInfo("3", success=0, failures=""),  # Failure from workflow problems below
     ]
     return records
 
