@@ -22,5 +22,5 @@ def test_federation(ws, sql_backend):
     workspace_info = create_autospec(WorkspaceInfo)
     workspace_info.current.return_value = 'some_thing'
     federation = HiveMetastoreFederation(ws, external_locations, workspace_info)
-    federation.register_internal_hms_as_federated_catalog()
+    federation.register_hms_as_federated_catalog()
     workspace_info.current.assert_called_once()

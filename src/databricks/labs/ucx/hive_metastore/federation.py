@@ -38,23 +38,27 @@ class HiveMetastoreFederation:
         external_locations: ExternalLocations,
         workspace_info: WorkspaceInfo,
         enable_hms_federation: bool = False,
+        options: dict | None = None,
     ):
         self._workspace_client = workspace_client
         self._external_locations = external_locations
         self._workspace_info = workspace_info
         self._enable_hms_federation = enable_hms_federation
+        self._options = options or {}
 
-    def register_internal_hms_as_federated_catalog(self) -> CatalogInfo:
+    def register_hms_as_federated_catalog(self) -> CatalogInfo:
         if not self._enable_hms_federation:
             raise RuntimeWarning('Run `databricks labs ucx enable-hms-federation` to enable HMS Federation')
         name = self._workspace_info.current()
         connection_info = self._get_or_create_connection(name)
         assert connection_info.name is not None
+        options = self._options
+        options['authorized_paths'] = self._get_authorized_paths()
         try:
             return self._workspace_client.catalogs.create(
                 name=connection_info.name,
                 connection_name=connection_info.name,
-                options={"authorized_paths": self._get_authorized_paths()},
+                options=options,
             )
         except BadRequest as err:
             if err.error_code == 'CATALOG_ALREADY_EXISTS':

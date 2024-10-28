@@ -45,7 +45,7 @@ def test_create_federated_catalog():
     )
 
     hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
-    hms_fed.register_internal_hms_as_federated_catalog()
+    hms_fed.register_hms_as_federated_catalog()
 
     workspace_client.connections.create.assert_called_with(
         name='a',
@@ -97,7 +97,7 @@ def test_already_existing_connection():
     )
 
     hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
-    hms_fed.register_internal_hms_as_federated_catalog()
+    hms_fed.register_hms_as_federated_catalog()
 
     workspace_client.connections.create.assert_called_with(
         name='a',
