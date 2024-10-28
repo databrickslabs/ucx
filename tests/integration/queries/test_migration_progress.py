@@ -12,6 +12,7 @@ from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
@@ -49,13 +50,24 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 
 
 @pytest.fixture
-def tables():
-    # TODO: Let schema 1 be migrated and schema 2 not
+def tables() -> list[Table]:
     records = []
     for schema in "schema1", "schema2":
         for table in "table1", "table2", "table3", "table4", "table5":
             table = Table("hive_metastore", schema, table, "MANAGED", "delta")
             records.append(table)
+    return records
+
+
+@pytest.fixture
+def table_migration_status(tables: list[Table]) -> list[TableMigrationStatus]:
+    records = []
+    for table in tables:
+        if table.database == "schema1":  # schema1 tables are migrated
+            migration_status = TableMigrationStatus(table.database, table.name, "catalog", table.database, table.name)
+        else:
+            migration_status = TableMigrationStatus(table.database, table.name)
+        records.append(migration_status)
     return records
 
 
@@ -182,6 +194,7 @@ def catalog_populated(
     workflow_runs,
     workflow_problems,
     tables,
+    table_migration_status,
     udfs,
     grants,
     jobs,
@@ -206,6 +219,13 @@ def catalog_populated(
         f'hive_metastore.{runtime_ctx.inventory_database}.workflow_problems',
         workflow_problems,
         JobProblem,
+        mode='overwrite',
+    )
+    # Persists table migration status to propagate which tables are pending migration
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.migration_status',
+        table_migration_status,
+        TableMigrationStatus,
         mode='overwrite',
     )
     # Persists grant to propagate ownership to tables
