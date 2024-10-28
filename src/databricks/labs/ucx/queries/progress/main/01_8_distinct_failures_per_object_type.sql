@@ -1,7 +1,7 @@
 /* --title 'Distinct failures per object type' --width 6 */
 with failures AS (
   SELECT object_type, explode(failures) AS failure
-  FROM ucx_catalog.multiworkspace.latest_historical_per_workspace
+  FROM ucx_catalog.multiworkspace.objects_snapshot
   WHERE object_type IN ('ClusterInfo', 'Grant', 'JobInfo', 'PipelineInfo', 'PolicyInfo', 'Table', 'Udf')
 )
 

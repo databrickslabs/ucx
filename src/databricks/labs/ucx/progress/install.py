@@ -55,9 +55,7 @@ class ProgressTrackingInstallation:
         self._schema_deployer.deploy_schema()
         self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
         self._schema_deployer.deploy_table("historical", Historical)
-        self._schema_deployer.deploy_view(
-            "latest_historical_per_workspace", "queries/views/latest_historical_per_workspace.sql"
-        )
+        self._schema_deployer.deploy_view("objects_snapshot", "queries/views/objects_snapshot.sql")
         logger.info("Installation completed successfully!")
 
 
