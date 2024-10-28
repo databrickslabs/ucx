@@ -270,14 +270,14 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_progress", [Row(percentage=73.91)]),
-        ("01_1_percentage_udf_migration_progress", [Row(percentage=50.0)]),
-        ("01_2_percentage_grant_migration_progress", [Row(percentage=66.67)]),
-        ("01_3_percentage_job_migration_progress", [Row(percentage=50.0)]),
-        ("01_4_percentage_cluster_migration_progress", [Row(percentage=50.0)]),
-        ("01_5_percentage_table_migration_progress", [Row(percentage=100.0)]),
-        ("01_6_percentage_pipeline_migration_progress", [Row(percentage=50.0)]),
-        ("01_7_percentage_policy_migration_progress", [Row(percentage=50.0)]),
+        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 12 / 34, 2))]),
+        ("01_1_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 1 / 13, 2))]),
+        ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 2 / 3, 2))]),
+        ("01_4_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_5_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
+        ("01_6_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_7_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
             "01_8_distinct_failures_per_object_type",
             [
@@ -321,9 +321,9 @@ def test_migration_progress_dashboard(
         (
             "02_4_migration_status_by_owner_overview",
             [
-                Row(owner="Andrew", percentage=50.0, total=2, total_migrated=1, total_not_migrated=1),
-                Row(owner="Cor", percentage=42.86, total=7, total_migrated=3, total_not_migrated=4),
-                Row(owner="Eric", percentage=100.0, total=1, total_migrated=1, total_not_migrated=0),
+                Row(owner="Andrew", percentage=round(100 * 1 / 2, 2), total=2, total_migrated=1, total_not_migrated=1),
+                Row(owner="Cor", percentage=round(100 * 3 / 7, 2), total=7, total_migrated=3, total_not_migrated=4),
+                Row(owner="Eric", percentage=round(100 * 1 / 1, 2), total=1, total_migrated=1, total_not_migrated=0),
             ],
         ),
     ],
