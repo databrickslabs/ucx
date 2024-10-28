@@ -290,10 +290,10 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 12 / 34, 2))]),
+        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 22 / 34, 2))]),
         ("01_1_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 1 / 13, 2))]),
-        ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 2 / 3, 2))]),
+        ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
+        ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
         ("01_4_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_5_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
         ("01_6_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
