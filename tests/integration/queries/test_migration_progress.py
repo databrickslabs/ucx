@@ -270,14 +270,14 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_readiness", [Row(percentage=73.91)]),
-        ("01_1_percentage_udf_migration_readiness", [Row(percentage=50.0)]),
-        ("01_2_percentage_grant_migration_readiness", [Row(percentage=66.67)]),
-        ("01_3_percentage_job_migration_readiness", [Row(percentage=50.0)]),
-        ("01_4_percentage_cluster_migration_readiness", [Row(percentage=50.0)]),
-        ("01_5_percentage_table_migration_readiness", [Row(percentage=100.0)]),
-        ("01_6_percentage_pipeline_migration_readiness", [Row(percentage=50.0)]),
-        ("01_7_percentage_policy_migration_readiness", [Row(percentage=50.0)]),
+        ("01_0_percentage_migration_progress", [Row(percentage=73.91)]),
+        ("01_1_percentage_udf_migration_progress", [Row(percentage=50.0)]),
+        ("01_2_percentage_grant_migration_progress", [Row(percentage=66.67)]),
+        ("01_3_percentage_job_migration_progress", [Row(percentage=50.0)]),
+        ("01_4_percentage_cluster_migration_progress", [Row(percentage=50.0)]),
+        ("01_5_percentage_table_migration_progress", [Row(percentage=100.0)]),
+        ("01_6_percentage_pipeline_migration_progress", [Row(percentage=50.0)]),
+        ("01_7_percentage_policy_migration_progress", [Row(percentage=50.0)]),
         (
             "02_1_pending_migration_data_objects",
             [Row(count=5)],
@@ -300,7 +300,7 @@ def test_migration_progress_dashboard(
         ),
     ],
 )
-def test_percentage_migration_readiness(
+def test_percentage_migration_progress(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
     query_name,
