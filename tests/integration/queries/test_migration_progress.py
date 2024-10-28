@@ -279,6 +279,34 @@ def test_migration_progress_dashboard(
         ("01_6_percentage_pipeline_migration_progress", [Row(percentage=50.0)]),
         ("01_7_percentage_policy_migration_progress", [Row(percentage=50.0)]),
         (
+            "01_8_distinct_failures_per_object_type",
+            [
+                Row(
+                    object_type="ClusterInfo",
+                    count=1,
+                    failure="Uses azure service principal credentials config in cluster",
+                ),
+                Row(object_type="JobInfo", count=1, failure="No isolation shared clusters not supported in UC"),
+                Row(
+                    object_type="JobInfo",
+                    count=1,
+                    failure="sql-parse-error: 23456 task: parent/child.py: Could not parse SQL",
+                ),
+                Row(
+                    object_type="PipelineInfo",
+                    count=1,
+                    failure="Uses passthrough config: spark.databricks.passthrough.enabled in pipeline",
+                ),
+                Row(
+                    object_type="PolicyInfo",
+                    count=1,
+                    failure="Uses azure service principal credentials config in policy",
+                ),
+                Row(object_type="Table", count=5, failure="Pending migration"),
+                Row(object_type="Udf", count=1, failure="UDF not supported by UC"),
+            ],
+        ),
+        (
             "02_1_pending_migration_data_objects",
             [Row(count=5)],
         ),
