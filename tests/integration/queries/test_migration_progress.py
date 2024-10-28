@@ -12,7 +12,6 @@ from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, Record
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.progress.history import HistoricalEncoder
@@ -66,29 +65,21 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 def tables():
     records = []
     for schema in "schema1", "schema2":
+        if schema == "schema1":
+            failures = []   # schema1 is migrated
+        else:
+            failures = ["Pending migration"]
         for table in "table1", "table2", "table3", "table4", "table5":
+            if table == "table1":
+                owner = "Andrew"
+            elif schema == "schema1" and table == "table2":
+                owner = "Eric"
+            else:
+                owner = "Cor"
             table = Table("hive_metastore", schema, table, "MANAGED", "delta")
-            record = ("tables", [table.catalog, table.database, table.name], table, [], "Cor")
+            record = ("tables", [table.catalog, table.database, table.name], table, failures, owner)
             records.append(record)
     return records
-
-
-@pytest.fixture
-def table_migration_statuses(tables):
-    statuses = []
-    for _, id_, table, _, owner in tables:
-        table_migration_status = TableMigrationStatus(table.catalog, table.database, table.name)
-        failures = ["not migrated"]
-        owner = "Andrew" if table.name == "table1" else "Cor"
-        if table.database == "schema1":  # Simulate one schema being migrated
-            if table.name == "table2":  # An owner with only migrated objects
-                owner = "Eric"
-            table_migration_status.dst_catalog = "catalog1"
-            table_migration_status.dst_schema = table.database
-            table_migration_status.dst_table = table.name
-            failures = []
-        statuses.append(("migration_status", id_, table_migration_status, failures, owner))
-    return statuses
 
 
 @pytest.fixture
@@ -233,7 +224,6 @@ def policies():
 @pytest.fixture
 def historical_objects(
     tables,
-    table_migration_statuses,
     udfs,
     grants,
     jobs,
@@ -241,7 +231,7 @@ def historical_objects(
     pipelines,
     policies,
 ):
-    return tables + table_migration_statuses + udfs + grants + jobs + clusters + pipelines + policies
+    return tables + udfs + grants + jobs + clusters + pipelines + policies
 
 
 @pytest.fixture
