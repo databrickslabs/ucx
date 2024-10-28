@@ -124,6 +124,7 @@ def jobs():
     ]
     return records
 
+
 @pytest.fixture
 def workflow_problems(installation_ctx):
     """Workflow problems are detected by the linter"""
@@ -212,7 +213,7 @@ def catalog_populated(
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
         runtime_ctx = runtime_ctx.replace(parent_run_id=parent_run_id)
         runtime_ctx.tables_progress.append_inventory_snapshot(tables)
-        # The delets below reset the cached parent run ids on the encoders
+        # The deletes below reset the cached parent run ids on the encoders
         del runtime_ctx.tables_progress
         runtime_ctx.udfs_progress.append_inventory_snapshot(udfs)
         del runtime_ctx.udfs_progress
