@@ -12,7 +12,8 @@ from databricks.sdk.errors import NotFound
 
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineToMigrate
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineToMigrate, PipelineMapping
+from unit import mock_pipeline_mapping
 
 logger = logging.getLogger(__name__)
 
@@ -37,3 +38,17 @@ def test_pipeline_rule():
     assert rule.target_catalog_name == "cat"
     assert rule.target_schema_name is None
     assert rule.target_pipeline_name == "pipe"
+
+def test_current_pipelines(mock_installation):
+    errors = {}
+    rows = {
+        "hive_metastore.inventory_database.pipelines": [],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    workspace_client = create_autospec(WorkspaceClient)
+
+    pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
+    pipelines_crawler = PipelinesCrawler(workspace_client, sql_backend, "schema")
+
+    pipelines = pipeline_mapping.current_pipelines(pipelines_crawler, "workspace_name", "catalog_name")
+    assert isinstance(pipelines, Generator)
