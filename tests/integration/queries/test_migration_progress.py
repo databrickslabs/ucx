@@ -53,8 +53,8 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 def tables() -> list[Table]:
     records = []
     for schema in "schema1", "schema2":
-        for table in "table1", "table2", "table3", "table4", "table5":
-            table = Table("hive_metastore", schema, table, "MANAGED", "delta")
+        for table_name in "table1", "table2", "table3", "table4", "table5":
+            table = Table("hive_metastore", schema, table_name, "MANAGED", "delta")
             records.append(table)
     return records
 
