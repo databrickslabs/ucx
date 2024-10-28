@@ -140,15 +140,15 @@ def workflow_problems() -> list[JobProblem]:
     records = [
         JobProblem(
             job_id=3,
-            job_name="Peter the Job",
-            task_key="23456",
-            path="parent/child.py",
+            job_name="Job",
+            task_key="4",
+            path="file.py",
             code="sql-parse-error",
             message="Could not parse SQL",
-            start_line=1234,
-            start_col=22,
-            end_line=1234,
-            end_col=32,
+            start_line=12,
+            start_col=4,
+            end_line=12,
+            end_col=10,
         )
     ]
     return records
@@ -189,7 +189,7 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def catalog_populated(
+def catalog_populated(  # pylint: disable=too-many-arguments
     runtime_ctx: MockRuntimeContext,
     workflow_runs: list[WorkflowRun],
     tables: list[Table],
