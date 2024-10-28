@@ -72,7 +72,7 @@ def table_migration_status(tables: list[Table]) -> list[TableMigrationStatus]:
 
 
 @pytest.fixture
-def udfs():
+def udfs() -> list[Udf]:
     records = [
         Udf(
             "hive_metastore",
@@ -104,7 +104,7 @@ def udfs():
 
 
 @pytest.fixture
-def grants():
+def grants() -> list[Grant]:
     records = [
         Grant("service_principal", "MODIFY", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
@@ -125,7 +125,7 @@ def grants():
 
 
 @pytest.fixture
-def jobs():
+def jobs() -> list[JobInfo]:
     records = [
         JobInfo("1", success=1, failures=""),
         JobInfo("2", success=0, failures='["No isolation shared clusters not supported in UC"]'),
@@ -135,7 +135,7 @@ def jobs():
 
 
 @pytest.fixture
-def workflow_problems(installation_ctx):
+def workflow_problems() -> list[JobProblem]:
     """Workflow problems are detected by the linter"""
     records = [
         JobProblem(
@@ -155,7 +155,7 @@ def workflow_problems(installation_ctx):
 
 
 @pytest.fixture
-def clusters():
+def clusters() -> list[ClusterInfo]:
     records = [
         ClusterInfo("1", success=1, failures=""),
         ClusterInfo("2", success=0, failures='["Uses azure service principal credentials config in cluster"]'),
@@ -164,7 +164,7 @@ def clusters():
 
 
 @pytest.fixture
-def pipelines():
+def pipelines() -> list[PipelineInfo]:
     records = [
         PipelineInfo("1", success=1, failures=""),
         PipelineInfo(
@@ -175,7 +175,7 @@ def pipelines():
 
 
 @pytest.fixture
-def policies():
+def policies() -> list[PolicyInfo]:
     records = [
         PolicyInfo("1", "policy1", success=1, failures=""),
         PolicyInfo(
@@ -191,16 +191,16 @@ def policies():
 @pytest.fixture
 def catalog_populated(
     runtime_ctx: MockRuntimeContext,
-    workflow_runs,
-    workflow_problems,
-    tables,
-    table_migration_status,
-    udfs,
-    grants,
-    jobs,
-    clusters,
-    pipelines,
-    policies,
+    workflow_runs: list[WorkflowRun],
+    tables: list[Table],
+    table_migration_status: list[TableMigrationStatus],
+    udfs: list[Udf],
+    grants: list[Grant],
+    jobs: list[JobInfo],
+    workflow_problems: list[JobProblem],
+    clusters: list[ClusterInfo],
+    pipelines: list[PipelineInfo],
+    policies: list[PolicyInfo],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
