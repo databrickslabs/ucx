@@ -5,7 +5,7 @@ from functools import partial
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, DatabricksError
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
@@ -130,7 +130,7 @@ class PipelinesMigrator:
     def _migrate_pipeline(self, pipeline: PipelineToMigrate):
         try:
             return self._clone_pipeline(pipeline)
-        except Exception as e:
+        except DatabricksError as e:
             logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
             return False
 
