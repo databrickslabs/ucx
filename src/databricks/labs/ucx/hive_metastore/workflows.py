@@ -168,4 +168,3 @@ class PipelineMigration(Workflow):
         to the Unity Catalog using the clone API
         """
         ctx.pipeline_migrator.migrate_pipelines()
-
