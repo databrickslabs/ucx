@@ -73,7 +73,7 @@ class PriorityQueue:
     def __init__(self):
         self._entries: list[QueueEntry] = []
         self._entry_finder: dict[QueueTask, QueueEntry] = {}
-        self._counter = 0
+        self._counter = 0  # Tiebreaker with equal priorities, then "first in, first out"
 
     def put(self, priority: int, task: QueueTask) -> None:
         """Put or update task in the queue.
