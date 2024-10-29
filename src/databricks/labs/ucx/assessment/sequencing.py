@@ -234,18 +234,19 @@ class MigrationSequencer:
         """
         # pre-compute incoming keys for best performance of self._required_step_ids
         incoming = self._invert_outgoing_to_incoming()
-        incoming_counts = self._compute_incoming_counts(incoming)
-        queue = self._create_node_queue(incoming_counts)
+        queue = self._create_node_queue(incoming)
+        seen = set[MigrationNode]()
         node = queue.get()
         step_number = 1
         ordered_steps: list[MigrationStep] = []
         while node is not None:
             step = node.as_step(step_number, sorted(n.node_id for n in incoming[node.key]))
             ordered_steps.append(step)
-            # Update queue priorities
+            seen.add(node)
+            # Update the queue priority as if the migration step was completed
             for dependency in self._outgoing[node.key]:
-                incoming_counts[dependency.key] -= 1
-                queue.update(incoming_counts[dependency.key], dependency)
+                priority = len(incoming[dependency.key] - seen)
+                queue.update(priority, dependency)
             step_number += 1
             node = queue.get()
         return ordered_steps
@@ -257,21 +258,13 @@ class MigrationSequencer:
                 result[target.key].add(self._nodes[node_key])
         return result
 
-    def _compute_incoming_counts(
-        self, incoming: dict[MigrationNodeKey, set[MigrationNode]]
-    ) -> dict[MigrationNodeKey, int]:
-        result = defaultdict(int)
-        for node_key in self._nodes.keys():
-            result[node_key] = len(incoming[node_key])
-        return result
-
-    def _create_node_queue(self, incoming_counts: dict[MigrationNodeKey, int]) -> PriorityQueue:
+    def _create_node_queue(self, incoming: dict[MigrationNodeKey, set[MigrationNode]]) -> PriorityQueue:
         """Create a priority queue for their nodes using the incoming count as priority.
 
         A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
         first.
         """
         priority_queue = PriorityQueue()
-        for node_key, incoming_count in incoming_counts.items():
-            priority_queue.put(incoming_count, self._nodes[node_key])
+        for node_key, incoming_nodes in incoming.items():
+            priority_queue.put(len(incoming_nodes), self._nodes[node_key])
         return priority_queue
