@@ -132,12 +132,13 @@ class MigrationSequencer:
         return cluster_node
 
     def generate_steps(self) -> Iterable[MigrationStep]:
-        """algo adapted from Kahn topological sort. The differences are as follows:
-        - we want the same step number for all nodes with same dependency depth
-          so instead of pushing to a queue, we rebuild it once all leaf nodes are processed
-          (these are transient leaf nodes i.e. they only become leaf during processing)
-        - the inputs do not form a DAG so we need specialized handling of edge cases
-          (implemented in PR #3009)
+        """Generate the migration steps.
+
+        An adapted version of the Kahn topological sort is implemented. The differences are as follows:
+        - We want the same step number for all nodes with same dependency depth. Therefore, instead of pushing to a
+          queue, we rebuild it once all leaf nodes are processed (these are transient leaf nodes i.e. they only become
+          leaf during processing)
+        - We handle cyclic dependencies (implemented in PR #3009)
         """
         # pre-compute incoming keys for best performance of self._required_step_ids
         incoming_keys = self._collect_incoming_keys()
