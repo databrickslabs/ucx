@@ -31,6 +31,7 @@ MigrationNodeKey = tuple[str, str]
 
 @dataclass
 class MigrationNode:
+    # TODO: @JCZuurmond the prefixes look a bit redundant
     node_id: int = field(compare=False)
     """Globally unique id."""
 
