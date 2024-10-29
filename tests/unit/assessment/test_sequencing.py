@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 
 
-def test_cluster_from_task_has_children(ws, simple_dependency_resolver, mock_path_lookup):
+def test_cluster_from_task_has_children(ws, simple_dependency_resolver, mock_path_lookup) -> None:
     ws.clusters.get.return_value = ClusterDetails(cluster_name="my-cluster", creator_user_name="John Doe")
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
