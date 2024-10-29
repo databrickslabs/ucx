@@ -3,7 +3,7 @@ from __future__ import annotations
 import heapq
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 from databricks.sdk import WorkspaceClient
@@ -31,11 +31,20 @@ MigrationNodeKey = tuple[str, str]
 
 @dataclass
 class MigrationNode:
-    node_id: int
+    node_id: int = field(compare=False)
+    """Globally unique id."""
+
     object_type: str
+    """Object type. Together with `attr:object_id` a unique identifier."""
+
     object_id: str
-    object_name: str
-    object_owner: str
+    """Object id. Together with `attr:object_id` a unique identifier."""
+
+    object_name: str = field(compare=False)
+    """Object name, more human friendly than `attr:object_id`."""
+
+    object_owner: str = field(compare=False)
+    """Object owner."""
 
     @property
     def key(self) -> MigrationNodeKey:
