@@ -7,8 +7,7 @@ from databricks.sdk import WorkspaceClient
 
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping
-
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping, PipelinesMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +88,23 @@ def test_pipeline_to_migrate(mock_installation):
 
     pipelines_to_migrate = pipeline_mapping.get_pipelines_to_migrate(pipelines_crawler)
     assert len(pipelines_to_migrate) == 1
+
+
+def test_migrate_pipelines(mock_installation):
+    errors = {}
+    rows = {
+        "`hive_metastore`.`inventory_database`.`pipelines`": [
+            ("123", "pipe1", 1, "[]", "creator1"),
+            ("456", "pipe2", 1, "[]", "creator2"),
+            ("789", "pipe3", 1, "[]", "creator3"),
+        ],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    workspace_client = create_autospec(WorkspaceClient)
+
+    pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
+    pipelines_crawler = PipelinesCrawler(workspace_client, sql_backend, "inventory_database")
+    pipelines_migrator = PipelinesMigrator(workspace_client, pipelines_crawler, pipeline_mapping)
+    pipelines_migrator.migrate_pipelines()
+    workspace_client.api_client.do.assert_called_once()
+
