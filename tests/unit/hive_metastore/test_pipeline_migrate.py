@@ -62,14 +62,17 @@ def test_load(mock_installation):
     sql_backend = MockBackend()
     workspace_client = create_autospec(WorkspaceClient)
 
-    pipeline_mapping_file = """{
-            'workspace_name': 'test_workspace',
-            'src_pipeline_id': 'pipeline_123',
-            'target_catalog_name': 'test_catalog',
-            'target_schema_name': None,
-            'target_pipeline_name': None,
-        }"""
-    mock_installation.upload("pipeline_mapping.csv", pipeline_mapping_file.encode("ASCII"))
+    # TODO:
+    # try to add the pipeline mapping from this file but its unable to fetch
+    # pipeline_mapping_file = """{
+    #         'workspace_name': 'test_workspace',
+    #         'src_pipeline_id': 'pipeline_123',
+    #         'target_catalog_name': 'test_catalog',
+    #         'target_schema_name': None,
+    #         'target_pipeline_name': None,
+    #     }"""
+    # mock_installation.upload("pipeline_mapping.csv", pipeline_mapping_file.encode("ASCII"))
+
     pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
     pipelines_rules_fetch = pipeline_mapping.load()
-    assert True
+    assert len(pipelines_rules_fetch) == 1
