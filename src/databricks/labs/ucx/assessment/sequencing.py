@@ -79,7 +79,7 @@ class MigrationNode:
 
 
 QueueTask = TypeVar("QueueTask")
-QueueEntry = list[int, int, QueueTask | str]
+QueueEntry = list[int, int, QueueTask | str]  # type: ignore
 
 
 class PriorityQueue:
@@ -153,7 +153,7 @@ class MigrationSequencer:
         self._admin_locator = admin_locator
         self._last_node_id = 0
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
-        self._outgoing: dict[MigrationNodeKey, set[MigrationNodeKey]] = defaultdict(set)
+        self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
     def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
         task_id = f"{job.job_id}/{task.task_key}"
@@ -170,13 +170,13 @@ class MigrationSequencer:
             object_owner=job_node.object_owner,  # no task owner so use job one
         )
         self._nodes[task_node.key] = task_node
-        self._outgoing[task_node.key].add(job_node.key)
+        self._outgoing[task_node.key].add(job_node)
         if task.existing_cluster_id:
             cluster_node = self.register_cluster(task.existing_cluster_id)
             if cluster_node:
-                self._outgoing[task_node.key].add(cluster_node.key)
+                self._outgoing[task_node.key].add(cluster_node)
                 # also make the cluster dependent on the job
-                self._outgoing[job_node.key].add(cluster_node.key)
+                self._outgoing[job_node.key].add(cluster_node)
         # TODO register dependency graph
         return task_node
 
@@ -198,7 +198,7 @@ class MigrationSequencer:
             for job_cluster in job.settings.job_clusters:
                 cluster_node = self.register_job_cluster(job_cluster)
                 if cluster_node:
-                    self._outgoing[job_node.key].add(cluster_node.key)
+                    self._outgoing[job_node.key].add(cluster_node)
         return job_node
 
     def register_job_cluster(self, cluster: jobs.JobCluster) -> MigrationNode | None:
@@ -234,40 +234,35 @@ class MigrationSequencer:
         - We handle cyclic dependencies (implemented in PR #3009)
         """
         # pre-compute incoming keys for best performance of self._required_step_ids
-        incoming_keys = self._collect_incoming_keys()
-        incoming_counts = self.compute_incoming_counts(incoming_keys)
+        incoming = self._invert_outgoing_to_incoming()
+        incoming_counts = self._compute_incoming_counts(incoming)
         key_queue = self._create_key_queue(incoming_counts)
         key = key_queue.get()
         step_number = 1
         sorted_steps: list[MigrationStep] = []
         while key is not None:
-            required_step_ids = sorted(self._get_required_step_ids(incoming_keys[key]))
-            step = self._nodes[key].as_step(step_number, required_step_ids)
+            step = self._nodes[key].as_step(step_number, sorted(n.node_id for n in incoming[key]))
             sorted_steps.append(step)
             # Update queue priorities
-            for dependency_key in self._outgoing[key]:
-                incoming_counts[dependency_key] -= 1
-                key_queue.update(incoming_counts[dependency_key], dependency_key)
+            for dependency in self._outgoing[key]:
+                incoming_counts[dependency.key] -= 1
+                key_queue.update(incoming_counts[dependency.key], dependency)
             step_number += 1
             key = key_queue.get()
         return sorted_steps
 
-    def _collect_incoming_keys(self) -> dict[tuple[str, str], set[tuple[str, str]]]:
-        result: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
-        for source, outgoing in self._outgoing.items():
-            for target in outgoing:
-                result[target].add(source)
+    def _invert_outgoing_to_incoming(self) -> dict[MigrationNodeKey, set[MigrationNode]]:
+        result: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
+        for node_key, outgoing_nodes in self._outgoing.items():
+            for target in outgoing_nodes:
+                result[target.key].add(self._nodes[node_key])
         return result
 
-    def _get_required_step_ids(self, required_step_keys: set[tuple[str, str]]) -> Iterable[int]:
-        for source_key in required_step_keys:
-            yield self._nodes[source_key].node_id
-
-    def compute_incoming_counts(
-        self, incoming: dict[tuple[str, str], set[tuple[str, str]]]
-    ) -> dict[tuple[str, str], int]:
+    def _compute_incoming_counts(
+        self, incoming: dict[MigrationNodeKey, set[MigrationNode]]
+    ) -> dict[MigrationNodeKey, int]:
         result = defaultdict(int)
-        for node_key in self._nodes:
+        for node_key in self._nodes.keys():
             result[node_key] = len(incoming[node_key])
         return result
 
