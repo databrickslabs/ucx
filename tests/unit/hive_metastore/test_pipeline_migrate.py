@@ -14,6 +14,7 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineToMigrate, PipelineMapping
 from unit import mock_pipeline_mapping
+from unit.hive_metastore.test_principal_grants import installation
 
 logger = logging.getLogger(__name__)
 
@@ -56,3 +57,19 @@ def test_current_pipelines(mock_installation):
     pipelines = pipeline_mapping.current_pipelines(pipelines_crawler, "workspace_name", "catalog_name")
     assert isinstance(pipelines, Generator)
     assert len(list(pipelines)) == 3
+
+def test_load(mock_installation):
+    sql_backend = MockBackend()
+    workspace_client = create_autospec(WorkspaceClient)
+
+    pipeline_mapping_file = """{
+            'workspace_name': 'test_workspace',
+            'src_pipeline_id': 'pipeline_123',
+            'target_catalog_name': 'test_catalog',
+            'target_schema_name': None,
+            'target_pipeline_name': None,
+        }"""
+    mock_installation.upload("pipeline_mapping.csv", pipeline_mapping_file.encode("ASCII"))
+    pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
+    pipelines_rules_fetch = pipeline_mapping.load()
+    assert True
