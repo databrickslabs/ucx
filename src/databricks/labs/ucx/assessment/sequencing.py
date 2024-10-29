@@ -156,6 +156,30 @@ class MigrationSequencer:
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
+    def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
+        job_node = self._nodes.get(("JOB", str(job.job_id)), None)
+        if job_node:
+            return job_node
+        job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
+        job_node = MigrationNode(
+            node_id=next(self._counter),
+            object_type="JOB",
+            object_id=str(job.job_id),
+            object_name=job_name,
+            object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
+        )
+        self._nodes[job_node.key] = job_node
+        if job.settings and job.settings.job_clusters:
+            for job_cluster in job.settings.job_clusters:
+                maybe_cluster_node = self.register_job_cluster(job_cluster)
+                if maybe_cluster_node.node:
+                    self._outgoing[job_node.key].add(maybe_cluster_node.node)
+            for task in job.settings.tasks or []:
+                maybe_task_node = self._register_workflow_task(task, job)
+                if maybe_task_node.node:
+                    self._outgoing[job_node.key] = maybe_task_node.node
+        return job_node
+
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a workflow task.
 
@@ -183,30 +207,6 @@ class MigrationSequencer:
                 self._outgoing[task_node.key].add(maybe_cluster_node.node)
         # TODO: register `job_cluster_key
         return MaybeMigrationNode(task_node, [])
-
-    def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
-        job_node = self._nodes.get(("JOB", str(job.job_id)), None)
-        if job_node:
-            return job_node
-        job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
-        job_node = MigrationNode(
-            node_id=next(self._counter),
-            object_type="JOB",
-            object_id=str(job.job_id),
-            object_name=job_name,
-            object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
-        )
-        self._nodes[job_node.key] = job_node
-        if job.settings and job.settings.job_clusters:
-            for job_cluster in job.settings.job_clusters:
-                maybe_cluster_node = self.register_job_cluster(job_cluster)
-                if maybe_cluster_node.node:
-                    self._outgoing[job_node.key].add(maybe_cluster_node.node)
-            for task in job.settings.tasks or []:
-                maybe_task_node = self._register_workflow_task(task, job)
-                if maybe_task_node.node:
-                    self._outgoing[job_node.key] = maybe_task_node.node
-        return job_node
 
     def register_job_cluster(self, cluster: jobs.JobCluster) -> MaybeMigrationNode:
         if cluster.new_cluster:
