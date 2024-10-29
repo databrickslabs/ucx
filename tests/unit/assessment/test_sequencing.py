@@ -1,6 +1,7 @@
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 
@@ -40,7 +41,7 @@ def test_sequence_steps_from_job_task_with_cluster(
 
     def get_cluster(cluster_id: str) -> ClusterDetails:
         if cluster_id == "cluster-123":
-        raise ValueError(f"Unknown cluster: {cluster_id}")
+            return ClusterDetails(cluster_id="cluster-123", cluster_name="my-cluster", creator_user_name=admin_user)
         raise ResourceDoesNotExist(f"Unknown cluster: {cluster_id}")
 
     ws.clusters.get.side_effect = get_cluster
