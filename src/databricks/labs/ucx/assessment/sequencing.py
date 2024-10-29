@@ -263,6 +263,6 @@ class MigrationSequencer:
         first.
         """
         priority_queue = PriorityQueue()
-        for node_key, incoming_nodes in incoming.items():
-            priority_queue.put(len(incoming_nodes), self._nodes[node_key])
+        for node_key, node in self._nodes.items():
+            priority_queue.put(len(incoming[node_key]), node)
         return priority_queue
