@@ -4,7 +4,6 @@ import heapq
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -78,11 +77,13 @@ class MigrationNode:
         )
 
 
-QueueTask = TypeVar("QueueTask")
-QueueEntry = list[int, int, QueueTask | str]  # type: ignore
+# We expect `tuple[int, int, MigrationNode | str]`
+# for `[priority, counter, MigrationNode | PriorityQueue._REMOVED | PriorityQueue_UPDATED]`
+# but we use list for the required mutability
+QueueEntry = list[int | MigrationNode | str]
 
 
-class PriorityQueue(Generic[QueueTask]):
+class PriorityQueue:
     """A priority queue supporting to update tasks.
 
     An adaption from class:queue.Priority to support updating tasks.
@@ -100,38 +101,39 @@ class PriorityQueue(Generic[QueueTask]):
 
     def __init__(self):
         self._entries: list[QueueEntry] = []
-        self._entry_finder: dict[QueueTask, QueueEntry] = {}
+        self._entry_finder: dict[MigrationNode, QueueEntry] = {}
         self._counter = 0  # Tiebreaker with equal priorities, then "first in, first out"
 
-    def put(self, priority: int, task: QueueTask) -> None:
+    def put(self, priority: int, task: MigrationNode) -> None:
         """Put or update task in the queue.
 
         The lowest priority is retrieved from the queue first.
         """
         if task in self._entry_finder:
             raise KeyError(f"Use `:meth:update` to update existing task: {task}")
-        entry = [priority, self._counter, task]
+        entry: QueueEntry = [priority, self._counter, task]
         self._entry_finder[task] = entry
         heapq.heappush(self._entries, entry)
         self._counter += 1
 
-    def get(self) -> QueueTask | None:
+    def get(self) -> MigrationNode | None:
         """Gets the tasks with lowest priority."""
         while self._entries:
             _, _, task = heapq.heappop(self._entries)
             if task in (self._REMOVED, self._UPDATED):
                 continue
+            assert isinstance(task, MigrationNode)
             self._remove(task)
             # Ignore type because heappop returns Any, while we know it is an QueueEntry
-            return task  # type: ignore
+            return task
         return None
 
-    def _remove(self, task: QueueTask) -> None:
+    def _remove(self, task: MigrationNode) -> None:
         """Remove a task from the queue."""
         entry = self._entry_finder.pop(task)
         entry[2] = self._REMOVED
 
-    def update(self, priority: int, task: QueueTask) -> None:
+    def update(self, priority: int, task: MigrationNode) -> None:
         """Update a task in the queue."""
         entry = self._entry_finder.pop(task)
         if entry is None:
@@ -272,7 +274,7 @@ class MigrationSequencer:
         A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
         first.
         """
-        priority_queue: PriorityQueue[MigrationNode] = PriorityQueue()
+        priority_queue = PriorityQueue()
         for node_key, incoming_count in incoming_counts.items():
             priority_queue.put(incoming_count, self._nodes[node_key])
         return priority_queue
