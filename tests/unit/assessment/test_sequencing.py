@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam, jobs
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 
 from databricks.labs.ucx.assessment.sequencing import MigrationSequencer, MigrationStep
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
@@ -32,6 +32,23 @@ def test_register_non_existing_cluster(
     sequencer = MigrationSequencer(ws, admin_locator)
 
     maybe_node = sequencer.register_cluster("non-existing-id")
+
+    assert maybe_node.node is None
+    assert maybe_node.failed
+    assert maybe_node.problems == ["Could not find cluster: non-existing-id"]
+
+
+def test_register_non_existing_job_cluster(
+    ws,
+    simple_dependency_resolver,
+    mock_path_lookup,
+    admin_locator,
+) -> None:
+    """Register a non-existing job cluster."""
+    job_cluster = jobs.JobCluster(new_cluster=ClusterSpec(), job_cluster_key="non-existing-id")
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_node = sequencer.register_job_cluster(job_cluster)
 
     assert maybe_node.node is None
     assert maybe_node.failed
