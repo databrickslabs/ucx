@@ -90,7 +90,6 @@ def test_pipeline_to_migrate(ws, mock_installation):
         ],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-    # workspace_client = create_autospec(WorkspaceClient)
 
     pipeline_mapping = PipelineMapping(mock_installation, ws, sql_backend)
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
