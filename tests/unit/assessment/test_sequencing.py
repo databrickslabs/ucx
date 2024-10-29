@@ -95,7 +95,7 @@ def test_sequence_steps_from_job_task_with_cluster(
     dependency = WorkflowTask(ws, task, job)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer.register_workflow_task(task, job, graph)
+    sequencer._register_workflow_task(task, job, graph)
 
     steps = list(sequencer.generate_steps())
 

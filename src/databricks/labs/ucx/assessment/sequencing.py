@@ -156,7 +156,7 @@ class MigrationSequencer:
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
-    def register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
+    def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a workflow task.
 
         Args:
@@ -205,7 +205,7 @@ class MigrationSequencer:
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
-                maybe_task_node = self.register_workflow_task(task, job)
+                maybe_task_node = self._register_workflow_task(task, job)
                 if maybe_task_node.node:
                     self._outgoing[job_node.key] = maybe_task_node.node
         return job_node
