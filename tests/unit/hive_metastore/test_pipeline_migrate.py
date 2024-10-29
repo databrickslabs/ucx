@@ -63,18 +63,6 @@ def test_current_pipelines(ws, mock_installation):
 
 def test_load(ws, mock_installation):
     sql_backend = MockBackend()
-    # TODO:
-    # try to add the pipeline mapping from this file but its unable to fetch
-    # add test for NotFound when fetching the pipeline mapping
-    # pipeline_mapping_file = """{
-    #         'workspace_name': 'test_workspace',
-    #         'src_pipeline_id': 'pipeline_123',
-    #         'target_catalog_name': 'test_catalog',
-    #         'target_schema_name': None,
-    #         'target_pipeline_name': None,
-    #     }"""
-    # mock_installation.upload("pipeline_mapping.csv", pipeline_mapping_file.encode("ASCII"))
-
     pipeline_mapping = PipelineMapping(mock_installation, ws, sql_backend)
     pipelines_rules_fetch = pipeline_mapping.load()
     assert len(pipelines_rules_fetch) == 1
@@ -114,3 +102,15 @@ def test_migrate_pipelines(ws, mock_installation):
     pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, pipeline_mapping)
     pipelines_migrator.migrate_pipelines()
     ws.api_client.do.assert_called_once()
+    ws.api_client.do.assert_called_with(
+        'POST',
+        '/api/2.0/pipelines/123/clone',
+        body={
+            'catalog': 'catalog',
+            'clone_mode': 'MIGRATE_TO_UC',
+            'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
+            'target': 'schema',
+            'name': 'pipeline',
+        },
+        headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+    )
