@@ -237,17 +237,15 @@ class MigrationSequencer:
         queue = self._create_node_queue(incoming)
         seen = set[MigrationNode]()
         node = queue.get()
-        step_number = 1
         ordered_steps: list[MigrationStep] = []
         while node is not None:
-            step = node.as_step(step_number, sorted(n.node_id for n in incoming[node.key]))
+            step = node.as_step(len(ordered_steps), sorted(n.node_id for n in incoming[node.key]))
             ordered_steps.append(step)
             seen.add(node)
             # Update the queue priority as if the migration step was completed
             for dependency in self._outgoing[node.key]:
                 priority = len(incoming[dependency.key] - seen)
                 queue.update(priority, dependency)
-            step_number += 1
             node = queue.get()
         return ordered_steps
 

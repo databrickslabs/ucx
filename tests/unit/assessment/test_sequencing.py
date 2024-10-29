@@ -46,7 +46,7 @@ def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolve
     assert steps == [
         MigrationStep(
             step_id=2,
-            step_number=1,
+            step_number=0,
             object_type="TASK",
             object_id="1234/test-task",
             object_name="test-task",
@@ -55,7 +55,7 @@ def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolve
         ),
         MigrationStep(
             step_id=1,
-            step_number=2,
+            step_number=1,
             object_type="JOB",
             object_id="1234",
             object_name="test-job",
@@ -64,7 +64,7 @@ def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolve
         ),
         MigrationStep(
             step_id=3,
-            step_number=3,
+            step_number=2,
             object_type="CLUSTER",
             object_id="cluster-123",
             object_name="my-cluster",
