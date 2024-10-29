@@ -143,9 +143,9 @@ class MigrationSequencer:
             leaf_keys = list(self._get_leaf_keys(incoming_counts))
             for leaf_key in leaf_keys:
                 del incoming_counts[leaf_key]
-                sorted_steps.append(
-                    self._nodes[leaf_key].as_step(step_number, list(self._required_step_ids(incoming_keys[leaf_key])))
-                )
+                required_step_ids = sorted(self._required_step_ids(incoming_keys[leaf_key]))
+                step = self._nodes[leaf_key].as_step(step_number, required_step_ids)
+                sorted_steps.append(step)
                 for dependency_key in self._outgoing[leaf_key]:
                     incoming_counts[dependency_key] -= 1
             step_number += 1
