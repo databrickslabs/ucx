@@ -49,6 +49,11 @@ class MigrationNode:
 
 
 class MigrationSequencer:
+    """Sequence the migration dependencies in order to execute the migration.
+
+    Similar to the other graph logic, we first build the graph by registering dependencies, then we analyse the graph.
+    Analysing the graph in this case means: computing the migration sequence in `meth:generate_steps`.
+    """
 
     def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
         self._ws = ws
