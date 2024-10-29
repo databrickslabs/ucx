@@ -67,6 +67,7 @@ class PriorityQueue:
     """
 
     _REMOVED = "<removed>"  # Mark removed items
+    _UPDATED = "<updated>"  # Mark updated items
 
     def __init__(self):
         self._entries: list[QueueEntry] = []
@@ -78,9 +79,8 @@ class PriorityQueue:
 
         The lowest priority is retrieved from the queue first.
         """
-        # Update a task by checking if it already exists, then removing it
         if task in self._entry_finder:
-            self._remove(task)
+            raise KeyError(f"Use `:meth:update` to update existing task: {task}")
         entry = [priority, self._counter, task]
         self._entry_finder[task] = entry
         heapq.heappush(self._entries, entry)
@@ -90,16 +90,26 @@ class PriorityQueue:
         """Gets the tasks with lowest priority."""
         while self._entries:
             _, _, task = heapq.heappop(self._entries)
-            if task != self._REMOVED:
-                self._remove(task)
-                # Ignore type because heappop returns Any, while we know it is an QueueEntry
-                return task  # type: ignore
+            if task in (self._REMOVED, self._UPDATED):
+                continue
+            self._remove(task)
+            # Ignore type because heappop returns Any, while we know it is an QueueEntry
+            return task  # type: ignore
         return None
 
     def _remove(self, task: QueueTask) -> None:
         """Remove a task from the queue."""
         entry = self._entry_finder.pop(task)
         entry[2] = self._REMOVED
+
+    def update(self, priority: int, task: QueueTask) -> None:
+        """Update a task in the queue."""
+        entry = self._entry_finder.pop(task)
+        if entry is None:
+            raise KeyError(f"Cannot update unknown task: {task}")
+        if entry[2] != self._REMOVED:  # Do not update REMOVED tasks
+            entry[2] = self._UPDATED
+            self.put(priority, task)
 
 
 class MigrationSequencer:
@@ -205,12 +215,11 @@ class MigrationSequencer:
             required_step_ids = sorted(self._get_required_step_ids(incoming_keys[key]))
             step = self._nodes[key].as_step(step_number, required_step_ids)
             sorted_steps.append(step)
-            # Update the
+            # Update queue priorities
             for dependency_key in self._outgoing[key]:
                 incoming_counts[dependency_key] -= 1
-                key_queue.put(incoming_counts[dependency_key], dependency_key)
+                key_queue.update(incoming_counts[dependency_key], dependency_key)
             step_number += 1
-            key_queue = self._create_key_queue(incoming_counts)  # Reprioritize queue given new incoming counts
             key = key_queue.get()
         return sorted_steps
 
