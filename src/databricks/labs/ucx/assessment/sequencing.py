@@ -18,12 +18,25 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph
 @dataclass
 class MigrationStep:
     step_id: int
+    """Globally unique id."""
+
     step_number: int
+    """The position in the migration sequence."""
+
     object_type: str
+    """Object type. Together with `attr:object_id` a unique identifier."""
+
     object_id: str
+    """Object id. Together with `attr:object_id` a unique identifier."""
+
     object_name: str
+    """Object name, more human friendly than `attr:object_id`."""
+
     object_owner: str
+    """Object owner."""
+
     required_step_ids: list[int]
+    """The step ids that should be completed before this step is started."""
 
 
 MigrationNodeKey = tuple[str, str]
