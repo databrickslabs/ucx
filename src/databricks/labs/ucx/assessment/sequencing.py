@@ -4,7 +4,7 @@ import heapq
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -82,7 +82,7 @@ QueueTask = TypeVar("QueueTask")
 QueueEntry = list[int, int, QueueTask | str]  # type: ignore
 
 
-class PriorityQueue:
+class PriorityQueue(Generic[QueueTask]):
     """A priority queue supporting to update tasks.
 
     An adaption from class:queue.Priority to support updating tasks.
@@ -272,7 +272,7 @@ class MigrationSequencer:
         A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
         first.
         """
-        priority_queue = PriorityQueue()
+        priority_queue: PriorityQueue[MigrationNode] = PriorityQueue()
         for node_key, incoming_count in incoming_counts.items():
             priority_queue.put(incoming_count, self._nodes[node_key])
         return priority_queue
