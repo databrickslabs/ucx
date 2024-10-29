@@ -42,7 +42,7 @@ class MigrationStep:
 MigrationNodeKey = tuple[str, str]
 
 
-@dataclass
+@dataclass(frozen=True)
 class MigrationNode:
     # TODO: @JCZuurmond the prefixes look a bit redundant
     node_id: int = field(compare=False)
@@ -236,20 +236,20 @@ class MigrationSequencer:
         # pre-compute incoming keys for best performance of self._required_step_ids
         incoming = self._invert_outgoing_to_incoming()
         incoming_counts = self._compute_incoming_counts(incoming)
-        key_queue = self._create_key_queue(incoming_counts)
-        key = key_queue.get()
+        queue = self._create_node_queue(incoming_counts)
+        node = queue.get()
         step_number = 1
-        sorted_steps: list[MigrationStep] = []
-        while key is not None:
-            step = self._nodes[key].as_step(step_number, sorted(n.node_id for n in incoming[key]))
-            sorted_steps.append(step)
+        ordered_steps: list[MigrationStep] = []
+        while node is not None:
+            step = node.as_step(step_number, sorted(n.node_id for n in incoming[node.key]))
+            ordered_steps.append(step)
             # Update queue priorities
-            for dependency in self._outgoing[key]:
+            for dependency in self._outgoing[node.key]:
                 incoming_counts[dependency.key] -= 1
-                key_queue.update(incoming_counts[dependency.key], dependency)
+                queue.update(incoming_counts[dependency.key], dependency)
             step_number += 1
-            key = key_queue.get()
-        return sorted_steps
+            node = queue.get()
+        return ordered_steps
 
     def _invert_outgoing_to_incoming(self) -> dict[MigrationNodeKey, set[MigrationNode]]:
         result: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
@@ -266,14 +266,13 @@ class MigrationSequencer:
             result[node_key] = len(incoming[node_key])
         return result
 
-    @staticmethod
-    def _create_key_queue(incoming_counts: dict[tuple[str, str], int]) -> PriorityQueue:
-        """Create a priority queue given the keys and their incoming counts.
+    def _create_node_queue(self, incoming_counts: dict[MigrationNodeKey, int]) -> PriorityQueue:
+        """Create a priority queue for their nodes using the incoming count as priority.
 
         A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
         first.
         """
         priority_queue = PriorityQueue()
         for node_key, incoming_count in incoming_counts.items():
-            priority_queue.put(incoming_count, node_key)
+            priority_queue.put(incoming_count, self._nodes[node_key])
         return priority_queue
