@@ -1,20 +1,14 @@
-import datetime
 import logging
-import sys
 from collections.abc import Generator
-from itertools import cycle
 from unittest.mock import create_autospec
 
-import pytest
-from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineToMigrate, PipelineMapping
-from unit import mock_pipeline_mapping
-from unit.hive_metastore.test_principal_grants import installation
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping
+
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +58,7 @@ def test_load(mock_installation):
 
     # TODO:
     # try to add the pipeline mapping from this file but its unable to fetch
+    # add test for NotFound when fetching the pipeline mapping
     # pipeline_mapping_file = """{
     #         'workspace_name': 'test_workspace',
     #         'src_pipeline_id': 'pipeline_123',
@@ -76,3 +71,21 @@ def test_load(mock_installation):
     pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
     pipelines_rules_fetch = pipeline_mapping.load()
     assert len(pipelines_rules_fetch) == 1
+
+def test_pipeline_to_migrate(mock_installation):
+    errors = {}
+    rows = {
+        "`hive_metastore`.`inventory_database`.`pipelines`": [
+            ("123", "pipe1", 1, "[]", "creator1"),
+            ("456", "pipe2", 1, "[]", "creator2"),
+            ("789", "pipe3", 1, "[]", "creator3"),
+        ],
+    }
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    workspace_client = create_autospec(WorkspaceClient)
+
+    pipeline_mapping = PipelineMapping(mock_installation, workspace_client, sql_backend)
+    pipelines_crawler = PipelinesCrawler(workspace_client, sql_backend, "inventory_database")
+
+    pipelines_to_migrate = pipeline_mapping.get_pipelines_to_migrate(pipelines_crawler)
+    assert len(pipelines_to_migrate) == 1
