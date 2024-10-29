@@ -21,9 +21,7 @@ def test_pipeline_migrate(
     runtime_ctx,
 ):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    target_schemas = 5*[
-        runtime_ctx.make_schema(catalog_name="hive_metastore")
-    ]
+    target_schemas = 5 * [runtime_ctx.make_schema(catalog_name="hive_metastore")]
 
     dlt_notebook_path = f"{make_directory()}/dlt_notebook.py"
     src_table = runtime_ctx.make_table(catalog_name="hive_metastore", schema_name=src_schema.name, non_delta=True)
@@ -32,20 +30,18 @@ def test_pipeline_migrate(
     )
     make_notebook(content=dlt_notebook_text.encode("ASCII"), path=dlt_notebook_path)
 
-    pipeline_names = [
-        f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}"
-        for _ in range(3)
-    ]
-
-    created_pipelines = [
-        make_pipeline(
-            configuration=_PIPELINE_CONF,
-            name=pipeline_name,
-            target=target_schema.name,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
+    pipeline_names = []
+    created_pipelines = []
+    for _ in range(3):
+        pipeline_names.append(f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}")
+        created_pipelines.append(
+            make_pipeline(
+                configuration=_PIPELINE_CONF,
+                name=pipeline_names[_],
+                target=target_schemas[_].name,
+                libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
+            )
         )
-        for pipeline_name, target_schema in zip(pipeline_names, target_schemas[:3])
-    ]
 
     pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
@@ -93,4 +89,3 @@ def test_pipeline_migrate(
             results.append(pipeline)
 
     assert len(results) == 3
-
