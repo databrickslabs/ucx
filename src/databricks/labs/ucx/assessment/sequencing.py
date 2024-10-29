@@ -7,12 +7,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import jobs
 
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.source_code.graph import DependencyGraph
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
 
 @dataclass
@@ -75,6 +76,16 @@ class MigrationNode:
             object_owner=self.object_owner,
             required_step_ids=required_step_ids,
         )
+
+
+@dataclass
+class MaybeMigrationNode:
+    node: MigrationNode | None
+    problems: list[DependencyProblem]
+
+    @property
+    def failed(self) -> bool:
+        return len(self.problems) > 0
 
 
 # We expect `tuple[int, int, MigrationNode | str]`
@@ -142,7 +153,7 @@ class MigrationSequencer:
         self._ws = ws
         self._admin_locator = admin_locator
         self._last_node_id = 0
-        self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
+        self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
     def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
@@ -162,11 +173,11 @@ class MigrationSequencer:
         self._nodes[task_node.key] = task_node
         self._outgoing[task_node.key].add(job_node)
         if task.existing_cluster_id:
-            cluster_node = self.register_cluster(task.existing_cluster_id)
-            if cluster_node:
-                self._outgoing[task_node.key].add(cluster_node)
+            maybe_cluster_node = self.register_cluster(task.existing_cluster_id)
+            if maybe_cluster_node.node:
+                self._outgoing[task_node.key].add(maybe_cluster_node.node)
                 # also make the cluster dependent on the job
-                self._outgoing[job_node.key].add(cluster_node)
+                self._outgoing[job_node.key].add(maybe_cluster_node.node)
         # TODO register dependency graph
         return task_node
 
@@ -186,21 +197,25 @@ class MigrationSequencer:
         self._nodes[job_node.key] = job_node
         if job.settings and job.settings.job_clusters:
             for job_cluster in job.settings.job_clusters:
-                cluster_node = self.register_job_cluster(job_cluster)
-                if cluster_node:
-                    self._outgoing[job_node.key].add(cluster_node)
+                maybe_cluster_node = self.register_job_cluster(job_cluster)
+                if maybe_cluster_node.node:
+                    self._outgoing[job_node.key].add(maybe_cluster_node.node)
         return job_node
 
-    def register_job_cluster(self, cluster: jobs.JobCluster) -> MigrationNode | None:
+    def register_job_cluster(self, cluster: jobs.JobCluster) -> MaybeMigrationNode:
         if cluster.new_cluster:
-            return None
+            return MaybeMigrationNode(None, [])
         return self.register_cluster(cluster.job_cluster_key)
 
-    def register_cluster(self, cluster_id: str) -> MigrationNode:
-        cluster_node = self._nodes.get(("CLUSTER", cluster_id), None)
-        if cluster_node:
-            return cluster_node
-        details = self._ws.clusters.get(cluster_id)
+    def register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
+        node_seen = self._nodes.get(("CLUSTER", cluster_id), None)
+        if node_seen:
+            return MaybeMigrationNode(node_seen, [])
+        try:
+            details = self._ws.clusters.get(cluster_id)
+        except DatabricksError:
+            message = f"Could not find cluster: {cluster_id}"
+            return MaybeMigrationNode(None, [DependencyProblem('cluster-not-found', message)])
         object_name = details.cluster_name if details and details.cluster_name else cluster_id
         self._last_node_id += 1
         cluster_node = MigrationNode(
@@ -212,7 +227,7 @@ class MigrationSequencer:
         )
         self._nodes[cluster_node.key] = cluster_node
         # TODO register warehouses and policies
-        return cluster_node
+        return MaybeMigrationNode(cluster_node, [])
 
     def generate_steps(self) -> Iterable[MigrationStep]:
         """Generate the migration steps.

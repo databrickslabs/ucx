@@ -21,6 +21,23 @@ def admin_locator(ws):
     return AdministratorLocator(ws, finders=[lambda _ws: admin_finder])
 
 
+def test_register_non_existing_cluster(
+    ws,
+    simple_dependency_resolver,
+    mock_path_lookup,
+    admin_locator,
+) -> None:
+    """Register a non existing cluster."""
+    ws.clusters.get.side_effect = ResourceDoesNotExist("Unknown cluster")
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_node = sequencer.register_cluster("non-existing-id")
+
+    assert maybe_node.node is None
+    assert maybe_node.failed
+    assert maybe_node.problems == ["Could not find cluster: non-existing-id"]
+
+
 def test_sequence_steps_from_job_task_with_cluster(
     ws, simple_dependency_resolver, mock_path_lookup, admin_locator
 ) -> None:
