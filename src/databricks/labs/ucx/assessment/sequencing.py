@@ -26,6 +26,9 @@ class MigrationStep:
     required_step_ids: list[int]
 
 
+MigrationNodeKey = tuple[str, str]
+
+
 @dataclass
 class MigrationNode:
     node_id: int
@@ -35,7 +38,7 @@ class MigrationNode:
     object_owner: str
 
     @property
-    def key(self) -> tuple[str, str]:
+    def key(self) -> MigrationNodeKey:
         return self.object_type, self.object_id
 
     def as_step(self, step_number: int, required_step_ids: list[int]) -> MigrationStep:
@@ -124,8 +127,8 @@ class MigrationSequencer:
         self._ws = ws
         self._admin_locator = admin_locator
         self._last_node_id = 0
-        self._nodes: dict[tuple[str, str], MigrationNode] = {}
-        self._outgoing: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
+        self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
+        self._outgoing: dict[MigrationNodeKey, set[MigrationNodeKey]] = defaultdict(set)
 
     def register_workflow_task(self, task: jobs.Task, job: jobs.Job, _graph: DependencyGraph) -> MigrationNode:
         task_id = f"{job.job_id}/{task.task_key}"
