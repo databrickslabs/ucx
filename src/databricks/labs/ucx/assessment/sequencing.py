@@ -63,7 +63,8 @@ class PriorityQueue:
         This implementation does not support threading safety as that is not required.
 
     Source:
-        https://docs.python.org/3/library/heapq.html
+        See https://docs.python.org/3/library/heapq.html#priority-queue-implementation-notes on the changes below
+        to handle priority changes in the task.
     """
 
     _REMOVED = "<removed>"  # Mark removed items
