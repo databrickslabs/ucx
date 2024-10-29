@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import queue
+import heapq
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TypeVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -47,6 +48,55 @@ class MigrationNode:
             object_owner=self.object_owner,
             required_step_ids=required_step_ids,
         )
+
+
+QueueTask = TypeVar("QueueTask")
+QueueEntry = list[int, int, QueueTask | str]
+
+
+class PriorityQueue:
+    """A priority queue supporting to update tasks.
+
+    An adaption from class:queue.Priority to support updating tasks.
+
+    Note:
+        This implementation does not support threading safety as that is not required.
+    """
+
+    _REMOVED = "<removed>"  # Mark removed items
+
+    def __init__(self):
+        self._entries: list[QueueEntry] = []
+        self._entry_finder: dict[QueueTask, QueueEntry] = {}
+        self._counter = 0
+
+    def put(self, priority: int, task: QueueTask) -> None:
+        """Put or update task in the queue.
+
+        The lowest priority is retrieved from the queue first.
+        """
+        # Update a task by checking if it already exists, then removing it
+        if task in self._entry_finder:
+            self._remove(task)
+        entry = [priority, self._counter, task]
+        self._entry_finder[task] = entry
+        heapq.heappush(self._entries, entry)
+        self._counter += 1
+
+    def get(self) -> QueueTask | None:
+        """Gets the tasks with lowest priority."""
+        while self._entries:
+            _, _, task = heapq.heappop(self._entries)
+            if task != self._REMOVED:
+                self._remove(task)
+                # Ignore type because heappop returns Any, while we know it is an QueueEntry
+                return task  # type: ignore
+        return None
+
+    def _remove(self, task: QueueTask) -> None:
+        """Remove a task from the queue."""
+        entry = self._entry_finder.pop(task)
+        entry[2] = self._REMOVED
 
 
 class MigrationSequencer:
@@ -145,18 +195,20 @@ class MigrationSequencer:
         incoming_keys = self._collect_incoming_keys()
         incoming_counts = self.compute_incoming_counts(incoming_keys)
         key_queue = self._create_key_queue(incoming_counts)
+        key = key_queue.get()
         step_number = 1
         sorted_steps: list[MigrationStep] = []
-        while not key_queue.empty():
-            _, leaf_key = key_queue.get()
-            incoming_counts.pop(leaf_key)
-            required_step_ids = sorted(self._get_required_step_ids(incoming_keys[leaf_key]))
-            step = self._nodes[leaf_key].as_step(step_number, required_step_ids)
+        while key is not None:
+            required_step_ids = sorted(self._get_required_step_ids(incoming_keys[key]))
+            step = self._nodes[key].as_step(step_number, required_step_ids)
             sorted_steps.append(step)
-            for dependency_key in self._outgoing[leaf_key]:
+            # Update the
+            for dependency_key in self._outgoing[key]:
                 incoming_counts[dependency_key] -= 1
+                key_queue.put(incoming_counts[dependency_key], dependency_key)
             step_number += 1
             key_queue = self._create_key_queue(incoming_counts)  # Reprioritize queue given new incoming counts
+            key = key_queue.get()
         return sorted_steps
 
     def _collect_incoming_keys(self) -> dict[tuple[str, str], set[tuple[str, str]]]:
@@ -179,13 +231,13 @@ class MigrationSequencer:
         return result
 
     @staticmethod
-    def _create_key_queue(incoming_counts: dict[tuple[str, str], int]) -> queue.PriorityQueue:
+    def _create_key_queue(incoming_counts: dict[tuple[str, str], int]) -> PriorityQueue:
         """Create a priority queue given the keys and their incoming counts.
 
         A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
         first.
         """
-        priority_queue = queue.PriorityQueue()
+        priority_queue = PriorityQueue()
         for node_key, incoming_count in incoming_counts.items():
-            priority_queue.put((incoming_count, node_key))
+            priority_queue.put(incoming_count, node_key)
         return priority_queue
