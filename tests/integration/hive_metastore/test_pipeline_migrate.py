@@ -63,7 +63,7 @@ def test_pipeline_migrate(
         ),
     ]
 
-    pipeline_crawler = PipelinesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
     results = []
     for pipeline in pipelines:
