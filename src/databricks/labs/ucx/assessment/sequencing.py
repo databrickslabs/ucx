@@ -84,16 +84,14 @@ QueueEntry = list[int | MigrationNode | str]
 
 
 class PriorityQueue:
-    """A priority queue supporting to update tasks.
-
-    An adaption from class:queue.Priority to support updating tasks.
+    """A migration node priority queue.
 
     Note:
         This implementation does not support threading safety as that is not required.
 
     Source:
         See https://docs.python.org/3/library/heapq.html#priority-queue-implementation-notes on the changes below
-        to handle priority changes in the task.
+        to handle priority changes in the task. Also, the _UPDATED marker is introduced to avoid updating removed nodes.
     """
 
     _REMOVED = "<removed>"  # Mark removed items
