@@ -152,7 +152,7 @@ class MigrationSequencer:
     def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
         self._ws = ws
         self._admin_locator = admin_locator
-        self._last_node_id = 0
+        self._counter = itertools.count()
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
@@ -169,9 +169,8 @@ class MigrationSequencer:
         task_node = self._nodes.get(("TASK", task_id), None)
         if task_node:
             return MaybeMigrationNode(task_node, [])
-        self._last_node_id += 1
         task_node = MigrationNode(
-            node_id=self._last_node_id,
+            node_id=next(self._counter),
             object_type="TASK",
             object_id=task_id,
             object_name=task.task_key,
@@ -189,10 +188,9 @@ class MigrationSequencer:
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
             return job_node
-        self._last_node_id += 1
         job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
         job_node = MigrationNode(
-            node_id=self._last_node_id,
+            node_id=next(self._counter),
             object_type="JOB",
             object_id=str(job.job_id),
             object_name=job_name,
@@ -225,9 +223,8 @@ class MigrationSequencer:
             message = f"Could not find cluster: {cluster_id}"
             return MaybeMigrationNode(None, [DependencyProblem('cluster-not-found', message)])
         object_name = details.cluster_name if details and details.cluster_name else cluster_id
-        self._last_node_id += 1
         cluster_node = MigrationNode(
-            node_id=self._last_node_id,
+            node_id=next(self._counter),
             object_type="CLUSTER",
             object_id=cluster_id,
             object_name=object_name,
