@@ -1,6 +1,5 @@
 from unittest.mock import create_autospec
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 
@@ -11,9 +10,7 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 
 
-def test_sequence_steps_from_job_task_with_cluster(
-    ws: WorkspaceClient, simple_dependency_resolver, mock_path_lookup
-) -> None:
+def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolver, mock_path_lookup) -> None:
     """Sequence a job with a task referencing a cluster.
 
     Sequence:  # TODO: @JCZuurmond: Would expect cluster first.
