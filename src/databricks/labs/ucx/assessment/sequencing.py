@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import queue
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -143,18 +144,19 @@ class MigrationSequencer:
         # pre-compute incoming keys for best performance of self._required_step_ids
         incoming_keys = self._collect_incoming_keys()
         incoming_counts = self.compute_incoming_counts(incoming_keys)
+        key_queue = self._create_key_queue(incoming_counts)
         step_number = 1
         sorted_steps: list[MigrationStep] = []
-        while len(incoming_counts) > 0:
-            leaf_keys = list(self._get_leaf_keys(incoming_counts))
-            for leaf_key in leaf_keys:
-                del incoming_counts[leaf_key]
-                required_step_ids = sorted(self._required_step_ids(incoming_keys[leaf_key]))
-                step = self._nodes[leaf_key].as_step(step_number, required_step_ids)
-                sorted_steps.append(step)
-                for dependency_key in self._outgoing[leaf_key]:
-                    incoming_counts[dependency_key] -= 1
+        while not key_queue.empty():
+            _, leaf_key = key_queue.get()
+            incoming_counts.pop(leaf_key)
+            required_step_ids = sorted(self._get_required_step_ids(incoming_keys[leaf_key]))
+            step = self._nodes[leaf_key].as_step(step_number, required_step_ids)
+            sorted_steps.append(step)
+            for dependency_key in self._outgoing[leaf_key]:
+                incoming_counts[dependency_key] -= 1
             step_number += 1
+            key_queue = self._create_key_queue(incoming_counts)  # Reprioritize queue given new incoming counts
         return sorted_steps
 
     def _collect_incoming_keys(self) -> dict[tuple[str, str], set[tuple[str, str]]]:
@@ -164,7 +166,7 @@ class MigrationSequencer:
                 result[target].add(source)
         return result
 
-    def _required_step_ids(self, required_step_keys: set[tuple[str, str]]) -> Iterable[int]:
+    def _get_required_step_ids(self, required_step_keys: set[tuple[str, str]]) -> Iterable[int]:
         for source_key in required_step_keys:
             yield self._nodes[source_key].node_id
 
@@ -177,8 +179,13 @@ class MigrationSequencer:
         return result
 
     @staticmethod
-    def _get_leaf_keys(incoming_counts: dict[tuple[str, str], int]) -> Iterable[tuple[str, str]]:
+    def _create_key_queue(incoming_counts: dict[tuple[str, str], int]) -> queue.PriorityQueue:
+        """Create a priority queue given the keys and their incoming counts.
+
+        A lower number means it is pulled from the queue first, i.e. the key with the lowest number of keys is retrieved
+        first.
+        """
+        priority_queue = queue.PriorityQueue()
         for node_key, incoming_count in incoming_counts.items():
-            if incoming_count > 0:
-                continue
-            yield node_key
+            priority_queue.put((incoming_count, node_key))
+        return priority_queue
