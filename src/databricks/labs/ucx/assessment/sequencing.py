@@ -156,7 +156,7 @@ class MigrationSequencer:
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
-    def register_workflow_job(self, job: jobs.Job) -> MigrationNode:
+    def register_job(self, job: jobs.Job) -> MigrationNode:
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
             return job_node
