@@ -171,7 +171,7 @@ class MigrationSequencer:
         self._nodes[job_node.key] = job_node
         if job.settings and job.settings.job_clusters:
             for job_cluster in job.settings.job_clusters:
-                maybe_cluster_node = self.register_job_cluster(job_cluster)
+                maybe_cluster_node = self._register_job_cluster(job_cluster)
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
@@ -202,18 +202,18 @@ class MigrationSequencer:
         )
         self._nodes[task_node.key] = task_node
         if task.existing_cluster_id:
-            maybe_cluster_node = self.register_cluster(task.existing_cluster_id)
+            maybe_cluster_node = self._register_cluster(task.existing_cluster_id)
             if maybe_cluster_node.node:
                 self._outgoing[task_node.key].add(maybe_cluster_node.node)
         # TODO: register `job_cluster_key
         return MaybeMigrationNode(task_node, [])
 
-    def register_job_cluster(self, cluster: jobs.JobCluster) -> MaybeMigrationNode:
+    def _register_job_cluster(self, cluster: jobs.JobCluster) -> MaybeMigrationNode:
         if cluster.new_cluster:
             return MaybeMigrationNode(None, [])
-        return self.register_cluster(cluster.job_cluster_key)
+        return self._register_cluster(cluster.job_cluster_key)
 
-    def register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
+    def _register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
         node_seen = self._nodes.get(("CLUSTER", cluster_id), None)
         if node_seen:
             return MaybeMigrationNode(node_seen, [])
