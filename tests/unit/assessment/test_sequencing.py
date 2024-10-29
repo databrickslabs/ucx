@@ -1,5 +1,6 @@
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.sdk.service import iam, jobs
 from databricks.sdk.service.compute import ClusterDetails
 
@@ -10,7 +11,18 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 
 
-def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolver, mock_path_lookup) -> None:
+@pytest.fixture
+def admin_locator(ws):
+    """Create a mock for an `class:AdminLocator`"""
+    admin_finder = create_autospec(AdministratorFinder)
+    admin_user = iam.User(user_name="John Doe", active=True, roles=[iam.ComplexValue(value="account_admin")])
+    admin_finder.find_admin_users.return_value = (admin_user,)
+    return AdministratorLocator(ws, finders=[lambda _ws: admin_finder])
+
+
+def test_sequence_steps_from_job_task_with_cluster(
+    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
+) -> None:
     """Sequence a job with a task referencing a cluster.
 
     Sequence:  # TODO: @JCZuurmond: Would expect cluster first.
@@ -24,21 +36,18 @@ def test_sequence_steps_from_job_task_with_cluster(ws, simple_dependency_resolve
     ws.jobs.get.return_value = job
 
     # Match task cluster above on cluster id
+    admin_user = admin_locator.get_workspace_administrator()
+
     def get_cluster(cluster_id: str) -> ClusterDetails:
         if cluster_id == "cluster-123":
-            return ClusterDetails(cluster_id="cluster-123", cluster_name="my-cluster", creator_user_name="John Doe")
         raise ValueError(f"Unknown cluster: {cluster_id}")
+        raise ResourceDoesNotExist(f"Unknown cluster: {cluster_id}")
 
     ws.clusters.get.side_effect = get_cluster
 
-    # Match cluster creator above on username
-    admin_finder = create_autospec(AdministratorFinder)
-    admin_user = iam.User(user_name="John Doe", active=True, roles=[iam.ComplexValue(value="account_admin")])
-    admin_finder.find_admin_users.return_value = (admin_user,)
-
     dependency = WorkflowTask(ws, task, job)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    sequencer = MigrationSequencer(ws, AdministratorLocator(ws, finders=[lambda _ws: admin_finder]))
+    sequencer = MigrationSequencer(ws, admin_locator)
     sequencer.register_workflow_task(task, job, graph)
 
     steps = list(sequencer.generate_steps())
