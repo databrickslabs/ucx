@@ -49,9 +49,11 @@ class MigrationNode:
 
     @property
     def key(self) -> MigrationNodeKey:
+        """Unique identifier of the node."""
         return self.object_type, self.object_id
 
     def as_step(self, step_number: int, required_step_ids: list[int]) -> MigrationStep:
+        """Convert to class:MigrationStep."""
         return MigrationStep(
             step_id=self.node_id,
             step_number=step_number,
