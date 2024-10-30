@@ -25,7 +25,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
+from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache, InvalidPath
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     LocatedAdvice,
@@ -160,7 +160,7 @@ class WorkflowTaskContainer(SourceContainer):
                 return DBFSPath(self._ws, parsed_path.path)
             case other:
                 msg = f"Unsupported schema: {other} (only DBFS or Workspace paths are allowed)"
-                raise ValueError(msg)
+                raise InvalidPath(msg)
 
     @classmethod
     @contextmanager
@@ -183,7 +183,7 @@ class WorkflowTaskContainer(SourceContainer):
                 yield from self._register_whl(graph, library)
             if library.requirements:
                 yield from self._register_requirements_txt(graph, library)
-        except WorkspaceCache.InvalidWorkspacePath as e:
+        except InvalidPath as e:
             yield DependencyProblem('cannot-load-file', str(e))
         except BadRequest as e:
             # see https://github.com/databrickslabs/ucx/issues/2916
@@ -209,9 +209,12 @@ class WorkflowTaskContainer(SourceContainer):
                 yield from graph.register_library(clean_requirement)
 
     def _register_whl(self, graph, library) -> Iterable[DependencyProblem]:
-        wheel_path = self._as_path(library.whl)
-        with self._temporary_copy(wheel_path) as local_file:
-            yield from graph.register_library(local_file.as_posix())
+        try:
+            wheel_path = self._as_path(library.whl)
+            with self._temporary_copy(wheel_path) as local_file:
+                yield from graph.register_library(local_file.as_posix())
+        except InvalidPath as e:
+            yield DependencyProblem('cannot-load-file', str(e))
 
     def _register_egg(self, graph, library) -> Iterable[DependencyProblem]:
         if self.runtime_version > (14, 0):
@@ -220,9 +223,12 @@ class WorkflowTaskContainer(SourceContainer):
                 message='Installing eggs is no longer supported on Databricks 14.0 or higher',
             )
         logger.info(f"Registering library from {library.egg}")
-        egg_path = self._as_path(library.egg)
-        with self._temporary_copy(egg_path) as local_file:
-            yield from graph.register_library(local_file.as_posix())
+        try:
+            egg_path = self._as_path(library.egg)
+            with self._temporary_copy(egg_path) as local_file:
+                yield from graph.register_library(local_file.as_posix())
+        except InvalidPath as e:
+            yield DependencyProblem('cannot-load-file', str(e))
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
@@ -237,7 +243,7 @@ class WorkflowTaskContainer(SourceContainer):
         try:
             # Notebooks can't be on DBFS.
             path = self._cache.get_workspace_path(notebook_path)
-        except WorkspaceCache.InvalidWorkspacePath as e:
+        except InvalidPath as e:
             return [DependencyProblem('cannot-load-notebook', str(e))]
         return graph.register_notebook(path, False)
 
@@ -249,7 +255,7 @@ class WorkflowTaskContainer(SourceContainer):
         logger.info(f'Discovering {self._task.task_key} entrypoint: {python_file}')
         try:
             path = self._as_path(python_file)
-        except WorkspaceCache.InvalidWorkspacePath as e:
+        except InvalidPath as e:
             return [DependencyProblem('cannot-load-file', str(e))]
         return graph.register_file(path)
 
@@ -326,7 +332,7 @@ class WorkflowTaskContainer(SourceContainer):
         try:
             # Notebooks can't be on DBFS.
             path = self._cache.get_workspace_path(notebook_path)
-        except WorkspaceCache.InvalidWorkspacePath as e:
+        except InvalidPath as e:
             yield DependencyProblem('cannot-load-notebook', str(e))
             return
         # the notebook is the root of the graph, so there's no context to inherit
