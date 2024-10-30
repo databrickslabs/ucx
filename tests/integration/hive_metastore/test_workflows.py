@@ -1,5 +1,7 @@
 import pytest
 from databricks.sdk.errors import NotFound
+
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -58,6 +60,39 @@ def test_table_migration_job_refreshes_migration_status(
         "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
     )
     assert len(asserts) == 0, assert_message
+
+
+@pytest.mark.parametrize(
+    "prepare_tables_for_migration,workflow",
+    [
+        ("managed", "migrate-tables"),
+    ],
+    indirect=("prepare_tables_for_migration",),
+)
+def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
+    # This test cases test the CONVERT_TO_EXTERNAL scenario.
+    tables, dst_schema = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r"If hive_metastore contains managed table with external.*": "0",
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow(workflow)
+
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+    managed_table = tables["src_managed_table"]
+
+    for key, value, _ in sql_backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"):
+        if key == "Type":
+            assert value == "EXTERNAL"
+            break
 
 
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)

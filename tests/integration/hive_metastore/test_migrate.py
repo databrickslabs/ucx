@@ -186,7 +186,7 @@ def test_migrate_managed_table_to_external_table_without_conversion(
     env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
+    src_schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/{src_schema_name}'
     src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
@@ -230,7 +230,7 @@ def test_migrate_managed_table_to_external_table_with_clone(
     env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
+    src_schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/{src_schema_name}'
     src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
