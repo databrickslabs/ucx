@@ -182,7 +182,7 @@ class MigrationSequencer:
         self._nodes[job_node.key] = job_node
         if job.settings:
             for job_cluster in job.settings.job_clusters or []:
-                maybe_cluster_node = self._register_job_cluster(job_cluster)
+                maybe_cluster_node = self._register_job_cluster(job_cluster, job)
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
