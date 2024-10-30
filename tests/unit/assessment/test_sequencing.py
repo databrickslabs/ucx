@@ -8,7 +8,7 @@ from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 from databricks.labs.ucx.assessment.sequencing import MigrationSequencer, MigrationStep
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyGraph
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.jobs import WorkflowTask
 
 
@@ -42,7 +42,7 @@ def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
 
 def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     """Register a non existing cluster."""
-    task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
+    task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
 
@@ -52,7 +52,12 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     maybe_node = sequencer.register_job(job)
 
     assert maybe_node.failed
-    assert maybe_node.problems == ["Could not find cluster: non-existing-id"]
+    assert maybe_node.problems == [
+        DependencyProblem(
+            code="cluster-not-found",
+            message="Could not find cluster: non-existing-id",
+        )
+    ]
 
 
 def test_register_non_existing_job_cluster(
