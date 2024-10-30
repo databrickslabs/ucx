@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, DatabricksError
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping, PipelinesMigrator
@@ -122,3 +122,7 @@ def test_migrate_pipelines(ws, mock_installation):
         },
         headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
     )
+
+    ws.api_client.do.side_effect = DatabricksError("Error")
+    pipelines_migrator.migrate_pipelines()
+
