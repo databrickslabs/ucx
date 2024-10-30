@@ -21,8 +21,11 @@ def admin_locator(ws):
     return AdministratorLocator(ws, finders=[lambda _ws: admin_finder])
 
 
-def test_register_existing_cluster(ws, admin_locator) -> None:
+def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
     """Register a existing cluster."""
+    task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
+    settings = jobs.JobSettings(name="test-job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
 
     def get_cluster(cluster_id: str) -> ClusterDetails:
         if cluster_id == "cluster-123":
@@ -32,11 +35,9 @@ def test_register_existing_cluster(ws, admin_locator) -> None:
     ws.clusters.get.side_effect = get_cluster
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer._register_cluster("cluster-123")
+    maybe_node = sequencer.register_job(job)
 
-    assert maybe_node.node is not None
     assert not maybe_node.failed
-    assert not maybe_node.problems
 
 
 def test_register_non_existing_cluster(ws, admin_locator) -> None:
