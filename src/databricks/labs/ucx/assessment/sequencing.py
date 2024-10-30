@@ -176,7 +176,7 @@ class MigrationSequencer:
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
-                maybe_task_node = self._register_workflow_task(task, job)
+                maybe_task_node = self._register_workflow_task(task, job_node)
                 problems.extend(maybe_task_node.problems)
                 if maybe_task_node.node:
                     self._outgoing[job_node.key] = maybe_task_node.node
