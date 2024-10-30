@@ -76,6 +76,7 @@ def test_load(ws, mock_installation):
     with pytest.raises(ValueError):
         pipeline_mapping.load()
 
+
 def test_pipeline_to_migrate(ws, mock_installation):
     errors = {}
     rows = {
@@ -125,4 +126,3 @@ def test_migrate_pipelines(ws, mock_installation):
 
     ws.api_client.do.side_effect = DatabricksError("Error")
     pipelines_migrator.migrate_pipelines()
-
