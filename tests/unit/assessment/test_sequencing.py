@@ -60,20 +60,27 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     ]
 
 
-def test_register_non_existing_job_cluster(
+def test_register_job_with_non_existing_job_cluster_key(
     ws,
     mock_path_lookup,
     admin_locator,
 ) -> None:
-    """Register a non-existing job cluster."""
-    job_cluster = jobs.JobCluster(new_cluster=ClusterSpec(), job_cluster_key="non-existing-id")
+    """Register a job with non-existing job cluster key."""
+    task = jobs.Task(task_key="test-task", job_cluster_key="non-existing-id")
+    settings = jobs.JobSettings(name="test-job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
+
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer._register_job_cluster(job_cluster)
+    maybe_node = sequencer.register_job(job)
 
-    assert maybe_node.node is None
     assert maybe_node.failed
-    assert maybe_node.problems == ["Could not find cluster: non-existing-id"]
+    assert maybe_node.problems == [
+        DependencyProblem(
+            code="cluster-not-found",
+            message="Could not find cluster: non-existing-id",
+        )
+    ]
 
 
 def test_register_workflow_task_with_missing_cluster_dependency(
