@@ -170,8 +170,8 @@ class MigrationSequencer:
             object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
         )
         self._nodes[job_node.key] = job_node
-        if job.settings and job.settings.job_clusters:
-            for job_cluster in job.settings.job_clusters:
+        if job.settings:
+            for job_cluster in job.settings.job_clusters or []:
                 maybe_cluster_node = self._register_job_cluster(job_cluster)
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
