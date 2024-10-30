@@ -32,7 +32,7 @@ def test_register_existing_cluster(ws, admin_locator) -> None:
     ws.clusters.get.side_effect = get_cluster
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_cluster("cluster-123")
+    maybe_node = sequencer._register_cluster("cluster-123")
 
     assert maybe_node.node is not None
     assert not maybe_node.failed
@@ -44,7 +44,7 @@ def test_register_non_existing_cluster(ws, admin_locator) -> None:
     ws.clusters.get.side_effect = ResourceDoesNotExist("Unknown cluster")
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_cluster("non-existing-id")
+    maybe_node = sequencer._register_cluster("non-existing-id")
 
     assert maybe_node.node is None
     assert maybe_node.failed
@@ -60,7 +60,7 @@ def test_register_non_existing_job_cluster(
     job_cluster = jobs.JobCluster(new_cluster=ClusterSpec(), job_cluster_key="non-existing-id")
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job_cluster(job_cluster)
+    maybe_node = sequencer._register_job_cluster(job_cluster)
 
     assert maybe_node.node is None
     assert maybe_node.failed
