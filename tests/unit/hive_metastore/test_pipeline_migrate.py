@@ -1,8 +1,11 @@
 import logging
 from collections.abc import Generator
+from unittest.mock import create_autospec
 
+import pytest
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
-
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineRule, PipelineMapping, PipelinesMigrator
@@ -67,6 +70,11 @@ def test_load(ws, mock_installation):
     pipelines_rules_fetch = pipeline_mapping.load()
     assert len(pipelines_rules_fetch) == 1
 
+    installation = create_autospec(Installation)
+    installation.load.side_effect = NotFound("Not found")
+    pipeline_mapping = PipelineMapping(installation, ws, sql_backend)
+    with pytest.raises(ValueError):
+        pipeline_mapping.load()
 
 def test_pipeline_to_migrate(ws, mock_installation):
     errors = {}
