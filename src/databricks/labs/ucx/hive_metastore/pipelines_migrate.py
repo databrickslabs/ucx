@@ -87,7 +87,6 @@ class PipelineMapping:
         try:
             return self._installation.load(list[PipelineRule], filename=self.FILENAME)
         except NotFound:
-            # TODO: add pipeline mapping creation command
             msg = "Please create pipeline mapping file"
             raise ValueError(msg) from None
 
