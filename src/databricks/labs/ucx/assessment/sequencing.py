@@ -13,7 +13,7 @@ from databricks.sdk.service import jobs
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 
 @dataclass
