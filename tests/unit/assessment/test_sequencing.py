@@ -22,7 +22,7 @@ def admin_locator(ws):
 
 
 def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
-    """Register a existing cluster."""
+    """Register an existing cluster."""
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
