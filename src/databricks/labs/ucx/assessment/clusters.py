@@ -215,20 +215,22 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         self._ws = ws
 
     def _crawl(self) -> Iterable[PolicyInfo]:
-        all_policices = list(self._ws.cluster_policies.list())
-        return list(self._assess_policies(all_policices))
+        all_policies = list(self._ws.cluster_policies.list())
+        return list(self._assess_policies(all_policies))
 
-    def _assess_policies(self, all_policices) -> Iterable[PolicyInfo]:
-        for policy in all_policices:
+    def _assess_policies(self, all_policies: Iterable[Policy]) -> Iterable[PolicyInfo]:
+        for policy in all_policies:
             failures: list[str] = []
             if policy.policy_id is None:
                 continue
             failures.extend(self._check_cluster_policy(policy.policy_id, "policy"))
-            try:
-                spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
-            except KeyError:
-                spark_version = None
-            policy_name = policy.name
+            spark_version = None
+            if policy.definition is not None:
+                try:
+                    spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
+                except KeyError:
+                    pass
+            policy_name = policy.name or "UNDEFINED"
             creator_name = policy.creator_user_name or None
 
             policy_info = PolicyInfo(

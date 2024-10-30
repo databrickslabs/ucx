@@ -47,13 +47,15 @@ class ProgressTrackingInstallation:
     _SCHEMA = "multiworkspace"
 
     def __init__(self, sql_backend: SqlBackend, ucx_catalog: str) -> None:
-        # `mod` is a required parameter, though, it's not used in this context without views.
-        self._schema_deployer = SchemaDeployer(sql_backend, self._SCHEMA, mod=None, catalog=ucx_catalog)
+        from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
+
+        self._schema_deployer = SchemaDeployer(sql_backend, self._SCHEMA, mod=ucx, catalog=ucx_catalog)
 
     def run(self) -> None:
         self._schema_deployer.deploy_schema()
         self._schema_deployer.deploy_table("workflow_runs", WorkflowRun)
         self._schema_deployer.deploy_table("historical", Historical)
+        self._schema_deployer.deploy_view("objects_snapshot", "queries/views/objects_snapshot.sql")
         logger.info("Installation completed successfully!")
 
 
