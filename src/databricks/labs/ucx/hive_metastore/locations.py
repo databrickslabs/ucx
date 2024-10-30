@@ -188,7 +188,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     curr.parent and curr.parent.is_valid() and num_children == 0 and not curr.is_jdbc()
                 ):  # one table having the prefix
                     curr = curr.parent
-                assert curr.location is not None
+                if not curr.location:
+                    continue
                 external_location = ExternalLocation(curr.location, len(list(curr.all_tables())))
                 external_locations.append(external_location)
                 continue
