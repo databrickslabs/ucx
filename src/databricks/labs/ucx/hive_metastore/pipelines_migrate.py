@@ -76,7 +76,7 @@ class PipelineMapping:
 
     @staticmethod
     def current_pipelines(pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str):
-        pipeline_snapshot = list(pipelines.snapshot())
+        pipeline_snapshot = list(pipelines.snapshot(force_refresh=True))
         if not pipeline_snapshot:
             msg = "No pipelines found."
             raise ValueError(msg)
