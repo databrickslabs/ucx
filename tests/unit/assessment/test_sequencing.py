@@ -60,6 +60,23 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     ]
 
 
+def test_register_job_with_existing_job_cluster_key(
+    ws,
+    mock_path_lookup,
+    admin_locator,
+) -> None:
+    """Register a job with existing job cluster key."""
+    job_cluster = jobs.JobCluster("existing-id", ClusterSpec())
+    task = jobs.Task(task_key="test-task", job_cluster_key="existing-id")
+    settings = jobs.JobSettings(name="test-job", tasks=[task], job_clusters=[job_cluster])
+    job = jobs.Job(job_id=1234, settings=settings)
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_node = sequencer.register_job(job)
+
+    assert not maybe_node.failed
+
+
 def test_register_job_with_non_existing_job_cluster_key(
     ws,
     mock_path_lookup,
