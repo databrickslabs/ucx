@@ -157,9 +157,10 @@ class MigrationSequencer:
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
     def register_job(self, job: jobs.Job) -> MaybeMigrationNode:
+        problems = []
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
-            return MaybeMigrationNode(job_node, [])
+            return MaybeMigrationNode(job_node, problems)
         job_name = job.settings.name if job.settings and job.settings.name else str(job.job_id)
         job_node = MigrationNode(
             node_id=next(self._counter),
@@ -176,9 +177,10 @@ class MigrationSequencer:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
                 maybe_task_node = self._register_workflow_task(task, job)
+                problems.extend(maybe_task_node.problems)
                 if maybe_task_node.node:
                     self._outgoing[job_node.key] = maybe_task_node.node
-        return MaybeMigrationNode(job_node, [])
+        return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a workflow task.
@@ -189,10 +191,11 @@ class MigrationSequencer:
             parent : MigrationNode
                 The migration node for the parent job
         """
+        problems = []
         task_id = f"{parent.key}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
         if task_node:
-            return MaybeMigrationNode(task_node, [])
+            return MaybeMigrationNode(task_node, problems)
         task_node = MigrationNode(
             node_id=next(self._counter),
             object_type="TASK",
@@ -203,10 +206,11 @@ class MigrationSequencer:
         self._nodes[task_node.key] = task_node
         if task.existing_cluster_id:
             maybe_cluster_node = self._register_cluster(task.existing_cluster_id)
+            problems.extend(maybe_cluster_node.problems)
             if maybe_cluster_node.node:
                 self._outgoing[task_node.key].add(maybe_cluster_node.node)
         # TODO: register `job_cluster_key
-        return MaybeMigrationNode(task_node, [])
+        return MaybeMigrationNode(task_node, problems)
 
     def _register_job_cluster(self, cluster: jobs.JobCluster) -> MaybeMigrationNode:
         if cluster.new_cluster:
