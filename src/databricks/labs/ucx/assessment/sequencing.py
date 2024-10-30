@@ -157,6 +157,16 @@ class MigrationSequencer:
         self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
     def register_job(self, job: jobs.Job) -> MaybeMigrationNode:
+        """Register a job.
+
+        Args:
+            job (jobs.Job) : The job to register.
+
+        Returns:
+            MaybeMigrationNode : A maybe migration node, which has the migration node if no problems occurred during
+                registering. Otherwise, the maybe migration node contains the dependency problems occurring during
+                registering the job.
+        """
         problems = []
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
