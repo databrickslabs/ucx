@@ -95,7 +95,8 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     return data
 
             return None
-        except (NotFound, BadRequest):
+        except (NotFound, BadRequest, FileNotFoundError, UnicodeDecodeError) as e:
+            logger.warning(f"Error reading {init_script_info}: {e}")
             return None
 
     def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
