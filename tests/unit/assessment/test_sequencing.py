@@ -67,6 +67,30 @@ def test_register_non_existing_job_cluster(
     assert maybe_node.problems == ["Could not find cluster: non-existing-id"]
 
 
+def test_register_workflow_task_with_missing_cluster_dependency(
+    ws,
+    simple_dependency_resolver,
+    mock_path_lookup,
+    admin_locator,
+) -> None:
+    """Register a workflow task with missing cluster dependency."""
+    task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
+    settings = jobs.JobSettings(name="test-job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
+    ws.jobs.get.return_value = job
+
+    ws.clusters.get.side_effect = ResourceDoesNotExist("Unknown cluster")
+
+    dependency = WorkflowTask(ws, task, job)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_node = sequencer._register_workflow_task(task, job, graph)
+
+    assert maybe_node.node is None
+    assert maybe_node.failed()
+
+
 def test_sequence_steps_from_job_task_with_cluster(
     ws, simple_dependency_resolver, mock_path_lookup, admin_locator
 ) -> None:
