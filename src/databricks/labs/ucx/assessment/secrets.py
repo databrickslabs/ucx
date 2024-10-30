@@ -3,7 +3,7 @@ import logging
 import re
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, InvalidState
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,10 @@ class SecretsMixin:
             return base64.b64decode(secret.value).decode("utf-8")
         except NotFound:
             logger.warning(f'removed on the backend: {secret_scope}/{secret_key}')
+            return None
+        except InvalidState as e:
+            # see https://github.com/databrickslabs/ucx/issues/3090
+            logger.warning(f'Invalid Azure Key Vault for {secret_scope}/{secret_key}: {e}')
             return None
         except UnicodeDecodeError:
             logger.warning(
