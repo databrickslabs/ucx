@@ -56,12 +56,31 @@ def test_current_pipelines(ws, mock_installation):
         ],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-
     pipeline_mapping = PipelineMapping(mock_installation, ws, sql_backend)
-    pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
+    pipelines_crawler = create_autospec(PipelinesCrawler)
+    pipelines_crawler.snapshot.return_value = iter(
+        [
+            PipelineInfo(pipeline_id="id1", pipeline_name="pipe1", creator_name="creator1", success=1, failures="[]"),
+            PipelineInfo(pipeline_id="id2", pipeline_name="pipe2", creator_name="creator2", success=1, failures="[]"),
+            PipelineInfo(pipeline_id="id3", pipeline_name="pipe3", creator_name="creator3", success=1, failures="[]"),
+        ]
+    )
     pipelines = pipeline_mapping.current_pipelines(pipelines_crawler, "workspace_name", "catalog_name")
     assert isinstance(pipelines, Generator)
     assert len(list(pipelines)) == 3
+
+
+def test_current_pipelines_no_pipelines(ws, mock_installation):
+    errors = {}
+    rows = {}
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    pipeline_mapping = PipelineMapping(mock_installation, ws, sql_backend)
+    pipelines_crawler = create_autospec(PipelinesCrawler)
+    pipelines_crawler.snapshot.return_value = iter([])
+
+    pipelines = pipeline_mapping.current_pipelines(pipelines_crawler, "workspace_name", "catalog_name")
+    with pytest.raises(ValueError):
+        list(pipelines)
 
 
 def test_load(ws, mock_installation):
