@@ -125,14 +125,13 @@ class PriorityQueue:
         heapq.heappush(self._entries, entry)
 
     def get(self) -> MigrationNode | None:
-        """Gets the tasks with lowest priority."""
+        """Gets the tasks with the lowest priority."""
         while self._entries:
             _, _, task = heapq.heappop(self._entries)
             if task == self._REMOVED:
                 continue
             assert isinstance(task, MigrationNode)
             self._remove(task)
-            # Ignore type because heappop returns Any, while we know it is an QueueEntry
             return task
         return None
 
