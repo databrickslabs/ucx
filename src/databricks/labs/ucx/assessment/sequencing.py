@@ -270,21 +270,20 @@ class MigrationSequencer:
           leaf during processing)
         - We handle cyclic dependencies (implemented in PR #3009)
         """
-        # pre-compute incoming keys for best performance of self._required_step_ids
-        incoming = self._invert_outgoing_to_incoming()
-        queue = self._create_node_queue(incoming)
-        seen = set[MigrationNode]()
-        node = queue.get()
         ordered_steps: list[MigrationStep] = []
+        incoming = self._invert_outgoing_to_incoming()  # For updating the priority of steps that depend on other steps
+        seen = set[MigrationNode]()
+        queue = self._create_node_queue(self._outgoing)
+        node = queue.get()
         while node is not None:
-            step = node.as_step(len(ordered_steps), sorted(n.node_id for n in incoming[node.key]))
+            step = node.as_step(len(ordered_steps), sorted(n.node_id for n in self._outgoing[node.key]))
             ordered_steps.append(step)
             seen.add(node)
             # Update the queue priority as if the migration step was completed
-            for dependency in self._outgoing[node.key]:
+            for dependency in incoming[node.key]:
                 if dependency in seen:
                     continue
-                priority = len(incoming[dependency.key] - seen)
+                priority = len(self._outgoing[dependency.key] - seen)
                 queue.put(priority, dependency)
             node = queue.get()
         return ordered_steps

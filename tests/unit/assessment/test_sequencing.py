@@ -123,10 +123,10 @@ def test_sequence_steps_from_job_task_with_existing_cluster_id(
 ) -> None:
     """Sequence a job with a task referencing an existing cluster.
 
-    Sequence:  # TODO: @JCZuurmond: Would expect cluster first.
-    1. Task
-    2. Job
-    3. Cluster
+    Sequence:
+    1. Cluster
+    2. Task
+    3. Job
     """
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -151,28 +151,28 @@ def test_sequence_steps_from_job_task_with_existing_cluster_id(
         MigrationStep(
             step_id=2,
             step_number=0,
-            object_type="TASK",
-            object_id="1234/test-task",
-            object_name="test-task",
+            object_type="CLUSTER",
+            object_id="cluster-123",
+            object_name="my-cluster",
             object_owner="John Doe",
             required_step_ids=[],
         ),
         MigrationStep(
             step_id=1,
             step_number=1,
-            object_type="JOB",
-            object_id="1234",
-            object_name="test-job",
+            object_type="TASK",
+            object_id="1234/test-task",
+            object_name="test-task",
             object_owner="John Doe",
             required_step_ids=[2],
         ),
         MigrationStep(
-            step_id=3,
+            step_id=0,
             step_number=2,
-            object_type="CLUSTER",
-            object_id="cluster-123",
-            object_name="my-cluster",
+            object_type="JOB",
+            object_id="1234",
+            object_name="test-job",
             object_owner="John Doe",
-            required_step_ids=[1, 2],
+            required_step_ids=[1],
         ),
     ]
