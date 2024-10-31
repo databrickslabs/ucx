@@ -221,7 +221,7 @@ class MigrationSequencer:
             if maybe_cluster_node.node:
                 self._outgoing[task_node.key].add(maybe_cluster_node.node)
         if task.job_cluster_key:
-            job_cluster_node = self._nodes.get(("CLUSTER", task.job_cluster_key))
+            job_cluster_node = self._nodes.get(("CLUSTER", f"{parent.object_id}/{task.job_cluster_key}"))
             if job_cluster_node:
                 self._outgoing[task_node.key].add(job_cluster_node)
             else:
@@ -230,10 +230,12 @@ class MigrationSequencer:
         return MaybeMigrationNode(task_node, problems)
 
     def _register_job_cluster(self, cluster: jobs.JobCluster, job: jobs.Job) -> MaybeMigrationNode:
+        # Different jobs can have job clusters with the same key, therefore job id is prepended to ensure uniqueness
+        cluster_id = f"{job.job_id}/{cluster.job_cluster_key}"
         cluster_node = MigrationNode(
             node_id=next(self._counter),
-            object_type="CLUSTER",  # TODO: Do we want to differentiate between job and normal clusters?
-            object_id=cluster.job_cluster_key,
+            object_type="CLUSTER",
+            object_id=cluster_id,
             object_name=cluster.job_cluster_key,
             # Job clusters are ephemeral and exist during a job run for a specific job only
             object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
