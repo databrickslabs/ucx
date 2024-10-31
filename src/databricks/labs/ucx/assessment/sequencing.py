@@ -153,7 +153,7 @@ class MigrationSequencer:
         self._ws = ws
         self._admin_locator = admin_locator
         self._counter = itertools.count()
-        self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
+        self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
 
         # Outgoing references contains edges in the graph pointing from a node to a set of nodes that the node
         # references. These references follow the API references, e.g. a job contains tasks in the
