@@ -1,6 +1,5 @@
 from databricks.sdk.service.pipelines import PipelineLibrary, NotebookLibrary
 
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule, PipelineMapping
 from ..assessment.test_assessment import _PIPELINE_CONF
 
@@ -38,8 +37,7 @@ def test_pipeline_migrate(
         libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
     )
 
-    pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
-    pipelines = pipeline_crawler.snapshot()
+    pipelines = runtime_ctx.pipelines_crawler.snapshot()
     results = []
     for pipeline in pipelines:
         if pipeline.success != 0:
@@ -61,11 +59,11 @@ def test_pipeline_migrate(
     runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
     pipeline_mapping = PipelineMapping(runtime_ctx.installation, ws, sql_backend)
 
-    pipelines_migrator = PipelinesMigrator(ws, pipeline_crawler, pipeline_mapping)
+    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, pipeline_mapping)
     pipelines_migrator.migrate_pipelines()
 
     # crawl pipeline in UC and check if it is migrated
-    pipelines = pipeline_crawler.snapshot(force_refresh=True)
+    pipelines = runtime_ctx.pipelines_crawler.snapshot(force_refresh=True)
     results = []
     for pipeline in pipelines:
         if pipeline.pipeline_name == f"{pipeline_name}-migrated":
