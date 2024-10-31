@@ -58,11 +58,7 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     ]
 
 
-def test_register_job_with_existing_job_cluster_key(
-    ws,
-    mock_path_lookup,
-    admin_locator,
-) -> None:
+def test_register_job_with_existing_job_cluster_key(ws, admin_locator) -> None:
     """Register a job with a task referencing a existing job cluster."""
     job_cluster = jobs.JobCluster("existing-id", ClusterSpec())
     task = jobs.Task(task_key="test-task", job_cluster_key="existing-id")
@@ -75,11 +71,7 @@ def test_register_job_with_existing_job_cluster_key(
     assert not maybe_node.failed
 
 
-def test_register_job_with_non_existing_job_cluster_key(
-    ws,
-    mock_path_lookup,
-    admin_locator,
-) -> None:
+def test_register_job_with_non_existing_job_cluster_key(ws, admin_locator) -> None:
     """Register a job with a task referencing a non-existing job cluster."""
     task = jobs.Task(task_key="test-task", job_cluster_key="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -98,12 +90,7 @@ def test_register_job_with_non_existing_job_cluster_key(
     ]
 
 
-def test_register_job_with_new_cluster(
-    ws,
-    simple_dependency_resolver,
-    mock_path_lookup,
-    admin_locator,
-) -> None:
+def test_register_job_with_new_cluster(ws, admin_locator) -> None:
     """Register a job with a task with a new cluster definition."""
     task = jobs.Task(task_key="test-task", new_cluster=ClusterSpec())
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -116,9 +103,7 @@ def test_register_job_with_new_cluster(
     assert not maybe_node.failed
 
 
-def test_sequence_steps_from_job_task_with_existing_cluster_id(
-    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
-) -> None:
+def test_sequence_steps_from_job_task_with_existing_cluster_id(ws, admin_locator) -> None:
     """Sequence a job with a task referencing an existing cluster.
 
     Sequence:
@@ -176,9 +161,7 @@ def test_sequence_steps_from_job_task_with_existing_cluster_id(
     ]
 
 
-def test_sequence_steps_from_job_task_with_existing_job_cluster_key(
-    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
-) -> None:
+def test_sequence_steps_from_job_task_with_existing_job_cluster_key(ws, admin_locator) -> None:
     """Sequence a job with a task referencing an existing job cluster.
 
     Sequence:
@@ -226,9 +209,7 @@ def test_sequence_steps_from_job_task_with_existing_job_cluster_key(
     ]
 
 
-def test_sequence_steps_from_job_task_with_new_cluster(
-    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
-) -> None:
+def test_sequence_steps_from_job_task_with_new_cluster(ws, admin_locator) -> None:
     """Sequence a job with a task that has a new cluster definition.
 
     Sequence:
@@ -265,9 +246,7 @@ def test_sequence_steps_from_job_task_with_new_cluster(
     ]
 
 
-def test_sequence_steps_from_job_task_with_non_existing_cluster(
-    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
-) -> None:
+def test_sequence_steps_from_job_task_with_non_existing_cluster(ws, admin_locator) -> None:
     """Sequence a job with a task that references a non-existing cluster.
 
     Sequence:
