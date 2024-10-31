@@ -183,31 +183,32 @@ class MigrationSequencer:
             object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
         )
         self._nodes[job_node.key] = job_node
-        if job.settings:
-            for job_cluster in job.settings.job_clusters or []:
-                maybe_cluster_node = self._register_job_cluster(job_cluster, job_node)
-                if maybe_cluster_node.node:
-                    self._outgoing_references[job_node.key].add(maybe_cluster_node.node)
-            for task in job.settings.tasks or []:
-                maybe_task_node = self._register_workflow_task(task, job_node)
-                problems.extend(maybe_task_node.problems)
-                if maybe_task_node.node:
-                    self._outgoing_references[job_node.key].add(maybe_task_node.node)
-            # Only after registering all tasks, we can resolve the task dependencies
-            for task in job.settings.tasks or []:
-                task_key = ("TASK", f"{job.job_id}/{task.task_key}")
-                for task_dependency in task.depends_on or []:
-                    task_dependency_key = ("TASK", f"{job.job_id}/{task_dependency.task_key}")
-                    maybe_task_dependency = self._nodes.get(task_dependency_key)
-                    if maybe_task_dependency:
-                        self._outgoing_references[task_key].add(maybe_task_dependency)
-                    else:
-                        # Verified that a job with a task having a depends on referring a non-existing task cannot be
-                        # created. However, this code is just in case.
-                        problem = DependencyProblem(
-                            'task-dependency-not-found', f"Could not find task: {task_dependency_key[1]}"
-                        )
-                        problems.append(problem)
+        if not job.settings:
+            return MaybeMigrationNode(job_node, problems)
+        for job_cluster in job.settings.job_clusters or []:
+            maybe_cluster_node = self._register_job_cluster(job_cluster, job_node)
+            if maybe_cluster_node.node:
+                self._outgoing_references[job_node.key].add(maybe_cluster_node.node)
+        for task in job.settings.tasks or []:
+            maybe_task_node = self._register_workflow_task(task, job_node)
+            problems.extend(maybe_task_node.problems)
+            if maybe_task_node.node:
+                self._outgoing_references[job_node.key].add(maybe_task_node.node)
+        # Only after registering all tasks, we can resolve the task dependencies
+        for task in job.settings.tasks or []:
+            task_key = ("TASK", f"{job.job_id}/{task.task_key}")
+            for task_dependency in task.depends_on or []:
+                task_dependency_key = ("TASK", f"{job.job_id}/{task_dependency.task_key}")
+                maybe_task_dependency = self._nodes.get(task_dependency_key)
+                if maybe_task_dependency:
+                    self._outgoing_references[task_key].add(maybe_task_dependency)
+                else:
+                    # Verified that a job with a task having a depends on referring a non-existing task cannot be
+                    # created. However, this code is just in case.
+                    problem = DependencyProblem(
+                        'task-dependency-not-found', f"Could not find task: {task_dependency_key[1]}"
+                    )
+                    problems.append(problem)
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
