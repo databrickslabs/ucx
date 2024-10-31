@@ -207,7 +207,21 @@ class MigrationSequencer:
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
-        """Register a workflow task."""
+        """Register a workflow task.
+
+        TODO:
+            Handle following jobs.Task attributes:
+            - for_each_task
+            - libraries
+            - notebook_task
+            - pipeline_task
+            - python_wheel_task
+            - run_job_tasl
+            - spark_jar_task
+            - spark_python_taks
+            - spark_submit_task
+            - sql_task
+        """
         problems: list[DependencyProblem] = []
         task_id = f"{parent.object_id}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
