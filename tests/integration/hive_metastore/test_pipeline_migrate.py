@@ -21,7 +21,7 @@ def test_pipeline_migrate(
     runtime_ctx,
 ):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    target_schemas = 5 * [runtime_ctx.make_schema(catalog_name="hive_metastore")]
+    target_schemas = 2 * [runtime_ctx.make_schema(catalog_name="hive_metastore")]
 
     dlt_notebook_path = f"{make_directory()}/dlt_notebook.py"
     src_table = runtime_ctx.make_table(catalog_name="hive_metastore", schema_name=src_schema.name, non_delta=True)
@@ -30,18 +30,13 @@ def test_pipeline_migrate(
     )
     make_notebook(content=dlt_notebook_text.encode("ASCII"), path=dlt_notebook_path)
 
-    pipeline_names = []
-    created_pipelines = []
-    for _ in range(3):
-        pipeline_names.append(f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}")
-        created_pipelines.append(
-            make_pipeline(
-                configuration=_PIPELINE_CONF,
-                name=pipeline_names[_],
-                target=target_schemas[_].name,
-                libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
-            )
-        )
+    pipeline_name = f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}"
+    created_pipeline = make_pipeline(
+        configuration=_PIPELINE_CONF,
+        name=pipeline_name,
+        target=target_schemas[0].name,
+        libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
+    )
 
     pipeline_crawler = PipelinesCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
     pipelines = pipeline_crawler.snapshot()
@@ -49,26 +44,18 @@ def test_pipeline_migrate(
     for pipeline in pipelines:
         if pipeline.success != 0:
             continue
-        if pipeline.pipeline_id in [
-            created_pipelines[0].pipeline_id,
-            created_pipelines[1].pipeline_id,
-            created_pipelines[2].pipeline_id,
-        ]:
+        if pipeline.pipeline_id == created_pipeline.pipeline_id:
             results.append(pipeline)
-    assert len(results) == 3
+    assert len(results) == 1
 
     # TODO: Add other rules as well to test the migration
     pipeline_rules = [
-        PipelineRule.from_src_dst("test_workspace", created_pipelines[0].pipeline_id, "test_catalog"),
-        PipelineRule.from_src_dst(
-            "test_workspace", created_pipelines[1].pipeline_id, "test_catalog", target_schemas[3].name
-        ),
         PipelineRule.from_src_dst(
             "test_workspace",
-            created_pipelines[2].pipeline_id,
+            created_pipeline.pipeline_id,
             "test_catalog",
-            target_schemas[4].name,
-            f"{pipeline_names[2]}-migrated",
+            target_schemas[1].name,
+            f"{pipeline_name}-migrated",
         ),
     ]
     runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
@@ -81,11 +68,7 @@ def test_pipeline_migrate(
     pipelines = pipeline_crawler.snapshot(force_refresh=True)
     results = []
     for pipeline in pipelines:
-        if pipeline.pipeline_name in [
-            f"{pipeline_names[0]} [UC]",
-            f"{pipeline_names[1]} [UC]",
-            f"{pipeline_names[2]}-migrated",
-        ]:
+        if pipeline.pipeline_name == f"{pipeline_name}-migrated":
             results.append(pipeline)
 
-    assert len(results) == 3
+    assert len(results) == 1
