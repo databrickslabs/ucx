@@ -268,7 +268,17 @@ class MigrationSequencer:
         return MaybeMigrationNode(cluster_node, [])
 
     def _register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
-        """Register a cluster."""
+        """Register a cluster.
+
+        TODO
+            Handle following jobs.Task attributes:
+            - init_scripts
+            - instance_pool_id (maybe_not)
+            - policy_id
+            - spec.init_scripts
+            - spec.instance_pool_id (maybe not)
+            - spec.policy_id
+        """
         node_seen = self._nodes.get(("CLUSTER", cluster_id), None)
         if node_seen:
             return MaybeMigrationNode(node_seen, [])
