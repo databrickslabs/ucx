@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 from functools import partial
+from typing import BinaryIO
+from collections.abc import Generator
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -75,7 +77,7 @@ class PipelineMapping:
         self._sql_backend = sql_backend
 
     @staticmethod
-    def current_pipelines(pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str):
+    def current_pipelines(pipelines: PipelinesCrawler, workspace_name: str, catalog_name: str) -> Generator:
         pipeline_snapshot = list(pipelines.snapshot(force_refresh=True))
         if not pipeline_snapshot:
             msg = "No pipelines found."
@@ -90,7 +92,7 @@ class PipelineMapping:
             msg = "Please create pipeline mapping file"
             raise ValueError(msg) from None
 
-    def get_pipelines_to_migrate(self, _pc):
+    def get_pipelines_to_migrate(self, _pc) -> list[PipelineToMigrate]:
         rules = self.load()
         # Getting all the source tables from the rules
         pipelines = list(_pc.snapshot())
@@ -110,10 +112,10 @@ class PipelinesMigrator:
         self._pipeline_crawler = pipelines_crawler
         self._pipeline_mapping = pipeline_mapping
 
-    def migrate_pipelines(self):
+    def migrate_pipelines(self) -> None:
         self._migrate_pipelines()
 
-    def _migrate_pipelines(self):
+    def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
         # get pipelines to migrate
         pipelines_to_migrate = self._pipeline_mapping.get_pipelines_to_migrate(self._pipeline_crawler)
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
@@ -126,14 +128,14 @@ class PipelinesMigrator:
             logger.info("No pipelines found to migrate")
         return tasks
 
-    def _migrate_pipeline(self, pipeline: PipelineToMigrate):
+    def _migrate_pipeline(self, pipeline: PipelineToMigrate) -> dict | list | BinaryIO | bool:
         try:
             return self._clone_pipeline(pipeline)
         except DatabricksError as e:
             logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
             return False
 
-    def _clone_pipeline(self, pipeline: PipelineToMigrate):
+    def _clone_pipeline(self, pipeline: PipelineToMigrate) -> dict | list | BinaryIO:
         # TODO: implement this in sdk
         headers = {
             'Accept': 'application/json',
