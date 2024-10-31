@@ -103,6 +103,24 @@ def test_register_job_with_new_cluster(ws, admin_locator) -> None:
     assert not maybe_node.failed
 
 
+def test_register_job_with_task_dependency(ws, admin_locator) -> None:
+    """Register a job with two tasks having a dependency."""
+    task1 = jobs.Task(task_key="task1")
+    task_dependency = jobs.TaskDependency(task1.task_key)
+    task2 = jobs.Task(task_key="task2", depends_on=[task_dependency])
+    tasks = [task2, task1]  # Reverse order on purpose to test if this is handled
+    settings = jobs.JobSettings(name="job", tasks=tasks)
+    job = jobs.Job(job_id=1234, settings=settings)
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_job_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_job(job)
+
+    assert not maybe_node.failed
+
+    assert not maybe_job_node.failed
+
+
 def test_sequence_steps_from_job_task_with_existing_cluster_id(ws, admin_locator) -> None:
     """Sequence a job with a task referencing an existing cluster.
 
