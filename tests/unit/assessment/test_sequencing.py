@@ -118,10 +118,10 @@ def test_register_job_with_new_cluster(
     assert not maybe_node.failed
 
 
-def test_sequence_steps_from_job_task_with_cluster(
+def test_sequence_steps_from_job_task_with_existing_cluster_id(
     ws, simple_dependency_resolver, mock_path_lookup, admin_locator
 ) -> None:
-    """Sequence a job with a task referencing a cluster.
+    """Sequence a job with a task referencing an existing cluster.
 
     Sequence:  # TODO: @JCZuurmond: Would expect cluster first.
     1. Task
@@ -131,7 +131,6 @@ def test_sequence_steps_from_job_task_with_cluster(
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
-    ws.jobs.get.return_value = job
 
     # Match task cluster above on cluster id
     admin_user = admin_locator.get_workspace_administrator()
@@ -143,10 +142,8 @@ def test_sequence_steps_from_job_task_with_cluster(
 
     ws.clusters.get.side_effect = get_cluster
 
-    dependency = WorkflowTask(ws, task, job)
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer._register_workflow_task(task, job, graph)
+    sequencer.register_job(job)
 
     steps = list(sequencer.generate_steps())
 

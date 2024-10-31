@@ -189,7 +189,7 @@ class MigrationSequencer:
                 maybe_task_node = self._register_workflow_task(task, job_node)
                 problems.extend(maybe_task_node.problems)
                 if maybe_task_node.node:
-                    self._outgoing[job_node.key] = maybe_task_node.node
+                    self._outgoing[job_node.key].add(maybe_task_node.node)
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
