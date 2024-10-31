@@ -202,7 +202,9 @@ class MigrationSequencer:
                     if maybe_task_dependency:
                         self._outgoing_references[task_key].add(maybe_task_dependency)
                     else:
-                        problem = DependencyProblem('task-dependency-not-found', f"Could not find task: {task_dependency}")
+                        problem = DependencyProblem(
+                            'task-dependency-not-found', f"Could not find task: {task_dependency}"
+                        )
                         problems.append(problem)
         return MaybeMigrationNode(job_node, problems)
 

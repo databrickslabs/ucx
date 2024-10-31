@@ -38,7 +38,7 @@ def test_migration_sequencing_job_with_task_referencing_cluster(
 
 def test_migration_sequencing_job_with_task_referencing_non_existing_cluster(runtime_ctx) -> None:
     """Sequence a job with a task referencing existing cluster"""
-    # Cannot make an actual job referencing a non-exsting cluster
+    # Cannot make an actual job referencing a non-existing cluster
     task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
