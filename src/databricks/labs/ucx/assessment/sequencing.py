@@ -202,8 +202,10 @@ class MigrationSequencer:
                     if maybe_task_dependency:
                         self._outgoing_references[task_key].add(maybe_task_dependency)
                     else:
+                        # Verified that a job with a task having a depends on referring a non-existing task cannot be
+                        # created. However, this code is just in case.
                         problem = DependencyProblem(
-                            'task-dependency-not-found', f"Could not find task: {task_dependency}"
+                            'task-dependency-not-found', f"Could not find task: {task_dependency_key[1]}"
                         )
                         problems.append(problem)
         return MaybeMigrationNode(job_node, problems)

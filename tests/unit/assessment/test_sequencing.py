@@ -113,12 +113,28 @@ def test_register_job_with_task_dependency(ws, admin_locator) -> None:
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_job_node = sequencer.register_job(job)
     maybe_node = sequencer.register_job(job)
 
     assert not maybe_node.failed
 
-    assert not maybe_job_node.failed
+
+def test_register_job_with_non_existing_task_dependency(ws, admin_locator) -> None:
+    """Register a job with a non-existing task dependency."""
+    task_dependency = jobs.TaskDependency("non-existing-id")
+    task = jobs.Task(task_key="task2", depends_on=[task_dependency])
+    settings = jobs.JobSettings(name="job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_node = sequencer.register_job(job)
+
+    assert maybe_node.failed
+    assert maybe_node.problems == [
+        DependencyProblem(
+            code="task-dependency-not-found",
+            message="Could not find task: 1234/non-existing-id",
+        )
+    ]
 
 
 def test_sequence_steps_from_job_task_with_existing_cluster_id(ws, admin_locator) -> None:
