@@ -232,8 +232,8 @@ def test_sequence_steps_from_job_task_with_new_cluster(
     """Sequence a job with a task that has a new cluster definition.
 
     Sequence:
-    1. Cluster
-    2. Task  # The cluster is part of the task, not a separate step in the sequence
+    1. Task  # The cluster is part of the task, not a separate step in the sequence
+    2. Job
     """
     task = jobs.Task(task_key="test-task", new_cluster=ClusterSpec())
     settings = jobs.JobSettings(name="test-job", tasks=[task])
