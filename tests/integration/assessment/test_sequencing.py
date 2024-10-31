@@ -34,3 +34,18 @@ def test_migration_sequencing_job_with_task_referencing_cluster(
     steps = runtime_ctx.migration_sequencer.generate_steps()
     step_object_types = [step.object_type for step in steps]
     assert step_object_types == ["CLUSTER", "TASK", "JOB"]
+
+
+def test_migration_sequencing_job_with_task_referencing_non_existing_cluster(runtime_ctx) -> None:
+    """Sequence a job with a task referencing existing cluster"""
+    # Cannot make an actual job referencing a non-exsting cluster
+    task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
+    settings = jobs.JobSettings(name="test-job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
+
+    maybe_job_node = runtime_ctx.migration_sequencer.register_job(job)
+    assert maybe_job_node.failed
+
+    steps = runtime_ctx.migration_sequencer.generate_steps()
+    step_object_types = [step.object_type for step in steps]
+    assert step_object_types == ["CLUSTER", "TASK", "JOB"]  # TODO: What do we expect?
