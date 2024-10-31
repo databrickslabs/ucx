@@ -263,3 +263,53 @@ def test_sequence_steps_from_job_task_with_new_cluster(
             required_step_ids=[1],
         ),
     ]
+
+
+def test_sequence_steps_from_job_task_with_non_existing_cluster(
+    ws, simple_dependency_resolver, mock_path_lookup, admin_locator
+) -> None:
+    """Sequence a job with a task that references a non-existing cluster.
+
+    Sequence:
+    1. Cluster  # TODO: Do we still expect this reference?
+    2. Task
+    3. Job
+    """
+    ws.clusters.get.side_effect = ResourceDoesNotExist("Unknown cluster")
+    task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
+    settings = jobs.JobSettings(name="test-job", tasks=[task])
+    job = jobs.Job(job_id=1234, settings=settings)
+    sequencer = MigrationSequencer(ws, admin_locator)
+    sequencer.register_job(job)
+
+    steps = list(sequencer.generate_steps())
+
+    assert steps == [
+        MigrationStep(
+            step_id=2,
+            step_number=0,
+            object_type="CLUSTER",
+            object_id="non-existing-id",
+            object_name="non-existing-id",
+            object_owner="John Doe",
+            required_step_ids=[],
+        ),
+        MigrationStep(
+            step_id=1,
+            step_number=0,
+            object_type="TASK",
+            object_id="1234/test-task",
+            object_name="test-task",
+            object_owner="John Doe",
+            required_step_ids=[2],
+        ),
+        MigrationStep(
+            step_id=0,
+            step_number=1,
+            object_type="JOB",
+            object_id="1234",
+            object_name="test-job",
+            object_owner="John Doe",
+            required_step_ids=[1],
+        ),
+    ]
