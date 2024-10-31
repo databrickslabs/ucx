@@ -20,7 +20,7 @@ def admin_locator(ws):
 
 
 def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
-    """Register an existing cluster."""
+    """Register a job with a task referencing an existing cluster."""
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
@@ -39,7 +39,7 @@ def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
 
 
 def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
-    """Register a non existing cluster."""
+    """Register a job with a task referencing a non-existing cluster."""
     task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
@@ -63,7 +63,7 @@ def test_register_job_with_existing_job_cluster_key(
     mock_path_lookup,
     admin_locator,
 ) -> None:
-    """Register a job with existing job cluster key."""
+    """Register a job with a task referencing a existing job cluster."""
     job_cluster = jobs.JobCluster("existing-id", ClusterSpec())
     task = jobs.Task(task_key="test-task", job_cluster_key="existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task], job_clusters=[job_cluster])
@@ -80,7 +80,7 @@ def test_register_job_with_non_existing_job_cluster_key(
     mock_path_lookup,
     admin_locator,
 ) -> None:
-    """Register a job with non-existing job cluster key."""
+    """Register a job with a task referencing a non-existing job cluster."""
     task = jobs.Task(task_key="test-task", job_cluster_key="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
@@ -104,7 +104,7 @@ def test_register_job_with_new_cluster(
     mock_path_lookup,
     admin_locator,
 ) -> None:
-    """Register a workflow task with a new cluster."""
+    """Register a job with a task with a new cluster definition."""
     task = jobs.Task(task_key="test-task", new_cluster=ClusterSpec())
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
