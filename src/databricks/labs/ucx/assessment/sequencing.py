@@ -167,7 +167,7 @@ class MigrationSequencer:
                 registering. Otherwise, the maybe migration node contains the dependency problems occurring during
                 registering the job.
         """
-        problems = []
+        problems: list[DependencyProblem] = []
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
             return MaybeMigrationNode(job_node, problems)
@@ -201,7 +201,7 @@ class MigrationSequencer:
             parent : MigrationNode
                 The migration node for the parent job
         """
-        problems = []
+        problems: list[DependencyProblem] = []
         task_id = f"{parent.object_id}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
         if task_node:
