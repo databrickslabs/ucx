@@ -214,6 +214,7 @@ class MigrationSequencer:
             object_owner=parent.object_owner,  # No task owner so use parent job owner
         )
         self._nodes[task_node.key] = task_node
+        # `task.new_cluster` is not handled because it is part of the task and not a separate node
         if task.existing_cluster_id:
             maybe_cluster_node = self._register_cluster(task.existing_cluster_id)
             problems.extend(maybe_cluster_node.problems)
@@ -226,7 +227,6 @@ class MigrationSequencer:
             else:
                 problem = DependencyProblem('cluster-not-found', f"Could not find cluster: {task.job_cluster_key}")
                 problems.append(problem)
-        # TODO: Handle `task.new_cluster`
         return MaybeMigrationNode(task_node, problems)
 
     def _register_job_cluster(self, cluster: jobs.JobCluster, job: jobs.Job) -> MaybeMigrationNode:
