@@ -197,14 +197,7 @@ class MigrationSequencer:
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
-        """Register a workflow task.
-
-        Args:
-            task : jobs.Task
-                The task to register
-            parent : MigrationNode
-                The migration node for the parent job
-        """
+        """Register a workflow task."""
         problems: list[DependencyProblem] = []
         task_id = f"{parent.object_id}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
@@ -237,12 +230,6 @@ class MigrationSequencer:
         """Register a job cluster.
 
         A job cluster is defined within a job and therefore is found when defined on the job by definition.
-
-        Args:
-            cluster : jobs.JobCluster
-                The job cluster to register
-            parent : MigrationNode
-                The migration node of the parent job
         """
         # Different jobs can have job clusters with the same key, therefore job id is prepended to ensure uniqueness
         cluster_id = f"{parent.object_id}/{cluster.job_cluster_key}"
@@ -257,6 +244,7 @@ class MigrationSequencer:
         return MaybeMigrationNode(cluster_node, [])
 
     def _register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
+        """Register a cluster."""
         node_seen = self._nodes.get(("CLUSTER", cluster_id), None)
         if node_seen:
             return MaybeMigrationNode(node_seen, [])
@@ -287,7 +275,8 @@ class MigrationSequencer:
         - We handle cyclic dependencies (implemented in PR #3009)
         """
         ordered_steps: list[MigrationStep] = []
-        incoming = self._invert_outgoing_to_incoming()  # For updating the priority of steps that depend on other steps
+        # For updating the priority of steps that depend on other steps
+        incoming_references = self._invert_outgoing_to_incoming_references()
         seen = set[MigrationNode]()
         queue = self._create_node_queue(self._outgoing_references)
         node = queue.get()
@@ -296,7 +285,7 @@ class MigrationSequencer:
             ordered_steps.append(step)
             seen.add(node)
             # Update the queue priority as if the migration step was completed
-            for dependency in incoming[node.key]:
+            for dependency in incoming_references[node.key]:
                 if dependency in seen:
                     continue
                 priority = len(self._outgoing_references[dependency.key] - seen)
@@ -304,7 +293,8 @@ class MigrationSequencer:
             node = queue.get()
         return ordered_steps
 
-    def _invert_outgoing_to_incoming(self) -> dict[MigrationNodeKey, set[MigrationNode]]:
+    def _invert_outgoing_to_incoming_references(self) -> dict[MigrationNodeKey, set[MigrationNode]]:
+        """Invert the outgoing references to incoming references."""
         result: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
         for node_key, outgoing_nodes in self._outgoing_references.items():
             for target in outgoing_nodes:
