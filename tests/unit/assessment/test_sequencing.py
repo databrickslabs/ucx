@@ -292,3 +292,54 @@ def test_sequence_steps_from_job_task_with_non_existing_cluster(ws, admin_locato
             required_step_ids=[1],
         ),
     ]
+
+
+def test_sequence_steps_from_job_task_referencing_other_task(ws, admin_locator) -> None:
+    """Sequence a job with a task that has a new cluster definition.
+
+    Sequence:
+    1. Task1
+    2. Task2
+    3. Job
+    """
+    task1 = jobs.Task(task_key="task1")
+    task_dependency = jobs.TaskDependency(task1.task_key)
+    task2 = jobs.Task(task_key="task2", depends_on=[task_dependency])
+    tasks = [task2, task1]  # Reverse order on purpose to test if this is handled
+    settings = jobs.JobSettings(name="job", tasks=tasks)
+    job = jobs.Job(job_id=1234, settings=settings)
+    sequencer = MigrationSequencer(ws, admin_locator)
+
+    maybe_job_node = sequencer.register_job(job)
+    assert not maybe_job_node.failed
+
+    steps = list(sequencer.generate_steps())
+    assert steps == [
+        MigrationStep(
+            step_id=1,
+            step_number=0,
+            object_type="TASK",
+            object_id="1234/task1",
+            object_name="task1",
+            object_owner="John Doe",
+            required_step_ids=[],
+        ),
+        MigrationStep(
+            step_id=2,
+            step_number=0,
+            object_type="TASK",
+            object_id="1234/task2",
+            object_name="task2",
+            object_owner="John Doe",
+            required_step_ids=[1],
+        ),
+        MigrationStep(
+            step_id=0,
+            step_number=1,
+            object_type="JOB",
+            object_id="1234",
+            object_name="job",
+            object_owner="John Doe",
+            required_step_ids=[1, 2],
+        ),
+    ]
