@@ -202,7 +202,7 @@ class MigrationSequencer:
                 The migration node for the parent job
         """
         problems = []
-        task_id = f"{parent.key}/{task.task_key}"
+        task_id = f"{parent.object_id}/{task.task_key}"
         task_node = self._nodes.get(("TASK", task_id), None)
         if task_node:
             return MaybeMigrationNode(task_node, problems)
