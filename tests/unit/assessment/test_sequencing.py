@@ -7,9 +7,7 @@ from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 
 from databricks.labs.ucx.assessment.sequencing import MigrationSequencer, MigrationStep
 from databricks.labs.ucx.framework.owners import AdministratorLocator, AdministratorFinder
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.jobs import WorkflowTask
+from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 
 @pytest.fixture
