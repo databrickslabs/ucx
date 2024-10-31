@@ -175,7 +175,6 @@ def test_migrate_external_table(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3054")
 def test_migrate_managed_table_to_external_table_without_conversion(
     ws,
     sql_backend,
@@ -219,7 +218,6 @@ def test_migrate_managed_table_to_external_table_without_conversion(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3055")
 def test_migrate_managed_table_to_external_table_with_clone(
     ws,
     sql_backend,
