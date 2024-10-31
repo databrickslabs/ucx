@@ -238,6 +238,7 @@ class MigrationSequencer:
             # Job clusters are ephemeral and exist during a job run for a specific job only
             object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
         )
+        self._nodes[cluster_node.key] = cluster_node
         return MaybeMigrationNode(cluster_node, [])
 
     def _register_cluster(self, cluster_id: str) -> MaybeMigrationNode:
