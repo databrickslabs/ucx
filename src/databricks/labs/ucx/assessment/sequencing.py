@@ -219,7 +219,13 @@ class MigrationSequencer:
             problems.extend(maybe_cluster_node.problems)
             if maybe_cluster_node.node:
                 self._outgoing[task_node.key].add(maybe_cluster_node.node)
-        # TODO: register `job_cluster_key
+        if task.job_cluster_key:
+            job_cluster_node = self._nodes.get(("CLUSTER", task.job_cluster_key))
+            if job_cluster_node:
+                self._outgoing[task_node.key].add(job_cluster_node)
+            else:
+                problem = DependencyProblem('cluster-not-found', f"Could not find cluster: {task.job_cluster_key}")
+                problems.append(problem)
         return MaybeMigrationNode(task_node, problems)
 
     def _register_job_cluster(self, cluster: jobs.JobCluster, job: jobs.Job) -> MaybeMigrationNode:
