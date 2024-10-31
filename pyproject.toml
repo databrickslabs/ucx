@@ -173,6 +173,14 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
+exclude_also = [
+    "if not ctx:",
+    "except InvalidPath as e:",
+    "if maybe_tree.failure:",
+    "def __repr__(self):",
+    "logger.debug*",
+    "assert *"
+]
 
 [tool.pylint.main]
 # PyLint configuration is adapted from Google Python Style Guide with modifications.

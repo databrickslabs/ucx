@@ -129,9 +129,7 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        visitor = _DetectDirectFsAccessVisitor(self._session_state, self._prevent_spark_duplicates)
-        visitor.visit(tree.node)
-        for directfs_node in visitor.directfs_nodes:
+        for directfs_node in self.collect_dfsas_from_tree(tree):
             advisory = Deprecation.from_node(
                 code='direct-filesystem-access',
                 message=f"The use of direct filesystem references is deprecated: {directfs_node.dfsa.path}",
