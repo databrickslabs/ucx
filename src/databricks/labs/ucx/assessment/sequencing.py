@@ -182,7 +182,7 @@ class MigrationSequencer:
         self._nodes[job_node.key] = job_node
         if job.settings:
             for job_cluster in job.settings.job_clusters or []:
-                maybe_cluster_node = self._register_job_cluster(job_cluster, job)
+                maybe_cluster_node = self._register_job_cluster(job_cluster, job_node)
                 if maybe_cluster_node.node:
                     self._outgoing[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
@@ -229,16 +229,25 @@ class MigrationSequencer:
                 problems.append(problem)
         return MaybeMigrationNode(task_node, problems)
 
-    def _register_job_cluster(self, cluster: jobs.JobCluster, job: jobs.Job) -> MaybeMigrationNode:
+    def _register_job_cluster(self, cluster: jobs.JobCluster, parent: MigrationNode) -> MaybeMigrationNode:
+        """Register a job cluster.
+
+        A job cluster is defined within a job and therefore is found when defined on the job by definition.
+
+        Args:
+            cluster : jobs.JobCluster
+                The job cluster to register
+            parent : MigrationNode
+                The migration node of the parent job
+        """
         # Different jobs can have job clusters with the same key, therefore job id is prepended to ensure uniqueness
-        cluster_id = f"{job.job_id}/{cluster.job_cluster_key}"
+        cluster_id = f"{parent.object_id}/{cluster.job_cluster_key}"
         cluster_node = MigrationNode(
             node_id=next(self._counter),
             object_type="CLUSTER",
             object_id=cluster_id,
             object_name=cluster.job_cluster_key,
-            # Job clusters are ephemeral and exist during a job run for a specific job only
-            object_owner=JobOwnership(self._admin_locator).owner_of(JobInfo.from_job(job)),
+            object_owner=parent.object_owner,
         )
         self._nodes[cluster_node.key] = cluster_node
         return MaybeMigrationNode(cluster_node, [])
