@@ -193,6 +193,17 @@ class MigrationSequencer:
                 problems.extend(maybe_task_node.problems)
                 if maybe_task_node.node:
                     self._outgoing_references[job_node.key].add(maybe_task_node.node)
+            # Only after registering all tasks, we can resolve the task dependencies
+            for task in job.settings.tasks or []:
+                task_key = ("TASK", f"{job.job_id}/{task.task_key}")
+                for task_dependency in task.depends_on or []:
+                    task_dependency_key = ("TASK", f"{job.job_id}/{task_dependency.task_key}")
+                    maybe_task_dependency = self._nodes.get(task_dependency_key)
+                    if maybe_task_dependency:
+                        self._outgoing_references[task_key].add(maybe_task_dependency)
+                    else:
+                        problem = DependencyProblem('task-dependency-not-found', f"Could not find task: {task_dependency}")
+                        problems.append(problem)
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:

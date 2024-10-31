@@ -316,7 +316,7 @@ def test_sequence_steps_from_job_task_referencing_other_task(ws, admin_locator) 
     steps = list(sequencer.generate_steps())
     assert steps == [
         MigrationStep(
-            step_id=1,
+            step_id=2,
             step_number=0,
             object_type="TASK",
             object_id="1234/task1",
@@ -325,17 +325,17 @@ def test_sequence_steps_from_job_task_referencing_other_task(ws, admin_locator) 
             required_step_ids=[],
         ),
         MigrationStep(
-            step_id=2,
-            step_number=0,
+            step_id=1,
+            step_number=1,
             object_type="TASK",
             object_id="1234/task2",
             object_name="task2",
             object_owner="John Doe",
-            required_step_ids=[1],
+            required_step_ids=[2],
         ),
         MigrationStep(
             step_id=0,
-            step_number=1,
+            step_number=2,
             object_type="JOB",
             object_id="1234",
             object_name="job",
