@@ -776,26 +776,27 @@ class MigrateGrants:
         self,
         sql_backend: SqlBackend,
         group_manager: GroupManager,
+        ownership_loader: Callable[[], Iterable[Grant]],
         grant_loaders: list[Callable[[], Iterable[Grant]]],
         /,
         skip_grant_migration: bool = False,
-        fixed_owner: str | None = None,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
+        self._ownership_loader = ownership_loader
         self._grant_loaders = grant_loaders
         self._skip_grant_migration = skip_grant_migration
-        self._fixed_owner = fixed_owner
         if self._skip_grant_migration:
             logger.info("Skipping grant migration")
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
-        if self._skip_grant_migration:
-            return True
-        for grant in self._match_grants(src):
-            # Skip ownership grants if fixed owner is set
-            if self._fixed_owner is not None and grant.action_type == "OWN":
-                continue
+        grants = []
+        ownership_grant = self._match_ownership_grant(src)
+        if ownership_grant:
+            grants.append(ownership_grant)
+        if not self._skip_grant_migration:
+            grants.extend(self._match_grants(src))
+        for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -810,13 +811,15 @@ class MigrateGrants:
                 logger.warning(
                     f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
                 )
-        if self._fixed_owner:
-            self._apply_ownership(dst, self._fixed_owner)
-        return True
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
         grants = []
-        for grant in self._match_grants(src):
+        ownership_grant = self._match_ownership_grant(src)
+        if ownership_grant:
+            grants.append(ownership_grant)
+        if not self._skip_grant_migration:
+            grants.extend(self._match_grants(src))
+        for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -834,11 +837,23 @@ class MigrateGrants:
 
     @cached_property
     def _grants(self) -> list[Grant]:
+        # Accumulate grants from all loaders skips ownership grants
         grants = []
         for loader in self._grant_loaders:
             for grant in loader():
+                # Skip ownership grants
+                if grant.action_type == "OWN":
+                    continue
                 grants.append(grant)
         return grants
+
+    @cached_property
+    def _ownership_grants(self) -> list[Grant]:
+        ownership_grants = []
+        for grant in self._ownership_loader():
+            if grant.action_type == "OWN":
+                ownership_grants.append(grant)
+        return ownership_grants
 
     def _match_grants(self, src: SecurableObject) -> list[Grant]:
         matched_grants = []
@@ -848,6 +863,12 @@ class MigrateGrants:
             grant = self._replace_account_group(grant)
             matched_grants.append(grant)
         return sorted(matched_grants, key=lambda g: g.order)
+
+    def _match_ownership_grant(self, src: SecurableObject) -> Grant | None:
+        for grant in self._ownership_grants:
+            if grant.object_key == src.key:
+                grant = self._replace_account_group(grant)
+            return grant
 
     def _replace_account_group(self, grant: Grant) -> Grant:
         target_principal = self._workspace_to_account_group_names.get(grant.principal)

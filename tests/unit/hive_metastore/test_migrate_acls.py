@@ -138,7 +138,11 @@ def test_migrate_matched_grants_applies() -> None:
     dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
     one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
 
-    migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
+    def single_owner() -> Iterable[Grant]:
+        yield Grant('me', 'OWN', database='default', table='foo')
+
+    one_owner: Callable[[], Iterable[Grant]] = single_owner
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_owner, one_grant)
     migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_called()

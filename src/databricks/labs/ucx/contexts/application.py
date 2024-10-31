@@ -48,6 +48,7 @@ from databricks.labs.ucx.hive_metastore.ownership import (
     TableMigrationOwnership,
     TableOwnership,
     TableOwnershipGrantLoader,
+    StaticTableOwnership,
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
@@ -277,6 +278,13 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def static_table_ownership(self) -> StaticTableOwnership:
+        # Returns a static table ownership resolver
+        return StaticTableOwnership(
+            self.administrator_locator, self.config.default_owner_group, self.connect_config.username
+        )
+
+    @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:
         return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
 
@@ -322,22 +330,23 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def table_ownership_grant_loader(self) -> TableOwnershipGrantLoader:
-        return TableOwnershipGrantLoader(self.tables_crawler, self.table_ownership)
+        return TableOwnershipGrantLoader(self.tables_crawler, self.static_table_ownership)
 
     @cached_property
     def migrate_grants(self) -> MigrateGrants:
         # owner grants have to come first
+        ownership_loader: Callable[[], Iterable[Grant]] = self.table_ownership_grant_loader.load
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
-            self.table_ownership_grant_loader.load,
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
         ]
         return MigrateGrants(
             self.sql_backend,
             self.group_manager,
+            ownership_loader,
             grant_loaders,
             skip_grant_migration=self.config.skip_grant_migration,
-            fixed_owner=self.config.fixed_owner,
+            fixed_owner=self.config.default_owner_group,
         )
 
     @cached_property
