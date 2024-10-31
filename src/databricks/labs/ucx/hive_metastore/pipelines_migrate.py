@@ -105,17 +105,17 @@ class PipelineMapping:
 
 
 class PipelinesMigrator:
-    def __init__(self, ws: WorkspaceClient, pipeline_crawler: PipelinesCrawler, pipeline_mapping: PipelineMapping):
+    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, pipeline_mapping: PipelineMapping):
         self._ws = ws
-        self._pc = pipeline_crawler
-        self._pm = pipeline_mapping
+        self._pipeline_crawler = pipelines_crawler
+        self._pipeline_mapping = pipeline_mapping
 
     def migrate_pipelines(self):
         self._migrate_pipelines()
 
     def _migrate_pipelines(self):
         # get pipelines to migrate
-        pipelines_to_migrate = self._pm.get_pipelines_to_migrate(self._pc)
+        pipelines_to_migrate = self._pipeline_mapping.get_pipelines_to_migrate(self._pipeline_crawler)
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
