@@ -154,7 +154,11 @@ class MigrationSequencer:
         self._admin_locator = admin_locator
         self._counter = itertools.count()
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}  # TODO: Update to MaybeMigrationNode
-        self._outgoing: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
+
+        # Outgoing references contains edges in the graph pointing from a node to a set of nodes that the node
+        # references. These references follow the API references, e.g. a job contains tasks in the
+        # `jobs.Job.settings.tasks`, thus a job has an outgoing reference to each of those tasks.
+        self._outgoing_references: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
     def register_job(self, job: jobs.Job) -> MaybeMigrationNode:
         """Register a job.
@@ -184,12 +188,12 @@ class MigrationSequencer:
             for job_cluster in job.settings.job_clusters or []:
                 maybe_cluster_node = self._register_job_cluster(job_cluster, job_node)
                 if maybe_cluster_node.node:
-                    self._outgoing[job_node.key].add(maybe_cluster_node.node)
+                    self._outgoing_references[job_node.key].add(maybe_cluster_node.node)
             for task in job.settings.tasks or []:
                 maybe_task_node = self._register_workflow_task(task, job_node)
                 problems.extend(maybe_task_node.problems)
                 if maybe_task_node.node:
-                    self._outgoing[job_node.key].add(maybe_task_node.node)
+                    self._outgoing_references[job_node.key].add(maybe_task_node.node)
         return MaybeMigrationNode(job_node, problems)
 
     def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
@@ -219,11 +223,11 @@ class MigrationSequencer:
             maybe_cluster_node = self._register_cluster(task.existing_cluster_id)
             problems.extend(maybe_cluster_node.problems)
             if maybe_cluster_node.node:
-                self._outgoing[task_node.key].add(maybe_cluster_node.node)
+                self._outgoing_references[task_node.key].add(maybe_cluster_node.node)
         if task.job_cluster_key:
             job_cluster_node = self._nodes.get(("CLUSTER", f"{parent.object_id}/{task.job_cluster_key}"))
             if job_cluster_node:
-                self._outgoing[task_node.key].add(job_cluster_node)
+                self._outgoing_references[task_node.key].add(job_cluster_node)
             else:
                 problem = DependencyProblem('cluster-not-found', f"Could not find cluster: {task.job_cluster_key}")
                 problems.append(problem)
@@ -285,24 +289,24 @@ class MigrationSequencer:
         ordered_steps: list[MigrationStep] = []
         incoming = self._invert_outgoing_to_incoming()  # For updating the priority of steps that depend on other steps
         seen = set[MigrationNode]()
-        queue = self._create_node_queue(self._outgoing)
+        queue = self._create_node_queue(self._outgoing_references)
         node = queue.get()
         while node is not None:
-            step = node.as_step(len(ordered_steps), sorted(n.node_id for n in self._outgoing[node.key]))
+            step = node.as_step(len(ordered_steps), sorted(n.node_id for n in self._outgoing_references[node.key]))
             ordered_steps.append(step)
             seen.add(node)
             # Update the queue priority as if the migration step was completed
             for dependency in incoming[node.key]:
                 if dependency in seen:
                     continue
-                priority = len(self._outgoing[dependency.key] - seen)
+                priority = len(self._outgoing_references[dependency.key] - seen)
                 queue.put(priority, dependency)
             node = queue.get()
         return ordered_steps
 
     def _invert_outgoing_to_incoming(self) -> dict[MigrationNodeKey, set[MigrationNode]]:
         result: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
-        for node_key, outgoing_nodes in self._outgoing.items():
+        for node_key, outgoing_nodes in self._outgoing_references.items():
             for target in outgoing_nodes:
                 result[target.key].add(self._nodes[node_key])
         return result
