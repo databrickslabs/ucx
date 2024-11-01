@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
+from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
 
 from ..conftest import MockRuntimeContext
@@ -183,6 +184,42 @@ def policies() -> list[PolicyInfo]:
             "policy2",
             success=0,
             failures='["Uses azure service principal credentials config in policy"]',
+        ),
+    ]
+    return records
+
+
+@pytest.fixture
+def dfsas() -> list[DirectFsAccess]:
+    # TODO: What is a LineageAtom?
+    records = [
+        DirectFsAccess(
+            path="some_path",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+        DirectFsAccess(
+            path="some_path",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
+                LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         ),
     ]
     return records

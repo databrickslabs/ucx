@@ -25,7 +25,7 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
     query_record = next(record for record in records if record.source_id == f"{dashboard.id}/{query.id}")
 
     # Verify ownership can be made.
-    owner = runtime_ctx.directfs_access_ownership.owner_of(query_record)
+    owner = runtime_ctx.direct_filesystem_access_ownership.owner_of(query_record)
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
@@ -61,5 +61,5 @@ def test_path_dfsa_ownership(
     path_record = next(record for record in records if record.source_id == str(notebook))
 
     # Verify ownership can be made.
-    owner = runtime_ctx.directfs_access_ownership.owner_of(path_record)
+    owner = runtime_ctx.direct_filesystem_access_ownership.owner_of(path_record)
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name

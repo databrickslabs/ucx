@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import Any, BinaryIO, ClassVar, TextIO
 
 from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
@@ -195,8 +195,9 @@ class SourceInfo:
     UNKNOWN = "unknown"
 
     source_id: str = UNKNOWN
-    source_timestamp: datetime = datetime.fromtimestamp(0)
+    source_timestamp: datetime = datetime.fromtimestamp(0)  # TODO: Where is this used?
     source_lineage: list[LineageAtom] = field(default_factory=list)
+    # TODO: Should these be part of the SourceInfo
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
@@ -283,12 +284,18 @@ class TableSqlCollector(TableCollector, ABC): ...
 
 
 @dataclass
-class DirectFsAccess(SourceInfo):
+class DirectFsAccess(SourceInfo):  # TODO: @JCZuurmond Move to directfs_access module
     """A record describing a Direct File System Access"""
 
     path: str = SourceInfo.UNKNOWN
     is_read: bool = False
     is_write: bool = False
+
+    # TODO: The ids are expected to be unique, but the `UNKNOWN` might not be
+    __id_attributes__: ClassVar[tuple[str, ...]] = (
+        "source_id",
+        "path",
+    )
 
 
 @dataclass

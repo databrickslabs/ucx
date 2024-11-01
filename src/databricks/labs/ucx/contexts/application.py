@@ -44,8 +44,9 @@ from databricks.labs.ucx.hive_metastore.grants import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
+from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
 from databricks.labs.ucx.hive_metastore.table_migrate import (
+    TableMigrationOwnership,
     TableMigrationStatusRefresher,
     TablesMigrator,
 )
@@ -63,7 +64,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.queries import QueryLinter
+from databricks.labs.ucx.source_code.queries import QueryLinter, QueryProblemOwnership
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -281,7 +282,11 @@ class GlobalContext(abc.ABC):
         return LegacyQueryOwnership(self.administrator_locator, self.workspace_client)
 
     @cached_property
-    def directfs_access_ownership(self) -> DirectFsAccessOwnership:
+    def query_problem_ownership(self) -> QueryProblemOwnership:
+        return QueryProblemOwnership(self.administrator_locator, self.workspace_client)
+
+    @cached_property
+    def direct_filesystem_access_ownership(self) -> DirectFsAccessOwnership:
         return DirectFsAccessOwnership(
             self.administrator_locator,
             self.workspace_path_ownership,

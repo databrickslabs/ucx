@@ -3,6 +3,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery
@@ -11,6 +12,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnershipMixin, Ownership
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess
@@ -32,6 +34,10 @@ class QueryProblem:
     code: str
     message: str
 
+    # TODO: @JCZuurmond verify these are the correct id attributes.
+    # Note: Do we deduplicate the messages for a query?
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
+
 
 @dataclass
 class _ReportingContext:
@@ -39,6 +45,17 @@ class _ReportingContext:
     all_problems: list[QueryProblem] = field(default_factory=list)
     all_dfsas: list[DirectFsAccess] = field(default_factory=list)
     all_tables: list[UsedTable] = field(default_factory=list)
+
+
+class QueryProblemOwnership(Ownership[QueryProblem], LegacyQueryOwnershipMixin):
+    """Query ownership given a query problem"""
+
+    def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
+        super().__init__(administrator_locator)
+        self._workspace_client = workspace_client
+
+    def _maybe_direct_owner(self, record: QueryProblem) -> str | None:
+        return self._maybe_direct_owner_from_query_id(self._workspace_client, record.query_id)
 
 
 class QueryLinter:

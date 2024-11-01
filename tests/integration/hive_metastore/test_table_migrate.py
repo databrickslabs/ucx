@@ -5,7 +5,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatus,
     TableMigrationStatusRefresher,
 )
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership
+from databricks.labs.ucx.hive_metastore.table_migrate import TableMigrationOwnership
 
 
 def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:

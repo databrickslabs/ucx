@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     What,
 )
-from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
+from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
