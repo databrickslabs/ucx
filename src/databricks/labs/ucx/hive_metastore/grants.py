@@ -811,6 +811,7 @@ class MigrateGrants:
                 logger.warning(
                     f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
                 )
+        return False
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
         grants = []
@@ -867,8 +868,8 @@ class MigrateGrants:
     def _match_ownership_grant(self, src: SecurableObject) -> Grant | None:
         for grant in self._ownership_grants:
             if grant.object_key == src.key:
-                grant = self._replace_account_group(grant)
-            return grant
+                return self._replace_account_group(grant)
+        return None
 
     def _replace_account_group(self, grant: Grant) -> Grant:
         target_principal = self._workspace_to_account_group_names.get(grant.principal)
