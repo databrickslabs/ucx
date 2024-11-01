@@ -29,6 +29,7 @@ from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
+from databricks.labs.ucx.source_code.base import DirectFsAccess
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
 # pylint: disable=too-many-public-methods
@@ -236,6 +237,17 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.udf_ownership,
             Udf,
+            self.parent_run_id,
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def direct_filesystem_access_progress(self) -> ProgressEncoder[DirectFsAccess]:
+        return ProgressEncoder(
+            self.sql_backend,
+            self.direct_filesystem_access_ownership,
+            DirectFsAccess,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
