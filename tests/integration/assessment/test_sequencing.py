@@ -1,5 +1,7 @@
 from databricks.sdk.service import jobs
 
+from databricks.labs.ucx.source_code.graph import DependencyProblem
+
 
 def test_migration_sequencing_simple_job(make_job, runtime_ctx) -> None:
     """Sequence a simple job"""
@@ -43,9 +45,15 @@ def test_migration_sequencing_job_with_task_referencing_non_existing_cluster(run
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
 
-    maybe_job_node = runtime_ctx.migration_sequencer.register_job(job)
-    assert maybe_job_node.failed
+    maybe_node = runtime_ctx.migration_sequencer.register_job(job)
+    assert maybe_node.failed
+    assert maybe_node.problems == [
+        DependencyProblem(
+            code="cluster-not-found",
+            message="Could not find cluster: non-existing-id",
+        )
+    ]
 
     steps = runtime_ctx.migration_sequencer.generate_steps()
     step_object_types = [step.object_type for step in steps]
-    assert step_object_types == ["CLUSTER", "TASK", "JOB"]  # TODO: What do we expect?
+    assert step_object_types == ["TASK", "JOB"]
