@@ -292,7 +292,10 @@ class DirectFsAccess(SourceInfo):
     is_write: bool = False
 
     # TODO: The ids are expected to be unique, but the `UNKNOWN` might not be
-    __id_attributes__: ClassVar[tuple[str, ...]] = ("source_id", "path",)
+    __id_attributes__: ClassVar[tuple[str, ...]] = (
+        "source_id",
+        "path",
+    )
 
 
 @dataclass
