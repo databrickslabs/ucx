@@ -7,7 +7,7 @@ def test_migration_sequencing_simple_job(make_job, runtime_ctx) -> None:
     """Sequence a simple job"""
     job = make_job()
 
-    maybe_job_node = runtime_ctx.migration_sequencer.register_job(job)
+    maybe_job_node = runtime_ctx.migration_sequencer.register_jobs(job)[0]
     assert not maybe_job_node.failed
 
     steps = runtime_ctx.migration_sequencer.generate_steps()
@@ -30,7 +30,7 @@ def test_migration_sequencing_job_with_task_referencing_cluster(
     )
     job = make_job(tasks=[task])
 
-    maybe_job_node = runtime_ctx.migration_sequencer.register_job(job)
+    maybe_job_node = runtime_ctx.migration_sequencer.register_jobs(job)[0]
     assert not maybe_job_node.failed
 
     steps = runtime_ctx.migration_sequencer.generate_steps()
@@ -45,7 +45,7 @@ def test_migration_sequencing_job_with_task_referencing_non_existing_cluster(run
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
 
-    maybe_node = runtime_ctx.migration_sequencer.register_job(job)
+    maybe_node = runtime_ctx.migration_sequencer.register_jobs(job)[0]
     assert maybe_node.failed
     assert maybe_node.problems == [
         DependencyProblem(

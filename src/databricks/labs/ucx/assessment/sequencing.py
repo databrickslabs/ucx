@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
-from databricks.sdk.service import jobs
+from databricks.sdk.service.jobs import Job, JobCluster, Task
 
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
@@ -156,20 +156,29 @@ class MigrationSequencer:
 
         # Outgoing references contains edges in the graph pointing from a node to a set of nodes that the node
         # references. These references follow the API references, e.g. a job contains tasks in the
-        # `jobs.Job.settings.tasks`, thus a job has an outgoing reference to each of those tasks.
+        # `Job.settings.tasks`, thus a job has an outgoing reference to each of those tasks.
         self._outgoing_references: dict[MigrationNodeKey, set[MigrationNode]] = defaultdict(set)
 
-    def register_job(self, job: jobs.Job) -> MaybeMigrationNode:
+    def register_jobs(self, *jobs: Job) -> list[MaybeMigrationNode]:
         """Register a job.
 
         Args:
-            job (jobs.Job) : The job to register.
+            jobs (Job) : The jobs to register.
 
         Returns:
-            MaybeMigrationNode : A maybe migration node, which has the migration node if no problems occurred during
-                registering. Otherwise, the maybe migration node contains the dependency problems occurring during
-                registering the job.
+            list[MaybeMigrationNode] : Each element contains a maybe migration node for each job respectively. If no
+                problems occurred during registering the job, the maybe migration node contains the migration node.
+                Otherwise, the maybe migration node contains the dependency problems occurring during registering the
+                job.
         """
+        nodes: list[MaybeMigrationNode] = []
+        for job in jobs:
+            node = self._register_job(job)
+            nodes.append(node)
+        return nodes
+
+    def _register_job(self, job: Job) -> MaybeMigrationNode:
+        """Register a single job."""
         problems: list[DependencyProblem] = []
         job_node = self._nodes.get(("JOB", str(job.job_id)), None)
         if job_node:
@@ -211,11 +220,11 @@ class MigrationSequencer:
                     problems.append(problem)
         return MaybeMigrationNode(job_node, problems)
 
-    def _register_workflow_task(self, task: jobs.Task, parent: MigrationNode) -> MaybeMigrationNode:
+    def _register_workflow_task(self, task: Task, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a workflow task.
 
         TODO:
-            Handle following jobs.Task attributes:
+            Handle following Task attributes:
             - for_each_task
             - libraries
             - notebook_task
@@ -255,7 +264,7 @@ class MigrationSequencer:
                 problems.append(problem)
         return MaybeMigrationNode(task_node, problems)
 
-    def _register_job_cluster(self, cluster: jobs.JobCluster, parent: MigrationNode) -> MaybeMigrationNode:
+    def _register_job_cluster(self, cluster: JobCluster, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a job cluster.
 
         A job cluster is defined within a job and therefore is found when defined on the job by definition.
@@ -276,7 +285,7 @@ class MigrationSequencer:
         """Register a cluster.
 
         TODO
-            Handle following jobs.Task attributes:
+            Handle following Task attributes:
             - init_scripts
             - instance_pool_id (maybe_not)
             - policy_id

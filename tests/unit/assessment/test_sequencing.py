@@ -19,7 +19,7 @@ def admin_locator(ws):
     return AdministratorLocator(ws, finders=[lambda _ws: admin_finder])
 
 
-def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
+def test_register_jobs_with_existing_cluster(ws, admin_locator) -> None:
     """Register a job with a task referencing an existing cluster."""
     task = jobs.Task(task_key="test-task", existing_cluster_id="cluster-123")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -33,12 +33,12 @@ def test_register_job_with_existing_cluster(ws, admin_locator) -> None:
     ws.clusters.get.side_effect = get_cluster
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert not maybe_node.failed
 
 
-def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
+def test_register_jobs_with_non_existing_cluster(ws, admin_locator) -> None:
     """Register a job with a task referencing a non-existing cluster."""
     task = jobs.Task(task_key="test-task", existing_cluster_id="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -47,7 +47,7 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     ws.clusters.get.side_effect = ResourceDoesNotExist("Unknown cluster")
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert maybe_node.failed
     assert maybe_node.problems == [
@@ -58,7 +58,7 @@ def test_register_job_with_non_existing_cluster(ws, admin_locator) -> None:
     ]
 
 
-def test_register_job_with_existing_job_cluster_key(ws, admin_locator) -> None:
+def test_register_jobs_with_existing_job_cluster_key(ws, admin_locator) -> None:
     """Register a job with a task referencing a existing job cluster."""
     job_cluster = jobs.JobCluster("existing-id", ClusterSpec())
     task = jobs.Task(task_key="test-task", job_cluster_key="existing-id")
@@ -66,12 +66,12 @@ def test_register_job_with_existing_job_cluster_key(ws, admin_locator) -> None:
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert not maybe_node.failed
 
 
-def test_register_job_with_non_existing_job_cluster_key(ws, admin_locator) -> None:
+def test_register_jobs_with_non_existing_job_cluster_key(ws, admin_locator) -> None:
     """Register a job with a task referencing a non-existing job cluster."""
     task = jobs.Task(task_key="test-task", job_cluster_key="non-existing-id")
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -79,7 +79,7 @@ def test_register_job_with_non_existing_job_cluster_key(ws, admin_locator) -> No
 
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert maybe_node.failed
     assert maybe_node.problems == [
@@ -90,7 +90,7 @@ def test_register_job_with_non_existing_job_cluster_key(ws, admin_locator) -> No
     ]
 
 
-def test_register_job_with_new_cluster(ws, admin_locator) -> None:
+def test_register_jobs_with_new_cluster(ws, admin_locator) -> None:
     """Register a job with a task with a new cluster definition."""
     task = jobs.Task(task_key="test-task", new_cluster=ClusterSpec())
     settings = jobs.JobSettings(name="test-job", tasks=[task])
@@ -98,12 +98,12 @@ def test_register_job_with_new_cluster(ws, admin_locator) -> None:
     ws.jobs.get.return_value = job
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert not maybe_node.failed
 
 
-def test_register_job_with_task_dependency(ws, admin_locator) -> None:
+def test_register_jobs_with_task_dependency(ws, admin_locator) -> None:
     """Register a job with two tasks having a dependency."""
     task1 = jobs.Task(task_key="task1")
     task_dependency = jobs.TaskDependency(task1.task_key)
@@ -113,12 +113,12 @@ def test_register_job_with_task_dependency(ws, admin_locator) -> None:
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert not maybe_node.failed
 
 
-def test_register_job_with_non_existing_task_dependency(ws, admin_locator) -> None:
+def test_register_jobs_with_non_existing_task_dependency(ws, admin_locator) -> None:
     """Register a job with a non-existing task dependency."""
     task_dependency = jobs.TaskDependency("non-existing-id")
     task = jobs.Task(task_key="task2", depends_on=[task_dependency])
@@ -126,7 +126,7 @@ def test_register_job_with_non_existing_task_dependency(ws, admin_locator) -> No
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_node = sequencer.register_job(job)
+    maybe_node = sequencer.register_jobs(job)[0]
 
     assert maybe_node.failed
     assert maybe_node.problems == [
@@ -160,7 +160,7 @@ def test_sequence_steps_from_job_task_with_existing_cluster_id(ws, admin_locator
     ws.clusters.get.side_effect = get_cluster
 
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer.register_job(job)
+    sequencer.register_jobs(job)
 
     steps = list(sequencer.generate_steps())
 
@@ -208,7 +208,7 @@ def test_sequence_steps_from_job_task_with_existing_job_cluster_key(ws, admin_lo
     settings = jobs.JobSettings(name="test-job", tasks=[task], job_clusters=[job_cluster])
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer.register_job(job)
+    sequencer.register_jobs(job)
 
     steps = list(sequencer.generate_steps())
 
@@ -254,7 +254,7 @@ def test_sequence_steps_from_job_task_with_new_cluster(ws, admin_locator) -> Non
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer.register_job(job)
+    sequencer.register_jobs(job)
 
     steps = list(sequencer.generate_steps())
 
@@ -292,7 +292,7 @@ def test_sequence_steps_from_job_task_with_non_existing_cluster(ws, admin_locato
     settings = jobs.JobSettings(name="test-job", tasks=[task])
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
-    sequencer.register_job(job)
+    sequencer.register_jobs(job)
 
     steps = list(sequencer.generate_steps())
 
@@ -334,7 +334,7 @@ def test_sequence_steps_from_job_task_referencing_other_task(ws, admin_locator) 
     job = jobs.Job(job_id=1234, settings=settings)
     sequencer = MigrationSequencer(ws, admin_locator)
 
-    maybe_job_node = sequencer.register_job(job)
+    maybe_job_node = sequencer.register_jobs(job)[0]
     assert not maybe_job_node.failed
 
     steps = list(sequencer.generate_steps())
