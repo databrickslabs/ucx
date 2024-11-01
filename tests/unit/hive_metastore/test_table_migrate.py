@@ -24,6 +24,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrator,
+    TableMigrationOwnership,
 )
 from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatusRefresher,
@@ -31,12 +32,12 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import (
     TableMigrationStatus,
     TableView,
 )
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
 from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     TablesCrawler,
     What,
 )
+from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.progress.history import ProgressEncoder
 
