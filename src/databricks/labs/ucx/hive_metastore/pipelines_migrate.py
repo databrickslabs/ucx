@@ -123,9 +123,9 @@ class PipelinesMigrator:
         tasks = []
         for pipeline in pipelines_to_migrate:
             tasks.append(partial(self._migrate_pipeline, pipeline))
-        Threads.strict("migrate pipelines", tasks)
         if not tasks:
-            logger.info("No pipelines found to migrate")
+            return []
+        Threads.strict("migrate pipelines", tasks)
         return tasks
 
     def _migrate_pipeline(self, pipeline: PipelineToMigrate) -> dict | list | BinaryIO | bool:
