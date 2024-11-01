@@ -284,7 +284,7 @@ class TableSqlCollector(TableCollector, ABC): ...
 
 
 @dataclass
-class DirectFsAccess(SourceInfo):
+class DirectFsAccess(SourceInfo):  # TODO: @JCZuurmond Move to directfs_access module
     """A record describing a Direct File System Access"""
 
     path: str = SourceInfo.UNKNOWN
