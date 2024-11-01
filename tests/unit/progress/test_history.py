@@ -19,7 +19,7 @@ from databricks.labs.ucx.progress.history import (
     DataclassWithIdAttributes,
 )
 from databricks.labs.ucx.progress.install import Historical
-from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.base import DirectFsAccess
 
 
 @dataclass(frozen=True, kw_only=True)
