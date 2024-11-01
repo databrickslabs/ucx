@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import BinaryIO
 
@@ -54,13 +54,7 @@ class PipelineRule:
 @dataclass
 class PipelineToMigrate:
     src: PipelineInfo
-    rule: PipelineRule
-
-    def __hash__(self):
-        return hash(self.src)
-
-    def __eq__(self, other):
-        return isinstance(other, PipelineToMigrate) and self.src == other.src
+    rule: PipelineRule = field(compare=False)
 
 
 class PipelineMapping:
