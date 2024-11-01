@@ -146,9 +146,9 @@ class PipelinesMigrator:
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
         }
-        if pipeline.rule.target_schema_name != "":
+        if pipeline.rule.target_schema_name:
             body['target'] = pipeline.rule.target_schema_name
-        if pipeline.rule.target_pipeline_name != "":
+        if pipeline.rule.target_pipeline_name:
             body['name'] = pipeline.rule.target_pipeline_name
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
