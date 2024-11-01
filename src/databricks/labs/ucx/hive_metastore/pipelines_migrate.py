@@ -10,8 +10,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.assessment.pipelines import (PipelineInfo,
-                                                      PipelinesCrawler)
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
 logger = logging.getLogger(__name__)
 

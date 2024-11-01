@@ -1,7 +1,6 @@
 from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import (
-    PipelineMapping, PipelineRule, PipelinesMigrator)
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
 
 from ..assessment.test_assessment import _PIPELINE_CONF
 
