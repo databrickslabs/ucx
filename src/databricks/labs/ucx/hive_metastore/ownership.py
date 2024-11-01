@@ -109,6 +109,9 @@ class StaticTableOwnership(Ownership[Table]):
         for table in self._tables_crawler.snapshot():
             owner = self._maybe_direct_owner(table)
             table_name, view_name = self._names(table)
+            if not owner:
+                logger.warning(f"No owner found for {table.key}")
+                continue
             yield Grant(
                 principal=owner,
                 action_type='OWN',
