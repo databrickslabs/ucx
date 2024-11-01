@@ -37,6 +37,7 @@ class QueryProblem:
     # Note: Do we deduplicate the messages for a query?
     __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
 
+
 @dataclass
 class _ReportingContext:
     linted_queries: set[str] = field(default_factory=set)

@@ -24,7 +24,9 @@ from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
         )
     ],
 )
-def test_direct_filesystem_access_progress_encoder_failures(mock_backend, direct_filesystem_access: DirectFsAccess) -> None:
+def test_direct_filesystem_access_progress_encoder_failures(
+    mock_backend, direct_filesystem_access: DirectFsAccess
+) -> None:
     """A direct filesystem access is a failure by definition as it is not supported by Unity Catalog."""
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
