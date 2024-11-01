@@ -281,7 +281,10 @@ class GlobalContext(abc.ABC):
     def static_table_ownership(self) -> StaticTableOwnership:
         # Returns a static table ownership resolver
         return StaticTableOwnership(
-            self.administrator_locator, self.config.default_owner_group, self.connect_config.username
+            self.administrator_locator,
+            self.tables_crawler,
+            self.config.default_owner_group,
+            self.connect_config.username
         )
 
     @cached_property
@@ -335,7 +338,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def migrate_grants(self) -> MigrateGrants:
         # owner grants have to come first
-        ownership_loader: Callable[[], Iterable[Grant]] = self.table_ownership_grant_loader.load
+        ownership_loader: Callable[[], Iterable[Grant]] = self.static_table_ownership.load
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,

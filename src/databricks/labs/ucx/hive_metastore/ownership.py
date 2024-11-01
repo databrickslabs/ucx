@@ -96,12 +96,33 @@ class StaticTableOwnership(Ownership[Table]):
     def __init__(
         self,
         administrator_locator: AdministratorLocator,
+        table_crawler: TablesCrawler,
         fixed_owner_group: str | None,
         application_principal: str | None,
     ) -> None:
+        self._tables_crawler = table_crawler
         self._fixed_owner_group = fixed_owner_group
         self._application_principal = application_principal
         super().__init__(administrator_locator)
+
+    def load(self) -> Iterable[Grant]:
+        for table in self._tables_crawler.snapshot():
+            owner = self._maybe_direct_owner(table)
+            table_name, view_name = self._names(table)
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=table.catalog,
+                database=table.database,
+                table=table_name,
+                view=view_name,
+            )
+
+    @staticmethod
+    def _names(table: Table) -> tuple[str | None, str | None]:
+        if table.view_text:
+            return None, table.name
+        return table.name, None
 
     def _maybe_direct_owner(self, record: Table) -> str | None:
         if self._fixed_owner_group:
