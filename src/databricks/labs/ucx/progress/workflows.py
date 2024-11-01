@@ -150,7 +150,7 @@ class MigrationProgress(Workflow):
         ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
         # TODO: Ensure that query problems, dfsas and used tables are appended to inventory
         snapshot = ctx.directfs_access_crawler_for_queries.snapshot()  # Snapshot is updated in the refresh report
-        ctx.directfs_access_for_queries_progress.append_inventory_snapshot(snapshot)
+        ctx.direct_filesystem_access_progress.append_inventory_snapshot(snapshot)
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):
