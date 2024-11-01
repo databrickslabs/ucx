@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import Any, BinaryIO, ClassVar, TextIO
 
 from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
@@ -289,6 +289,9 @@ class DirectFsAccess(SourceInfo):
     path: str = SourceInfo.UNKNOWN
     is_read: bool = False
     is_write: bool = False
+
+    # TODO: The ids are expected to be unique, but the `UNKNOWN` might not be
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("source_id", "path",)
 
 
 @dataclass
