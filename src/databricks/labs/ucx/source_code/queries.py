@@ -3,6 +3,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery
@@ -32,6 +33,9 @@ class QueryProblem:
     code: str
     message: str
 
+    # TODO: @JCZuurmond verify these are the correct id attributes.
+    # Note: Do we deduplicate the messages for a query?
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
 
 @dataclass
 class _ReportingContext:
