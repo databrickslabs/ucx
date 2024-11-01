@@ -11,7 +11,6 @@ from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccess,
     DirectFsAccessOwnership,
 )
-from databricks.labs.ucx.source_code.python.python_ast import DfsaPyCollector
 
 
 def test_crawler_appends_dfsas() -> None:
