@@ -197,6 +197,7 @@ class SourceInfo:
     source_id: str = UNKNOWN
     source_timestamp: datetime = datetime.fromtimestamp(0)
     source_lineage: list[LineageAtom] = field(default_factory=list)
+    # TODO: Should these be part of the SourceInfo
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
     assessment_end_timestamp: datetime = datetime.fromtimestamp(0)
 
