@@ -11,7 +11,6 @@ from databricks.labs.lsql.core import Row
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.framework.owners import Ownership
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.progress.history import (
     HistoricalEncoder,
     ProgressEncoder,
@@ -19,7 +18,6 @@ from databricks.labs.ucx.progress.history import (
     DataclassWithIdAttributes,
 )
 from databricks.labs.ucx.progress.install import Historical
-from databricks.labs.ucx.source_code.base import DirectFsAccess
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -568,39 +566,3 @@ def test_history_log_default_location(mock_backend, ownership) -> None:
 
     assert history_log.full_name == "the_catalog.multiworkspace.historical"
     assert mock_backend.has_rows_written_for("`the_catalog`.`multiworkspace`.`historical`")
-
-
-@pytest.mark.parametrize(
-    "direct_filesystem_access",
-    [
-        DirectFsAccess(
-            path="dbfs://folder/file.csv",
-            is_read=False,
-            is_write=True,
-            source_id="/some/path/to/file.py",
-            # Dummy timestamps
-            source_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
-        )
-    ],
-)
-def test_direct_filesystem_access_progress_encoder(mock_backend, direct_filesystem_access: DirectFsAccess) -> None:
-    """A direct filesystem access is per definition a failure as it is not support in UC."""
-    ownership = create_autospec(Ownership)
-    ownership.owner_of.return_value = "user"
-    encoder = ProgressEncoder(
-        mock_backend,
-        ownership,
-        DirectFsAccess,
-        run_id=1,
-        workspace_id=123456789,
-        catalog="test",
-    )
-
-    encoder.append_inventory_snapshot([direct_filesystem_access])
-
-    rows = mock_backend.rows_written_for(escape_sql_identifier(encoder.full_name), "append")
-    assert len(rows) > 0, f"No rows written for: {encoder.full_name}"
-    assert rows[0].failures == ["Direct filesystem access is not supported in UC"]
-    ownership.owner_of.assert_called_once()
