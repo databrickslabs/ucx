@@ -815,6 +815,7 @@ class MigrateGrants:
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
         grants = []
+        discover_grants = []
         ownership_grant = self._match_ownership_grant(src)
         if ownership_grant:
             grants.append(ownership_grant)
@@ -829,8 +830,8 @@ class MigrateGrants:
                 )
                 continue
             logger.debug(f"Retrieving acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
-            grants.append(grant)
-        return grants
+            discover_grants.append(grant)
+        return discover_grants
 
     @cached_property
     def _workspace_to_account_group_names(self) -> dict[str, str]:
