@@ -17,6 +17,7 @@ from databricks.labs.ucx.assessment.clusters import (
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
+from databricks.labs.ucx.assessment.sequencing import MigrationSequencer
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts, TablesCrawler
@@ -240,3 +241,7 @@ class RuntimeContext(GlobalContext):
             self.workspace_id,
             self.config.ucx_catalog,
         )
+
+    @cached_property
+    def migration_sequencer(self) -> MigrationSequencer:
+        return MigrationSequencer(self.workspace_client, self.administrator_locator)
