@@ -2,10 +2,9 @@ from dataclasses import replace
 
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.owners import LegacyQueryOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
-from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.queries import QueryProblem, QueryProblemOwnership
 
 
 class QueryProblemProgressEncoder(ProgressEncoder[QueryProblem]):
@@ -18,7 +17,7 @@ class QueryProblemProgressEncoder(ProgressEncoder[QueryProblem]):
     def __init__(
         self,
         sql_backend: SqlBackend,
-        ownership: LegacyQueryOwnership,
+        ownership: QueryProblemOwnership,
         run_id: int,
         workspace_id: int,
         catalog: str,

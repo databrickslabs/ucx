@@ -12,6 +12,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import User, PermissionLevel
 from databricks.sdk.service.workspace import ObjectType
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -242,16 +243,32 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         return None
 
 
-class LegacyQueryOwnership(Ownership[str]):
-    def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
-        super().__init__(administrator_locator)
-        self._workspace_client = workspace_client
+class LegacyQueryOwnershipMixin:
+    """Retrieve ownership of legacy queries.
 
-    def _maybe_direct_owner(self, record: str) -> str | None:
+    A mixin is introduced to get query ownership for both plain query ids and query problems.
+
+    This ownership class is different from most ownership implementations as it fetches the query from the workspace,
+    where most other classes expect an object that contains the ownership thus not requiring workspace access.
+    """
+
+    @staticmethod
+    def _maybe_direct_owner_from_query_id(ws: WorkspaceClient, query_id: str) -> str | None:
         try:
-            legacy_query = self._workspace_client.queries.get(record)
+            legacy_query = ws.queries.get(query_id)
             return legacy_query.owner_user_name
         except NotFound:
             return None
         except InternalError:  # redash is very naughty and throws 500s instead of proper 404s
             return None
+
+
+class LegacyQueryOwnership(Ownership[str], LegacyQueryOwnershipMixin):
+    """Query ownership given a query id"""
+
+    def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
+        super().__init__(administrator_locator)
+        self._workspace_client = workspace_client
+
+    def _maybe_direct_owner(self, record: str) -> str | None:
+        return self._maybe_direct_owner_from_query_id(self._workspace_client, record)
