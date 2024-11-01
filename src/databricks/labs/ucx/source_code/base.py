@@ -195,7 +195,7 @@ class SourceInfo:
     UNKNOWN = "unknown"
 
     source_id: str = UNKNOWN
-    source_timestamp: datetime = datetime.fromtimestamp(0)
+    source_timestamp: datetime = datetime.fromtimestamp(0)  # TODO: Where is this used?
     source_lineage: list[LineageAtom] = field(default_factory=list)
     # TODO: Should these be part of the SourceInfo
     assessment_start_timestamp: datetime = datetime.fromtimestamp(0)
