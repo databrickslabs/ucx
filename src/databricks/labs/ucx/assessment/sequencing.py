@@ -148,9 +148,9 @@ class MigrationSequencer:
     Analysing the graph in this case means: computing the migration sequence in `meth:generate_steps`.
     """
 
-    def __init__(self, ws: WorkspaceClient, admin_locator: AdministratorLocator):
+    def __init__(self, ws: WorkspaceClient, administrator_locator: AdministratorLocator):
         self._ws = ws
-        self._admin_locator = admin_locator
+        self._admin_locator = administrator_locator
         self._counter = itertools.count()
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
 
