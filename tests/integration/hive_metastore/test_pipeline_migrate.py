@@ -1,6 +1,8 @@
-from databricks.sdk.service.pipelines import PipelineLibrary, NotebookLibrary
+from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator, PipelineRule, PipelineMapping
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import (
+    PipelineMapping, PipelineRule, PipelinesMigrator)
+
 from ..assessment.test_assessment import _PIPELINE_CONF
 
 _TEST_STORAGE_ACCOUNT = "storage_acct_1"

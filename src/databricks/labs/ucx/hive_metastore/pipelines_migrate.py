@@ -1,16 +1,17 @@
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
 from functools import partial
 from typing import BinaryIO
-from collections.abc import Generator
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, DatabricksError
-from databricks.labs.blueprint.installation import Installation
+from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo
+from databricks.labs.ucx.assessment.pipelines import (PipelineInfo,
+                                                      PipelinesCrawler)
 
 logger = logging.getLogger(__name__)
 
