@@ -246,10 +246,12 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
 class LegacyQueryOwnershipMixin:
     """Retrieve ownership of legacy queries.
 
-    A mixin is introduced to get query ownership for both plain query ids and query problems.
-
     This ownership class is different from most ownership implementations as it fetches the query from the workspace,
     where most other classes expect an object that contains the ownership thus not requiring workspace access.
+
+    A mixin is introduced to get query ownership for both plain query ids and class:QueryProblem, while maintaining
+    the type hinting and reducing risk by handling the call to the workspace in **one** place (in case another exception
+    needs to be caught later).
     """
 
     @staticmethod
