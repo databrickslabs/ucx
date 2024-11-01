@@ -7,10 +7,8 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, NotFound
 
-from databricks.labs.ucx.assessment.pipelines import (PipelineInfo,
-                                                      PipelinesCrawler)
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import (
-    PipelineMapping, PipelineRule, PipelinesMigrator)
+from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
 
 logger = logging.getLogger(__name__)
 
