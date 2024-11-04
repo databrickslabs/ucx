@@ -18,6 +18,7 @@ from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
+from databricks.labs.ucx.source_code.queries import QueryProblem
 
 from ..conftest import MockRuntimeContext
 
@@ -190,6 +191,24 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
+def query_problems(make_query) -> list[QueryProblem]:
+    query = make_query()
+    records = [
+        QueryProblem(
+            "dashboard_id",
+            "dashboard_parent",
+            "dashboard_name",
+            query.id,
+            query.parent,
+            query.name,
+            "code",
+            "message",
+        )
+    ]
+    return records
+
+
+@pytest.fixture
 def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
     records = [
         DirectFsAccess(
@@ -237,6 +256,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     clusters: list[ClusterInfo],
     pipelines: list[PipelineInfo],
     policies: list[PolicyInfo],
+    query_problems: list[QueryProblem],
     dfsas: list[DirectFsAccess],
 ):
     """Populate the UCX catalog with multiworkspace tables.
@@ -289,6 +309,8 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         del runtime_ctx.pipelines_progress
         runtime_ctx.policies_progress.append_inventory_snapshot(policies)
         del runtime_ctx.policies_progress
+        runtime_ctx.query_problem_progress.append_inventory_snapshot(query_problems)
+        del runtime_ctx.query_problem_progress
         runtime_ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsas)
         del runtime_ctx.direct_filesystem_access_progress
     return runtime_ctx.ucx_catalog
