@@ -191,7 +191,6 @@ def policies() -> list[PolicyInfo]:
 
 @pytest.fixture
 def dfsas() -> list[DirectFsAccess]:
-    # TODO: What is a LineageAtom?
     records = [
         DirectFsAccess(
             path="some_path",
