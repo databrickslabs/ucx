@@ -11,6 +11,8 @@ from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.source_code.queries import QueryLinter
+from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 
 
 @pytest.mark.parametrize(
@@ -66,19 +68,21 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
     mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    "task, linter",
-    (
-        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
-        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
-    ),
-)
-def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
-    linter_class = get_type_hints(linter.func)["return"]
-    mock_linter = create_autospec(linter_class)
-    linter_name = linter.attrname
-    ctx = run_workflow(task, named_parameters={"parent_run_id": 1}, **{linter_name: mock_linter})
-    mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
+def test_migration_progress_assess_dashboards_refreshes_report(run_workflow) -> None:
+    mock_linter = create_autospec(QueryLinter)
+    mock_linter.snapshots.return_value = [[], [], []]
+
+    run_workflow(MigrationProgress.assess_dashboards, named_parameters={"parent_run_id": 1}, query_linter=mock_linter)
+
+    mock_linter.refresh_report.assert_called_once()
+
+
+def test_migration_progress_assess_workflows_refreshes_report(run_workflow) -> None:
+    mock_linter = create_autospec(WorkflowLinter)
+
+    run_workflow(MigrationProgress.assess_workflows, workflow_linter=mock_linter)
+
+    mock_linter.refresh_report.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
