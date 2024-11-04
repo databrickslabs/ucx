@@ -245,12 +245,12 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
-def used_tables() -> list[UsedTable]:
+def used_tables(make_workspace_file) -> list[UsedTable]:
     records = [
         UsedTable(
             catalog_name="hive_metastore",  # Table is pending migration
-            schema_name="staff_db",
-            table_name="employees",
+            schema_name="schema2",
+            table_name="table1",
             is_read=False,
             is_write=True,
             source_id="xyz.py",
@@ -259,7 +259,7 @@ def used_tables() -> list[UsedTable]:
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id="my file_path"),
+                LineageAtom(object_type="FILE", object_id=str(make_workspace_file())),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
@@ -467,14 +467,34 @@ def test_migration_progress_dashboard(
                 Row(owner="Eric", percentage=round(100 * 1 / 1, 2), total=1, total_migrated=1, total_not_migrated=0),
             ],
         ),
+        (
+            "03_01_pending_migration_used_tables",
+            [
+                Row(count=1),
+            ],
+        ),
     ],
 )
-def test_percentage_migration_progress(
+def test_migration_progress_query(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
     query_name,
     rows,
 ) -> None:
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == rows
+
+
+def test_migration_progress_query_pending_used_tables(
+    ws: WorkspaceClient,
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+) -> None:
+    """Required to set the owner of the used table at runtime"""
+    query_name = "03_02_used_tables_by_owner_bar_graph"
+    rows = [Row(owner=ws.current_user.me().user_name, count=1)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
