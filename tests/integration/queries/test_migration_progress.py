@@ -280,7 +280,7 @@ def used_tables() -> list[UsedTable]:
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
-        )
+        ),
     ]
     return records
 
@@ -396,22 +396,28 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 23 / 35, 2))]),
-        ("01_1_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
-        ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
-        ("01_4_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_5_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
-        ("01_6_percentage_used_table_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_7_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_8_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 37, 2))]),
+        ("01_01_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_02_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
+        ("01_03_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
+        ("01_04_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_05_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
+        ("01_06_percentage_used_table_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_07_count_direct_filesystem_access", [Row(counter=2)]),
+        ("01_08_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_09_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
-            "01_9_distinct_failures_per_object_type",
+            "01_10_distinct_failures_per_object_type",
             [
                 Row(
                     object_type="ClusterInfo",
                     count=1,
                     failure="Uses azure service principal credentials config in cluster",
+                ),
+                Row(
+                    object_type="DirectFsAccess",
+                    count=2,
+                    failure="Direct filesystem access is not supported in Unity Catalog",
                 ),
                 Row(
                     object_type="Grant",
