@@ -28,7 +28,7 @@ from databricks.labs.ucx.progress.directfs_access import DirectFsAccessProgressE
 from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
-from databricks.labs.ucx.progress.tables import TableProgressEncoder
+from databricks.labs.ucx.progress.tables import TableProgressEncoder, UsedTableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 from databricks.labs.ucx.progress.queries import QueryProblemProgressEncoder
 
@@ -258,6 +258,16 @@ class RuntimeContext(GlobalContext):
         return DirectFsAccessProgressEncoder(
             self.sql_backend,
             self.direct_filesystem_access_ownership,
+            self.parent_run_id,
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def used_table_progress(self) -> UsedTableProgressEncoder:
+        return UsedTableProgressEncoder(
+            self.sql_backend,
+            self.used_table_ownership,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
