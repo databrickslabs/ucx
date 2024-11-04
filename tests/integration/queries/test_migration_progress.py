@@ -202,8 +202,8 @@ def query_problems(make_query) -> list[QueryProblem]:
             query.id,
             query.parent,
             query.name,
-            "code",
-            "message",
+            "sql-parse-error",
+            "Could not parse SQL",
         )
     ]
     return records
@@ -396,7 +396,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 37, 2))]),
+        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 38, 2))]),
         ("01_01_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_02_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
         ("01_03_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
@@ -404,10 +404,11 @@ def test_migration_progress_dashboard(
         ("01_05_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
         ("01_06_percentage_used_table_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_07_count_direct_filesystem_access", [Row(counter=2)]),
-        ("01_08_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_09_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_08_count_query_problem", [Row(counter=1)]),
+        ("01_09_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_10_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
-            "01_10_distinct_failures_per_object_type",
+            "01_11_distinct_failures_per_object_type",
             [
                 Row(
                     object_type="ClusterInfo",
@@ -440,6 +441,7 @@ def test_migration_progress_dashboard(
                     count=1,
                     failure="Uses azure service principal credentials config in policy",
                 ),
+                Row(object_type="QueryProblem", count=1, failure="[sql-parse-error] Could not parse SQL"),
                 Row(object_type="Table", count=5, failure="Pending migration"),
                 Row(object_type="Udf", count=1, failure="UDF not supported by UC"),
                 Row(object_type="UsedTable", count=1, failure="Pending migration"),
