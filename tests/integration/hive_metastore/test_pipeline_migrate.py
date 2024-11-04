@@ -1,3 +1,4 @@
+import pytest
 from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
@@ -19,7 +20,9 @@ def test_pipeline_migrate(
     inventory_schema,
     sql_backend,
     runtime_ctx,
+    make_catalog
 ):
+    dst_catalog = make_catalog()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     target_schemas = 2 * [runtime_ctx.make_schema(catalog_name="hive_metastore")]
 
@@ -60,14 +63,14 @@ def test_pipeline_migrate(
     runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
     pipeline_mapping = PipelineMapping(runtime_ctx.installation, ws, sql_backend)
 
-    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, pipeline_mapping)
+    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, dst_catalog.name)
     pipelines_migrator.migrate_pipelines()
 
     # crawl pipeline in UC and check if it is migrated
     pipelines = runtime_ctx.pipelines_crawler.snapshot(force_refresh=True)
     results = []
     for pipeline in pipelines:
-        if pipeline.pipeline_name == f"{pipeline_name}-migrated":
+        if pipeline.pipeline_name == f"{pipeline_name} [UC]":
             results.append(pipeline)
 
     assert len(results) == 1
