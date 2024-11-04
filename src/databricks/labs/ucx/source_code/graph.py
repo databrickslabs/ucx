@@ -527,11 +527,16 @@ class MaybeGraph:
         return len(self.problems) > 0
 
 
+@dataclass
 class InheritedContext:
+
+    tree: Tree | None
+    found: bool
+    problems: Iterable[DependencyProblem]
 
     @classmethod
     def from_route(cls, graph: DependencyGraph, path_lookup: PathLookup, route: list[Dependency]) -> InheritedContext:
-        context = InheritedContext(None, False)
+        context = InheritedContext(None, False, [])
         for i, dependency in enumerate(route):
             if i >= len(route) - 1:
                 break
@@ -545,18 +550,6 @@ class InheritedContext:
             context = context.append(local, i == len(route) - 2)
         return context.finalize()
 
-    def __init__(self, tree: Tree | None, found: bool):
-        self._tree = tree
-        self._found = found
-
-    @property
-    def tree(self) -> Tree | None:
-        return self._tree
-
-    @property
-    def found(self) -> bool:
-        return self._found
-
     def append(self, context: InheritedContext, copy_found: bool) -> InheritedContext:
         # we should never append to a found context
         if self.found:
@@ -564,11 +557,11 @@ class InheritedContext:
         tree = context.tree
         found = copy_found and context.found
         if tree is None:
-            return InheritedContext(self._tree, found)
-        if self._tree is None:
-            self._tree = Tree.new_module()
-        self._tree.append_tree(tree)
-        return InheritedContext(self._tree, found)
+            return InheritedContext(self.tree, found, context.problems)
+        new_tree = self.tree or Tree.new_module()
+        new_tree.append_tree(tree)
+        new_problems = itertools.chain(self.problems, context.problems)
+        return InheritedContext(new_tree, found, new_problems)
 
     def finalize(self) -> InheritedContext:
         # hacky stuff for aligning with Astroid's inference engine behavior
@@ -576,10 +569,10 @@ class InheritedContext:
         # see https://github.com/pylint-dev/astroid/blob/5b665e7e760a7181625a24b3635e9fec7b174d87/astroid/filter_statements.py#L113
         # this is problematic when linting code fragments that refer to inherited code with unrelated line numbers
         # here we fool the engine by pretending that all nodes from context have negative line numbers
-        if self._tree is None:
+        if self.tree is None:
             return self
-        tree = self._tree.renumber(-1)
-        return InheritedContext(tree, self.found)
+        tree = self.tree.renumber(-1)
+        return InheritedContext(tree, self.found, [])
 
 
 T = TypeVar("T")

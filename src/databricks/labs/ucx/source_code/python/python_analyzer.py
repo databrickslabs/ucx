@@ -62,13 +62,11 @@ class PythonCodeAnalyzer:
     def build_inherited_context(self, child_path: Path) -> InheritedContext:
         tree, nodes, problems = self._parse_and_extract_nodes()
         if problems:
-            # TODO: bubble up problems via InheritedContext
-            logger.warning(f"Failed to parse: {problems}")
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, problems)
         assert tree is not None, "no problems should yield a tree"
         if len(nodes) == 0:
-            return InheritedContext(tree, False)
-        context = InheritedContext(Tree.new_module(), False)
+            return InheritedContext(tree, False, [])
+        context = InheritedContext(Tree.new_module(), False, [])
         assert context.tree is not None, "Tree should be initialized"
         last_line = -1
         for base_node in nodes:
@@ -123,22 +121,31 @@ class PythonCodeAnalyzer:
         elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
         else:
-            logger.warning(f"Can't build graph for node {NodeBase.__name__} of type {type(base_node).__name__}")
+            problem = DependencyProblem.from_node(
+                "unsupported-node-type",
+                f"Can't build graph for node {NodeBase.__name__} of type {type(base_node).__name__}",
+                base_node.node,
+            )
+            yield problem
 
     def _build_inherited_context_from_node(self, base_node: NodeBase, child_path: Path) -> InheritedContext:
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         if isinstance(base_node, ImportSource):
             # nothing to do, Astroid takes care of imports
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         if isinstance(base_node, NotebookRunCall):
             # nothing to do, dbutils.notebook.run uses a dedicated context
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         if isinstance(base_node, MagicLine):
             return base_node.build_inherited_context(self._context, child_path)
-        logger.warning(f"Can't build inherited context for node {NodeBase.__name__} of type {type(base_node).__name__}")
-        return InheritedContext(None, False)
+        problem = DependencyProblem.from_node(
+            "unsupported-node-type",
+            f"Can't build inherited context for node {NodeBase.__name__} of type {type(base_node).__name__}",
+            base_node.node,
+        )
+        return InheritedContext(None, False, [problem])
 
     def _register_import(self, base_node: ImportSource) -> Iterable[DependencyProblem]:
         prefix = ""

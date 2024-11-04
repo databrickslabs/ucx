@@ -73,7 +73,7 @@ class MagicLine(NodeBase):
         magic = self.as_magic()
         if magic is not None:
             return magic.build_inherited_context(context, child_path)
-        return InheritedContext(None, False)
+        return InheritedContext(None, False, [])
 
 
 class MagicNode(NodeNG):
@@ -90,7 +90,7 @@ class MagicCommand(ABC):
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]: ...
 
     def build_inherited_context(self, _context: DependencyGraphContext, _child_path: Path) -> InheritedContext:
-        return InheritedContext(None, False)
+        return InheritedContext(None, False, [])
 
 
 _FACTORIES: list[Callable[[str, NodeNG], MagicCommand | None]] = []
