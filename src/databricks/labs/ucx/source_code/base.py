@@ -16,10 +16,11 @@ from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
 from sqlglot.errors import SqlglotError
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 if sys.version_info >= (3, 11):
@@ -266,6 +267,17 @@ class UsedTable(SourceInfo):
     table_name: str = SourceInfo.UNKNOWN
     is_read: bool = True
     is_write: bool = False
+
+    @classmethod
+    def from_table(cls, table: Table, *, is_read: bool, is_write: bool) -> UsedTable:
+        """Create a `:class:UsedTable` from a Hive `:class:Table`."""
+        return cls(
+            catalog_name=table.catalog,
+            schema_name=table.database,
+            table_name=table.name,
+            is_read=is_read,
+            is_write=is_write,
+        )
 
 
 class TableCollector(ABC):

@@ -18,37 +18,34 @@ from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
-class TableOwnership(Ownership[Table]):
-    """Determine ownership of tables in the inventory based on the following rules:
-    - If a table is owned by a principal in the grants table, then that principal is the owner.
-    - If a table is written to by a query, then the owner of that query is the owner of the table.
-    - If a table is written to by a notebook or file, then the owner of the path is the owner of the table.
-    """
+class UsedTableOwnership(Ownership[UsedTable]):
+    """Used table ownership."""
 
     def __init__(
         self,
         administrator_locator: AdministratorLocator,
-        grants_crawler: GrantsCrawler,
         used_tables_in_paths: UsedTablesCrawler,
         used_tables_in_queries: UsedTablesCrawler,
         legacy_query_ownership: LegacyQueryOwnership,
         workspace_path_ownership: WorkspacePathOwnership,
     ) -> None:
         super().__init__(administrator_locator)
-        self._grants_crawler = grants_crawler
         self._used_tables_in_paths = used_tables_in_paths
         self._used_tables_in_queries = used_tables_in_queries
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_path_ownership = workspace_path_ownership
 
-    def _maybe_direct_owner(self, record: Table) -> str | None:
-        owner = self._maybe_from_grants(record)
-        if owner:
-            return owner
-        return self._maybe_from_sources(record)
+    @cached_property
+    def _used_tables_snapshot(self) -> dict[tuple[str, str, str], UsedTable]:
+        index = {}
+        for collection in (self._used_tables_in_paths.snapshot(), self._used_tables_in_queries.snapshot()):
+            for used_table in collection:
+                key = used_table.catalog_name, used_table.schema_name, used_table.table_name
+                index[key] = used_table
+        return index
 
-    def _maybe_from_sources(self, record: Table) -> str | None:
-        used_table = self._used_tables_snapshot.get((record.catalog, record.database, record.name))
+    def _maybe_direct_owner(self, record: UsedTable) -> str | None:
+        used_table = self._used_tables_snapshot.get((record.catalog_name, record.schema_name, record.table_name))
         if not used_table:
             return None
         # If something writes to a table, then it's an owner of it
@@ -61,14 +58,32 @@ class TableOwnership(Ownership[Table]):
         logger.warning(f"Unknown source type {used_table.source_type} for {used_table.source_id}")
         return None
 
-    @cached_property
-    def _used_tables_snapshot(self) -> dict[tuple[str, str, str], UsedTable]:
-        index = {}
-        for collection in (self._used_tables_in_paths.snapshot(), self._used_tables_in_queries.snapshot()):
-            for used_table in collection:
-                key = used_table.catalog_name, used_table.schema_name, used_table.table_name
-                index[key] = used_table
-        return index
+
+class TableOwnership(Ownership[Table]):
+    """Determine ownership of tables in the inventory based on the following rules:
+    - If a table is owned by a principal in the grants table, then that principal is the owner.
+    - If a table is written to by a query, then the owner of that query is the owner of the table.
+    - If a table is written to by a notebook or file, then the owner of the path is the owner of the table.
+    """
+
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        grants_crawler: GrantsCrawler,
+        used_table_ownership: UsedTableOwnership,
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._grants_crawler = grants_crawler
+        self._used_table_ownership = used_table_ownership
+
+    def _maybe_direct_owner(self, record: Table) -> str | None:
+        owner = self._maybe_from_grants(record)
+        if owner:
+            return owner
+        # Read and write do - or should - not affect ownership
+        used_table = UsedTable.from_table(record, is_read=False, is_write=False)
+        # This call defers the `administrator_locator` to the one of `UsedTableOwnership`, we expect them to be the same
+        return self._used_table_ownership.owner_of(used_table)
 
     def _maybe_from_grants(self, record: Table) -> str | None:
         for grant in self._grants_snapshot:

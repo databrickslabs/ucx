@@ -44,7 +44,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
+from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership, UsedTableOwnership
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationOwnership,
     TableMigrationStatusRefresher,
@@ -263,14 +263,21 @@ class GlobalContext(abc.ABC):
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def table_ownership(self) -> TableOwnership:
-        return TableOwnership(
+    def used_table_ownership(self) -> UsedTableOwnership:
+        return UsedTableOwnership(
             self.administrator_locator,
-            self.grants_crawler,
             self.used_tables_crawler_for_paths,
             self.used_tables_crawler_for_queries,
             self.legacy_query_ownership,
             self.workspace_path_ownership,
+        )
+
+    @cached_property
+    def table_ownership(self) -> TableOwnership:
+        return TableOwnership(
+            self.administrator_locator,
+            self.grants_crawler,
+            self.used_table_ownership,
         )
 
     @cached_property
