@@ -268,6 +268,8 @@ class UsedTable(SourceInfo):
     is_read: bool = True
     is_write: bool = False
 
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("catalog_name", "schema_name", "table_name")
+
     @classmethod
     def from_table(cls, table: Table, *, is_read: bool, is_write: bool) -> UsedTable:
         """Create a `:class:UsedTable` from a Hive `:class:Table`."""
