@@ -246,6 +246,7 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 @pytest.fixture
 def used_tables(make_workspace_file) -> list[UsedTable]:
+    workspace_file = make_workspace_file()
     records = [
         UsedTable(
             catalog_name="hive_metastore",  # Table is pending migration
@@ -253,7 +254,7 @@ def used_tables(make_workspace_file) -> list[UsedTable]:
             table_name="table1",
             is_read=False,
             is_write=True,
-            source_id="xyz.py",
+            source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
@@ -270,7 +271,7 @@ def used_tables(make_workspace_file) -> list[UsedTable]:
             table_name="employees",
             is_read=False,
             is_write=True,
-            source_id="xyz.py",
+            source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
@@ -333,6 +334,13 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         f'hive_metastore.{runtime_ctx.inventory_database}.grants',
         grants,
         Grant,
+        mode='overwrite',
+    )
+    # Persist UsedTable to match when looking for UsedTable ownership to tables
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.used_tables_in_paths',
+        used_tables,
+        UsedTable,
         mode='overwrite',
     )
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
@@ -492,7 +500,7 @@ def test_migration_progress_query_pending_used_tables(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
 ) -> None:
-    """Required to set the owner of the used table at runtime"""
+    """Separate test is required to set the owner of the used table at runtime"""
     query_name = "03_02_used_tables_by_owner_bar_graph"
     rows = [Row(owner=ws.current_user.me().user_name, count=1)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
