@@ -84,7 +84,7 @@ class Cell(ABC):
         return f"{self.language.name}: {self._original_code[:20]}"
 
     def build_inherited_context(self, _graph: DependencyGraph, _child_path: Path) -> InheritedContext:
-        return InheritedContext(None, False)
+        return InheritedContext(None, False, [])
 
 
 class PythonCell(Cell):
@@ -438,20 +438,20 @@ class RunCommand(MagicCommand):
         path = self.notebook_path
         if path is None:
             logger.warning("Missing notebook path in %run command")
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         maybe = context.resolver.resolve_notebook(context.path_lookup, path, inherit_context=True)
         if not maybe.dependency:
             logger.warning(f"Could not load notebook {path}")
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         child_path = maybe.dependency.path
         absolute_path = context.path_lookup.resolve(path)
         absolute_child = context.path_lookup.resolve(child_path)
         if absolute_path == absolute_child:
-            return InheritedContext(None, True)
+            return InheritedContext(None, True, [])
         container = maybe.dependency.load(context.path_lookup)
         if not container:
             logger.warning(f"Could not load notebook {path}")
-            return InheritedContext(None, False)
+            return InheritedContext(None, False, [])
         return container.build_inherited_context(context.parent, child_path)
 
 
