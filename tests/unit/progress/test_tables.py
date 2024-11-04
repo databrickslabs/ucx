@@ -1,3 +1,4 @@
+import datetime as dt
 from unittest.mock import create_autospec
 
 import pytest
@@ -7,7 +8,8 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.grants import GrantProgressEncoder
-from databricks.labs.ucx.progress.tables import TableProgressEncoder
+from databricks.labs.ucx.progress.tables import TableProgressEncoder, UsedTableProgressEncoder
+from databricks.labs.ucx.source_code.used_table import UsedTable
 
 
 @pytest.mark.parametrize(
@@ -60,3 +62,61 @@ def test_table_progress_encoder_pending_migration_failure(mock_backend, table: T
     ownership.owner_of.assert_called_once()
     table_migration_index.is_migrated.assert_called_with(table.database, table.name)
     grant_progress_encoder.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "used_table",
+    [
+        UsedTable(
+            catalog_name="catalog",
+            schema_name="schema",
+            table_name="table",
+            source_timestamp=dt.datetime.now(dt.timezone.utc),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
+        ),
+    ],
+)
+def test_used_table_progress_encoder_no_failures(mock_backend, used_table: UsedTable) -> None:
+    """No failures when the table is not in the Hive metastore."""
+    ownership = create_autospec(Ownership)
+    ownership.owner_of.return_value = "user"
+    encoder = UsedTableProgressEncoder(
+        mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test"
+    )
+
+    encoder.append_inventory_snapshot([used_table])
+
+    rows = mock_backend.rows_written_for(escape_sql_identifier(encoder.full_name), "append")
+    assert len(rows) > 0, f"No rows written for: {encoder.full_name}"
+    assert len(rows[0].failures) == 0
+    ownership.owner_of.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "used_table",
+    [
+        UsedTable(
+            catalog_name="hive_metastore",
+            schema_name="schema",
+            table_name="table",
+            source_timestamp=dt.datetime.now(dt.timezone.utc),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
+        ),
+    ],
+)
+def test_used_table_progress_encoder_pending_migration_failure(mock_backend, used_table: UsedTable) -> None:
+    """Failures when the table is in the Hive metastore."""
+    ownership = create_autospec(Ownership)
+    ownership.owner_of.return_value = "user"
+    encoder = UsedTableProgressEncoder(
+        mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test"
+    )
+
+    encoder.append_inventory_snapshot([used_table])
+
+    rows = mock_backend.rows_written_for(escape_sql_identifier(encoder.full_name), "append")
+    assert len(rows) > 0, f"No rows written for: {encoder.full_name}"
+    assert rows[0].failures == ["Pending migration"]
+    ownership.owner_of.assert_called_once()
