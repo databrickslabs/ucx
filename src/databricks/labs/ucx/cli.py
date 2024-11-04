@@ -652,7 +652,11 @@ def assign_owner_group(
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
 
-    owner_group = workspace_contexts[0].group_manager.pick_owner_group(prompts)
+    username = w.current_user.me().user_name
+    if not username:
+        logger.error("Couldn't find the username of the current user.")
+        return
+    owner_group = workspace_contexts[0].group_manager.pick_owner_group(prompts, username)
     if not owner_group:
         return
     for workspace_context in workspace_contexts:
