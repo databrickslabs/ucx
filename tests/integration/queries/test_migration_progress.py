@@ -237,6 +237,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     clusters: list[ClusterInfo],
     pipelines: list[PipelineInfo],
     policies: list[PolicyInfo],
+    dfsas: list[DirectFsAccess],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
@@ -288,6 +289,8 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         del runtime_ctx.pipelines_progress
         runtime_ctx.policies_progress.append_inventory_snapshot(policies)
         del runtime_ctx.policies_progress
+        runtime_ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsas)
+        del runtime_ctx.direct_filesystem_access_progress
     return runtime_ctx.ucx_catalog
 
 
