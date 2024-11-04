@@ -106,12 +106,16 @@ class StaticTableOwnership(Ownership[Table]):
         super().__init__(administrator_locator)
 
     def load(self) -> Iterable[Grant]:
+        databases = set()
+        owner = self._static_owner()
+        if not owner:
+            logger.warning("No owner found for tables and databases")
+            return
         for table in self._tables_crawler.snapshot():
-            owner = self._maybe_direct_owner(table)
             table_name, view_name = self._names(table)
-            if not owner:
-                logger.warning(f"No owner found for {table.key}")
-                continue
+
+            if table.database not in databases:
+                databases.add(table.database)
             yield Grant(
                 principal=owner,
                 action_type='OWN',
@@ -120,6 +124,15 @@ class StaticTableOwnership(Ownership[Table]):
                 table=table_name,
                 view=view_name,
             )
+        for database in databases:
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog="hive_metastore",
+                database=database,
+                table=None,
+                view=None,
+            )
 
     @staticmethod
     def _names(table: Table) -> tuple[str | None, str | None]:
@@ -127,10 +140,13 @@ class StaticTableOwnership(Ownership[Table]):
             return None, table.name
         return table.name, None
 
-    def _maybe_direct_owner(self, record: Table) -> str | None:
+    def _static_owner(self) -> str | None:
         if self._fixed_owner_group:
             return self._fixed_owner_group
         return self._application_principal
+
+    def _maybe_direct_owner(self, record: Table) -> str | None:
+        return self._static_owner()
 
 
 class TableOwnershipGrantLoader:

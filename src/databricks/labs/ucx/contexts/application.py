@@ -284,7 +284,7 @@ class GlobalContext(abc.ABC):
             self.administrator_locator,
             self.tables_crawler,
             self.config.default_owner_group,
-            self.connect_config.username,
+            self.workspace_client.current_user.me().user_name,
         )
 
     @cached_property

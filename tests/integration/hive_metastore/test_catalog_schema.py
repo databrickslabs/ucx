@@ -170,7 +170,8 @@ def test_create_catalog_schema_with_legacy_hive_metastore_privileges(
     def get_schema_permissions_list(full_name: str) -> PermissionsList:
         return ws.grants.get(SecurableType.SCHEMA, full_name)
 
-    assert ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}").owner == schema_owner.user_name
+    assert (ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}").owner ==
+            runtime_ctx.workspace_client.current_user.me().user_name)
     schema_grants = get_schema_permissions_list(f"{dst_catalog_name}.{dst_schema_name}")
     assert schema_grants.privilege_assignments is not None
     assert PrivilegeAssignment(table_owner.user_name, [Privilege.USE_SCHEMA]) in schema_grants.privilege_assignments
