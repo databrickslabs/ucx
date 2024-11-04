@@ -132,6 +132,11 @@ class QueryLinter:
             mode='overwrite',
         )
 
+    def _try_fetch_problems(self) -> Iterable[QueryProblem]:
+        sql = f"SELECT * FROM {escape_sql_identifier(self._full_name)}"
+        for row in self._sql_backend.fetch(sql):
+            yield QueryProblem.from_dict(row.asDict())
+
     def _dump_dfsas(
         self, dfsas: Sequence[DirectFsAccess], assessment_start: datetime, assessment_end: datetime
     ) -> None:
