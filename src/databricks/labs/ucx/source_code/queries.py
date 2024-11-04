@@ -113,14 +113,12 @@ class QueryLinter:
         self._dump_dfsas(context.all_dfsas, assessment_start, assessment_end)
         self._dump_used_tables(context.all_tables, assessment_start, assessment_end)
 
-    def snapshots(
-        self, *, force_refresh: bool = False
-    ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
+    def snapshots(self) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
         """Snapshots of the resources acquired during linting."""
         return (
             self._try_fetch_problems(),
-            self._directfs_crawler.snapshot(force_refresh=force_refresh),
-            self._used_tables_crawler.snapshot(force_refresh=force_refresh),
+            self._directfs_crawler.snapshot(),
+            self._used_tables_crawler.snapshot(),
         )
 
     def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
