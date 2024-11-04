@@ -77,7 +77,7 @@ def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
     linter_class = get_type_hints(linter.func)["return"]
     mock_linter = create_autospec(linter_class)
     linter_name = linter.attrname
-    ctx = run_workflow(task, **{linter_name: mock_linter})
+    ctx = run_workflow(task, named_parameters={"parent_run_id": 1}, **{linter_name: mock_linter})
     mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
 
 
