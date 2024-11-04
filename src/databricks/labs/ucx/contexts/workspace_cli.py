@@ -9,6 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreation
@@ -19,6 +20,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -202,6 +204,11 @@ class WorkspaceContext(CliContext):
             self.workspace_info,
             self.config.enable_hms_federation,
         )
+
+    @cached_property
+    def pipeline_migrator(self) -> PipelinesMigrator:
+        pipeline_crawler = PipelinesCrawler(self.workspace_client, self.sql_backend, self.config.ucx_catalog)
+        return PipelinesMigrator(self.workspace_client, pipeline_crawler, self.pipeline_mapping)
 
 
 class LocalCheckoutContext(WorkspaceContext):
