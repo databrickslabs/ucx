@@ -33,7 +33,7 @@ def test_crawler_appends_dfsas() -> None:
         for path in ("a", "b", "c")
     )
     crawler.dump_all(dfsas)
-    rows = backend.rows_written_for(crawler.full_name, "append")
+    rows = backend.rows_written_for(crawler.full_name, "overwrite")
     assert len(rows) == 3
 
 
