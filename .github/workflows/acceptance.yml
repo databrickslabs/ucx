@@ -47,7 +47,7 @@ jobs:
 
       # TODO: update `acceptance/v0.4.0` everywhere
       - name: Run integration tests
-        uses: databrickslabs/sandbox/acceptance@acceptance/v0.4.0
+        uses: databrickslabs/sandbox/acceptance@acceptance/v0.4.1
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
           timeout: 2h
