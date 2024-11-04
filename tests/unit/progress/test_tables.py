@@ -81,9 +81,7 @@ def test_used_table_progress_encoder_no_failures(mock_backend, used_table: UsedT
     """No failures when the table is not in the Hive metastore."""
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
-    encoder = UsedTableProgressEncoder(
-        mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test"
-    )
+    encoder = UsedTableProgressEncoder(mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test")
 
     encoder.append_inventory_snapshot([used_table])
 
@@ -110,9 +108,7 @@ def test_used_table_progress_encoder_pending_migration_failure(mock_backend, use
     """Failures when the table is in the Hive metastore."""
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
-    encoder = UsedTableProgressEncoder(
-        mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test"
-    )
+    encoder = UsedTableProgressEncoder(mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test")
 
     encoder.append_inventory_snapshot([used_table])
 
