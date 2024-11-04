@@ -56,10 +56,10 @@ class TablesMigrator:
         self._external_locations = external_locations
 
     def get_remaining_tables(self) -> list[Table]:
-        self.index(force_refresh=True)
+        migration_index = self.index(force_refresh=True)
         table_rows = []
         for crawled_table in self._tables_crawler.snapshot():
-            if not self._is_migrated(crawled_table.database, crawled_table.name):
+            if not migration_index.is_migrated(crawled_table.database, crawled_table.name):
                 table_rows.append(crawled_table)
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
         return table_rows
@@ -592,7 +592,3 @@ class TablesMigrator:
             f"('upgraded_from' = '{source}'"
             f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
-
-    def _is_migrated(self, schema: str, table: str) -> bool:
-        index = self._migration_status_refresher.index()
-        return index.is_migrated(schema, table)
