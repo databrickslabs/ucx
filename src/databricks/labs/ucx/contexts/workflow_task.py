@@ -31,7 +31,6 @@ from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 from databricks.labs.ucx.progress.queries import QueryProblemProgressEncoder
-from databricks.labs.ucx.source_code.base import DirectFsAccess
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
 # pylint: disable=too-many-public-methods
