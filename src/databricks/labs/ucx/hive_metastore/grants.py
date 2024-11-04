@@ -939,10 +939,6 @@ class ACLMigrator(CrawlerBase[Grant]):
             grants += self._migrate_grants.retrieve(table.src, table.rule.as_uc_table)
         return grants
 
-    def _is_migrated(self, schema: str, table: str) -> bool:
-        index = self._migration_status_refresher.index()
-        return index.is_migrated(schema, table)
-
     def _crawl(self) -> Iterable[Grant]:
         return self._retrieve_table_acls()
 
