@@ -101,52 +101,59 @@ class PipelineMapping:
 
 
 class PipelinesMigrator:
-    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, pipeline_mapping: PipelineMapping):
+    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
-        self._pipeline_mapping = pipeline_mapping
+        self._catalog_name = catalog_name
+
+    def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
+        # TODO:
+        # add skip logic and return only the pipelines that need to be migrated
+        return self._pipeline_crawler.snapshot()
 
     def migrate_pipelines(self) -> None:
         self._migrate_pipelines()
 
     def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
         # get pipelines to migrate
-        pipelines_to_migrate = self._pipeline_mapping.get_pipelines_to_migrate(self._pipeline_crawler)
+        pipelines_to_migrate = self.get_pipelines_to_migrate()
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
         for pipeline in pipelines_to_migrate:
-            tasks.append(partial(self._migrate_pipeline, pipeline))
+            if pipeline.creator_name == "pritish.pai@databricks.com":
+                tasks.append(partial(self._migrate_pipeline, pipeline))
         if not tasks:
             return []
         Threads.strict("migrate pipelines", tasks)
         return tasks
 
-    def _migrate_pipeline(self, pipeline: PipelineToMigrate) -> dict | list | BinaryIO | bool:
+    def _migrate_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO | bool:
         try:
             return self._clone_pipeline(pipeline)
         except DatabricksError as e:
-            logger.error(f"Failed to migrate pipeline {pipeline.src.pipeline_id}: {e}")
+            logger.error(f"Failed to migrate pipeline {pipeline.pipeline_id}: {e}")
             return False
 
-    def _clone_pipeline(self, pipeline: PipelineToMigrate) -> dict | list | BinaryIO:
-        # TODO: implement this in sdk
+    def _clone_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO:
+        # Stop HMS pipeline
+        # Rename old pipeline first
+
+        # Clone pipeline
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }
         body = {
-            'catalog': pipeline.rule.target_catalog_name,
+            'catalog': self._catalog_name,
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
         }
-        if pipeline.rule.target_schema_name:
-            body['target'] = pipeline.rule.target_schema_name
-        if pipeline.rule.target_pipeline_name:
-            body['name'] = pipeline.rule.target_pipeline_name
         res = self._ws.api_client.do(
-            'POST', f'/api/2.0/pipelines/{pipeline.src.pipeline_id}/clone', body=body, headers=headers
+            'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
         )
+
+        # After successful clone, update jobs
 
         # TODO:
         # Check the error from UI
