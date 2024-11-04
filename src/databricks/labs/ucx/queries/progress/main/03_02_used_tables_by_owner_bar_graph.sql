@@ -6,8 +6,8 @@
     "version": 3,
     "widgetType": "bar",
     "encodings": {
-        "x":{"fieldName": "owner", "scale": {"type": "categorical"}, "displayName": "owner"},
-        "y":{"fieldName": "count", "scale": {"type": "quantitative"}, "displayName": "count"}
+        "x": {"fieldName": "owner", "scale": {"type": "categorical"}, "displayName": "owner"},
+        "y": {"fieldName": "count", "scale": {"type": "quantitative"}, "displayName": "count"}
     }
 }}'
 */
