@@ -63,32 +63,49 @@ class QueryLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        inventory_database: str,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
         include_dashboard_ids: list[str] | None,
     ):
         self._ws = ws
+        self._sql_backend = sql_backend
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
         self._include_dashboard_ids = include_dashboard_ids
 
-    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
+        self._catalog = "hive_metastore"
+        self._schema = inventory_database
+        self._table = "query_problems"
+
+    @property
+    def _full_name(self) -> str:
+        """
+        Generates the full name of the table.
+
+        Returns:
+            str: The full table name.
+        """
+        return f"{self._catalog}.{self._schema}.{self._table}"
+
+    def refresh_report(self) -> None:
         assessment_start = datetime.now(timezone.utc)
         context = _ReportingContext()
         self._lint_dashboards(context)
         self._lint_queries(context)
         assessment_end = datetime.now(timezone.utc)
-        self._dump_problems(context, sql_backend, inventory_database)
         self._dump_dfsas(context, assessment_start, assessment_end)
         self._dump_used_tables(context, assessment_start, assessment_end)
+        self._dump_problems(context.all_problems)
 
-    def _dump_problems(self, context: _ReportingContext, sql_backend: SqlBackend, inventory_database: str) -> None:
-        logger.info(f"Saving {len(context.all_problems)} linting problems...")
-        sql_backend.save_table(
-            f'{escape_sql_identifier(inventory_database)}.query_problems',
-            context.all_problems,
+    def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
+        logger.info(f"Saving {len(problems)} linting problems...")
+        self._sql_backend.save_table(
+            escape_sql_identifier(self._full_name),
+            problems,
             QueryProblem,
             mode='overwrite',
         )

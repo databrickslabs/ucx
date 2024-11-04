@@ -13,12 +13,14 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
     # Produce a DFSA record for the query.
     linter = QueryLinter(
         runtime_ctx.workspace_client,
+        runtime_ctx.sql_backend,
+        runtime_ctx.inventory_database,
         TableMigrationIndex([]),
         runtime_ctx.directfs_access_crawler_for_queries,
         runtime_ctx.used_tables_crawler_for_queries,
         include_dashboard_ids=[dashboard.id],
     )
-    linter.refresh_report(sql_backend, inventory_schema)
+    linter.refresh_report()
 
     # Find a record for the query.
     records = runtime_ctx.directfs_access_crawler_for_queries.snapshot()

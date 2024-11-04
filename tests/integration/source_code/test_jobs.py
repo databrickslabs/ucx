@@ -39,7 +39,7 @@ def test_linter_from_context(simple_ctx, make_job) -> None:
     # Ensure we have at least 1 job that fails: "Deprecated file system path in call to: /mnt/things/e/f/g"
     job = make_job(content="spark.read.table('a_table').write.csv('/mnt/things/e/f/g')\n")
     simple_ctx.config.include_job_ids = [job.job_id]
-    simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
+    simple_ctx.workflow_linter.refresh_report()
 
     # Verify that the 'problems' table has content.
     cursor = simple_ctx.sql_backend.fetch(

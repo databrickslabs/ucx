@@ -189,7 +189,7 @@ class Assessment(Workflow):
 
         Also, stores direct filesystem accesses for display in the migration dashboard.
         """
-        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.query_linter.refresh_report()
 
     @job_task
     def assess_workflows(self, ctx: RuntimeContext):
