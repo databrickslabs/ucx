@@ -147,10 +147,11 @@ class MigrationProgress(Workflow):
     def assess_dashboards(self, ctx: RuntimeContext):
         """Scans all dashboards for migration issues in SQL code of embedded widgets.
         Also stores direct filesystem accesses for display in the migration dashboard."""
-        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
-        # TODO: Ensure that query problems, dfsas and used tables are appended to inventory
-        snapshot = ctx.directfs_access_crawler_for_queries.snapshot()  # Snapshot is updated in the refresh report
-        ctx.direct_filesystem_access_progress.append_inventory_snapshot(snapshot)
+        ctx.query_linter.refresh_report()
+        query_problem_snapshot, dfsa_snapshot, used_table_snapshot = ctx.query_linter.snapshots()
+        ctx.query_problem_progress.append_inventory_snapshot(query_problem_snapshot)
+        ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsa_snapshot)
+        # ctx.used_table_progress.append_inventory_snapshot(used_table_snapshot)
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):
