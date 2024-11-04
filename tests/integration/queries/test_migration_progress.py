@@ -19,6 +19,7 @@ from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.used_table import UsedTable
 
 from ..conftest import MockRuntimeContext
 
@@ -244,6 +245,30 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
+def used_tables() -> list[UsedTable]:
+    records = [
+        UsedTable(
+            catalog_name="hive_metastore",
+            schema_name="staff_db",
+            table_name="employees",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        )
+    ]
+    return records
+
+
+@pytest.fixture
 def catalog_populated(  # pylint: disable=too-many-arguments
     runtime_ctx: MockRuntimeContext,
     workflow_runs: list[WorkflowRun],
@@ -258,6 +283,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     policies: list[PolicyInfo],
     query_problems: list[QueryProblem],
     dfsas: list[DirectFsAccess],
+    used_tables: list[UsedTable],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
@@ -313,6 +339,8 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         del runtime_ctx.query_problem_progress
         runtime_ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsas)
         del runtime_ctx.direct_filesystem_access_progress
+        runtime_ctx.used_table_progress.append_inventory_snapshot(used_tables)
+        del runtime_ctx.used_table_progress
     return runtime_ctx.ucx_catalog
 
 
