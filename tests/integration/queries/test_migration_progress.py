@@ -248,7 +248,24 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 def used_tables() -> list[UsedTable]:
     records = [
         UsedTable(
-            catalog_name="hive_metastore",
+            catalog_name="hive_metastore",  # Table is pending migration
+            schema_name="staff_db",
+            table_name="employees",
+            is_read=False,
+            is_write=True,
+            source_id="xyz.py",
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+        UsedTable(
+            catalog_name="catalog",  # Migrated table
             schema_name="staff_db",
             table_name="employees",
             is_read=False,
@@ -379,16 +396,17 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 22 / 34, 2))]),
+        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 23 / 35, 2))]),
         ("01_1_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
         ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
         ("01_4_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_5_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
-        ("01_6_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_7_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_6_percentage_used_table_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_7_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_8_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
-            "01_8_distinct_failures_per_object_type",
+            "01_9_distinct_failures_per_object_type",
             [
                 Row(
                     object_type="ClusterInfo",
@@ -418,6 +436,7 @@ def test_migration_progress_dashboard(
                 ),
                 Row(object_type="Table", count=5, failure="Pending migration"),
                 Row(object_type="Udf", count=1, failure="UDF not supported by UC"),
+                Row(object_type="UsedTable", count=1, failure="Pending migration"),
             ],
         ),
         (
