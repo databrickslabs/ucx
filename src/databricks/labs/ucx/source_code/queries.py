@@ -1,7 +1,7 @@
 import dataclasses
 import logging
-from collections.abc import Iterable
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, ClassVar
@@ -132,9 +132,11 @@ class QueryLinter:
             mode='overwrite',
         )
 
-    def _dump_dfsas(self, context: _ReportingContext, assessment_start: datetime, assessment_end: datetime) -> None:
+    def _dump_dfsas(
+        self, dfsas: Sequence[DirectFsAccess], assessment_start: datetime, assessment_end: datetime
+    ) -> None:
         processed_dfsas = []
-        for dfsa in context.all_dfsas:
+        for dfsa in dfsas:
             dfsa = dataclasses.replace(
                 dfsa,
                 assessment_start_timestamp=assessment_start,
@@ -145,18 +147,18 @@ class QueryLinter:
 
     def _dump_used_tables(
         self,
-        context: _ReportingContext,
+        used_tables: Sequence[UsedTable],
         assessment_start: datetime,
         assessment_end: datetime,
     ) -> None:
         processed_tables = []
-        for table in context.all_tables:
-            table = dataclasses.replace(
-                table,
+        for used_table in used_tables:
+            used_table = dataclasses.replace(
+                used_table,
                 assessment_start_timestamp=assessment_start,
                 assessment_end_timestamp=assessment_end,
             )
-            processed_tables.append(table)
+            processed_tables.append(used_table)
         self._used_tables_crawler.dump_all(processed_tables)
 
     def _lint_dashboards(self, context: _ReportingContext) -> None:
