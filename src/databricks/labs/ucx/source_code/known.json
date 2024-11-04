@@ -13171,24 +13171,7 @@
     "pexpect": []
   },
   "phik": {
-    "phik": [],
-    "phik.betainc": [],
-    "phik.binning": [],
-    "phik.bivariate": [],
-    "phik.data_quality": [],
-    "phik.decorators": [],
-    "phik.decorators.pandas": [],
-    "phik.definitions": [],
-    "phik.entry_points": [],
-    "phik.outliers": [],
-    "phik.phik": [],
-    "phik.report": [],
-    "phik.resources": [],
-    "phik.significance": [],
-    "phik.simcore": [],
-    "phik.simulation": [],
-    "phik.statistics": [],
-    "phik.utils": []
+    "phik": []
   },
   "phonetics": {
     "phonetics": [],
