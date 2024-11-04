@@ -33,6 +33,7 @@ from databricks.labs.ucx.framework.owners import (
     WorkspacePathOwnership,
     Ownership,
     LegacyQueryOwnership,
+    Record,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -577,17 +578,18 @@ class GlobalContext(abc.ABC):
         return AdministratorLocator(self.workspace_client)
 
     @cached_property
-    def ownership_factory(self) -> Callable[[type], Ownership]:
+    def ownership_factory(self) -> Callable[[Record], Ownership]:
         # ensure registration of Ownerships
-        names_with_ownership = [name for name in dir(GlobalContext) if "ownership" in name]
-        for name in names_with_ownership:
-            if name == "ownership_factory":
-                continue
-            prop = getattr(GlobalContext, name)
-            if not isinstance(prop, cached_property):
-                continue
-            _ = getattr(self, name)
-        return Ownership.for_record_type
+        _ = [
+            self.directfs_access_ownership,
+            self.grant_ownership,
+            self.legacy_query_ownership,
+            self.table_migration_ownership,
+            self.table_ownership,
+            self.udf_ownership,
+            self.workspace_path_ownership,
+        ]
+        return Ownership.for_record
 
 
 class CliContext(GlobalContext, abc.ABC):

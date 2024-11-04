@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence, Iterable
+from typing import Any
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
@@ -82,10 +83,13 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
         legacy_query_ownership: LegacyQueryOwnership,
         workspace_client: WorkspaceClient,
     ) -> None:
-        super().__init__(administrator_locator, DirectFsAccess)
+        super().__init__(administrator_locator)
         self._workspace_path_ownership = workspace_path_ownership
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_client = workspace_client
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, DirectFsAccess)
 
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
         if record.source_type == 'QUERY' and record.query_id:

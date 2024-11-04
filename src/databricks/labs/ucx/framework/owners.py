@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property
-from typing import Generic, TypeVar, final, cast
+from typing import Generic, TypeVar, final, Any
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
@@ -171,15 +171,21 @@ class AdministratorLocator:
 class Ownership(ABC, Generic[Record]):
     """Determine an owner for a given type of object."""
 
-    _factories: dict[type, Ownership] = {}
+    _ownerships: set[Ownership] = set()
 
     @classmethod
-    def for_record_type(cls, record_type: type) -> Ownership[Record]:
-        return cast(Ownership[Record], cls._factories[record_type])
+    def for_record(cls, record: Any) -> Ownership[Record]:
+        for ownership in cls._ownerships:
+            if ownership.is_applicable_to(record):
+                return ownership
+        raise ValueError(f"Ownership not implemented or not registered for {type(record).__name__}")
 
-    def __init__(self, administrator_locator: AdministratorLocator, record_type: type) -> None:
+    def __init__(self, administrator_locator: AdministratorLocator) -> None:
         self._administrator_locator = administrator_locator
-        self._factories[record_type] = self
+        self._ownerships.add(self)
+
+    @abstractmethod
+    def is_applicable_to(self, record: Any) -> bool: ...
 
     @final
     def owner_of(self, record: Record) -> str:
@@ -207,8 +213,11 @@ class Ownership(ABC, Generic[Record]):
 
 class WorkspacePathOwnership(Ownership[WorkspacePath]):
     def __init__(self, administrator_locator: AdministratorLocator, ws: WorkspaceClient) -> None:
-        super().__init__(administrator_locator, WorkspacePath)
+        super().__init__(administrator_locator)
         self._ws = ws
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, WorkspacePath)
 
     def owner_of_path(self, path: str) -> str:
         return self.owner_of(WorkspacePath(self._ws, path))
@@ -258,8 +267,11 @@ class LegacyQueryPath:
 
 class LegacyQueryOwnership(Ownership[LegacyQueryPath]):
     def __init__(self, administrator_locator: AdministratorLocator, workspace_client: WorkspaceClient) -> None:
-        super().__init__(administrator_locator, LegacyQueryPath)
+        super().__init__(administrator_locator)
         self._workspace_client = workspace_client
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, LegacyQueryPath)
 
     def _maybe_direct_owner(self, record: LegacyQueryPath) -> str | None:
         try:

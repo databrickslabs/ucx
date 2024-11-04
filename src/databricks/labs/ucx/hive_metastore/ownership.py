@@ -1,5 +1,6 @@
 import logging
 from functools import cached_property
+from typing import Any
 
 from databricks.labs.ucx.framework.owners import (
     Ownership,
@@ -34,12 +35,15 @@ class TableOwnership(Ownership[Table]):
         legacy_query_ownership: LegacyQueryOwnership,
         workspace_path_ownership: WorkspacePathOwnership,
     ) -> None:
-        super().__init__(administrator_locator, Table)
+        super().__init__(administrator_locator)
         self._grants_crawler = grants_crawler
         self._used_tables_in_paths = used_tables_in_paths
         self._used_tables_in_queries = used_tables_in_queries
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_path_ownership = workspace_path_ownership
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, Table)
 
     def _maybe_direct_owner(self, record: Table) -> str | None:
         owner = self._maybe_from_grants(record)
@@ -93,12 +97,16 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
     """
 
     def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
-        super().__init__(table_ownership._administrator_locator, TableMigrationStatus)  # TODO: Fix this
+        super().__init__(table_ownership._administrator_locator)  # TODO: Fix this
         self._tables_crawler = tables_crawler
         self._table_ownership = table_ownership
         self._indexed_tables: dict[tuple[str, str], Table] | None = None
 
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, TableMigrationStatus)
+
     def _tables_snapshot_index(self, reindex: bool = False) -> dict[tuple[str, str], Table]:
+
         index = self._indexed_tables
         if index is None or reindex:
             snapshot = self._tables_crawler.snapshot()

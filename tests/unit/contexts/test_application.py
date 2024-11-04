@@ -54,17 +54,17 @@ def test_local_context_attributes_not_none(attribute: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "record_type",
+    "record",
     [
-        DirectFsAccess,
-        WorkspacePath,
-        Grant,
-        Table,
-        Udf,
-        TableMigrationStatus,
+        DirectFsAccess(),
+        WorkspacePath(mock_workspace_client()),
+        Grant("x", "y"),
+        Table("a", "b", "c", "d", "e"),
+        Udf("a", "b", "c", "d", "e", "a", False, "c", "d", "e"),
+        TableMigrationStatus("x", "y"),
     ],
 )
-def test_ownership_factory_succeeds(record_type: type):
+def test_ownership_factory_succeeds(record: type):
     ctx = GlobalContext().replace(workspace_client=mock_workspace_client(), sql_backend=MockBackend())
-    ownership = ctx.ownership_factory(record_type)
+    ownership = ctx.ownership_factory(record)
     assert isinstance(ownership, Ownership)
