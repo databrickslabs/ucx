@@ -1,3 +1,4 @@
+from dataclasses import replace
 from io import BytesIO
 import json
 import webbrowser
@@ -632,6 +633,32 @@ def create_ucx_catalog(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceConte
     workspace_context.catalog_schema.create_ucx_catalog(prompts)
     workspace_context.progress_tracking_installation.run()
     workspace_context.verify_progress_tracking.verify()
+
+
+@ucx.command
+def assign_owner_group(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    *,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
+    """
+    Pick owner group. This group will be assigned as owner to all the migrated tables.
+    """
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+
+    owner_group = workspace_contexts[0].group_manager.pick_owner_group(prompts)
+    if not owner_group:
+        return
+    for workspace_context in workspace_contexts:
+        config = workspace_context.installation.load(WorkspaceConfig)
+        config = replace(config, default_owner_group=owner_group)
+        workspace_context.installation.save(config)
 
 
 @ucx.command
