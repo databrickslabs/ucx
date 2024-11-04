@@ -477,14 +477,14 @@ class DependencyResolver:
         return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._file_resolver}, {self._path_lookup}>"
 
 
-MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
+_MISSING_SOURCE_PATH = Path("<MISSING_SOURCE_PATH>")
 
 
 @dataclass
 class DependencyProblem:
     code: str
     message: str
-    source_path: Path = Path(MISSING_SOURCE_PATH)
+    source_path: Path = _MISSING_SOURCE_PATH
     # Lines and columns are both 0-based: the first line is line 0.
     start_line: int = -1
     start_col: int = -1
@@ -492,7 +492,7 @@ class DependencyProblem:
     end_col: int = -1
 
     def is_path_missing(self) -> bool:
-        return self.source_path == Path(MISSING_SOURCE_PATH)
+        return self.source_path == _MISSING_SOURCE_PATH
 
     def as_advisory(self) -> 'Advisory':
         return Advisory(
