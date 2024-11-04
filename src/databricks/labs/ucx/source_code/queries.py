@@ -1,9 +1,10 @@
 import dataclasses
 import logging
 from collections.abc import Iterable
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery
@@ -19,6 +20,13 @@ from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawle
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,10 @@ class QueryProblem:
     # TODO: @JCZuurmond verify these are the correct id attributes.
     # Note: Do we deduplicate the messages for a query?
     __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        return cls(**data)
 
 
 @dataclass
@@ -97,9 +109,19 @@ class QueryLinter:
         self._lint_dashboards(context)
         self._lint_queries(context)
         assessment_end = datetime.now(timezone.utc)
-        self._dump_dfsas(context, assessment_start, assessment_end)
-        self._dump_used_tables(context, assessment_start, assessment_end)
         self._dump_problems(context.all_problems)
+        self._dump_dfsas(context.all_dfsas, assessment_start, assessment_end)
+        self._dump_used_tables(context.all_tables, assessment_start, assessment_end)
+
+    def snapshots(
+        self, *, force_refresh: bool = False
+    ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
+        """Snapshots of the resources acquired during linting."""
+        return (
+            self._try_fetch_problems(),
+            self._directfs_crawler.snapshot(force_refresh=force_refresh),
+            self._used_tables_crawler.snapshot(force_refresh=force_refresh),
+        )
 
     def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
         logger.info(f"Saving {len(problems)} linting problems...")
