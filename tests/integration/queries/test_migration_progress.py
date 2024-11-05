@@ -236,7 +236,7 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
-                LineageAtom(object_type="QUERY", object_id=query.id, other={"name": "my_query"}),
+                LineageAtom(object_type="QUERY", object_id=f"my_dashboard_id/{query.id}", other={"name": "my_query"}),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
