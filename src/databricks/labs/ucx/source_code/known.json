@@ -26931,6 +26931,12 @@
   "pyasn1_modules": {
     "pyasn1_modules": []
   },
+  "pybind11": {
+    "pybind11": [],
+    "pybind11._version": [],
+    "pybind11.commands": [],
+    "pybind11.setup_helpers": []
+  },
   "pyccolo": {
     "pyccolo": [],
     "pyccolo._fast": [],
