@@ -10,9 +10,7 @@
         {"fieldName": "query_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/sql/editor/{{ query_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "Query"}
       ]},
     "invisibleColumns": [
-      {"name": "dashboard_parent", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "dashboard_parent"},
       {"name": "dashboard_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "dashboard_id"},
-      {"name": "query_parent", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "query_parent"},
       {"name": "query_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "query_id"}
     ]
   }}'
@@ -23,8 +21,8 @@ SELECT
     data.message,
     data.dashboard_name,
     data.query_name,
-    data.dashboard_parent,
-    data.query_parent,
+    -- Below are invisible columns used in links url templates
+    data.dashboard_id,
     data.query_id
 FROM ucx_catalog.multiworkspace.objects_snapshot
 WHERE object_type = 'QueryProblem'
