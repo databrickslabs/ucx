@@ -33,10 +33,6 @@ SELECT
   data.is_read,
   data.is_write,
   -- Below are invisible column(s) used in links url templates
-  CASE
-    WHEN object_type = 'DirectFsAccess' THEN concat('/#workspace/', data.source_id)
-    WHEN object_type = 'UsedTable' THEN concat('/explore/data/', concat_ws('/', object_id))
-    ELSE ''
-  END AS link
+  concat('/#workspace/', data.source_id) AS link
 FROM ucx_catalog.multiworkspace.objects_snapshot
 WHERE object_type IN ('DirectFsAccess', 'UsedTable')
