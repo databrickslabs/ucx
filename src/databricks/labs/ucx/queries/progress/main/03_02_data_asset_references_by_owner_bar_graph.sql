@@ -1,6 +1,6 @@
 /*
 --title 'Pending migration'
---description 'Tables and views per owner'
+--description 'Tables, views and dfsa per owner'
 --width 5
 --overrides '{"spec": {
     "version": 3,
@@ -14,7 +14,7 @@
 WITH owners_with_failures AS (
     SELECT owner
     FROM ucx_catalog.multiworkspace.objects_snapshot
-    WHERE object_type = 'UsedTable' AND array_contains(failures, 'Pending migration')
+    WHERE object_type IN ('DirectFsAccess', 'UsedTable') AND array_contains(failures, 'Pending migration')
 )
 
 SELECT

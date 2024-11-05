@@ -476,7 +476,7 @@ def test_migration_progress_dashboard(
             ],
         ),
         (
-            "03_01_pending_migration_used_tables",
+            "03_01_pending_migration_data_asset_references",
             [
                 Row(count=1),
             ],
@@ -495,13 +495,13 @@ def test_migration_progress_query(
     assert query_results == rows
 
 
-def test_migration_progress_query_pending_used_tables(
+def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
-    query_name = "03_02_used_tables_by_owner_bar_graph"
+    query_name = "03_02_data_asset_references_by_owner_bar_graph"
     rows = [Row(owner=ws.current_user.me().user_name, count=1)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
