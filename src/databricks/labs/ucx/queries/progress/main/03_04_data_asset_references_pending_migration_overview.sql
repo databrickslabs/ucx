@@ -1,6 +1,6 @@
 /* --title 'Overview' --description 'Table, view and dfsa migration' --width 5 */
 WITH migration_statuses AS (
-    SELECT *
+    SELECT owner, failures
     FROM ucx_catalog.multiworkspace.objects_snapshot
     WHERE object_type IN ('DirectFsAccess', 'UsedTable')
 )
