@@ -496,9 +496,8 @@ the [assessment report](docs/assessment.md).
 17. `crawl_groups`: This tasks retrieves workspace-local groups and persists these permissions in the `groups` table.
 18. `assess_dashboards`: This task retrieves the dashboards to analyze their queries for
     [migration problems](#linter-message-codes)
-19. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration
-    problems. It also collects direct filesystem access patterns that require attention.
-
+19. `assess_workflows`: This task retrieves the jobs to analyze their notebooks and files for
+    [migration problems](#linter-message-codes).
 
 ![report](docs/assessment-report.png)
 
