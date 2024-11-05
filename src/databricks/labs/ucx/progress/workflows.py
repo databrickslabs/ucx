@@ -47,6 +47,13 @@ class MigrationProgress(Workflow):
         ctx.tables_crawler.snapshot(force_refresh=True)
 
     @job_task(depends_on=[verify_prerequisites, crawl_tables], job_cluster="table_migration")
+    def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        ctx.migration_status_refresher.snapshot(force_refresh=True)
+
+    @job_task(
+        depends_on=[verify_prerequisites, crawl_tables, refresh_table_migration_status], job_cluster="table_migration"
+    )
     def update_tables_history_log(self, ctx: RuntimeContext) -> None:
         """Update the history log with the latest tables inventory snapshot."""
         # The table migration cluster is not legacy-ACL enabled, so we can't crawl from here.
@@ -135,16 +142,6 @@ class MigrationProgress(Workflow):
         history_log = ctx.policies_progress
         cluster_policies_snapshot = ctx.policies_crawler.snapshot(force_refresh=True)
         history_log.append_inventory_snapshot(cluster_policies_snapshot)
-
-    @job_task(depends_on=[verify_prerequisites, crawl_tables, verify_prerequisites], job_cluster="table_migration")
-    def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
-        """Scan the tables (and views) in the inventory and record whether each has been migrated or not.
-
-        The results of the scan are stored in the `$inventory.migration_status` inventory table.
-        """
-        history_log = ctx.historical_table_migration_log
-        migration_status_snapshot = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        history_log.append_inventory_snapshot(migration_status_snapshot)
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_dashboards(self, ctx: RuntimeContext):

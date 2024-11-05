@@ -803,6 +803,20 @@ class MigrateGrants:
                 )
         return True
 
+    def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
+        grants = []
+        for grant in self._match_grants(src):
+            acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
+            if acl_migrate_sql is None:
+                logger.warning(
+                    f"failed-to-migrate: Hive metastore grant '{grant.action_type}' cannot be mapped to UC grant for "
+                    f"{dst.kind} '{dst.full_name}'. Skipping."
+                )
+                continue
+            logger.debug(f"Retrieving acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
+            grants.append(grant)
+        return grants
+
     @cached_property
     def _workspace_to_account_group_names(self) -> dict[str, str]:
         return {g.name_in_workspace: g.name_in_account for g in self._group_manager.snapshot()}
@@ -831,18 +845,21 @@ class MigrateGrants:
         return replace(grant, principal=target_principal)
 
 
-class ACLMigrator:
+class ACLMigrator(CrawlerBase[Grant]):
     def __init__(
         self,
         tables_crawler: TablesCrawler,
         workspace_info: WorkspaceInfo,
         migration_status_refresher: TableMigrationStatusRefresher,
         migrate_grants: MigrateGrants,
+        backend: SqlBackend,
+        schema: str,
     ):
         self._tables_crawler = tables_crawler
         self._workspace_info = workspace_info
         self._migration_status_refresher = migration_status_refresher
         self._migrate_grants = migrate_grants
+        super().__init__(backend, "hive_metastore", schema, "inferred_grants", Grant)
 
     def migrate_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> None:
         workspace_name = self._workspace_info.current()
@@ -855,6 +872,20 @@ class ACLMigrator:
         else:
             tables_to_migrate = self._get_migrated_tables(tables)
         self._migrate_acls(tables_to_migrate)
+
+    def _retrieve_table_acls(self, *, target_catalog: str | None = None, hms_fed: bool = False) -> Iterable[Grant]:
+        tables = list(self._tables_crawler.snapshot())
+        grants: list[Grant] = []
+        if not tables:
+            logger.info("No tables found to acl")
+            return grants
+        if hms_fed:
+            tables_to_migrate = self._get_hms_fed_tables(
+                tables, target_catalog if target_catalog else self._workspace_info.current()
+            )
+        else:
+            tables_to_migrate = self._get_migrated_tables(tables)
+        return self._retrieve_acls(tables_to_migrate)
 
     def _get_migrated_tables(self, tables: list[Table]) -> list[TableToMigrate]:
         # gets all the migrated table to apply ACLs to
@@ -902,9 +933,22 @@ class ACLMigrator:
     def _migrate_acls(self, tables_in_scope: list[TableToMigrate]) -> None:
         tasks = []
         for table in tables_in_scope:
-            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table_key))
+            tasks.append(partial(self._migrate_grants.apply, table.src, table.rule.as_uc_table))
         Threads.strict("migrate grants", tasks)
+
+    def _retrieve_acls(self, tables_in_scope: list[TableToMigrate]) -> Iterable[Grant]:
+        grants = []
+        for table in tables_in_scope:
+            grants += self._migrate_grants.retrieve(table.src, table.rule.as_uc_table)
+        return grants
 
     def _is_migrated(self, schema: str, table: str) -> bool:
         index = self._migration_status_refresher.index()
         return index.is_migrated(schema, table)
+
+    def _crawl(self) -> Iterable[Grant]:
+        return self._retrieve_table_acls()
+
+    def _try_fetch(self):
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Grant(*row)

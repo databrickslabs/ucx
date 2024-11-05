@@ -48,7 +48,7 @@ dependencies = ["databricks-sdk~=0.30",
                 "databricks-labs-lsql>=0.5,<0.13",
                 "databricks-labs-blueprint>=0.9.1,<0.10",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=25.5.0,<25.28",
+                "sqlglot>=25.5.0,<25.29",
                 "astroid>=3.3.1"]
 
 [project.optional-dependencies]
@@ -172,6 +172,14 @@ exclude_lines = [
     "no cov",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+]
+exclude_also = [
+    "if not ctx:",
+    "except InvalidPath as e:",
+    "if maybe_tree.failure:",
+    "def __repr__(self):",
+    "logger.debug*",
+    "assert *"
 ]
 
 [tool.pylint.main]

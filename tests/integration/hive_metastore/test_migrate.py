@@ -2,16 +2,21 @@ import logging
 from datetime import timedelta
 
 import pytest
+from databricks.sdk import AccountClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
+from databricks.labs.ucx.__about__ import __version__
+
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
+
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
@@ -170,7 +175,6 @@ def test_migrate_external_table(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3054")
 def test_migrate_managed_table_to_external_table_without_conversion(
     ws,
     sql_backend,
@@ -181,7 +185,7 @@ def test_migrate_managed_table_to_external_table_without_conversion(
     env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
+    src_schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/{src_schema_name}'
     src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
@@ -214,7 +218,6 @@ def test_migrate_managed_table_to_external_table_without_conversion(
     assert migration_status[0].dst_table == src_external_table.name
 
 
-@pytest.mark.skip("https://github.com/databrickslabs/ucx/issues/3055")
 def test_migrate_managed_table_to_external_table_with_clone(
     ws,
     sql_backend,
@@ -225,7 +228,7 @@ def test_migrate_managed_table_to_external_table_with_clone(
     env_or_skip,
 ):
     src_schema_name = f"dummy_s{make_random(4)}".lower()
-    src_schema_location = f"{env_or_skip('TEST_MOUNT_CONTAINER')}/a/{src_schema_name}"
+    src_schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/{src_schema_name}'
     src_schema = runtime_ctx.make_schema(name=src_schema_name, location=src_schema_location)
     src_external_table = runtime_ctx.make_table(
         schema_name=src_schema.name,
@@ -646,12 +649,19 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     assert "upgraded_to" not in results
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user):
+# @retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user, env_or_skip):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
 
+    acc_client = AccountClient(
+        host=ws.config.environment.deployment_url("accounts"),
+        account_id=env_or_skip("DATABRICKS_ACCOUNT_ID"),
+        product='ucx',
+        product_version=__version__,
+    )
+    runtime_ctx.with_workspace_info([acc_client.workspaces.get(ws.get_workspace_id())])
     runtime_ctx.make_grant(
         principal=user.user_name,
         action_type="SELECT",
@@ -684,6 +694,29 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
     assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
     assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+
+    acl_migrator = runtime_ctx.acl_migrator
+    acls = acl_migrator.snapshot()
+    assert (
+        Grant(
+            principal=user.user_name,
+            action_type='MODIFY',
+            catalog='hive_metastore',
+            database=src_managed_table.schema_name,
+            table=src_managed_table.name,
+        )
+        in acls
+    )
+    assert (
+        Grant(
+            principal=user.user_name,
+            action_type="SELECT",
+            catalog='hive_metastore',
+            database=src_managed_table.schema_name,
+            table=src_managed_table.name,
+        )
+        in acls
+    )
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))

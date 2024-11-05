@@ -127,6 +127,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "directfs_in_queries", DirectFsAccess),
             functools.partial(table, "used_tables_in_paths", UsedTable),
             functools.partial(table, "used_tables_in_queries", UsedTable),
+            functools.partial(table, "inferred_grants", Grant),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
@@ -379,7 +380,7 @@ class WorkspaceInstaller(WorkspaceContext):
         managed_table_migration_choices = {
             "Migrate MANAGED HMS table as EXTERNAL UC table. This option would require you to convert MANAGED HMS tables to EXTERNAL HMS tables once UC migration is complete, otherwise deleting HMS MANAGED table would delete the migrated UC table": 'SYNC_AS_EXTERNAL',
             "Copy data from MANAGED HMS to MANAGED UC table": 'CLONE',
-            "Convert MANAGED HMS table to EXTERNAL HMS table and migrate as EXTERNAL UC table. This risks data leakage, as once the relevant HMS tables are deleted, the underlying data won't get deleted anymore.": 'CONVERT_TO_EXTERNAL',
+            "Convert MANAGED HMS table to EXTERNAL HMS table and migrate as EXTERNAL UC table. Once the relevant HMS tables are deleted, the underlying data won't get deleted anymore, consider the impact of this change on your data workloads": 'CONVERT_TO_EXTERNAL',
         }
         managed_table_migration_choice = self.prompts.choice_from_dict(
             "If hive_metastore contains managed table with external"
@@ -633,9 +634,16 @@ class WorkspaceInstallation(InstallationMixin):
     def _create_dashboard(self, folder: Path, *, parent_path: str) -> None:
         """Create a lakeview dashboard from the SQL queries in the folder"""
         logger.info(f"Creating dashboard in {folder}...")
-        metadata = DashboardMetadata.from_path(folder).replace_database(
-            database=f"hive_metastore.{self._config.inventory_database}",
-            database_to_replace="inventory",
+        metadata = (
+            DashboardMetadata.from_path(folder)
+            .replace_database(  # Assessment and migration dashboards
+                database=f"hive_metastore.{self._config.inventory_database}",
+                database_to_replace="inventory",
+            )
+            .replace_database(  # Migration progress dashboard
+                catalog=self._config.ucx_catalog,
+                catalog_to_replace="ucx_catalog",
+            )
         )
         metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
         reference = f"{folder.parent.stem}_{folder.stem}".lower()

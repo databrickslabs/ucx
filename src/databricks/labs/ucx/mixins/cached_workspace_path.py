@@ -111,10 +111,11 @@ class _CachedPath(WorkspacePath):
 _CachedPathT = TypeVar("_CachedPathT", bound=_CachedPath)
 
 
-class WorkspaceCache:
+class InvalidPath(ValueError):
+    pass
 
-    class InvalidWorkspacePath(ValueError):
-        pass
+
+class WorkspaceCache:
 
     def __init__(self, ws: WorkspaceClient, max_entries: int = 2048) -> None:
         self._ws = ws
@@ -129,10 +130,10 @@ class WorkspaceCache:
         Args:
             path: a valid workspace path (must be absolute)
         Raises:
-            WorkspaceCache.InvalidWorkspacePath: this is raised immediately if the supplied path is not a syntactically
+            InvalidPath: this is raised immediately if the supplied path is not a syntactically
                 valid workspace path. (This is not raised if the path is syntactically valid but does not exist.)
         """
         if not path.startswith("/"):
             msg = f"Invalid workspace path; must be absolute and start with a slash ('/'): {path}"
-            raise WorkspaceCache.InvalidWorkspacePath(msg)
+            raise InvalidPath(msg)
         return _CachedPath(self._cache, self._ws, path)

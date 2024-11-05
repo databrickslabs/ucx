@@ -195,7 +195,13 @@ class TableMapping:
         except (NotFound, BadRequest) as e:
             logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
 
-    def get_tables_to_migrate(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
+    def get_tables_to_migrate(
+        self,
+        tables_crawler: TablesCrawler,
+        check_uc_table: bool = True,
+    ) -> Collection[TableToMigrate]:
+        # the check_uc_table is added specifically for convert_managed_hms_to_external method
+        # so that it doesn't invoke any UC api which are not supported in non uc cluster
         rules = self.load()
         # Getting all the source tables from the rules
         databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})
@@ -212,7 +218,14 @@ class TableMapping:
                 logger.info(f"Table {rule.as_hms_table_key} is a db demo dataset and will not be migrated")
                 continue
             tasks.append(
-                partial(self._get_table_in_scope_task, TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
+                partial(
+                    self._get_table_in_scope_task,
+                    TableToMigrate(
+                        crawled_tables_keys[rule.as_hms_table_key],
+                        rule,
+                    ),
+                    check_uc_table,
+                )
             )
 
         return Threads.strict("checking all database properties", tasks)
@@ -243,11 +256,11 @@ class TableMapping:
             return None
         return database
 
-    def _get_table_in_scope_task(self, table_to_migrate: TableToMigrate) -> TableToMigrate | None:
+    def _get_table_in_scope_task(self, table_to_migrate: TableToMigrate, check_uc_table: bool) -> TableToMigrate | None:
         table = table_to_migrate.src
         rule = table_to_migrate.rule
 
-        if self.exists_in_uc(table, rule.as_uc_table_key):
+        if check_uc_table and self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
         properties = self._get_table_properties(table)
@@ -260,7 +273,7 @@ class TableMapping:
                 return None
             if value["key"] == "upgraded_to":
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
-                if self.exists_in_uc(table, value["value"]):
+                if check_uc_table and self.exists_in_uc(table, value["value"]):
                     logger.info(
                         f"The table {table.key} was previously migrated to {value['value']}. "
                         f"To revert the table and allow it to be migrated again use the CLI command:"

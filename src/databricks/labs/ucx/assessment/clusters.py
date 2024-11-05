@@ -49,6 +49,18 @@ class ClusterInfo:
 
     __id_attributes__: ClassVar[tuple[str, ...]] = ("cluster_id",)
 
+    @classmethod
+    def from_cluster_details(cls, details: ClusterDetails):
+        return ClusterInfo(
+            cluster_id=details.cluster_id if details.cluster_id else "",
+            cluster_name=details.cluster_name,
+            policy_id=details.policy_id,
+            spark_version=details.spark_version,
+            creator=details.creator_user_name or None,
+            success=1,
+            failures="[]",
+        )
+
 
 class CheckClusterMixin(CheckInitScriptMixin):
     _ws: WorkspaceClient
@@ -95,7 +107,8 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     return data
 
             return None
-        except (NotFound, BadRequest):
+        except (NotFound, BadRequest, FileNotFoundError, UnicodeDecodeError) as e:
+            logger.warning(f"Error reading {init_script_info}: {e}")
             return None
 
     def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
@@ -155,7 +168,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
         all_clusters = list(self._ws.clusters.list())
         return list(self._assess_clusters(all_clusters))
 
-    def _assess_clusters(self, all_clusters):
+    def _assess_clusters(self, all_clusters: Iterable[ClusterDetails]):
         for cluster in all_clusters:
             if cluster.cluster_source == ClusterSource.JOB:
                 continue
@@ -165,15 +178,7 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
                     f"Cluster {cluster.cluster_id} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            cluster_info = ClusterInfo(
-                cluster_id=cluster.cluster_id if cluster.cluster_id else "",
-                cluster_name=cluster.cluster_name,
-                policy_id=cluster.policy_id,
-                spark_version=cluster.spark_version,
-                creator=creator,
-                success=1,
-                failures="[]",
-            )
+            cluster_info = ClusterInfo.from_cluster_details(cluster)
             failures = self._check_cluster_failures(cluster, "cluster")
             if len(failures) > 0:
                 cluster_info.success = 0
@@ -218,20 +223,22 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         self._ws = ws
 
     def _crawl(self) -> Iterable[PolicyInfo]:
-        all_policices = list(self._ws.cluster_policies.list())
-        return list(self._assess_policies(all_policices))
+        all_policies = list(self._ws.cluster_policies.list())
+        return list(self._assess_policies(all_policies))
 
-    def _assess_policies(self, all_policices) -> Iterable[PolicyInfo]:
-        for policy in all_policices:
+    def _assess_policies(self, all_policies: Iterable[Policy]) -> Iterable[PolicyInfo]:
+        for policy in all_policies:
             failures: list[str] = []
             if policy.policy_id is None:
                 continue
             failures.extend(self._check_cluster_policy(policy.policy_id, "policy"))
-            try:
-                spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
-            except KeyError:
-                spark_version = None
-            policy_name = policy.name
+            spark_version = None
+            if policy.definition is not None:
+                try:
+                    spark_version = json.dumps(json.loads(policy.definition)["spark_version"])
+                except KeyError:
+                    pass
+            policy_name = policy.name or "UNDEFINED"
             creator_name = policy.creator_user_name or None
 
             policy_info = PolicyInfo(

@@ -178,9 +178,18 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             curr = queue.pop()
             num_children = len(curr.children)  # 0 - take parent
             if curr.location and (num_children > 1 or num_children == 0):
-                if curr.parent and num_children == 0 and not curr.is_jdbc():  # one table having the prefix
+                # Checking if the parent location is a valid location for external location.
+                # If the table location is a leaf location (a foldermore than 2 levels from the root)
+                # the parent folder will be considered as external location.
+                # If the table location is a root location (a folder at the root level) it will be considered as
+                # external location.
+
+                if (
+                    curr.parent and curr.parent.is_valid() and num_children == 0 and not curr.is_jdbc()
+                ):  # one table having the prefix
                     curr = curr.parent
-                assert curr.location is not None
+                if not curr.location:
+                    continue
                 external_location = ExternalLocation(curr.location, len(list(curr.all_tables())))
                 external_locations.append(external_location)
                 continue

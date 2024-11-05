@@ -1603,6 +1603,9 @@
   "coverage": {
     "coverage": []
   },
+  "cramjam": {
+    "cramjam": []
+  },
   "cryptography": {
     "cryptography": [],
     "cryptography.exceptions": [],
@@ -11298,6 +11301,10 @@
     "more_itertools.more": [],
     "more_itertools.recipes": []
   },
+  "mosaicml-streaming": {
+    "simulation": [],
+    "streaming": []
+  },
   "mpmath": {
     "mpmath": []
   },
@@ -11326,13 +11333,7 @@
     "msal.wstrust_response": []
   },
   "msal-extensions": {
-    "msal_extensions": [],
-    "msal_extensions.cache_lock": [],
-    "msal_extensions.libsecret": [],
-    "msal_extensions.osx": [],
-    "msal_extensions.persistence": [],
-    "msal_extensions.token_cache": [],
-    "msal_extensions.windows": []
+    "msal_extensions": []
   },
   "msgpack": {
     "msgpack": [],
@@ -12361,6 +12362,9 @@
     "oauthlib.signals": [],
     "oauthlib.uri_validate": []
   },
+  "oci": {
+    "oci": []
+  },
   "omegaconf": {
     "omegaconf": [],
     "omegaconf._impl": [],
@@ -12850,6 +12854,9 @@
   "pandocfilters": {
     "pandocfilters": []
   },
+  "paramiko": {
+    "paramiko": []
+  },
   "parso": {
     "parso": []
   },
@@ -13162,6 +13169,9 @@
   },
   "pexpect": {
     "pexpect": []
+  },
+  "phik": {
+    "phik": []
   },
   "phonetics": {
     "phonetics": [],
@@ -26630,6 +26640,74 @@
   "pluggy": {
     "pluggy": []
   },
+  "pmdarima": {
+    "pmdarima.__check_build": [],
+    "pmdarima.__check_build.setup": [],
+    "pmdarima._build_utils": [],
+    "pmdarima._build_utils.pre_build_helpers": [],
+    "pmdarima.arima": [],
+    "pmdarima.arima._auto_solvers": [],
+    "pmdarima.arima._context": [],
+    "pmdarima.arima._doc": [],
+    "pmdarima.arima._validation": [],
+    "pmdarima.arima.approx": [],
+    "pmdarima.arima.arima": [],
+    "pmdarima.arima.auto": [],
+    "pmdarima.arima.seasonality": [],
+    "pmdarima.arima.setup": [],
+    "pmdarima.arima.stationarity": [],
+    "pmdarima.arima.utils": [],
+    "pmdarima.base": [],
+    "pmdarima.compat": [],
+    "pmdarima.compat.matplotlib": [],
+    "pmdarima.compat.numpy": [],
+    "pmdarima.compat.pandas": [],
+    "pmdarima.compat.pytest": [],
+    "pmdarima.compat.sklearn": [],
+    "pmdarima.compat.statsmodels": [],
+    "pmdarima.context_managers": [],
+    "pmdarima.datasets": [],
+    "pmdarima.datasets._base": [],
+    "pmdarima.datasets.airpassengers": [],
+    "pmdarima.datasets.ausbeer": [],
+    "pmdarima.datasets.austres": [],
+    "pmdarima.datasets.gasoline": [],
+    "pmdarima.datasets.heartrate": [],
+    "pmdarima.datasets.lynx": [],
+    "pmdarima.datasets.setup": [],
+    "pmdarima.datasets.stocks": [],
+    "pmdarima.datasets.sunspots": [],
+    "pmdarima.datasets.taylor": [],
+    "pmdarima.datasets.wineind": [],
+    "pmdarima.datasets.woolyrnq": [],
+    "pmdarima.decorators": [],
+    "pmdarima.metrics": [],
+    "pmdarima.model_selection": [],
+    "pmdarima.model_selection._split": [],
+    "pmdarima.model_selection._validation": [],
+    "pmdarima.pipeline": [],
+    "pmdarima.preprocessing": [],
+    "pmdarima.preprocessing.base": [],
+    "pmdarima.preprocessing.endog": [],
+    "pmdarima.preprocessing.endog.base": [],
+    "pmdarima.preprocessing.endog.boxcox": [],
+    "pmdarima.preprocessing.endog.log": [],
+    "pmdarima.preprocessing.exog": [],
+    "pmdarima.preprocessing.exog.base": [],
+    "pmdarima.preprocessing.exog.dates": [],
+    "pmdarima.preprocessing.exog.fourier": [],
+    "pmdarima.preprocessing.exog.setup": [],
+    "pmdarima.preprocessing.setup": [],
+    "pmdarima.setup": [],
+    "pmdarima.utils": [],
+    "pmdarima.utils._show_versions": [],
+    "pmdarima.utils.array": [],
+    "pmdarima.utils.metaestimators": [],
+    "pmdarima.utils.setup": [],
+    "pmdarima.utils.visualization": [],
+    "pmdarima.utils.wrapped": [],
+    "pmdarima.warnings": []
+  },
   "pooch": {
     "pooch": [],
     "pooch._version": [],
@@ -26640,12 +26718,7 @@
     "pooch.utils": []
   },
   "portalocker": {
-    "portalocker": [],
-    "portalocker.constants": [],
-    "portalocker.exceptions": [],
-    "portalocker.portalocker": [],
-    "portalocker.redis": [],
-    "portalocker.utils": []
+    "portalocker": []
   },
   "prometheus_client": {
     "prometheus_client": [],
@@ -27064,6 +27137,9 @@
   "pylint-pytest": {
     "pylint_pytest": []
   },
+  "pynacl": {
+    "nacl": []
+  },
   "pyod": {
     "pyod": [],
     "pyod.models": [],
@@ -27123,6 +27199,9 @@
     "pyod.version": []
   },
   "pyodbc": {},
+  "pyopenssl": {
+    "OpenSSL": []
+  },
   "pyparsing": {
     "pyparsing": [],
     "pyparsing.actions": [],
@@ -28080,6 +28159,9 @@
     "pylsp.text_edit": [],
     "pylsp.uris": [],
     "pylsp.workspace": []
+  },
+  "python-snappy": {
+    "snappy": []
   },
   "pytoolconfig": {
     "pytoolconfig": [],
@@ -32587,6 +32669,71 @@
     "functorch": [],
     "torch": []
   },
+  "torchvision": {
+    "torchvision": [],
+    "torchvision._internally_replaced_utils": [],
+    "torchvision._meta_registrations": [],
+    "torchvision._utils": [],
+    "torchvision.datasets": [],
+    "torchvision.datasets._optical_flow": [],
+    "torchvision.datasets._stereo_matching": [],
+    "torchvision.datasets.caltech": [],
+    "torchvision.datasets.celeba": [],
+    "torchvision.datasets.cifar": [],
+    "torchvision.datasets.cityscapes": [],
+    "torchvision.datasets.clevr": [],
+    "torchvision.datasets.coco": [],
+    "torchvision.datasets.country211": [],
+    "torchvision.datasets.dtd": [],
+    "torchvision.datasets.eurosat": [],
+    "torchvision.datasets.fakedata": [],
+    "torchvision.datasets.fer2013": [],
+    "torchvision.datasets.fgvc_aircraft": [],
+    "torchvision.datasets.flickr": [],
+    "torchvision.datasets.flowers102": [],
+    "torchvision.datasets.folder": [],
+    "torchvision.datasets.food101": [],
+    "torchvision.datasets.gtsrb": [],
+    "torchvision.datasets.hmdb51": [],
+    "torchvision.datasets.imagenet": [],
+    "torchvision.datasets.imagenette": [],
+    "torchvision.datasets.inaturalist": [],
+    "torchvision.datasets.kinetics": [],
+    "torchvision.datasets.kitti": [],
+    "torchvision.datasets.lfw": [],
+    "torchvision.datasets.lsun": [],
+    "torchvision.datasets.mnist": [],
+    "torchvision.datasets.moving_mnist": [],
+    "torchvision.datasets.omniglot": [],
+    "torchvision.datasets.oxford_iiit_pet": [],
+    "torchvision.datasets.pcam": [],
+    "torchvision.datasets.phototour": [],
+    "torchvision.datasets.places365": [],
+    "torchvision.datasets.rendered_sst2": [],
+    "torchvision.datasets.samplers": [],
+    "torchvision.datasets.samplers.clip_sampler": [],
+    "torchvision.datasets.sbd": [],
+    "torchvision.datasets.sbu": [],
+    "torchvision.datasets.semeion": [],
+    "torchvision.datasets.stanford_cars": [],
+    "torchvision.datasets.stl10": [],
+    "torchvision.datasets.sun397": [],
+    "torchvision.datasets.svhn": [],
+    "torchvision.datasets.ucf101": [],
+    "torchvision.datasets.usps": [],
+    "torchvision.datasets.utils": [],
+    "torchvision.datasets.video_utils": [],
+    "torchvision.datasets.vision": [],
+    "torchvision.datasets.voc": [],
+    "torchvision.extension": [],
+    "torchvision.io": [],
+    "torchvision.models": [],
+    "torchvision.ops": [],
+    "torchvision.transforms": [],
+    "torchvision.tv_tensors": [],
+    "torchvision.utils": [],
+    "torchvision.version": []
+  },
   "tornado": {
     "tornado": []
   },
@@ -33640,5 +33787,6 @@
     "zipp.compat": [],
     "zipp.compat.py310": [],
     "zipp.glob": []
-  }
+  },
+  "zstd": {}
 }
