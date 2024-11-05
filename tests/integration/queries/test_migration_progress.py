@@ -211,18 +211,19 @@ def query_problems(make_query) -> list[QueryProblem]:
 
 @pytest.fixture
 def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
+    workspace_file, query = make_workspace_file(), make_query()
     records = [
         DirectFsAccess(
             path="dbfs://folder/notebook_path.csv",
             is_read=False,
             is_write=True,
-            source_id=str(make_workspace_file()),
+            source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id="my file_path"),
+                LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
@@ -231,11 +232,11 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
             path="dbfs://folder/query_path.csv",
             is_read=False,
             is_write=True,
-            source_id=str(make_workspace_file()),
+            source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
-                LineageAtom(object_type="QUERY", object_id=make_query().id, other={"name": "my_query"}),
+                LineageAtom(object_type="QUERY", object_id=query.id, other={"name": "my_query"}),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
