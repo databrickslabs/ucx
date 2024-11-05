@@ -482,6 +482,12 @@ def test_migration_progress_dashboard(
                 Row(count=3),
             ],
         ),
+        (
+            "03_03_migrated_data_asset_references",
+            [
+                Row(count=1),
+            ],
+        ),
     ],
 )
 def test_migration_progress_query(
