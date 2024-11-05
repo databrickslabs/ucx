@@ -849,7 +849,7 @@ support the `SYNC AS EXTERNAL` command.
    command.
 2. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
 3. `update_migration_status` : Refresh the migration status of all data objects.
-4.
+
 ### Migrate external tables CTAS
 
 The table migration workflow `migrate-external-tables-ctas` migrates tables with the `CREATE TABLE AS SELECT * FROM`
