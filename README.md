@@ -427,17 +427,13 @@ Failed workflows can be fixed with the [`repair-run` command](#repair-run-comman
 
 ![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
 
-The assessment workflow can be triggered using the Databricks UI or via
-the [`ensure-assessment-run command](#ensure-assessment-run-command):
+The assessment workflow can be triggered using the Databricks UI or via the
+[`ensure-assessment-run` command](#ensure-assessment-run-command).
 
-```commandline
-databricks labs ucx ensure-assessment-run
-```
-
-The assessment workflow retrieves - or *crawls* - all [workspace assets](https://docs.databricks.com/en/workspace/workspace-assets.html)
+The assessment workflow retrieves - or *crawls* - details of [workspace assets](https://docs.databricks.com/en/workspace/workspace-assets.html)
 and [securable objects in the Hive metastore](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore)
-relevant for upgrading to UC. Specifically, the workflow retrieves the required details of these assets and objects to
-assess the compatibility with and plan the upgrading to Unity Catalog. The output of each task is stored in the
+relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` tasks retrieve assess and objects. The
+`assess_` tasks assess the compatibility with UC. The output of each task is stored in the
 [inventory database](#installation-resources) so that it can be used for further analysis and decision-making through
 the [assessment report](docs/assessment.md).
 
@@ -450,58 +446,57 @@ the [assessment report](docs/assessment.md).
 2. `crawl_udfs`: This task retrieves UDF definitions from the Hive metastore and persists the definitions in
    the `udfs` table.
 3. `setup_tacl`: (Optimization) This task starts the `tacl` job cluster in parallel to other tasks.
-3. `crawl_grants`: This task retrieves [privileges you can grant on Hive objects](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#privileges-you-can-grant-on-hive-metastore-objects)
+4. `crawl_grants`: This task retrieves [privileges you can grant on Hive objects](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#privileges-you-can-grant-on-hive-metastore-objects)
    and persists the privilege definitions in the `grants` table
    The retrieved permission definitions include information such as:
    - Securable object: schema, table, view, (anonymous) function or any file.
    - Principal: user, service principal or group
    - Action type: grant, revoke or deny
-4. `estimate_table_size_for_migration`: This task analyzes the Delta table retrieved by `crawl_tables` to retrieve
+5. `estimate_table_size_for_migration`: This task analyzes the Delta table retrieved by `crawl_tables` to retrieve
    an estimate of their size and persists the table sizes in the `table_size` table. The table size support the decision
    for using the `SYNC` or `CLONE` [table migration strategy](#step-3-upgrade-the-metastore).
-5. `crawl_mounts`: This task retrieves mount point definitions and persists the definitions in the `mounts` table.
-6. `guess_external_locations`: This task guesses shared mount path prefixes of [external tables](https://docs.databricks.com/en/sql/language-manual/sql-ref-external-tables.html)
+6. `crawl_mounts`: This task retrieves mount point definitions and persists the definitions in the `mounts` table.
+7. `guess_external_locations`: This task guesses shared mount path prefixes of [external tables](https://docs.databricks.com/en/sql/language-manual/sql-ref-external-tables.html)
    retrieved by `crawl_tables` that use mount points and persists the locations in the `external_locations` table. The
    goal is to identify the to-be created UC [external locations](#step-23-create-external-locations).
-7. `assess_jobs`: This task retrieves the job definitions and persists the definitions in the `jobs` table. Job
+8. `assess_jobs`: This task retrieves the job definitions and persists the definitions in the `jobs` table. Job
    definitions may require updating to become UC compatible.
-8. `assess_clusters`: This task retrieves the clusters definitions and persists the definitions in the `clusters` table.
+9. `assess_clusters`: This task retrieves the clusters definitions and persists the definitions in the `clusters` table.
     Cluster definitions may require updating to become UC compatible.
-9. `assess_pipelines`: This task retrieves the [Delta Live Tables](https://www.databricks.com/product/delta-live-tables)
-   (DLT) pipelines definitions and persists the definitions in the `pipelines` table. DLT definitions may require
+10. `assess_pipelines`: This task retrieves the [Delta Live Tables](https://www.databricks.com/product/delta-live-tables)
+    (DLT) pipelines definitions and persists the definitions in the `pipelines` table. DLT definitions may require
     updating to become UC compatible.
-9. `assess_incompatible_submit_runs` : This module scans through all the Submit Runs and identifies those runs which may
-   become incompatible after
-   the workspace attachment. It looks for:
-    - All submit runs with DBR >=11.3 and data_security_mode:None
-
-   It also combines several submit runs under a single pseudo_id based on hash of the submit run configuration.
-   Subsequently, a list of all the incompatible runs with failures are stored in the `$inventory.submit_runs` table
-10. `crawl_cluster_policies` : This module scans through all the Cluster Policies and get the necessary information
-    It looks for:
-    - Clusters Policies with Databricks Runtime (DBR) version earlier than 11.3
-
-    Subsequently, a list of all the policies with matching configurations are stored in the `$inventory.policies` table.
-10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job
-    cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service
-    Principals who have been given access to the Azure storage accounts via spark configurations referred in those
-    entities. The list of all the Azure Service Principals referred in those configurations is saved in
-    the `$inventory.azure_service_principals` table.
-11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an
-    Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in
-    those scripts.
-11. `workspace_listing` : Scans the workspace for workspace objects. It recursively list all sub directories and
-    compiles a list of directories, notebooks, files, repos and libraries in the workspace. It uses multi-threading to
-    parallelize the listing process to speed up execution on big workspaces. It accepts starting path as the parameter
-    defaulted to the root path '/'.
-12. `crawl_permissions` : Scans the workspace-local groups and all their permissions. The list is stored in
-    the `$inventory.permissions` Delta table. This is the first step for the _group migration_ process, which is
-    continued in the `migrate-groups` workflow. This step includes preparing Legacy Table ACLs for local group
-    migration.
-13. `crawl_groups`: Scans all groups for the local group migration scope.
-12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration
-    problems. It also collects direct filesystem access patterns that require attention.
-13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration
+11. `assess_incompatible_submit_runs` : This task retrieves
+    [job runs](https://docs.databricks.com/en/jobs/monitor.html#view-runs-for-a-job), also known as
+    [job submit runs](https://docs.databricks.com/api/workspace/jobs/submit), and persists the definitions in the
+    `submit_runs` table. Incompatibility with UC is assessed:
+    - [Databricks runtime](https://www.databricks.com/glossary/what-is-databricks-runtime) should be version 11.3 or above
+    - [Access mode](https://docs.databricks.com/en/compute/configure.html#access-modes) should be set.
+12. `crawl_cluster_policies` : This tasks retrieves
+    [cluster policies](https://docs.databricks.com/en/admin/clusters/policies.html) and persists the policies in the
+    `policies` table. Incompatibility with UC is assessed:
+    - [Databricks runtime](https://www.databricks.com/glossary/what-is-databricks-runtime) should be version 11.3 or above
+13. `assess_azure_service_principals`: This tasks retrieves Azure service principal
+    [authentications information](https://learn.microsoft.com/en-us/azure/databricks/connect/storage/tutorial-azure-storage#connect-adls)
+    from Spark configurations to access storage accounts and persists these configuration information
+    in `azure_service_principals` table. The Spark configurations from the following places are retrieved:
+    - Clusters configurations
+    - Cluster policies
+    - Job cluster configurations
+    - Pipeline configurations
+    - Warehouse configuration
+14. `assess_global_init_scripts`: This task retrieves
+    [global init scripts](https://docs.databricks.com/en/init-scripts/global.html) and persists references to the
+    scripts in the `global_init_scripts` table. Again, Azure service principal authentication information might be given
+    in those scripts.
+15. `workspace_listing` : This tasks lists [workspace files](https://docs.databricks.com/en/workspace/workspace-assets.html#files)
+    recursively to compile a collection of directories, notebooks, files, repos and libraries. The task uses multi-threading
+    to parallelize the listing process for speeding up execution on big workspaces.
+16. `crawl_permissions` : This tasks retrieves workspace-local groups permissions and persists these permissions in the `permissions` table.
+17. `crawl_groups`: This tasks retrieves workspace-local groups and persists these permissions in the `groups` table.
+18. `assess_dashboards`: This task retrieves the dashboards to analyze their queries for
+    [migration problems](#linter-message-codes)
+19. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration
     problems. It also collects direct filesystem access patterns that require attention.
 
 
