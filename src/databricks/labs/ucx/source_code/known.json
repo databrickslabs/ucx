@@ -26722,12 +26722,7 @@
   },
   "preshed": {
     "preshed": [],
-    "preshed.about": [],
-    "preshed.tests": [],
-    "preshed.tests.test_bloom": [],
-    "preshed.tests.test_counter": [],
-    "preshed.tests.test_hashing": [],
-    "preshed.tests.test_pop": []
+    "preshed.about": []
   },
   "prometheus_client": {
     "prometheus_client": [],
