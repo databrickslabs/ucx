@@ -192,13 +192,13 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def query_problems(make_query) -> list[QueryProblem]:
-    query = make_query()
+def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
+    dashboard, query = make_dashboard(), make_query()
     records = [
         QueryProblem(
-            "dashboard_id",
-            "dashboard_parent",
-            "dashboard_name",
+            dashboard.id,
+            dashboard.parent,
+            dashboard.name,
             query.id,
             query.parent,
             query.name,
@@ -405,7 +405,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 38, 2))]),
+        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 39, 2))]),
         ("01_01_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_02_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
         ("01_03_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
