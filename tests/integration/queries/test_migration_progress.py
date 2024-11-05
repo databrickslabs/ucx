@@ -246,13 +246,13 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
-def used_tables(make_workspace_file) -> list[UsedTable]:
-    workspace_file = make_workspace_file()
+def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
+    table, workspace_file = make_table(catalog_name="hive_metastore"), make_workspace_file()
     records = [
         UsedTable(
-            catalog_name="hive_metastore",  # Table is pending migration
-            schema_name="schema2",
-            table_name="table1",
+            catalog_name=table.catalog_name,  # This table is pending migration
+            schema_name=table.schema_name,
+            table_name=table.name,
             is_read=False,
             is_write=True,
             source_id=str(workspace_file),
@@ -267,7 +267,7 @@ def used_tables(make_workspace_file) -> list[UsedTable]:
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         ),
         UsedTable(
-            catalog_name="catalog",  # Migrated table
+            catalog_name="catalog",  # This table is migrated
             schema_name="staff_db",
             table_name="employees",
             is_read=False,
