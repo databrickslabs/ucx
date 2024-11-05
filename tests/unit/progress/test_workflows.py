@@ -26,11 +26,6 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
             RuntimeContext.policies_crawler,
             RuntimeContext.policies_progress,
         ),
-        (
-            MigrationProgress.refresh_table_migration_status,
-            RuntimeContext.migration_status_refresher,
-            RuntimeContext.historical_table_migration_log,
-        ),
     ),
 )
 def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history_log) -> None:

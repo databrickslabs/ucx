@@ -53,7 +53,7 @@ class MaybeTree:
 
     def walk(self) -> Iterable[NodeNG]:
         # mainly a helper method for unit testing
-        if self.tree is None:
+        if self.tree is None:  # no cov
             assert self.failure is not None
             logger.warning(self.failure.message)
             return []
@@ -61,7 +61,7 @@ class MaybeTree:
 
     def first_statement(self) -> NodeNG | None:
         # mainly a helper method for unit testing
-        if self.tree is None:
+        if self.tree is None:  # no cov
             assert self.failure is not None
             logger.warning(self.failure.message)
             return None

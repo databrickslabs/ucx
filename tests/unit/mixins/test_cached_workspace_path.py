@@ -8,7 +8,7 @@ from tests.unit import mock_workspace_client
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache
+from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache, InvalidPath
 from databricks.labs.ucx.source_code.base import decode_with_bom
 
 
@@ -29,7 +29,7 @@ def test_path_like_returns_cached_instance() -> None:
 
 def test_non_absolute_path_error() -> None:
     cache = _WorkspaceCacheFriend(mock_workspace_client())
-    with pytest.raises(WorkspaceCache.InvalidWorkspacePath, match="Invalid workspace path; must be absolute"):
+    with pytest.raises(InvalidPath, match="Invalid workspace path; must be absolute"):
         _ = cache.get_workspace_path("not/an/absolute/path")
 
 
