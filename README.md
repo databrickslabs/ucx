@@ -374,9 +374,13 @@ Databricks CLI will confirm a few options:
 
 # Migration process
 
-On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow),
-followed by [group migration](#group-migration-workflow), [table migration process](#Table-Migration),
-finalised with the [code migration](#code-migration-commands). It can be described as:
+On a high level, the steps in migration process are:
+1. [assessment workflow](#assessment-workflow),
+2. [group migration](#group-migration-workflow)
+3. [table migration](#Table-Migration),
+4. [code migration](#code-migration-commands).
+
+The migration process can be schematic visualized as:
 
 ```mermaid
 flowchart TD
