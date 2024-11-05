@@ -122,7 +122,7 @@ def _id_list(cls: type, ids=None):
 
 
 def _load_sources(cls: type, *filenames: str):
-    # TODO: remove the usage of it in favor of MockPathLookup
+    # Utilize MockPathLookup to load source codes
     if not filenames:
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
