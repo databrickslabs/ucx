@@ -479,7 +479,7 @@ def test_migration_progress_dashboard(
         (
             "03_01_pending_migration_data_asset_references",
             [
-                Row(count=1),
+                Row(count=3),
             ],
         ),
     ],
