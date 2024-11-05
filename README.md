@@ -522,9 +522,12 @@ Alternatively, manually create the external locations
 
 ##### Step 2: Create Catalogs and Schemas
 
-In this step, we will create the UC catalogs and schemas required for the target tables using the
-[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command will create the UC catalogs and
-schemas based on the mapping file created in the previous step.
+Create Uniyt Catalog [catalogs](https://learn.microsoft.com/en-us/azure/databricks/catalogs/) and
+[schemas](https://learn.microsoft.com/en-us/azure/databricks/schemas/) to organize the destination tables and views in
+by running the
+[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command creates the UC catalogs and
+schemas based on the [table mapping file](#table-mapping). Additionally, it migrates Hive metastore database
+permissions if present.
 
 This step requires considering how to [physically separate data in storage](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#data-is-physically-separated-in-storage)
 within UC. As [Databricks recommends storing managed data at the catalog level](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#configure-a-unity-catalog-metastore),
@@ -537,8 +540,6 @@ reused when using subpaths, for example, a folder in a cloud storage
 
 ### Migrate Hive metastore data objects
 
-    4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC
-    4. Grant - The table upgrade the newly created object the same permission as the original object.
 In this step, tables and views are migrated using the following workflows:
 
 ```mermaid
@@ -579,7 +580,7 @@ flowchart LR
     migrate-tables -- 3rd --> mt_ctas_wf
 ```
 
-The table migration workflows can be triggered using the [`migrate-tables` command](#migrate-tables-command) or by
+The [table migration workflows](#table-migration-workflow) can be triggered using the [`migrate-tables` command](#migrate-tables-command) or by
 starting the workflows from the workspace UI manually. The table migration workflows are designed to minimize data
 copying and to maintain metadata while allowing users to choose preferred strategies where possible. Chose the
 strategies for migrating tables using the table below:
@@ -600,54 +601,61 @@ which the object is migrated. This property signals that the object is out-of-sc
 that the view dependency exists within UC. The created UC objects are marked with an `upgraded_from` property containing
 the Hive metastore identifier from which the object was migrated.
 
+Finally, the table migration workflows also migrate Hive metastore permissions to Unity Catalog.
+
+Considerations:
+- You may want to run the workflows multiple times to migrate tables in phases.
+- If your Delta tables in DBFS root have a large number of files, consider:
+  - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
+  - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
+- Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
+- You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
+
 Additional references:
 - [Databricks file system (dbfs)](https://docs.databricks.com/en/dbfs/index.html)
 - [External tables](https://docs.databricks.com/en/tables/external.html)
 
-#### Step 4: Odds and Ends
-The following steps can be used to repair/amend the metastore after the upgrade process.
+### Odds and Ends
 
-##### Step 4.1: Skipping schema, table or view
+The following sections detail how to repair/amend the UC metastore after the upgrade process.
+
+#### Skip migrating schemas, tables or views
 
 ```bash
 databricks labs ucx skip --schema X [--table Y] [--view Zj]
 ```
 
-This command will mark the schema, table or view as to-be skipped during the migration processes,
-see [`skip` command](#skip-command).
+The [`skip` command](#skip-command) marks a schema, table or view as to-be skipped during the migration processes.
 
-##### Step 4.2: Moving objects
+####  Move data objects
+
 ```bash
 databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
-This command will move the object from the source location to the target location.
-The `upgraded_from` property will be updated to reflect the new location on the source object.
-This command should be used in case the object was created in the wrong location.
 
-##### Step 4.2: Aliasing objects
+The [`move` command](#move-command) moves the object from the source to the target location. The `upgraded_from`
+property are updated to reflect the new location on the source object. Use this command if the data object is migrated
+to the wrong destination.
+
+#### Alias data objects
+
 ```bash
 databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
-This command will create an alias for the object in the target location. It will create a view for tables that need aliasing.
-It will create a mirror view to view that is marked as alias.
-The use of this command is in case we need multiple identical tables or views in multiple locations.
-HMS allows creating multiple tables pointing to the same location.
-UC does not support creating multiple tables pointing to the same location, thus we need to create an alias for the table.
 
-##### Step 4.3: Reverting objects
+This [`alias` command](#alias-command) creates an alias for the object in the target location by creating a view reading
+from the table that needs aliasing. It will create a mirror view to view that is marked as alias.
+Use this command if Hive metastore tables point to the same location as UC does not support UC does not support tables
+with overlapping data locations.
+
+#### Revert migrated data objects
+
 ```bash
 databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]
 ```
-This command will remove the upgraded table and reset the `upgraded_from` property. It will allow for upgrading the table again.
 
-
-### Other considerations
-- You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
-- If your Delta tables in DBFS root have a large number of files, consider:
-    - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
-    - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
-- Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
-- You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
+The [`revert-migrated-tables` command](#revert-migrated-tables-command) drops the Unity Catalog table or view and reset
+the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -812,9 +820,44 @@ For additional information see:
 
 [[back to top](#databricks-labs-ucx)]
 
-## Table migration workflow
+## Table migration workflows
 
-TODO
+This section lists the workflows that migrate tables and views. See [this section](#migrate-hive-metastore-data-objects)
+for deciding which workflow to run and additional context for migrating tables.
+
+### Migrate tables
+
+The general table migration workflow `migrate-tables` migrates all tables and views using default strategies.
+
+1. `migrate_external_tables_sync` : This step migrates the external tables that are supported by `SYNC` command.
+2. `migrate_dbfs_root_delta_tables` : This step migrates delta tables stored in DBFS root using the `DEEP CLONE`
+   command.
+3. `migrate_dbfs_root_non_delta_tables` : This step migrates non-delta tables stored in DBFS root using the `CREATE
+   TABLE AS SELECT * FROM` command.
+4. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+5. `update_migration_status` : Refresh the migration status of all data objects.
+
+### Migrate external Hive SerDe tables
+
+The experimental table migration workflow `migrate-external-hiveserde-tables-in-place-experimental` migrates tables that
+support the `SYNC AS EXTERNAL` command.
+
+1. `migrate_hive_serde_in_place` : This step migrates the Hive SerDe tables that are supported by `SYNC AS EXTERNAL`
+   command.
+2. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+3. `update_migration_status` : Refresh the migration status of all data objects.
+4.
+### Migrate external tables CTAS
+
+The table migration workflow `migrate-external-tables-ctas` migrates tables with the `CREATE TABLE AS SELECT * FROM`
+command.
+
+1. `migrate_other_external_ctas` This step migrates the Hive Serde tables using the `CREATE TABLE AS SELECT * FROM`
+   command.
+2. `migrate_hive_serde_ctas` : This step migrates the Hive Serde tables using the `CREATE TABLE AS SELECT * FROM`
+   command.
+4. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+4. `update_migration_status` : Refresh the migration status of all data objects.
 
 ## Post-migration data reconciliation workflow
 
