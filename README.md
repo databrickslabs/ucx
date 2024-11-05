@@ -499,15 +499,13 @@ the [assessment report](docs/assessment.md).
 19. `assess_workflows`: This task retrieves the jobs to analyze their notebooks and files for
     [migration problems](#linter-message-codes).
 
+After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
+See [this guide](docs/assessment.md) for more details.
+
 ![report](docs/assessment-report.png)
 
-After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
-
-The UCX assessment workflow is intended to only run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx) and [installing](#install-ucx) it again.
-
-Once you finish the assessment, proceed to the [group migration workflow](#group-migration-workflow).
-See the [migration process diagram](#migration-process) to understand the role of the assessment workflow in the migration process.
-
+Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
+[migration process diagram](#migration-process).
 
 [[back to top](#databricks-labs-ucx)]
 
