@@ -273,7 +273,11 @@ databricks --debug labs ucx <command>
 
 In the installation folder, the UCX configuration is kept.
 
-## [ADVANCED] Force install over existing UCX
+## Advanced installation options
+
+Advanced installation options are detailed below.
+
+### Force install over existing UCX
 Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
 The values for the environment variable are 'global' and 'user'.
 
@@ -301,7 +305,7 @@ At this moment there is no global override over a user installation of UCX. As t
 
 [[back to top](#databricks-labs-ucx)]
 
-## [ADVANCED] Installing UCX on all workspaces within a Databricks account
+### Installing UCX on all workspaces within a Databricks account
 Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
 
 * `UCX_FORCE_INSTALL=account databricks labs install ucx`
@@ -314,7 +318,7 @@ This installation mode will automatically select the following options:
 
 [[back to top](#databricks-labs-ucx)]
 
-## [ADVANCED] Installing UCX with company hosted PYPI mirror
+### Installing UCX with company hosted PYPI mirror
 
 Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
 company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
