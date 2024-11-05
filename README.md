@@ -68,26 +68,26 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [[LEGACY] Scan tables in mounts Workflow](#legacy-scan-tables-in-mounts-workflow)
       * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
     * [[LEGACY] Migrate tables in mounts Workflow](#legacy-migrate-tables-in-mounts-workflow)
-    * [Linter message codes](#linter-message-codes)
-      * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
-      * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
-      * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
-      * [`dependency-not-found`](#dependency-not-found)
-    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
-      * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
-      * [`not-supported`](#not-supported)
-      * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
-      * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
-      * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
-      * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
-      * [`sql-parse-error`](#sql-parse-error)
-      * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
-      * [`table-migrated-to-uc`](#table-migrated-to-uc)
-      * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
-      * [`unsupported-magic-line`](#unsupported-magic-line)
   * [[EXPERIMENTAL] Migration Progress Workflow](#experimental-migration-progress-workflow)
+* [Linter message codes](#linter-message-codes)
+  * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
+  * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
+  * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
+  * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
+  * [`direct-filesystem-access`](#direct-filesystem-access)
+  * [`dependency-not-found`](#dependency-not-found)
+  * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+  * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
+  * [`not-supported`](#not-supported)
+  * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+  * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
+  * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
+  * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
+  * [`sql-parse-error`](#sql-parse-error)
+  * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
+  * [`table-migrated-to-uc`](#table-migrated-to-uc)
+  * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
+  * [`unsupported-magic-line`](#unsupported-magic-line)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -903,13 +903,26 @@ The output is processed and displayed in the migration dashboard using the in `r
 
 [[back to top](#databricks-labs-ucx)]
 
-### Linter message codes
+## [EXPERIMENTAL] Migration Progress Workflow
+
+The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
+workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
+progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
+
+- `workflow_runs`: Tracks the status of the workflow runs.
+
+_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
+
+[[back to top](#databricks-labs-ucx)]
+
+# Linter message codes
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
 
 Here's the detailed explanation of the linter message codes:
 
-#### `cannot-autofix-table-reference`
+## `cannot-autofix-table-reference`
 
 This indicates that the linter has found a table reference that cannot be automatically fixed. The user must manually
 update the table reference to point to the correct table in Unity Catalog. This mostly occurs, when table name is
@@ -949,7 +962,7 @@ for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `catalog-api-in-shared-clusters`
+## `catalog-api-in-shared-clusters`
 
 `spark.catalog.*` functions require Databricks Runtime 14.3 LTS or above on Unity Catalog clusters in Shared access
 mode, so of your code has `spark.catalog.tableExists("table")` or `spark.catalog.listDatabases()`, you need to ensure
@@ -957,7 +970,7 @@ that your cluster is running the correct runtime version and data security mode.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `changed-result-format-in-uc`
+## `changed-result-format-in-uc`
 
 Calls to these functions would return a list of `<catalog>.<database>.<table>` instead of `<database>.<table>`. So if
 you have code like this:
@@ -971,7 +984,7 @@ you need to make sure that `do_stuff_with_table` can handle the new format.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `direct-filesystem-access-in-sql-query`
+## `direct-filesystem-access-in-sql-query`
 
 Direct filesystem access is deprecated in Unity Catalog.
 DBFS is no longer supported, so if you have code like this:
@@ -984,7 +997,7 @@ you need to change it to use UC tables.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `direct-filesystem-access`
+## `direct-filesystem-access`
 
 Direct filesystem access is deprecated in Unity Catalog.
 DBFS is no longer supported, so if you have code like this:
@@ -1003,7 +1016,7 @@ You need to change it to use UC tables or UC volumes.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `dependency-not-found`
+## `dependency-not-found`
 
 This message indicates that the linter has found a dependency, like Python source file or a notebook, that is not
 available in the workspace. The user must ensure that the dependency is available in the workspace. This usually
@@ -1011,7 +1024,7 @@ means an error in the user code.
 
 [[back to top](#databricks-labs-ucx)]
 
-### `jvm-access-in-shared-clusters`
+## `jvm-access-in-shared-clusters`
 
 You cannot access Spark Driver JVM on Unity Catalog clusters in Shared Access mode. If you have code like this:
 
@@ -1030,7 +1043,7 @@ you need to change it to use Python equivalents.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `legacy-context-in-shared-clusters`
+## `legacy-context-in-shared-clusters`
 
 SparkContext (`sc`) is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using SparkSession
 (`spark`). Example code that triggers this message:
@@ -1047,13 +1060,13 @@ sc.parallelize([1, 2, 3])
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `not-supported`
+## `not-supported`
 
 Installing eggs is no longer supported on Databricks 14.0 or higher.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `notebook-run-cannot-compute-value`
+## `notebook-run-cannot-compute-value`
 
 Path for `dbutils.notebook.run` cannot be computed and requires adjusting the notebook path.
 It is not clear for automated code analysis where the notebook is located, so you need to simplify the code like:
@@ -1072,7 +1085,7 @@ dbutils.notebook.run(a)
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `python-udf-in-shared-clusters`
+## `python-udf-in-shared-clusters`
 
 `applyInPandas` requires DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode. Example:
 
@@ -1097,7 +1110,7 @@ spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `rdd-in-shared-clusters`
+## `rdd-in-shared-clusters`
 
 RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use mapInArrow() or Pandas UDFs instead.
 
@@ -1107,7 +1120,7 @@ df.rdd.mapPartitions(myUdf)
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `spark-logging-in-shared-clusters`
+## `spark-logging-in-shared-clusters`
 
 Cannot set Spark log level directly from code on Unity Catalog clusters in Shared access mode. Remove the call and set
 the cluster spark conf `spark.log.level` instead:
@@ -1132,27 +1145,27 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `sql-parse-error`
+## `sql-parse-error`
 
 This is a generic message indicating that the SQL query could not be parsed. The user must manually check the SQL query.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `sys-path-cannot-compute-value`
+## `sys-path-cannot-compute-value`
 
 Path for `sys.path.append` cannot be computed and requires adjusting the path. It is not clear for automated code
 analysis where the path is located.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `table-migrated-to-uc`
+## `table-migrated-to-uc`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `to-json-in-shared-clusters`
+## `to-json-in-shared-clusters`
 
 `toJson()` is not available on Unity Catalog clusters in Shared access mode. Use `toSafeJson()` on DBR 13.3 LTS or
 above to get a subset of command context information. Example code that triggers this message:
@@ -1163,22 +1176,9 @@ dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `unsupported-magic-line`
+## `unsupported-magic-line`
 
 This message indicates the code that could not be analysed by UCX. User must check the code manually.
-
-[[back to top](#databricks-labs-ucx)]
-
-## [EXPERIMENTAL] Migration Progress Workflow
-
-The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
-workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
-progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
-
-- `workflow_runs`: Tracks the status of the workflow runs.
-
-_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
-the [assessment workflow](#assessment-workflow)._
 
 [[back to top](#databricks-labs-ucx)]
 
