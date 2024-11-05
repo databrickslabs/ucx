@@ -14,7 +14,7 @@
 WITH owners_with_failures AS (
     SELECT owner
     FROM ucx_catalog.multiworkspace.objects_snapshot
-    WHERE object_type IN ('DirectFsAccess', 'UsedTable') AND array_contains(failures, 'Pending migration')
+    WHERE object_type IN ('DirectFsAccess', 'UsedTable') AND SIZE(failures) > 0
 )
 
 SELECT
