@@ -234,12 +234,12 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 The following resources are installed by UCX:
 
-| Installed UCX resources                     | Description                                                                                      |
-|---------------------------------------------|--------------------------------------------------------------------------------------------------|
-| Inventory database                          | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| [Workflows](#workflows)                     | Workflows to execute UCX                                                                         |
-| Lakeview dashboards                         | Dashboards to visualize UCX outcomes.                                                            |
-| [Installation folder](#installation-folder) | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
+| Installed UCX resources                           | Description                                                                                      |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| [Inventory database](./docs/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
+| Lakeview dashboards                               | Dashboards to visualize UCX outcomes.                                                            |
+| [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
 
 ## Installation folder
 
