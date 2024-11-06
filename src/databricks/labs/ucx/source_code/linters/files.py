@@ -66,8 +66,13 @@ class LocalFile(SourceContainer):
         if self._language is CellLanguage.PYTHON:
             context = graph.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
-            return analyzer.build_inherited_context(child_path)
-        return InheritedContext(None, False)
+            inherited = analyzer.build_inherited_context(child_path)
+            problems = list(inherited.problems)
+            for idx, problem in enumerate(problems):
+                if problem.is_path_missing():
+                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
+            return dataclasses.replace(inherited, problems=problems)
+        return InheritedContext(None, False, [])
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"
