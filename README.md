@@ -238,7 +238,7 @@ The following resources are installed by UCX:
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | [Inventory database](./docs/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
 | [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
-| Lakeview dashboards                               | Dashboards to visualize UCX outcomes.                                                            |
+| [Dashboards](#dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
 | [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
 
 ## Installation folder
