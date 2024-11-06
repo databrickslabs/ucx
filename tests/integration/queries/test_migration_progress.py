@@ -592,7 +592,7 @@ def test_migration_progress_query_data_asset_references_pending_migration(
             failure="Pending migration",
             is_read=False,
             is_write=True,
-            link=f"/#workspace/Users/{current_user}/{used_table.source_id}"
+            link=f"/#workspace{used_table.source_id}"
         )
         rows.append(row)
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
