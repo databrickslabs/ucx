@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TypeVar
 from urllib import parse
 
-from databricks.labs.blueprint.parallel import ManyError, Threads
+from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -430,7 +430,8 @@ class WorkflowLinter:
         self._directfs_crawler.dump_all(job_dfsas)
         self._used_tables_crawler.dump_all(job_tables)
         if len(errors) > 0:
-            raise ManyError(errors)
+            error_messages = "\n".join([str(error) for error in errors])
+            logger.warning(f"Errors occurred during linting:\n{error_messages}")
 
     def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:

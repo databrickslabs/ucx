@@ -26720,6 +26720,10 @@
   "portalocker": {
     "portalocker": []
   },
+  "preshed": {
+    "preshed": [],
+    "preshed.about": []
+  },
   "prometheus_client": {
     "prometheus_client": [],
     "prometheus_client.asgi": [],
@@ -26910,6 +26914,9 @@
     "pure_eval.my_getattr_static": [],
     "pure_eval.utils": [],
     "pure_eval.version": []
+  },
+  "py-cpuinfo": {
+    "cpuinfo": []
   },
   "py4j": {
     "py4j": [
