@@ -247,7 +247,8 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 @pytest.fixture
 def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
-    table, workspace_file = make_table(catalog_name="hive_metastore"), make_workspace_file()
+    table = make_table(catalog_name="hive_metastore")
+    workspace_file = make_workspace_file(content=f'df = spark.read.table("{table.full_name}")\ndisplay(df)')
     records = [
         UsedTable(
             catalog_name=table.catalog_name,  # This table is pending migration
@@ -261,7 +262,7 @@ def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id=str(make_workspace_file())),
+                LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
@@ -272,7 +273,7 @@ def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
             table_name="employees",
             is_read=False,
             is_write=True,
-            source_id=str(workspace_file),
+            source_id=str(make_workspace_file()),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
