@@ -53,7 +53,7 @@ class TableView:
 
 
 class TableMigrationIndex:
-    def __init__(self, tables: list[TableMigrationStatus]):
+    def __init__(self, tables: Iterable[TableMigrationStatus]):
         self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
     def is_migrated(self, schema: str, table: str) -> bool:
@@ -84,7 +84,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         self._tables_crawler = tables_crawler
 
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
-        return TableMigrationIndex(list(self.snapshot(force_refresh=force_refresh)))
+        return TableMigrationIndex(self.snapshot(force_refresh=force_refresh))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}

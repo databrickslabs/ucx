@@ -48,7 +48,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
             index[job_problem.job_id].append(failure)
         return index
 
-    def _encode_record_as_historical(self, record: JobInfo) -> Historical:
-        historical = super()._encode_record_as_historical(record)
+    def _encode_record_as_historical(self, record: JobInfo, snapshot_context: None) -> Historical:
+        historical = super()._encode_record_as_historical(record, snapshot_context)
         failures = self._job_problems.get(int(record.job_id), [])
         return replace(historical, failures=historical.failures + failures)
