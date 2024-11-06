@@ -234,12 +234,18 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 The following resources are installed by UCX:
 
-| Installed UCX resources    | Description                                                                                      |
-|----------------------------|--------------------------------------------------------------------------------------------------|
-| Inventory database         | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| [Workflows](#workflows)    | Workflows to execute UCX                                                                         |
-| Lakeview dashboards        | Dashboards to visualize UCX outcomes.                                                            |
-| Installation folder        | A workspace folder containing UCX files in `/Applications/ucx`.                                  |
+| Installed UCX resources                     | Description                                                                                      |
+|---------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Inventory database                          | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](#workflows)                     | Workflows to execute UCX                                                                         |
+| Lakeview dashboards                         | Dashboards to visualize UCX outcomes.                                                            |
+| [Installation folder](#installation-folder) | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
+
+## Installation folder
+
+UCX is in installed in the workspace folder `/Applications/ucx/`. This folder contains UCX's code resources, like the
+[source code](./src) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
+*directly* used by UCX users. Resources that can be of importance to users are detailed in the subsections below.
 
 ### Readme notebook
 
@@ -914,6 +920,10 @@ progress by updating the following [UCX catalog](#create-ucx-catalog-command) ta
 
 _Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
 the [assessment workflow](#assessment-workflow)._
+
+[[back to top](#databricks-labs-ucx)]
+
+# Dashboards
 
 [[back to top](#databricks-labs-ucx)]
 
