@@ -216,6 +216,8 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
         DirectFsAccess(
             path="dbfs://folder/notebook_path.csv",
             is_read=False,
+            # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
             is_write=True,
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
@@ -231,6 +233,8 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
         DirectFsAccess(
             path="dbfs://folder/query_path.csv",
             is_read=False,
+            # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
             is_write=True,
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
@@ -255,6 +259,8 @@ def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
             schema_name=table.schema_name,
             table_name=table.name,
             is_read=False,
+            # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
             is_write=True,
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
