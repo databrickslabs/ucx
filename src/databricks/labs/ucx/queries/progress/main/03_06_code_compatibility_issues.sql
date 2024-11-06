@@ -4,6 +4,7 @@
 --overrides '{"spec":{
     "encodings":{
       "columns": [
+        {"fieldName": "workspace_id", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "workspace_id"},
         {"fieldName": "code", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "code"},
         {"fieldName": "message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "message"},
         {"fieldName": "dashboard_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/sql/dashboards/{{ dashboard_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "dashboard"},
@@ -16,7 +17,7 @@
   }}'
 */
 SELECT
-    object_type,
+    workspace_id,
     data.code,
     data.message,
     data.dashboard_name,
