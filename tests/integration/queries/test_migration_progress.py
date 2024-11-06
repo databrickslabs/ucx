@@ -211,10 +211,11 @@ def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
 
 @pytest.fixture
 def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
-    workspace_file, query = make_workspace_file(), make_query()
+    workspace_file = make_workspace_file(content=f'df = spark.read.csv("dbfs://folder/file.csv")')
+    query = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
         DirectFsAccess(
-            path="dbfs://folder/notebook_path.csv",
+            path="dbfs://folder/file.csv",
             is_read=False,
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
@@ -231,12 +232,12 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         ),
         DirectFsAccess(
-            path="dbfs://folder/query_path.csv",
+            path="dbfs://folder/file.csv",
             is_read=False,
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
             is_write=True,
-            source_id=str(workspace_file),
+            source_id=query.id,
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
