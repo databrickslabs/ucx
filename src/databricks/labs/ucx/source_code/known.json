@@ -26911,6 +26911,9 @@
     "pure_eval.utils": [],
     "pure_eval.version": []
   },
+  "py-cpuinfo": {
+    "cpuinfo": []
+  },
   "py4j": {
     "py4j": [
       {
