@@ -101,10 +101,14 @@ class PipelineMapping:
 
 
 class PipelinesMigrator:
-    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str):
+    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str,
+                 skip_pipelines=None):
+        if skip_pipelines is None:
+            skip_pipelines = []
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
         self._catalog_name = catalog_name
+        self._skip_pipelines = skip_pipelines
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         # TODO:
@@ -121,8 +125,10 @@ class PipelinesMigrator:
 
         tasks = []
         for pipeline in pipelines_to_migrate:
-            if pipeline.creator_name == "pritish.pai@databricks.com":
-                tasks.append(partial(self._migrate_pipeline, pipeline))
+            if pipeline.pipeline_id in self._skip_pipelines:
+                logger.info(f"Skipping pipeline {pipeline.pipeline_id}")
+                continue
+            tasks.append(partial(self._migrate_pipeline, pipeline))
         if not tasks:
             return []
         Threads.strict("migrate pipelines", tasks)
@@ -137,7 +143,9 @@ class PipelinesMigrator:
 
     def _clone_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO:
         # Stop HMS pipeline
+        self._ws.pipelines.stop(pipeline.pipeline_id)
         # Rename old pipeline first
+        # self._ws.pipelines.update(pipeline.pipeline_id, name=f"{pipeline.pipeline_name} [OLD]")
 
         # Clone pipeline
         headers = {
@@ -148,6 +156,7 @@ class PipelinesMigrator:
             'catalog': self._catalog_name,
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
+            # 'name': f"{pipeline.pipeline_name}",
         }
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
