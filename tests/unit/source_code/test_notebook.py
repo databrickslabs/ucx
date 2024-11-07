@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
@@ -16,7 +16,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from tests.unit import _load_sources
+from tests.unit.conftest import _load_sources
 
 # fmt: off
 # the following samples are real samples from https://github.com/databricks-industry-solutions
@@ -78,7 +78,7 @@ PIP_NOTEBOOK_SAMPLE = (
 )
 def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
-    sources: list[str] = _load_sources(SourceContainer, path)
+    sources: list[str] = _load_sources(path)
     assert len(sources) == 1
     notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
@@ -98,7 +98,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
 )
 def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
-    sources: list[str] = _load_sources(SourceContainer, path)
+    sources: list[str] = _load_sources(path)
     assert len(sources) == 1
     notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
@@ -121,7 +121,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]) ->
 )
 def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
-    sources: list[str] = _load_sources(SourceContainer, path)
+    sources: list[str] = _load_sources(path)
     assert len(sources) == 1
     notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
