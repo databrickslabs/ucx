@@ -199,10 +199,12 @@ class NotebookLinter:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
             yield maybe_tree.failure
-        assert maybe_tree.tree is not None
         tree = maybe_tree.tree
+        # a cell with only comments will not produce a tree
         if register_trees:
-            self._python_trees[python_cell] = tree
+            self._python_trees[python_cell] = tree or Tree.new_module()
+        if not tree:
+            return
         yield from self._load_children_from_tree(tree)
 
     def _load_children_from_tree(self, tree: Tree) -> Iterable[Advice]:
