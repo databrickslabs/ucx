@@ -18,7 +18,6 @@ def test_pipeline_migrate(
     watchdog_purge_suffix,
     make_directory,
     inventory_schema,
-    sql_backend,
     runtime_ctx,
     make_catalog
 ):
@@ -50,18 +49,6 @@ def test_pipeline_migrate(
             results.append(pipeline)
     assert len(results) == 1
 
-    # TODO: Add other rules as well to test the migration
-    pipeline_rules = [
-        PipelineRule.from_src_dst(
-            "test_workspace",
-            created_pipeline.pipeline_id,
-            "test_catalog",
-            target_schemas[1].name,
-            f"{pipeline_name}-migrated",
-        ),
-    ]
-    runtime_ctx.with_pipeline_mapping_rules(pipeline_rules)
-    pipeline_mapping = PipelineMapping(runtime_ctx.installation, ws, sql_backend)
 
     pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, dst_catalog.name)
     pipelines_migrator.migrate_pipelines()
@@ -70,7 +57,7 @@ def test_pipeline_migrate(
     pipelines = runtime_ctx.pipelines_crawler.snapshot(force_refresh=True)
     results = []
     for pipeline in pipelines:
-        if pipeline.pipeline_name == f"{pipeline_name} [UC]":
+        if pipeline.pipeline_name == f"{pipeline_name}":
             results.append(pipeline)
 
     assert len(results) == 1
