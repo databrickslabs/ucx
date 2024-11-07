@@ -30,7 +30,7 @@ Table utilization per workflow:
 | query_problems           | RW                  | RW                        |                |                         |              |                |                             |
 | workflow_problems        | RW                  | RW                        |                |                         |              |                |                             |
 | udfs                     | RW                  | RW                        | RO             |                         |              |                |                             |
-| logs                     | RW                  |                           | RW             | RW                      |              | RW             | RW                          |
+| logs                     | RW                  | RW                        | RW             | RW                      | RW           | RW             | RW                          |
 | recon_results            |                     |                           |                |                         |              |                | RW                          |
 
 **RW** - Read/Write, the job generates or updates the table.<br/>
