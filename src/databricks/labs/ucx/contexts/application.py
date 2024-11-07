@@ -48,7 +48,7 @@ from databricks.labs.ucx.hive_metastore.ownership import (
     TableMigrationOwnership,
     TableOwnership,
     TableOwnershipGrantLoader,
-    StaticTableOwnership,
+    DefaultSecurableOwnership,
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
@@ -278,9 +278,9 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def static_table_ownership(self) -> StaticTableOwnership:
+    def static_table_ownership(self) -> DefaultSecurableOwnership:
         # Returns a static table ownership resolver
-        return StaticTableOwnership(
+        return DefaultSecurableOwnership(
             self.administrator_locator,
             self.tables_crawler,
             self.config.default_owner_group,

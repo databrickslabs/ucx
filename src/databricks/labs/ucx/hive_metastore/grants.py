@@ -776,26 +776,15 @@ class MigrateGrants:
         self,
         sql_backend: SqlBackend,
         group_manager: GroupManager,
-        ownership_loader: Callable[[], Iterable[Grant]],
         grant_loaders: list[Callable[[], Iterable[Grant]]],
-        /,
-        skip_grant_migration: bool = False,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
-        self._ownership_loader = ownership_loader
         self._grant_loaders = grant_loaders
-        self._skip_grant_migration = skip_grant_migration
-        if self._skip_grant_migration:
-            logger.info("Skipping grant migration")
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
-        grants = []
-        ownership_grant = self._match_ownership_grant(src)
-        if ownership_grant:
-            grants.append(ownership_grant)
-        if not self._skip_grant_migration:
-            grants.extend(self._match_grants(src))
+        grants = self._match_grants(src)
+        grants.extend(self._match_grants(src))
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
@@ -814,13 +803,8 @@ class MigrateGrants:
         return False
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
-        grants = []
+        grants = self._match_grants(src)
         discover_grants = []
-        ownership_grant = self._match_ownership_grant(src)
-        if ownership_grant:
-            grants.append(ownership_grant)
-        if not self._skip_grant_migration:
-            grants.extend(self._match_grants(src))
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
@@ -849,14 +833,6 @@ class MigrateGrants:
                 grants.append(grant)
         return grants
 
-    @cached_property
-    def _ownership_grants(self) -> list[Grant]:
-        ownership_grants = []
-        for grant in self._ownership_loader():
-            if grant.action_type == "OWN":
-                ownership_grants.append(grant)
-        return ownership_grants
-
     def _match_grants(self, src: SecurableObject) -> list[Grant]:
         matched_grants = []
         for grant in self._grants:
@@ -866,12 +842,6 @@ class MigrateGrants:
             matched_grants.append(grant)
         return sorted(matched_grants, key=lambda g: g.order)
 
-    def _match_ownership_grant(self, src: SecurableObject) -> Grant | None:
-        for grant in self._ownership_grants:
-            if grant.object_key == src.key:
-                return self._replace_account_group(grant)
-        return None
-
     def _replace_account_group(self, grant: Grant) -> Grant:
         target_principal = self._workspace_to_account_group_names.get(grant.principal)
         if not target_principal:
@@ -879,16 +849,16 @@ class MigrateGrants:
         return replace(grant, principal=target_principal)
 
     def _apply_ownership(self, dst: SecurableObject, owner: str):
+        owner = escape_sql_identifier(owner)
+        destination = escape_sql_identifier(dst.full_name)
         if dst.kind == "TABLE":
-            sql = f"ALTER TABLE {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
+            sql = f"ALTER TABLE {destination} " f"SET OWNER TO {owner}"
         elif dst.kind == "VIEW":
-            sql = f"ALTER VIEW {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
+            sql = f"ALTER VIEW {destination} " f"SET OWNER TO {owner}"
         elif dst.kind in {"SCHEMA", "DATABASE"}:
-            sql = f"ALTER SCHEMA {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
+            sql = f"ALTER SCHEMA {destination} " f"SET OWNER TO {owner}"
         elif dst.kind == "CATALOG":
-            sql = (
-                f"ALTER CATALOG {escape_sql_identifier(dst.full_name)} " f"SET OWNER TO {escape_sql_identifier(owner)}"
-            )
+            sql = f"ALTER CATALOG {destination} " f"SET OWNER TO {owner}"
         else:
             logger.warning(f"Unknown object type {dst.kind} for ownership migration")
             return

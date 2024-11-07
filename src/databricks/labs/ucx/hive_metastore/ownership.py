@@ -86,7 +86,7 @@ class TableOwnership(Ownership[Table]):
         return self._grants_crawler.snapshot()
 
 
-class StaticTableOwnership(Ownership[Table]):
+class DefaultSecurableOwnership(Ownership[Table]):
     """Determine ownership of tables in the inventory based on the following rules:
     -- If a global owner group is defined, then all tables are owned by that group.
     -- If the user running the application can be identified, then all tables are owned by that user.
@@ -140,13 +140,10 @@ class StaticTableOwnership(Ownership[Table]):
             return None, table.name
         return table.name, None
 
-    def _static_owner(self) -> str | None:
+    def _maybe_direct_owner(self, record: Table) -> str | None:
         if self._fixed_owner_group:
             return self._fixed_owner_group
         return self._application_principal
-
-    def _maybe_direct_owner(self, record: Table) -> str | None:
-        return self._static_owner()
 
 
 class TableOwnershipGrantLoader:
