@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
 from functools import cached_property
 
 from databricks.labs.ucx.framework.owners import (
@@ -98,16 +98,26 @@ class DefaultSecurableOwnership(Ownership[Table]):
         administrator_locator: AdministratorLocator,
         table_crawler: TablesCrawler,
         fixed_owner_group: str | None,
-        application_principal: str | None,
+        app_principal_resolver: Callable[[], str | None],
     ) -> None:
         self._tables_crawler = table_crawler
         self._fixed_owner_group = fixed_owner_group
-        self._application_principal = application_principal
+        self._app_principal_resolver = app_principal_resolver
         super().__init__(administrator_locator)
+
+    @cached_property
+    def _application_principal(self) -> str | None:
+        return self._app_principal_resolver()
+
+    @cached_property
+    def _static_owner(self) -> str | None:
+        if self._fixed_owner_group:
+            return self._fixed_owner_group
+        return self._application_principal
 
     def load(self) -> Iterable[Grant]:
         databases = set()
-        owner = self._static_owner()
+        owner = self._static_owner
         if not owner:
             logger.warning("No owner found for tables and databases")
             return
@@ -141,9 +151,7 @@ class DefaultSecurableOwnership(Ownership[Table]):
         return table.name, None
 
     def _maybe_direct_owner(self, record: Table) -> str | None:
-        if self._fixed_owner_group:
-            return self._fixed_owner_group
-        return self._application_principal
+        return self._static_owner
 
 
 class TableOwnershipGrantLoader:

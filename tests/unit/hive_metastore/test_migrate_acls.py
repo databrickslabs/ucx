@@ -112,7 +112,7 @@ def test_tacl_crawler(ws, ws_info, caplog):
             temporary_name='temp_group1',
         ),
     ]
-    migrate_grants = MigrateGrants(sql_backend, group_manager, no_owner, [grant_loader])
+    migrate_grants = MigrateGrants(sql_backend, group_manager, [no_owner, grant_loader])
 
     migration_index = create_autospec(TableMigrationIndex)
     migration_index.is_migrated.return_value = True
@@ -139,13 +139,12 @@ def test_migrate_matched_grants_applies() -> None:
     group_manager = create_autospec(GroupManager)
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
     dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
-    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    one_owner_one_grant: list[Callable[[], Iterable[Grant]]] = [
+        lambda: [Grant('me', 'OWN', database='default', table='foo')],
+        lambda: [Grant('me', 'SELECT', database='default', table='foo')],
+    ]
 
-    def single_owner() -> Iterable[Grant]:
-        yield Grant('me', 'OWN', database='default', table='foo')
-
-    one_owner: Callable[[], Iterable[Grant]] = single_owner
-    migrate_grants = MigrateGrants(sql_backend, group_manager, one_owner, one_grant)
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_owner_one_grant)
     migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_called()
@@ -170,12 +169,12 @@ def test_migrate_matched_grants_applies_and_remaps_group() -> None:
     ]
     src = Table('hive_metastore', 'default', 'foo', 'MANAGED', 'DELTA')
     dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
-    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    one_owner_one_grant: list[Callable[[], Iterable[Grant]]] = [
+        lambda: [Grant('me', 'OWN', database='default', table='foo')],
+        lambda: [Grant('me', 'SELECT', database='default', table='foo')],
+    ]
 
-    def single_owner() -> Iterable[Grant]:
-        yield Grant('me', 'OWN', database='default', table='foo')
-
-    migrate_grants = MigrateGrants(sql_backend, group_manager, single_owner, one_grant)
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_owner_one_grant)
     migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_called()
@@ -191,14 +190,14 @@ def test_migrate_no_matched_grants_no_apply() -> None:
     sql_backend = create_autospec(SqlBackend)
     group_manager = create_autospec(GroupManager)
 
-    def no_owner() -> Iterable[Grant]:
-        return []
-
     src = Table('hive_metastore', 'default', 'bar', 'MANAGED', 'DELTA')
     dst = Table('catalog', 'schema', 'table', 'MANAGED', 'DELTA')
-    one_grant: list[Callable[[], Iterable[Grant]]] = [lambda: [Grant('me', 'SELECT', database='default', table='foo')]]
+    one_grant: list[Callable[[], Iterable[Grant]]] = [
+        lambda: [],
+        lambda: [Grant('me', 'SELECT', database='default', table='foo')],
+    ]
 
-    migrate_grants = MigrateGrants(sql_backend, group_manager, no_owner, one_grant)
+    migrate_grants = MigrateGrants(sql_backend, group_manager, one_grant)
     migrate_grants.apply(src, dst)
 
     group_manager.snapshot.assert_not_called()

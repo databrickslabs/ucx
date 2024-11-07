@@ -184,7 +184,7 @@ def prepare_test(  # pylint: disable=too-complex
         return []
 
     migrate_grants = MigrateGrants(
-        backend, group_manager, no_owner, [interactive_cluster_grants_loader, hive_grants_loader]
+        backend, group_manager, [no_owner, interactive_cluster_grants_loader, hive_grants_loader]
     )
 
     return CatalogSchema(ws, table_mapping, migrate_grants, "ucx", timeout=None)

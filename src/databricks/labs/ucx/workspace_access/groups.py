@@ -636,6 +636,19 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         group_names = [group.display_name for group in groups]
         return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
 
+    def validate_owner_group(self, group_name: str) -> bool:
+        # This method is used to validate that the current owner is a member of the group
+        username = self._ws.current_user.me().user_name
+        if not username:
+            logger.warning("No user found for the current session.")
+            return False
+        groups = self._user_account_groups(username)
+        if not groups:
+            logger.warning("No account groups found for the current user.")
+            return False
+        group_names = [group.display_name for group in groups]
+        return group_name in group_names
+
     def _user_account_groups(self, username: str) -> list[Group]:
         # This method is used to find all the account groups that a user is a member of.
         groups: list[Group] = []

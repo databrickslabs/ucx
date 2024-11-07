@@ -119,12 +119,14 @@ class Grant:
 
     @property
     def order(self) -> int:
-        """Order of the grants to be upheld when applying."""
+        """Apply Ownership First, then the rest.
+        Consider Revising When we properly apply manage permission"""
+
         match self.action_type:
             case "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
-                return 1
-            case _:
                 return 0
+            case _:
+                return 1
 
     def this_type_and_key(self):
         return self.type_and_key(
@@ -780,11 +782,11 @@ class MigrateGrants:
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
+        # List of grant loaders, the assumption that the first one is a loader for ownership grants
         self._grant_loaders = grant_loaders
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
         grants = self._match_grants(src)
-        grants.extend(self._match_grants(src))
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
@@ -800,7 +802,7 @@ class MigrateGrants:
                 logger.warning(
                     f"failed-to-migrate: Failed to migrate ACL for {src.full_name} to {dst.full_name}", exc_info=e
                 )
-        return False
+        return True
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
         grants = self._match_grants(src)
@@ -825,10 +827,11 @@ class MigrateGrants:
     def _grants(self) -> list[Grant]:
         # Accumulate grants from all loaders skips ownership grants
         grants = []
-        for loader in self._grant_loaders:
+        for index, loader in enumerate(self._grant_loaders):
             for grant in loader():
-                # Skip ownership grants
-                if grant.action_type == "OWN":
+                # Skip ownership grants for all loaders other than the first one
+                # The assumption is that the first one will be designated as the ownership loader
+                if index != 0 and grant.action_type == "OWN":
                     continue
                 grants.append(grant)
         return grants

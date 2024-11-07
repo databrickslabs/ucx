@@ -278,13 +278,20 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def static_table_ownership(self) -> DefaultSecurableOwnership:
+    def default_securable_ownership(self) -> DefaultSecurableOwnership:
+        # validate that the default_owner_group is set and is a valid group (the current user is a member)
+        owner_group = None
+        if self.config.default_owner_group:
+            if not self.group_manager.validate_owner_group(self.config.default_owner_group):
+                logger.warning("Default owner group is not valid, falling back to administrator ownership.")
+            else:
+                owner_group = self.config.default_owner_group
         # Returns a static table ownership resolver
         return DefaultSecurableOwnership(
             self.administrator_locator,
             self.tables_crawler,
-            self.config.default_owner_group,
-            self.workspace_client.current_user.me().user_name,
+            owner_group,
+            lambda: self.workspace_client.current_user.me().user_name,
         )
 
     @cached_property
@@ -333,22 +340,20 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def table_ownership_grant_loader(self) -> TableOwnershipGrantLoader:
-        return TableOwnershipGrantLoader(self.tables_crawler, self.static_table_ownership)
+        return TableOwnershipGrantLoader(self.tables_crawler, self.default_securable_ownership)
 
     @cached_property
     def migrate_grants(self) -> MigrateGrants:
         # owner grants have to come first
-        ownership_loader: Callable[[], Iterable[Grant]] = self.static_table_ownership.load
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
+            self.default_securable_ownership.load,
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
         ]
         return MigrateGrants(
             self.sql_backend,
             self.group_manager,
-            ownership_loader,
             grant_loaders,
-            skip_grant_migration=self.config.skip_grant_migration,
         )
 
     @cached_property

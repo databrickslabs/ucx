@@ -1,12 +1,18 @@
 import dataclasses
+import io
 import logging
+import os
 from unittest.mock import create_autospec
 
 import pytest
+import yaml
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.iam import ComplexValue, Group
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
@@ -14,6 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.workspace_access.groups import GroupManager
+from tests.unit import mock_workspace_client
 
 
 def test_type_and_key_table() -> None:
@@ -537,7 +544,7 @@ def test_migrate_grants_applies_query(
     group_manager = create_autospec(GroupManager)
     backend = MockBackend()
 
-    def one_owner() -> list[Grant]:
+    def grant_loader() -> list[Grant]:
         database = table = None
         if isinstance(src, Catalog):
             catalog = src.name
@@ -558,22 +565,6 @@ def test_migrate_grants_applies_query(
                 database=database,
                 table=table,
             ),
-        ]
-
-    def grant_loader() -> list[Grant]:
-        database = table = None
-        if isinstance(src, Catalog):
-            catalog = src.name
-        elif isinstance(src, Schema):
-            catalog = src.catalog
-            database = src.name
-        elif isinstance(src, Table):
-            catalog = src.catalog
-            database = src.database
-            table = src.name
-        else:
-            raise TypeError(f"Unsupported source type: {type(src)}")
-        return [
             dataclasses.replace(
                 grant,
                 catalog=catalog,
@@ -585,52 +576,12 @@ def test_migrate_grants_applies_query(
     migrate_grants = MigrateGrants(
         backend,
         group_manager,
-        one_owner,
-        [grant_loader],
+        [grant_loader, grant_loader],
     )
 
     migrate_grants.apply(src, dst)
 
     assert query in backend.queries
-    group_manager.assert_not_called()
-
-
-def test_migrate_grants_skip():
-    group_manager = create_autospec(GroupManager)
-    backend = MockBackend()
-
-    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
-    grant = Grant("user", "SELECT")
-    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
-
-    def grant_loader() -> list[Grant]:
-        catalog = src.catalog
-        database = src.database
-        table = src.name
-        return [
-            dataclasses.replace(
-                grant,
-                catalog=catalog,
-                database=database,
-                table=table,
-            ),
-        ]
-
-    def no_owner() -> list[Grant]:
-        return []
-
-    migrate_grants = MigrateGrants(
-        backend,
-        group_manager,
-        no_owner,
-        [grant_loader],
-        skip_grant_migration=True,
-    )
-
-    migrate_grants.apply(src, dst)
-
-    for query in backend.queries:
-        assert not query.startswith("GRANT")
     group_manager.assert_not_called()
 
 
@@ -684,29 +635,6 @@ def test_migrate_grants_set_fixed_owner(
     group_manager = create_autospec(GroupManager)
     backend = MockBackend()
 
-    def one_owner() -> list[Grant]:
-        database = table = None
-        if isinstance(src, Catalog):
-            catalog = src.name
-        elif isinstance(src, Schema):
-            catalog = src.catalog
-            database = src.name
-        elif isinstance(src, Table):
-            catalog = src.catalog
-            database = src.database
-            table = src.name
-        else:
-            raise TypeError(f"Unsupported source type: {type(src)}")
-        return [
-            Grant(
-                'fake_owner',
-                'OWN',
-                catalog=catalog,
-                database=database,
-                table=table,
-            )
-        ]
-
     def grant_loader() -> list[Grant]:
         grants = []
         for grant in src_grants:
@@ -730,13 +658,21 @@ def test_migrate_grants_set_fixed_owner(
                     table=table,
                 )
             )
+            grants.append(
+                Grant(
+                    'fake_owner',
+                    'OWN',
+                    catalog=catalog,
+                    database=database,
+                    table=table,
+                )
+            )
         return grants
 
     migrate_grants = MigrateGrants(
         backend,
         group_manager,
-        one_owner,
-        [grant_loader],
+        [grant_loader, grant_loader],
     )
 
     migrate_grants.apply(src, dst)
@@ -768,8 +704,7 @@ def test_migrate_grants_alters_ownership_as_last() -> None:
     migrate_grants = MigrateGrants(
         backend,
         group_manager,
-        one_owner,
-        [grant_loader],
+        [one_owner, grant_loader],
     )
     src = Schema("hive_metastore", "schema")
     dst = Schema("catalog", "schema")
@@ -801,8 +736,7 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     migrate_grants = MigrateGrants(
         MockBackend(),
         group_manager,
-        no_owner,
-        [grant_loader],
+        [no_owner, grant_loader],
     )
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.grants"):
@@ -1022,3 +956,32 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]
+
+
+def test_default_owner() -> None:
+    ws = mock_workspace_client()
+    download_yaml = {
+        'config.yml': yaml.dump(
+            {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'default_owner_group': 'fake_admin_group',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+        'workspaces.json': None,
+    }
+    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    account_admins_group = Group(id="1234", display_name="account users", members=[ComplexValue(display="fake_admin_group", value="1")])
+    ws.api_client.do.return_value = {
+        "Resources": [account_admins_group.as_dict()],
+    }
+    ctx = WorkspaceContext(ws)
+    default_owner = ctx.default_securable_ownership
+    config = ctx.config
+    print(config)
+    assert default_owner
+
