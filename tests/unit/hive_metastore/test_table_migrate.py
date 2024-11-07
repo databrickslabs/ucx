@@ -1375,63 +1375,70 @@ def test_revert_migrated_tables_failed(caplog, mock_pyspark):
     assert "Failed to revert table hive_metastore.test_schema1.test_table1: error" in caplog.text
 
 
-def test_refresh_migration_status_published_remained_tables(caplog, mock_pyspark):
-    backend = MockBackend()
+def test_refresh_migration_status_check_remaining_tables(ws, mock_backend, caplog) -> None:
     table_crawler = create_autospec(TablesCrawler)
-    client = mock_workspace_client()
-    table_crawler.snapshot.return_value = [
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="schema1",
-            name="table1",
-            location="s3://some_location/table1",
-            upgraded_to="ucx_default.db1_dst.dst_table1",
+    tables = (
+        (
+            Table(
+                object_type="EXTERNAL",
+                table_format="DELTA",
+                catalog="hive_metastore",
+                database="schema1",
+                name="table1",
+                location="s3://some_location/table1",
+                upgraded_to="ucx_default.db1_dst.dst_table1",
+            )
         ),
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="schema1",
-            name="table2",
-            location="s3://some_location/table2",
-            upgraded_to="ucx_default.db1_dst.dst_table2",
+        (
+            Table(
+                object_type="EXTERNAL",
+                table_format="DELTA",
+                catalog="hive_metastore",
+                database="schema1",
+                name="table2",
+                location="s3://some_location/table2",
+                upgraded_to="ucx_default.db1_dst.dst_table2",
+            )
         ),
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="schema1",
-            name="table3",
-            location="s3://some_location/table3",
+        (
+            Table(
+                object_type="EXTERNAL",
+                table_format="DELTA",
+                catalog="hive_metastore",
+                database="schema1",
+                name="table3",
+                location="s3://some_location/table3",
+            )
         ),
-    ]
-    table_mapping = mock_table_mapping()
-    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
-    migration_index = TableMigrationIndex(
-        [
-            TableMigrationStatus("schema1", "table1", "ucx_default", "db1_dst", "dst_table1"),
-            TableMigrationStatus("schema1", "table2", "ucx_default", "db1_dst", "dst_table2"),
-        ]
     )
-    migration_status_refresher.index.return_value = migration_index
+    table_crawler.snapshot.return_value = tables
+
+    def migration_status_from_table(table: Table) -> TableMigrationStatus:
+        catalog, schema, name = table.upgraded_to.split(".", maxsplit=2) if table.upgraded_to else (None, None, None)
+        return TableMigrationStatus(table.database, table.name, catalog, schema, name)
+
+    migration_status_snapshot = tuple(migration_status_from_table(table) for table in tables)
+    migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
     migrate_grants = create_autospec(MigrateGrants)
     external_locations = create_autospec(ExternalLocations)
     table_migrate = TablesMigrator(
         table_crawler,
-        client,
-        backend,
-        table_mapping,
+        ws,
+        mock_backend,
+        mock_table_mapping(),
         migration_status_refresher,
         migrate_grants,
         external_locations,
     )
+
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore"):
-        tables = table_migrate.get_remaining_tables()
+        table_migrate.check_remaining_tables(migration_status_snapshot)
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
-        assert len(tables) == 1 and tables[0].key == "hive_metastore.schema1.table3"
-    migrate_grants.assert_not_called()
+
+    table_crawler.snapshot.assert_called_once()
+    migration_status_refresher.index.assert_not_called()
+    migration_status_refresher.snapshot.assert_not_called()
+    migrate_grants.apply.assert_not_called()
     external_locations.resolve_mount.assert_not_called()
 
 

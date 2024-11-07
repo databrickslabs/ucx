@@ -3,6 +3,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 
 
 @pytest.mark.parametrize(
@@ -11,11 +12,11 @@ from databricks.labs.ucx.hive_metastore.tables import Table
         ("regular", "migrate-tables"),
         ("hiveserde", "migrate-external-hiveserde-tables-in-place-experimental"),
         ("hiveserde", "migrate-external-tables-ctas"),
+        # TODO: Some workflows are missing here, and also need to be included in the tests.
     ],
     indirect=("prepare_tables_for_migration",),
 )
 def test_table_migration_job_refreshes_migration_status(
-    ws,
     installation_ctx,
     prepare_tables_for_migration,
     workflow,
@@ -27,39 +28,60 @@ def test_table_migration_job_refreshes_migration_status(
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-
     ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow(workflow)
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
-    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
-    migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
+    run_id = ctx.deployed_workflows.run_workflow(workflow)
+    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
+
+    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching.
+    migration_status_query = f"SELECT * FROM {ctx.migration_status_refresher.full_name}"
     migration_statuses = list(ctx.sql_backend.fetch(migration_status_query))
 
-    if len(migration_statuses) == 0:
+    if not migration_statuses:
         ctx.deployed_workflows.relay_logs(workflow)
-        assert False, "No migration statuses found"
+        pytest.fail("No migration statuses found")
 
-    asserts = []
+    problems = []
     for table in tables.values():
         migration_status = []
         for status in migration_statuses:
             if status.src_schema == table.schema_name and status.src_table == table.name:
                 migration_status.append(status)
 
-        assert_message_postfix = f" found for {table.table_type} {table.full_name}"
-        if len(migration_status) == 0:
-            asserts.append("No migration status" + assert_message_postfix)
-        elif len(migration_status) > 1:
-            asserts.append("Multiple migration statuses" + assert_message_postfix)
-        elif migration_status[0].dst_schema is None:
-            asserts.append("No destination schema" + assert_message_postfix)
-        elif migration_status[0].dst_table is None:
-            asserts.append("No destination table" + assert_message_postfix)
+        match migration_status:
+            case []:
+                problems.append(f"No migration status found for {table.table_type} {table.full_name}")
+            case [_, _, *_]:
+                problems.append(f"Multiple migration statuses found for {table.table_type} {table.full_name}")
+            case [status] if status.dst_schema is None:
+                problems.append(f"No destination schema found for {table.table_type} {table.full_name}")
+            case [status] if status.dst_table is None:
+                problems.append(f"No destination table found for {table.table_type} {table.full_name}")
 
-    assert_message = (
-        "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
+    failure_message = (
+        "\n".join(problems) + " given migration statuses:\n" + "\n".join([str(status) for status in migration_statuses])
     )
-    assert len(asserts) == 0, assert_message
+    assert not problems, failure_message
+
+    # Ensure that the workflow populated the `workflow_runs` table.
+    query = (
+        f"SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs\n"
+        f"WHERE workspace_id = {installation_ctx.workspace_id}\n"
+        f"  AND workflow_run_id = {run_id}\n"
+        f"LIMIT 1\n"
+    )
+    assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
+
+    # Ensure that the history file has table records written to it that correspond to this run.
+    query = (
+        f"SELECT 1 from {installation_ctx.ucx_catalog}.multiworkspace.historical\n"
+        f"WHERE workspace_id = {installation_ctx.workspace_id}\n"
+        f"  AND job_run_id = {run_id}\n"
+        f"  AND object_type = 'Table'\n"
+        f"LIMIT 1\n"
+    )
+    assert any(installation_ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
 
 
 @pytest.mark.parametrize(

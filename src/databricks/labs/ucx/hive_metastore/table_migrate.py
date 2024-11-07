@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import partial, cached_property
 
 from databricks.labs.blueprint.parallel import Threads
@@ -19,7 +20,11 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import (
+    TableMigrationStatusRefresher,
+    TableMigrationStatus,
+    TableMigrationIndex,
+)
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -55,14 +60,11 @@ class TablesMigrator:
         self._migrate_grants = migrate_grants
         self._external_locations = external_locations
 
-    def get_remaining_tables(self) -> list[Table]:
-        self.index(force_refresh=True)
-        table_rows = []
+    def check_remaining_tables(self, migration_status: Iterable[TableMigrationStatus]):
+        migration_index = TableMigrationIndex(migration_status)
         for crawled_table in self._tables_crawler.snapshot():
-            if not self._is_migrated(crawled_table.database, crawled_table.name):
-                table_rows.append(crawled_table)
+            if not migration_index.is_migrated(crawled_table.database, crawled_table.name):
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
-        return table_rows
 
     def index(self, *, force_refresh: bool = False):
         return self._migration_status_refresher.index(force_refresh=force_refresh)
