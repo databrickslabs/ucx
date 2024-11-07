@@ -145,7 +145,17 @@ class PipelinesMigrator:
         # Stop HMS pipeline
         self._ws.pipelines.stop(pipeline.pipeline_id)
         # Rename old pipeline first
-        # self._ws.pipelines.update(pipeline.pipeline_id, name=f"{pipeline.pipeline_name} [OLD]")
+
+        # Need to get the pipeline again to get the libraries
+        # else updating name fails with libraries not provided error
+        get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
+        self._ws.pipelines.update(pipeline.pipeline_id, name=f"{pipeline.pipeline_name} [OLD]",
+                                  clusters=get_pipeline.spec.clusters,
+                                  storage=get_pipeline.spec.storage,
+                                  continuous=get_pipeline.spec.continuous,
+                                  deployment=get_pipeline.spec.deployment,
+                                  target=get_pipeline.spec.target,
+                                  libraries=get_pipeline.spec.libraries)
 
         # Clone pipeline
         headers = {
@@ -156,7 +166,7 @@ class PipelinesMigrator:
             'catalog': self._catalog_name,
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
-            # 'name': f"{pipeline.pipeline_name}",
+            'name': f"{pipeline.pipeline_name}",
         }
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
