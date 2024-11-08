@@ -624,10 +624,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
-    def pick_owner_group(self, prompt: Prompts, username: str) -> str | None:
+    def pick_owner_group(self, prompt: Prompts, user_id: str) -> str | None:
         # This method is used to select the group that will be used as the owner group.
         # The owner group will be assigned by default to all migrated tables/schemas
-        groups = self._user_account_groups(username)
+        groups = self._user_account_groups(user_id)
         if not groups:
             logger.warning("No account groups found for the current user.")
             return None
@@ -638,18 +638,18 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def validate_owner_group(self, group_name: str) -> bool:
         # This method is used to validate that the current owner is a member of the group
-        username = self._ws.current_user.me().user_name
-        if not username:
+        user_id = self._ws.current_user.me().id
+        if not user_id:
             logger.warning("No user found for the current session.")
             return False
-        groups = self._user_account_groups(username)
+        groups = self._user_account_groups(user_id)
         if not groups:
             logger.warning("No account groups found for the current user.")
             return False
         group_names = [group.display_name for group in groups]
         return group_name in group_names
 
-    def _user_account_groups(self, username: str) -> list[Group]:
+    def _user_account_groups(self, user_id: str) -> list[Group]:
         # This method is used to find all the account groups that a user is a member of.
         groups: list[Group] = []
         account_groups = self._list_account_groups("id,displayName,externalId,members")
@@ -659,7 +659,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             if not group.members:
                 continue
             for member in group.members:
-                if member.display == username:
+                if member.value == user_id:
                     groups.append(group)
                     break
         return groups

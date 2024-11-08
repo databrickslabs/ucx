@@ -137,7 +137,9 @@ def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
     workspace_client = create_autospec(WorkspaceClient)
     workspace_client.get_workspace_id.return_value = workspace_id
     workspace_client.config.host = 'https://localhost'
-    workspace_client.current_user.me.return_value = User(user_name="foo", groups=[ComplexValue(display="admins")])
+    workspace_client.current_user.me.return_value = User(
+        id="666", user_name="foo", groups=[ComplexValue(display="admins")]
+    )
     workspace_client.workspace.download.side_effect = mock_download
     workspace_client.statement_execution.execute_statement.return_value = sql.StatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
@@ -1284,7 +1286,7 @@ def test_assign_owner_group(tmp_path, workspace_clients, acc_client, run_as_coll
     prompts = MockPrompts({"Please provide the group name to assign as owner": "test_group"})
 
     for workspace_client in workspace_clients:
-        group1 = Group(id="1", display_name="test_group", members=[ComplexValue(display="foo", value="1")])
+        group1 = Group(id="1", display_name="test_group", members=[ComplexValue(display="foo", value="666")])
         workspace_client.api_client.do.return_value = {"Resources": [group1.as_dict()]}
 
     assign_owner_group(workspace_clients[0], prompts, run_as_collection=run_as_collection, a=acc_client)
