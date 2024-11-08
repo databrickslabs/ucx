@@ -22,6 +22,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigr
 from databricks.labs.ucx.source_code.graph import SourceContainer
 
 logging.getLogger("tests").setLevel("DEBUG")
+logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG = {
     "config.yml": {
@@ -119,16 +120,6 @@ def _id_list(cls: type, ids=None):
             output.append(policy)
         return output
     return [installation.load(cls, filename=_) for _ in ids]
-
-
-def _load_sources(cls: type, *filenames: str):
-    # TODO: remove the usage of it in favor of MockPathLookup
-    if not filenames:
-        return []
-    installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
-    # cleanly avoid mypy error
-    setattr(installation, "_unmarshal_type", lambda as_dict, filename, type_ref: as_dict)
-    return [installation.load(cls, filename=_) for _ in filenames]
 
 
 def _samples_path(cls: type) -> str:

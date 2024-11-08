@@ -1,8 +1,9 @@
+import dataclasses
 from pathlib import Path
 
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraph
+from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.known import KnownList, Compatibility, UNKNOWN
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
@@ -57,3 +58,10 @@ def test_graph_imports_dynamic_import():
     container = maybe.dependency.load(path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
+
+
+def test_is_path_missing():
+    problem = DependencyProblem("some-code", "some-message")
+    assert problem.is_path_missing()
+    problem = dataclasses.replace(problem, source_path=Path("stuff"))
+    assert not problem.is_path_missing()

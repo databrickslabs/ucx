@@ -28,6 +28,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
   * [Installation resources](#installation-resources)
+  * [Installation folder](#installation-folder)
     * [Readme notebook](#readme-notebook)
     * [Debug notebook](#debug-notebook)
     * [Debug logs](#debug-logs)
@@ -69,6 +70,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
       * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
     * [[LEGACY] Migrate tables in mounts Workflow](#legacy-migrate-tables-in-mounts-workflow)
   * [[EXPERIMENTAL] Migration Progress Workflow](#experimental-migration-progress-workflow)
+* [Dashboards](#dashboards)
 * [Linter message codes](#linter-message-codes)
   * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
   * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
@@ -924,6 +926,19 @@ the [assessment workflow](#assessment-workflow)._
 [[back to top](#databricks-labs-ucx)]
 
 # Dashboards
+
+The dashboards visualize UCX's outcomes. Each dashboard has text widgets detailing the contents in more detail. Below an
+overview with a short description is given.
+
+| Name                                                                                                            | Description                                        |
+|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| [Assessment \[Main\]](./src/databricks/labs/ucx/queries/assessment/main/00_0__assessment_overview.md)           | Assessment overview                                |
+| [Assessment \[Estimates\]](./src/databricks/labs/ucx/queries/assessment/estimates/00_0_metastore_assignment.md) | Migration effort estimates based on the assessment |
+| [Assessment \[Interactive\]](./src/databricks/labs/ucx/queries/assessment/interactive/00_0_interactive.md)      | Assessment outcomes on interactive clusters        |
+| [Assessment \[Azure\]](./src/databricks/labs/ucx/queries/assessment/azure/00_0_azure_service_principals.md)     | Assessment outcomes specific to Azure              |
+| [Migration \[Main\]](./src/databricks/labs/ucx/queries/migration/main/00_0_migration_overview.md)               | Migration overview                                 |
+| [Migration \[Groups\]](./src/databricks/labs/ucx/queries/migration/groups/00_0_migration_overview.md)           | Group migration outcomes                           |
+| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | Migration progress                                 |
 
 [[back to top](#databricks-labs-ucx)]
 
