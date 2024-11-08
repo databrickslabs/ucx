@@ -122,11 +122,9 @@ class Grant:
         """Apply Ownership First, then the rest.
         Consider Revising When we properly apply manage permission"""
 
-        match self.action_type:
-            case "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
-                return 0
-            case _:
-                return 1
+        if self.action_type == "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
+            return 0
+        return 1
 
     def this_type_and_key(self):
         return self.type_and_key(
