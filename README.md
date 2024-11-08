@@ -24,65 +24,72 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 <!-- TOC -->
 * [Databricks Labs UCX](#databricks-labs-ucx)
 * [Installation](#installation)
+  * [Installation requirements](#installation-requirements)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
-  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
-  * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
-  * [[ADVANCED] Installing UCX with company hosted PYPI mirror](#advanced-installing-ucx-with-company-hosted-pypi-mirror)
+  * [Installation resources](#installation-resources)
+  * [Installation folder](#installation-folder)
+    * [Readme notebook](#readme-notebook)
+    * [Debug notebook](#debug-notebook)
+    * [Debug logs](#debug-logs)
+    * [Installation configuration](#installation-configuration)
+  * [Advanced installation options](#advanced-installation-options)
+    * [Force install over existing UCX](#force-install-over-existing-ucx)
+    * [Installing UCX on all workspaces within a Databricks account](#installing-ucx-on-all-workspaces-within-a-databricks-account)
+    * [Installing UCX with company hosted PYPI mirror](#installing-ucx-with-company-hosted-pypi-mirror)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
+  * [Table migration process](#table-migration-process)
+    * [Table mapping](#table-mapping)
+      * [Step 1 : Create the mapping file](#step-1--create-the-mapping-file)
+      * [Step 2: Update the mapping file](#step-2-update-the-mapping-file)
+    * [Data access](#data-access)
+      * [Step 1 : Map cloud principals to cloud storage locations](#step-1--map-cloud-principals-to-cloud-storage-locations)
+      * [Step 2 : Create or modify cloud principals and credentials](#step-2--create-or-modify-cloud-principals-and-credentials)
+      * [Step 3: Create the "uber" Principal](#step-3-create-the-uber-principal)
+    * [New Unity Catalog resources](#new-unity-catalog-resources)
+      * [Step 0: Attach a metastore](#step-0-attach-a-metastore)
+      * [Step 1: Create external Locations](#step-1-create-external-locations)
+        * [Step 2: Create Catalogs and Schemas](#step-2-create-catalogs-and-schemas)
+    * [Migrate Hive metastore data objects](#migrate-hive-metastore-data-objects)
+    * [Odds and Ends](#odds-and-ends)
+      * [Skip migrating schemas, tables or views](#skip-migrating-schemas-tables-or-views)
+      * [Move data objects](#move-data-objects)
+      * [Alias data objects](#alias-data-objects)
+      * [Revert migrated data objects](#revert-migrated-data-objects)
 * [Workflows](#workflows)
-  * [Readme notebook](#readme-notebook)
   * [Assessment workflow](#assessment-workflow)
   * [Group migration workflow](#group-migration-workflow)
-  * [Debug notebook](#debug-notebook)
-  * [Debug logs](#debug-logs)
-  * [Table Migration](#table-migration)
-    * [Prerequisites](#prerequisites)
-    * [Upgrade Process](#upgrade-process)
-      * [Step 1: Mapping Metastore Tables (UCX Only)](#step-1-mapping-metastore-tables-ucx-only)
-        * [Step 1.1: Create the mapping file](#step-11-create-the-mapping-file)
-        * [Step 1.2: Update the mapping file](#step-12-update-the-mapping-file)
-      * [Step 2: Create the necessary cloud principals for the upgrade](#step-2-create-the-necessary-cloud-principals-for-the-upgrade)
-        * [Step 2.1: Map the cloud principals to the cloud "prefixes"](#step-21-map-the-cloud-principals-to-the-cloud-prefixes)
-        * [Step 2.2: Create/Modify Cloud Principals and Credentials](#step-22-createmodify-cloud-principals-and-credentials)
-        * [Step 2.3: Create External Locations](#step-23-create-external-locations)
-        * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
-        * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
-      * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
-      * [Table migration workflows](#table-migration-workflows)
-      * [Step 4: Odds and Ends](#step-4-odds-and-ends)
-        * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
-        * [Step 4.2: Moving objects](#step-42-moving-objects)
-        * [Step 4.2: Aliasing objects](#step-42-aliasing-objects)
-        * [Step 4.3: Reverting objects](#step-43-reverting-objects)
-    * [Post Migration Data Reconciliation Task](#post-migration-data-reconciliation-task)
-    * [Other considerations](#other-considerations)
-    * [[EXPERIMENTAL] Scan tables in mounts Workflow](#experimental-scan-tables-in-mounts-workflow)
+  * [Table migration workflows](#table-migration-workflows)
+    * [Migrate tables](#migrate-tables)
+    * [Migrate external Hive SerDe tables](#migrate-external-hive-serde-tables)
+    * [Migrate external tables CTAS](#migrate-external-tables-ctas)
+  * [Post-migration data reconciliation workflow](#post-migration-data-reconciliation-workflow)
+    * [[LEGACY] Scan tables in mounts Workflow](#legacy-scan-tables-in-mounts-workflow)
       * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
-    * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
-  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
-    * [Linter message codes](#linter-message-codes)
-      * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
-      * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
-      * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
-      * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
-      * [`direct-filesystem-access`](#direct-filesystem-access)
-      * [`dependency-not-found`](#dependency-not-found)
-    * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
-      * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
-      * [`not-supported`](#not-supported)
-      * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
-      * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
-      * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
-      * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
-      * [`sql-parse-error`](#sql-parse-error)
-      * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
-      * [`table-migrated-to-uc`](#table-migrated-to-uc)
-      * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
-      * [`unsupported-magic-line`](#unsupported-magic-line)
+    * [[LEGACY] Migrate tables in mounts Workflow](#legacy-migrate-tables-in-mounts-workflow)
   * [[EXPERIMENTAL] Migration Progress Workflow](#experimental-migration-progress-workflow)
+* [Dashboards](#dashboards)
+* [Linter message codes](#linter-message-codes)
+  * [`cannot-autofix-table-reference`](#cannot-autofix-table-reference)
+  * [`catalog-api-in-shared-clusters`](#catalog-api-in-shared-clusters)
+  * [`changed-result-format-in-uc`](#changed-result-format-in-uc)
+  * [`direct-filesystem-access-in-sql-query`](#direct-filesystem-access-in-sql-query)
+  * [`direct-filesystem-access`](#direct-filesystem-access)
+  * [`dependency-not-found`](#dependency-not-found)
+  * [`jvm-access-in-shared-clusters`](#jvm-access-in-shared-clusters)
+  * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
+  * [`not-supported`](#not-supported)
+  * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+  * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
+  * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
+  * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
+  * [`sql-parse-error`](#sql-parse-error)
+  * [`sys-path-cannot-compute-value`](#sys-path-cannot-compute-value)
+  * [`table-migrated-to-uc`](#table-migrated-to-uc)
+  * [`to-json-in-shared-clusters`](#to-json-in-shared-clusters)
+  * [`unsupported-magic-line`](#unsupported-magic-line)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -146,6 +153,11 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 # Installation
 
+UCX installation is covered by this section.
+
+## Installation requirements
+
+UCX has the following installation requirements:
 - Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli).
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
 - Databricks Premium or Enterprise workspace.
@@ -220,7 +232,63 @@ You can also install a specific version by specifying it like `@v0.13.2` - `data
 
 [[back to top](#databricks-labs-ucx)]
 
-## [ADVANCED] Force install over existing UCX
+## Installation resources
+
+The following resources are installed by UCX:
+
+| Installed UCX resources                           | Description                                                                                      |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| [Inventory database](./docs/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
+| [Dashboards](#dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
+| [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
+
+## Installation folder
+
+UCX is in installed in the workspace folder `/Applications/ucx/`. This folder contains UCX's code resources, like the
+[source code](./src) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
+*directly* used by UCX users. Resources that can be of importance to users are detailed in the subsections below.
+
+### Readme notebook
+
+![readme](docs/readme-notebook.png)
+
+Every installation creates a `README` notebook with a detailed description of all deployed workflows and their tasks,
+providing quick links to the relevant workflows and dashboards.
+
+[[back to top](#databricks-labs-ucx)]
+
+### Debug notebook
+
+![debug](docs/debug-notebook.png)
+
+Every installation creates a `DEBUG` notebook, that initializes UCX as a library for you to execute interactively.
+
+[[back to top](#databricks-labs-ucx)]
+
+### Debug logs
+
+![debug](docs/debug-logs.png)
+
+The [workflow](#workflows) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed
+every minute in a separate file. Debug logs for [the command-line interface](#authenticate-databricks-cli) are shown
+by adding the `--debug` flag:
+
+```commandline
+databricks --debug labs ucx <command>
+```
+
+[[back to top](#databricks-labs-ucx)]
+
+### Installation configuration
+
+In the installation folder, the UCX configuration is kept.
+
+## Advanced installation options
+
+Advanced installation options are detailed below.
+
+### Force install over existing UCX
 Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
 The values for the environment variable are 'global' and 'user'.
 
@@ -248,7 +316,7 @@ At this moment there is no global override over a user installation of UCX. As t
 
 [[back to top](#databricks-labs-ucx)]
 
-## [ADVANCED] Installing UCX on all workspaces within a Databricks account
+### Installing UCX on all workspaces within a Databricks account
 Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
 
 * `UCX_FORCE_INSTALL=account databricks labs install ucx`
@@ -261,7 +329,7 @@ This installation mode will automatically select the following options:
 
 [[back to top](#databricks-labs-ucx)]
 
-## [ADVANCED] Installing UCX with company hosted PYPI mirror
+### Installing UCX with company hosted PYPI mirror
 
 Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
 company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
@@ -317,9 +385,14 @@ Databricks CLI will confirm a few options:
 
 # Migration process
 
-On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow),
-followed by [group migration](#group-migration-workflow), [table migration process](#Table-Migration),
-finalised with the [code migration](#code-migration-commands). It can be described as:
+On a high level, the steps in migration process are:
+1. [assessment](#assessment-workflow)
+2. [group migration](#group-migration-workflow)
+3. [table migration](#table-migration-process)
+4. [data reconciliation](#post-migration-data-reconciliation-workflow)
+5. [code migration](#code-migration-commands)
+
+The migration process can be schematic visualized as:
 
 ```mermaid
 flowchart TD
@@ -354,217 +427,119 @@ flowchart TD
 
 [[back to top](#databricks-labs-ucx)]
 
-# Workflows
+## Table migration process
 
-Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html).
-You can view the status of deployed workflows via the [`workflows` command](#workflows-command).
-Failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+> You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
 
-[[back to top](#databricks-labs-ucx)]
+This section explains how to migrate Hive metastore data objects to Unity Catalog. The table migration process consists
+of more steps than only a [workflow](#table-migration-workflow), these steps are:
 
-## Readme notebook
+1. [Table mapping](#table-mapping) : Create a file that maps Hive metastore data objects to Unity Catalog locations.
+2. [Data access](#data-access) : Setup identities to access table data.
+3. [New Unity Catalog resources](#new-unity-catalog-resources) : Create **new** Unity Catalog resources that do not
+   require touching existing Hive metastore resources.
+4. [Migrate Hive metastore data objects](#migrate-hive-metastore-data-objects) : Migrate Hive metastore data objects to UC.
 
-![readme](docs/readme-notebook.png)
+### Table mapping
 
-Every installation creates a `README` notebook with a detailed description of all deployed workflows and their tasks,
-providing quick links to the relevant workflows and dashboards.
+This section details how to create the table mapping file. This file points existing Hive metastore tables and views to
+Unity Catalog locations. When [migrating the tables and views](#migrate-hive-metastore-data-objects), the file is read
+to decide where to migrate the tables and views to.
 
-[[back to top](#databricks-labs-ucx)]
+#### Step 1 : Create the mapping file
 
-## Assessment workflow
+Create the mapping file in the [UCX installation folder](#installation-resources) by running the
+[`create-table-mapping` command](#create-table-mapping-command). By default, the file contains all the Hive metastore
+tables and views mapped to a single UC catalog, while maintaining the original schema and table names.
 
-The assessment workflow can be triggered using the Databricks UI, or via the [command line](#ensure-assessment-run-command).
+#### Step 2: Update the mapping file
 
-```commandline
-databricks labs ucx ensure-assessment-run
-```
+Edit the mapping file from the previous step to:
+- Exclude tables and/or views by removing the lines
+- Change UC location by editing the destination catalog and/or schema
 
-![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
+The mapping file is in CSV format and can be edited using any text editor or Excel. If using Excel, save the file in CSV
+format.
 
-Once you finish the assessment, proceed to the [group migration workflow](#group-migration-workflow).
-See the [migration process diagram](#migration-process) to understand the role of the assessment workflow in the migration process.
+Example changes:
 
-The assessment workflow is designed to assess the compatibility of various entities in the current workspace with Unity Catalog.
-It identifies incompatible entities and provides information necessary for planning the migration to UC. The tasks in
-the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators.
-The output of each task is stored in Delta tables in the `$inventory_database` schema, that you specify during [installation](#install-ucx),
-which can be used for further analysis and decision-making through the [assessment report](docs/assessment.md).
+**Before editing**
 
-1. `crawl_tables`: This task scans all tables in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.tables`. This metadata includes information such as the database name, table name, table type, and table location. This task is used for assessing which tables cannot be easily migrated to Unity Catalog.
-2. `crawl_udfs`: This task scans all UDFs in the Hive Metastore of the current workspace and persists their metadata in a table named `$inventory_database.udfs`. This task assesses whether the UDFs can be easily migrated to Unity Catalog.
-3. `crawl_grants`: This task scans all securable objects (including tables/views and UDFs) to determine the directly assigned permissions. The scanned permissions metadata includes information such as the principal, action type, and the securable object to which it applies. This task persists the permissions in the `$inventory_database.grants` inventory table.
-4. `estimate_table_size_for_migration`: This task scans the Delta table named `$inventory_database.tables` and locates tables that cannot be synced. These tables will have to be cloned in the migration process. The task assesses the size of these tables and creates the `$inventory_database.table_size` table to list these sizes. The table size is a factor in deciding whether to clone these tables.
-5. `crawl_mounts`: This task scans the workspace to compile a list of all existing mount points and stores this information in the `$inventory.mounts` table. This is crucial for planning the migration.
-6. `guess_external_locations`: This task determines the shared path prefixes of all the tables that utilize mount points. The goal is to identify the external locations necessary for a successful migration and store this information in the `$inventory.external_locations` table.
-7. `assess_jobs`: This task scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is stored in the `$inventory.jobs` table.
-8. `assess_clusters`: This task scans through all the clusters and identifies those that are not compatible with UC. The list of all the clusters is stored in the `$inventory.clusters` table.
-9. `assess_pipelines`: This task scans through all the Pipelines and identifies those pipelines that have Azure Service Principals embedded in their configurations. A list of all the pipelines with matching configurations is stored in the `$inventory.pipelines` table.
-10. `assess_azure_service_principals`: This task scans through all the clusters configurations, cluster policies, job cluster configurations, Pipeline configurations, and Warehouse configuration and identifies all the Azure Service Principals who have been given access to the Azure storage accounts via spark configurations referred in those entities. The list of all the Azure Service Principals referred in those configurations is saved in the `$inventory.azure_service_principals` table.
-11. `assess_global_init_scripts`: This task scans through all the global init scripts and identifies if there is an Azure Service Principal who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
-12. `assess_dashboards`: This task scans through all the dashboards and analyzes embedded queries for migration problems which it persists in `$inventory_database.query_problems`. It also collects direct filesystem access patterns that require attention which it persists in `$inventory_database.directfs_in_queries`.
-13. `assess_workflows`: This task scans through all the jobs and tasks and analyzes notebooks and files for migration problems which it persists in `$inventory_database.workflow_problems`. It also collects direct filesystem access patterns that require attention which it persists in `$inventory_database.directfs_in_paths`.
+| **workspace_name**   | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
+|----------------------|--------------|----------------|----------------|---------------|---------------|
+| data_engineering_ws  | 123333333   | sales_analysis      | sales_analysis      | ytd_sales        | ytd_sales        |
 
-![report](docs/assessment-report.png)
+**After editing**
 
-After UCX assessment workflow is executed, the assessment dashboard will be populated with findings and common recommendations. See [this guide](docs/assessment.md) for more details.
+| **workspace_name**   | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
+|----------------------|------------------|----------------|----------------|---------------|---------------|
+| data_engineering_ws  | data_engineering | sales_analysis      | sales      | ytd_sales        | ytd_analysis        |
 
-The UCX assessment workflow is intended to only run once; re-running it is not supported. If the inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx) and [installing](#install-ucx) it again.
+### Data access
 
-[[back to top](#databricks-labs-ucx)]
+> Throughout this guide, we refer to IAM roles/instance profiles in AWS & service principals/managed identities in
+> as "cloud principals".
 
-## Group migration workflow
+This section creates the cloud principals to access data in Unity Catalog and during the table data during migration. To
+understand the motivation for this step, read how Databricks accesses cloud locations:
+- [AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
+- [Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
-You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
-See the [migration process diagram](#migration-process) to understand the role of the group migration workflow in the migration process.
+#### Step 1 : Map cloud principals to cloud storage locations
 
-See the [detailed design](docs/local-group-migration.md) of this workflow. It helps you to upgrade all Databricks workspace assets:
-Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
-Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
-SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
-Directories, Repos, and Files.
+Map the cloud principals to cloud storage by running the
+[`principal-prefix-access` command](#principal-prefix-access-command).
 
-Once done with the group migration, proceed to [table migration process](#Table-Migration).
+#### Step 2 : Create or modify cloud principals and credentials
 
-Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
-If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
+Manually create the cloud principals to access data from Unity Catalog:
 
-The group migration workflow is designed to migrate workspace-local groups to account-level groups in the Unity Catalog (UC) environment. It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. The output of each task is stored in Delta tables in the `$inventory_database` schema, which can be used for further analysis and decision-making. The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
+- AWS:
+  - [`create-missing-principals` command](#create-missing-principals-command-aws-only) creates new AWS roles for Unity
+    Catalog to access data.
+  - Or, [Manually create storage credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
+- Azure:
+  - [Manually create storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
-1. `crawl_groups`: This task scans all groups for the local group migration scope.
-2. `rename_workspace_local_groups`: This task renames workspace local groups by adding a `ucx-renamed-` prefix. This step is taken to avoid conflicts with account-level groups that may have the same name as workspace-local groups.
-3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this step to be successful. This step is necessary to ensure that the account-level groups are available in the workspace for assigning permissions.
-4. `apply_permissions_to_account_groups`: This task assigns the full set of permissions of the original group to the account-level one. It covers local workspace-local permissions for all entities, including Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage permissions, Secret Scopes, Notebooks, Directories, Repos, Files. This step is necessary to ensure that the account-level groups have the necessary permissions to manage the entities in the workspace.
-5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the destination groups.
-6. `delete_backup_groups`: This task removes all workspace-level backup groups, along with their permissions. This should only be executed after confirming that the workspace-local migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and remove any unnecessary groups and permissions.
+Then, run the [`migrate-credentials` command](#migrate-credentials-command) to migrate the cloud principal
+credentials to Unity Catalog.
 
-[[back to top](#databricks-labs-ucx)]
+#### Step 3: Create the "uber" Principal
 
-## Debug notebook
+Create the "uber" principal by running the [`create-uber-principal` command](#create-uber-principal-command).
+The table migration requires a cloud principal with access to table data stored in cloud storage. These tables are known
+as external tables. UCX name this cloud principal the "uber" principal as it has access to **all** in-scope cloud
+storage. This principal is only required for the table migration process and not for ongoing UC usage. Once the upgrade
+is completed, this principal should be deleted.
 
-![debug](docs/debug-notebook.png)
+### New Unity Catalog resources
 
-Every [installation](#installation) creates a debug notebook, that initializes UCX as a library,
-so that you can implement missing features and
+This section details the **new** Unity Catalog resources required for migration the data objects. These resources can be
+created without touching the existing Hive metastore objecs.
 
-[[back to top](#databricks-labs-ucx)]
+#### Step 0: Attach a metastore
 
-## Debug logs
+If skipping the [group migration](#group-migration-workflow), then a metastore should be attached to the workspace by
+following [these instructions](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) or running the [`assign-metastore` command](#assign-metastore-command).
 
-![debug](docs/debug-logs.png)
+#### Step 1: Create external Locations
 
-Every workflow run stores debug logs in the `logs` folder of the [installation](#installation).
-For tasks shorter than 10 minutes, they appear after task finish, whereas longer-running tasks
-flush the logs every 10 minutes.
+Create UC external locations by running the [`migration-locations` command](#migrate-locations-command). The command
+creates a location for each location found during the [assessment](#assessment-workflow). It uses the credentials
+created in the previous steps.
 
-To enable debug logs of [command-line interface](#authenticate-databricks-cli),
-simply add `--debug` flag to any command.
+Alternatively, manually create the external locations
+- [AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
+- [Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
-[[back to top](#databricks-labs-ucx)]
+##### Step 2: Create Catalogs and Schemas
 
-## Table Migration
-This Section provides a guide for upgrading the Hive metastore objects to UC using UCX.
-The metastore upgrade process is composed of multiple steps.
-To effectively upgrade the metastores, four principal operations are required:
-1. Assess - In this step, you evaluate the existing HMS tables identified for upgrade to determine the right approach for upgrade. This step is a prerequisite and is performed by the assessment workflow.
-2. Create - In this step, you create the required UC assets such as, Metastore, Catalog, Schema, Storage Credentials, External Locations. This step is part of the upgrade process.
-3. Upgrade/Grant these are two steps that UCX combine.
-   4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC
-   4. Grant - The table upgrade the newly created object the same permission as the original object.
-
-### Prerequisites
-For UCX to be able to upgrade the metastore. The following prerequisites must be met:
-1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to [This Guide](#installation).
-2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [External Metastore Guide](docs/external_hms_glue.md).
-3. The assessment workflow must be run.
-4. It is recommended that the group migration process will be completed before upgrading the metastore. For more information on how to migrate groups, refer to the [UCX Readme](#group-migration-workflow).
-5. The workspace should be configured with a Metastore follow the instruction here [Create UC Metastore](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)<br>
-   Metastore can be attached to the workspace using the following [UCX command](#assign-metastore-command)
-
-### Upgrade Process
-The upgrade process is done in multiple steps. For each step we will discuss the manual process and how to perform it using UCX.
-
-#### Step 1: Mapping Metastore Tables (UCX Only)
-In this step we will map the metastore tables to UC tables.
-
-##### Step 1.1: Create the mapping file
-This step can be performed using the `create-table-mapping` command documented in the [UCX Command](#create-table-mapping-command).
-
-The CLI command will create a mapping file in the workspace UCX folder.
-
-By default, all the tables/views will be mapped to UC tables.
-All the tables will be mapped to a single catalog (by default), maintaining the schema/name of the original table.
-
-##### Step 1.2: Update the mapping file
-Update the mapping file with the required mappings. That can be performed by editing the file that was created in the previous step.
-
-You can exclude tables from the mapping by removing the line from the mapping file.
-You can also change the catalog/schema name of the UC table by changing the line in the mapping file.
-The mapping file is in CSV format and can be edited using any text editor or Excel. When using any Excel make sure to save the file in CSV format.
-
-Example:
-
-Before:
-
-| **workspace_name**      | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
-|---------------------|--------------|----------------|----------------|---------------|---------------|
-| data_engineering_ws | 123333333   | sales_analysis      | sales_analysis      | ytd_sales        | ytd_sales        |
-
-After:
-
-| **workspace_name**      | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
-|---------------------|--------------|----------------|----------------|---------------|---------------|
-| data_engineering_ws | data_engineering   | sales_analysis      | sales      | ytd_sales        | ytd_analysis        |
-
-We are seeing that by default the mapping file retains the same schema name and table name. We override the schema name and table name to be different in the UC catalog.
-
-#### Step 2: Create the necessary cloud principals for the upgrade
-
-Throughout this guide, we will refer to IAM roles/instance profiles in AWS & service principals/managed identities in
-as cloud principals. These cloud principals must be created/modified as prerequisites for the upgrade process.
-
-This step has multiple sub steps and should be performed by a cloud account administrator.
-We rely on CLI access (AWS) or API Access (Azure) to create the necessary cloud principals.
-In the future we will add support for creating the necessary cloud principals using Terraform.
-
-To understand this step it is important to understand how Databricks accesses cloud locations.
-You can read about it here:
-[AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
-[Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
-
-##### Step 2.1: Map the cloud principals to the cloud "prefixes"
-In this step we are going to map all the cloud principals to the paths they have access to.
-We will use the `principal-prefix-access` [UCX Command](#principal-prefix-access-command)
-
-##### Step 2.2: Create/Modify Cloud Principals and Credentials
-In this step we will create the necessary cloud principals for the UC credentials.
-The manual process is documented in the following links:
-[AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
-[Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
-
-For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-principals-command-aws-only)
-
-For both AWS and Azure we can use the `migrate-credentials` [UCX command](#migrate-credentials-command) to upgrade the necessary cloud principals:
-
-##### Step 2.3: Create External Locations
-Once the UC credentials are created, we can create the UC external locations.
-An external location will be created for each of the locations identified in the assessment.
-The Assessment dashboard displays all the locations that need to be created.
-The Manual process is documented in the following links:
-[AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
-[Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
-
-For both AWS and Azure we can use the `migrate-location` [UCX Command](#migrate-locations-command) to create the UC external locations.
-This command will create the UC external locations for all the locations identified in the assessment.<br/>It will use the UC credentials created in the previous step.
-
-##### Step 2.4: Create "Uber Principal"
-The table migration cluster requires a cloud principal that have access to all the external tables' locations. We call that cloud principal "Uber Principals". These are only necessary for the migration process and not required to support ongoing UC usage.
-Once the upgrade is completed, these principals can (and should) be deleted.
-Use the `create-uber-principal` [UCX Command](#create-uber-principal-command) to create the Uber Principal.
-
-##### Step 2.5: Create Catalogs and Schemas
-In this step, we will create the UC catalogs and schemas required for the target tables using the
-[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command will create the UC catalogs and
-schemas based on the mapping file created in the previous step.
+Create Uniyt Catalog [catalogs](https://learn.microsoft.com/en-us/azure/databricks/catalogs/) and
+[schemas](https://learn.microsoft.com/en-us/azure/databricks/schemas/) to organize the destination tables and views in
+by running the
+[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command creates the UC catalogs and
+schemas based on the [table mapping file](#table-mapping). Additionally, it migrates Hive metastore database
+permissions if present.
 
 This step requires considering how to [physically separate data in storage](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#data-is-physically-separated-in-storage)
 within UC. As [Databricks recommends storing managed data at the catalog level](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#configure-a-unity-catalog-metastore),
@@ -575,32 +550,9 @@ reused when using subpaths, for example, a folder in a cloud storage
 (`abfss://container@storage.dfs.core.windows.net/folder`) can reuse the external location of the cloud storage
 (`abfss://container@storage.dfs.core.windows.net/`). (The previous example also holds for other clouds.)
 
-#### Step 3: Upgrade the Metastore
-Upgrading the metastore is done in steps.
-Each step can be executed separately as a standalone command.
-Each step represents a different type of metastore object.
-We identified the following object types.
-Each of the object that is being upgraded will be marked with an `upgraded_to` property.
-This property will be used to skip the object in the next upgrade runs.
-It also points to the location of the upgraded object in UC.
-Each of the upgraded objects will be marked with an `upgraded_from` property.
-This property will be used to identify the original location of the object in the metastore.
-We also add a `upgraded_from_workspace_id` property to the upgraded object, to identify the source workspace.
+### Migrate Hive metastore data objects
 
-| Object Type         | Description                                                                                                                                                                        | Upgrade Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| EXTERNAL_SYNC       | Tables not saved to the DBFS file system that are supported by the sync command.<br/> These tables are in one of the following formats: DELTA, PARQUET, CSV, JSON, ORC, TEXT, AVRO | During the upgrade process, these table contents will remain intact and the metadata will be recreated in UC using the sync SQL command.<br/>More information about the sync command can be found [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| EXTERNAL_HIVESERDE  | Tables with table type "HIVE" that are not supported by the sync command                                                                                                           | We provide two workflows for hiveserde table migration:<br/>1. Migrate all hiveserde tables using CTAS which we officially support.<br/>2. Migrate certain types of hiveserde in place, which is technically working, but the user need to accept the risk that the old files created by hiveserde may not be processed correctly by Spark datasource in corner cases. User will need to decide which workflow to runs first which will migrate the hiveserde tables and mark the `upgraded_to` property and hence those tables will be skipped in the migration workflow runs later.                                                                                                                                                                             |
-| EXTERNAL_NO_SYNC    | Tables not saved to the DBFS file system that are not supported by the sync command                                                                                                | The current upgrade process will migrate these tables to UC by creating a new managed table in UC and copying the data from the old table to the new table. The new table's format will be Delta.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| DBFS_ROOT_DELTA     | Tables saved to the DBFS file system that are in Delta format                                                                                                                      | The current upgrade process will create a copy of these tables in UC using the "deep clone" command.<br/>More information about the deep clone command can be found [here](https://docs.databricks.com/en/sql/language-manual/delta-clone.html)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| DBFS_ROOT_NON_DELTA | Tables saved to the DBFS file system that are not in Delta format                                                                                                                  | The current upgrade process will create a managed table using CTAS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| VIEW                | Datbase Views                                                                                                                                                                      | Views are recreated during the upgrade process. The view's definition will be modified to repoint to the new UC tables. Views should be migrated only after all the dependent tables have been migrated. The upgrade process account for View to View dependencies.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| MANAGED             | Tables that are created as managed table in hive_metastore.                                                                                                                        | Depending on the WorkspaceConfig property managed_table_external_storage: 1. If the property is set to default CLONE (selected during installation). The UC Table will be created as CTAS which will created a copy of the data in UC. 2 If the property is set to SYNC_AS_EXTERNAL, the UC Table will be created as a EXTERNAL table. There is a risk, if the managed HMS table is dropped, which will drop the data and it will affect the UC table as well. 3 If the property is set to CONVERT_TO_EXTERNAL, the managed HMS table is converted to external and the tabel is created as external table in UC. This gives the advantage that dropping the HMS table doesnt drop the data, but impact of this should be carefully validate in existing workloads |
-The upgrade process can be triggered using the `migrate-tables` [UCX command](#migrate-tables-command)
-
-Or by running the table migration workflows deployed to the workspace.
-
-#### Table migration workflows
+In this step, tables and views are migrated using the following workflows:
 
 ```mermaid
 flowchart LR
@@ -636,73 +588,308 @@ flowchart LR
     end
 
     migrate-tables -- 1st --> mt_workflow
-    migrate-tables -- 2nd, optional \n table migrated here \n will be excluded in ctas workflow --> mt_serde_inplace_wf
+    migrate-tables -- 2nd (optional) table migrated here will be excluded in ctas workflow --> mt_serde_inplace_wf
     migrate-tables -- 3rd --> mt_ctas_wf
 ```
 
+The [table migration workflows](#table-migration-workflow) can be triggered using the [`migrate-tables` command](#migrate-tables-command) or by
+starting the workflows from the workspace UI manually. The table migration workflows are designed to minimize data
+copying and to maintain metadata while allowing users to choose preferred strategies where possible. Chose the
+strategies for migrating tables using the table below:
 
-#### Step 4: Odds and Ends
-The following steps can be used to repair/amend the metastore after the upgrade process.
+| Object Type           | Description                                                                                            | Upgrade Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|-----------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `DBFS_ROOT_DELTA`     | Delta tables persisted on the Databricks file system (dbfs).                                           | Create a copy of the table with the [`DEEP CLONE` command](https://docs.databricks.com/en/sql/language-manual/delta-clone.html).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `DBFS_ROOT_NON_DELTA` | Non-delta tables persisted on the Databricks file system (dbfs).                                       | Create a copy of the table with a [`CREATE TABLE AS SELECT * FROM` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html). The UC table will be a Delta table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `MANAGED`             | Managed Hive metastore tables.                                                                         | Depending on the managed table migration strategy chosen during installation:<br/>1. `CLONE`: Create a copy of the table with a [`CREATE TABLE LOCATION '<location>' AS SELECT * FROM` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html).<br/>2. `SYNC_AS_EXTERNAL`, synchronize the table metadata to UC with the [`SYNC` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html). **Warning**: If the managed Hive metastore table is dropped, the drop deletes the underlying data affecting the synchronised UC table as well.<br/>3. `CONVERT_TO_EXTERNAL`: First, in-place convert the managed Hive metastore to a non-managed table. Then, synchronize the table metadata to UC with the [`SYNC` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html). **Warning**: This strategy has the advantage over `SYNC_AS_EXTERNAL` that dropping the Hive metastore table does not delete the underlying data, however, impact should be carefully validated in existing workloads as the strategy converts the managed Hive metastore to an external table **in-place**. |
+| `EXTERNAL_SYNC`       | External tables that the `SYNC` command supports: Delta, Parquet, CSV, JSON, ORC, text or Avro tables. | Synchronize the table metadata to UC with the [`SYNC` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `EXTERNAL_NO_SYNC`    | External tables that the `SYNC` command does not support.                                              | Create a copy of the table with a [`CREATE TABLE AS SELECT * FROM` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html). The UC table will be a Delta table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `EXTERNAL_HIVESERDE`  | External Hive SerDe tables that the `SYNC` command does not support.                                   | Depending on the migration workflow chosen:<br/>1. `migrate-external-tables-ctas` (officially supported) : Create a copy of the table with a [`CREATE TABLE AS SELECT * FROM` command](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-using.html) The UC table will be a Delta table.<br/>2. `migrate-external-hiveserde-tables-in-place-experimental` (experimental) : Recreate the [Hive SerDe](https://cwiki.apache.org/confluence/display/Hive/SerDe) tables using the serialization and deserialization protocols. **Warning:** Although this strategy is supported, there is a risk that the old files created by Hive SerDe may not be processed correctly by Spark datasource in corner cases.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `VIEW`                | Views                                                                                                  | Recreate [views](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-view.html) using their definitions after repointing their dependencies to UC objects. The migration process supports views depending on other views.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
-##### Step 4.1: Skipping schema, table or view
+The workflows may be executed multiple times. Each step is designed as a standalone operation that migrates all
+in-scope tables. After migration, each object is marked with an `upgraded_to` property containing the UC identifier to
+which the object is migrated. This property signals that the object is out-of-scope for other migration operations and
+that the view dependency exists within UC. The created UC objects are marked with an `upgraded_from` property containing
+the Hive metastore identifier from which the object was migrated.
 
-```bash
-databricks labs ucx skip --schema X [--table Y] [--view Zj]
-```
+Finally, the table migration workflows also migrate Hive metastore permissions to Unity Catalog.
 
-This command will mark the schema, table or view as to-be skipped during the migration processes,
-see [`skip` command](#skip-command).
-
-##### Step 4.2: Moving objects
-```bash
-databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
-```
-This command will move the object from the source location to the target location.
-The `upgraded_from` property will be updated to reflect the new location on the source object.
-This command should be used in case the object was created in the wrong location.
-
-##### Step 4.2: Aliasing objects
-```bash
-databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
-```
-This command will create an alias for the object in the target location. It will create a view for tables that need aliasing.
-It will create a mirror view to view that is marked as alias.
-The use of this command is in case we need multiple identical tables or views in multiple locations.
-HMS allows creating multiple tables pointing to the same location.
-UC does not support creating multiple tables pointing to the same location, thus we need to create an alias for the table.
-
-##### Step 4.3: Reverting objects
-```bash
-databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]
-```
-This command will remove the upgraded table and reset the `upgraded_from` property. It will allow for upgrading the table again.
-
-### Post Migration Data Reconciliation Task
-UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
-- Compare the schema of the source and target tables. The result is `schema_matches`, and column by column comparison
-is stored as `column_comparison` struct.
-- Compare the row counts of the source and target tables. If the row count is within the reconciliation threshold
-(defaults to 5%), `data_matches` is True.
-- Compare the content of individual row between source and target tables to identify any discrepancies (when `compare_rows`
-flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
-and `target_missing_count`
-
-Once the workflow completes, the output will be stored in `$inventory_database.reconciliation_results` view, and displayed
-in the Migration dashboard.
-
-![reconciliation results](docs/recon_results.png)
-
-### Other considerations
-- You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
+Considerations:
+- You may want to run the workflows multiple times to migrate tables in phases.
 - If your Delta tables in DBFS root have a large number of files, consider:
   - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
   - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
 - Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
-### [EXPERIMENTAL] Scan tables in mounts Workflow
+Additional references:
+- [Databricks file system (dbfs)](https://docs.databricks.com/en/dbfs/index.html)
+- [External tables](https://docs.databricks.com/en/tables/external.html)
+
+### Odds and Ends
+
+The following sections detail how to repair/amend the UC metastore after the upgrade process.
+
+#### Skip migrating schemas, tables or views
+
+```bash
+databricks labs ucx skip --schema X [--table Y] [--view Zj]
+```
+
+The [`skip` command](#skip-command) marks a schema, table or view as to-be skipped during the migration processes.
+
+####  Move data objects
+
+```bash
+databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
+```
+
+The [`move` command](#move-command) moves the object from the source to the target location. The `upgraded_from`
+property are updated to reflect the new location on the source object. Use this command if the data object is migrated
+to the wrong destination.
+
+#### Alias data objects
+
+```bash
+databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
+```
+
+This [`alias` command](#alias-command) creates an alias for the object in the target location by creating a view reading
+from the table that needs aliasing. It will create a mirror view to view that is marked as alias.
+Use this command if Hive metastore tables point to the same location as UC does not support UC does not support tables
+with overlapping data locations.
+
+#### Revert migrated data objects
+
+```bash
+databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]
+```
+
+The [`revert-migrated-tables` command](#revert-migrated-tables-command) drops the Unity Catalog table or view and reset
+the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
+
+[[back to top](#databricks-labs-ucx)]
+
+# Workflows
+
+Part of this application is deployed as [Databricks Workflows](https://docs.databricks.com/en/workflows/index.html).
+You can view the status of deployed workflows via the [`workflows` command](#workflows-command).
+Failed workflows can be fixed with the [`repair-run` command](#repair-run-command).
+
+[[back to top](#databricks-labs-ucx)]
+
+## Assessment workflow
+
+![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
+
+The assessment workflow can be triggered using the Databricks UI or via the
+[`ensure-assessment-run` command](#ensure-assessment-run-command).
+
+The assessment workflow retrieves - or *crawls* - details of [workspace assets](https://docs.databricks.com/en/workspace/workspace-assets.html)
+and [securable objects in the Hive metastore](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore)
+relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` tasks retrieve assess and objects. The
+`assess_` tasks assess the compatibility with UC. The output of each task is stored in the
+[inventory database](#installation-resources) so that it can be used for further analysis and decision-making through
+the [assessment report](docs/assessment.md).
+
+1. `crawl_tables`: This task retrieves table definitions from the Hive metastore and persists the definitions in
+   the `tables` table. The definitions include information such as:
+   - Database/schema name
+   - Table name
+   - Table type
+   - Table location
+2. `crawl_udfs`: This task retrieves UDF definitions from the Hive metastore and persists the definitions in
+   the `udfs` table.
+3. `setup_tacl`: (Optimization) This task starts the `tacl` job cluster in parallel to other tasks.
+4. `crawl_grants`: This task retrieves [privileges you can grant on Hive objects](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#privileges-you-can-grant-on-hive-metastore-objects)
+   and persists the privilege definitions in the `grants` table
+   The retrieved permission definitions include information such as:
+   - Securable object: schema, table, view, (anonymous) function or any file.
+   - Principal: user, service principal or group
+   - Action type: grant, revoke or deny
+5. `estimate_table_size_for_migration`: This task analyzes the Delta table retrieved by `crawl_tables` to retrieve
+   an estimate of their size and persists the table sizes in the `table_size` table. The table size support the decision
+   for using the `SYNC` or `CLONE` [table migration strategy](#step-3-upgrade-the-metastore).
+6. `crawl_mounts`: This task retrieves mount point definitions and persists the definitions in the `mounts` table.
+7. `guess_external_locations`: This task guesses shared mount path prefixes of [external tables](https://docs.databricks.com/en/sql/language-manual/sql-ref-external-tables.html)
+   retrieved by `crawl_tables` that use mount points and persists the locations in the `external_locations` table. The
+   goal is to identify the to-be created UC [external locations](#step-23-create-external-locations).
+8. `assess_jobs`: This task retrieves the job definitions and persists the definitions in the `jobs` table. Job
+   definitions may require updating to become UC compatible.
+9. `assess_clusters`: This task retrieves the clusters definitions and persists the definitions in the `clusters` table.
+    Cluster definitions may require updating to become UC compatible.
+10. `assess_pipelines`: This task retrieves the [Delta Live Tables](https://www.databricks.com/product/delta-live-tables)
+    (DLT) pipelines definitions and persists the definitions in the `pipelines` table. DLT definitions may require
+    updating to become UC compatible.
+11. `assess_incompatible_submit_runs` : This task retrieves
+    [job runs](https://docs.databricks.com/en/jobs/monitor.html#view-runs-for-a-job), also known as
+    [job submit runs](https://docs.databricks.com/api/workspace/jobs/submit), and persists the definitions in the
+    `submit_runs` table. Incompatibility with UC is assessed:
+    - [Databricks runtime](https://www.databricks.com/glossary/what-is-databricks-runtime) should be version 11.3 or above
+    - [Access mode](https://docs.databricks.com/en/compute/configure.html#access-modes) should be set.
+12. `crawl_cluster_policies` : This tasks retrieves
+    [cluster policies](https://docs.databricks.com/en/admin/clusters/policies.html) and persists the policies in the
+    `policies` table. Incompatibility with UC is assessed:
+    - [Databricks runtime](https://www.databricks.com/glossary/what-is-databricks-runtime) should be version 11.3 or above
+13. `assess_azure_service_principals`: This tasks retrieves Azure service principal
+    [authentications information](https://learn.microsoft.com/en-us/azure/databricks/connect/storage/tutorial-azure-storage#connect-adls)
+    from Spark configurations to access storage accounts and persists these configuration information
+    in `azure_service_principals` table. The Spark configurations from the following places are retrieved:
+    - Clusters configurations
+    - Cluster policies
+    - Job cluster configurations
+    - Pipeline configurations
+    - Warehouse configuration
+14. `assess_global_init_scripts`: This task retrieves
+    [global init scripts](https://docs.databricks.com/en/init-scripts/global.html) and persists references to the
+    scripts in the `global_init_scripts` table. Again, Azure service principal authentication information might be given
+    in those scripts.
+15. `workspace_listing` : This tasks lists [workspace files](https://docs.databricks.com/en/workspace/workspace-assets.html#files)
+    recursively to compile a collection of directories, notebooks, files, repos and libraries. The task uses multi-threading
+    to parallelize the listing process for speeding up execution on big workspaces.
+16. `crawl_permissions` : This tasks retrieves workspace-local groups permissions and persists these permissions in the `permissions` table.
+17. `crawl_groups`: This tasks retrieves workspace-local groups and persists these permissions in the `groups` table.
+18. `assess_dashboards`: This task retrieves the dashboards to analyze their queries for
+    [migration problems](#linter-message-codes)
+19. `assess_workflows`: This task retrieves the jobs to analyze their notebooks and files for
+    [migration problems](#linter-message-codes).
+
+After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
+See [this guide](docs/assessment.md) for more details.
+
+![report](docs/assessment-report.png)
+
+Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
+[migration process diagram](#migration-process).
+
+[[back to top](#databricks-labs-ucx)]
+
+## Group migration workflow
+
+> You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
+
+**The group migration workflow does NOT CREATE account groups.** In contrast to account groups, [the (legacy)
+workspace-local groups cannot be assigned to additional workspaces or granted access to data in a Unity Catalog
+metastore](https://docs.databricks.com/en/admin/users-groups/groups.html#difference-between-account-groups-and-workspace-local-groups).
+A Databricks admin [assigns account groups to workspaces](https://docs.databricks.com/en/admin/users-groups/index.html#assign-users-to-workspaces)
+using [identity federation](https://docs.databricks.com/en/admin/users-groups/index.html#enable-identity-federation)
+to manage groups from a single place: your Databricks account. We expect UCX users to create account groups
+centrally while most other Databricks resources that UCX touches are scoped to a single workspace.
+If you do not have account groups matching the workspace in which UCX is installed, please
+run [`create-account-groups` command](#create-account-groups-command) before running the group migration workflow.
+
+The group migration workflow is designed to migrate workspace-local groups to account-level groups. It verifies if
+the necessary groups are available to the workspace with the correct permissions, and removes unnecessary groups and
+permissions. The group migration workflow depends on the output of the assessment workflow, thus, should only be
+executed after a successful run of the assessment workflow. The group migration workflow may be executed multiple times.
+
+1. `verify_metastore_attached`: Verifies if a metastore is attached. Account level groups are only available when
+    a metastore is attached. [See `assign-metastore` command.](#assign-metastore-command)
+2. `rename_workspace_local_groups`: This task renames workspace-local groups by adding a `ucx-renamed-` prefix. This
+   step is taken to avoid conflicts with account groups that may have the same name as workspace-local groups.
+3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account
+   groups must exist for this step to be successful. This step is necessary to ensure that the account groups
+   are available in the workspace for assigning permissions.
+4. `apply_permissions_to_account_groups`: This task assigns the full set of permissions of the original group to the
+   account-level one. This step is necessary to ensure that the account-level groups have the necessary permissions to
+   manage the entities in the workspace. It covers workspace-local permissions for all entities including:
+   - Legacy Table ACLs
+   - Entitlements
+   - AWS instance profiles
+   - Clusters
+   - Cluster policies
+   - Instance Pools
+   - Databricks SQL warehouses
+   - Delta Live Tables
+   - Jobs
+   - MLflow experiments
+   - MLflow registry
+   - SQL Dashboards & Queries
+   - SQL Alerts
+   - Token and Password usage permissions
+   - Secret Scopes
+   - Notebooks
+   - Directories
+   - Repos
+   - Files
+5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the
+   destination groups.
+
+After successfully running the group migration workflow:
+1. Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence the newly created
+   account level groups are considered to be valid.
+2. Run the [`remove-workspace-local-backup-grups`](#validate-groups-membership-command) to remove workspace-level backup
+   groups, along with their permissions. This should only be executed after confirming that the workspace-local
+   migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and
+   remove any unnecessary groups and permissions.
+3. Proceed to the [table migration process](#Table-Migration).
+
+For additional information see:
+- The [detailed design](docs/local-group-migration.md) of thie group migration workflow.
+- The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
+  migration process.
+
+[[back to top](#databricks-labs-ucx)]
+
+## Table migration workflows
+
+This section lists the workflows that migrate tables and views. See [this section](#migrate-hive-metastore-data-objects)
+for deciding which workflow to run and additional context for migrating tables.
+
+### Migrate tables
+
+The general table migration workflow `migrate-tables` migrates all tables and views using default strategies.
+
+1. `migrate_external_tables_sync` : This step migrates the external tables that are supported by `SYNC` command.
+2. `migrate_dbfs_root_delta_tables` : This step migrates delta tables stored in DBFS root using the `DEEP CLONE`
+   command.
+3. `migrate_dbfs_root_non_delta_tables` : This step migrates non-delta tables stored in DBFS root using the `CREATE
+   TABLE AS SELECT * FROM` command.
+4. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+5. `update_migration_status` : Refresh the migration status of all data objects.
+
+### Migrate external Hive SerDe tables
+
+The experimental table migration workflow `migrate-external-hiveserde-tables-in-place-experimental` migrates tables that
+support the `SYNC AS EXTERNAL` command.
+
+1. `migrate_hive_serde_in_place` : This step migrates the Hive SerDe tables that are supported by `SYNC AS EXTERNAL`
+   command.
+2. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+3. `update_migration_status` : Refresh the migration status of all data objects.
+
+### Migrate external tables CTAS
+
+The table migration workflow `migrate-external-tables-ctas` migrates tables with the `CREATE TABLE AS SELECT * FROM`
+command.
+
+1. `migrate_other_external_ctas` This step migrates the Hive Serde tables using the `CREATE TABLE AS SELECT * FROM`
+   command.
+2. `migrate_hive_serde_ctas` : This step migrates the Hive Serde tables using the `CREATE TABLE AS SELECT * FROM`
+   command.
+4. `migrate_views` : This step migrates views using the `CREATE VIEW` command.
+4. `update_migration_status` : Refresh the migration status of all data objects.
+
+## Post-migration data reconciliation workflow
+
+The `migrate-data-reconciliation` workflow validates the integrity of the migrated tables and persists its results in
+the `recon_results` table. The workflow compares the following between the migrated Hive metastore and its UC
+counterpart table:
+- `Schema` : See this result in the `schema_matches` column.
+- `Column by column` : See this result in the `column_comparison` column.
+- `Row counts` : If the row count is within the reconciliation threshold (defaults to 5%), the `data_matches` column is
+  set to `true`, otherwise it is set to `false`.
+- `Rows` : If the `compare_rows` flag is set to `true`, rows are compared using a hash comparison. Number of missing
+  rows are stored in the `source_missing_count` and `target_missing_count` column, respectively.
+
+The output is processed and displayed in the migration dashboard using the in `reconciliation_results` view.
+
+![reconciliation results](docs/recon_results.png)
+
+### [LEGACY] Scan tables in mounts Workflow
 #### <b>Always run this workflow AFTER the assessment has finished</b>
-- This experimental workflow attemps to find all Tables inside mount points that are present on your workspace.
+- This experimental workflow attempts to find all Tables inside mount points that are present on your workspace.
 - If you do not run this workflow, then `migrate-tables-in-mounts-experimental` won't do anything.
 - It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
 - This command is incremental, meaning that each time you run it, it will overwrite the previous tables in mounts found.
@@ -714,7 +901,7 @@ in the Migration dashboard.
   - exclude_paths_in_mount : A list of paths to exclude in all mount points
   - include_paths_in_mount : A list of paths to include in all mount points
 
-### [EXPERIMENTAL] Migrate tables in mounts Workflow
+### [LEGACY] Migrate tables in mounts Workflow
 - An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter.
 - You must do the following in order to make this work:
   - run the Assessment [workflow](#assessment-workflow)
@@ -725,13 +912,43 @@ in the Migration dashboard.
 
 [[back to top](#databricks-labs-ucx)]
 
-### Linter message codes
+## [EXPERIMENTAL] Migration Progress Workflow
+
+The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
+workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
+progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
+
+- `workflow_runs`: Tracks the status of the workflow runs.
+
+_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
+
+[[back to top](#databricks-labs-ucx)]
+
+# Dashboards
+
+The dashboards visualize UCX's outcomes. Each dashboard has text widgets detailing the contents in more detail. Below an
+overview with a short description is given.
+
+| Name                                                                                                            | Description                                        |
+|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| [Assessment \[Main\]](./src/databricks/labs/ucx/queries/assessment/main/00_0__assessment_overview.md)           | Assessment overview                                |
+| [Assessment \[Estimates\]](./src/databricks/labs/ucx/queries/assessment/estimates/00_0_metastore_assignment.md) | Migration effort estimates based on the assessment |
+| [Assessment \[Interactive\]](./src/databricks/labs/ucx/queries/assessment/interactive/00_0_interactive.md)      | Assessment outcomes on interactive clusters        |
+| [Assessment \[Azure\]](./src/databricks/labs/ucx/queries/assessment/azure/00_0_azure_service_principals.md)     | Assessment outcomes specific to Azure              |
+| [Migration \[Main\]](./src/databricks/labs/ucx/queries/migration/main/00_0_migration_overview.md)               | Migration overview                                 |
+| [Migration \[Groups\]](./src/databricks/labs/ucx/queries/migration/groups/00_0_migration_overview.md)           | Group migration outcomes                           |
+| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | Migration progress                                 |
+
+[[back to top](#databricks-labs-ucx)]
+
+# Linter message codes
 
 ![code compatibility problems](docs/code_compatibility_problems.png)
 
 Here's the detailed explanation of the linter message codes:
 
-#### `cannot-autofix-table-reference`
+## `cannot-autofix-table-reference`
 
 This indicates that the linter has found a table reference that cannot be automatically fixed. The user must manually
 update the table reference to point to the correct table in Unity Catalog. This mostly occurs, when table name is
@@ -771,7 +988,7 @@ for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `catalog-api-in-shared-clusters`
+## `catalog-api-in-shared-clusters`
 
 `spark.catalog.*` functions require Databricks Runtime 14.3 LTS or above on Unity Catalog clusters in Shared access
 mode, so of your code has `spark.catalog.tableExists("table")` or `spark.catalog.listDatabases()`, you need to ensure
@@ -779,7 +996,7 @@ that your cluster is running the correct runtime version and data security mode.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `changed-result-format-in-uc`
+## `changed-result-format-in-uc`
 
 Calls to these functions would return a list of `<catalog>.<database>.<table>` instead of `<database>.<table>`. So if
 you have code like this:
@@ -793,7 +1010,7 @@ you need to make sure that `do_stuff_with_table` can handle the new format.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `direct-filesystem-access-in-sql-query`
+## `direct-filesystem-access-in-sql-query`
 
 Direct filesystem access is deprecated in Unity Catalog.
 DBFS is no longer supported, so if you have code like this:
@@ -806,7 +1023,7 @@ you need to change it to use UC tables.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `direct-filesystem-access`
+## `direct-filesystem-access`
 
 Direct filesystem access is deprecated in Unity Catalog.
 DBFS is no longer supported, so if you have code like this:
@@ -825,7 +1042,7 @@ You need to change it to use UC tables or UC volumes.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `dependency-not-found`
+## `dependency-not-found`
 
 This message indicates that the linter has found a dependency, like Python source file or a notebook, that is not
 available in the workspace. The user must ensure that the dependency is available in the workspace. This usually
@@ -833,7 +1050,7 @@ means an error in the user code.
 
 [[back to top](#databricks-labs-ucx)]
 
-### `jvm-access-in-shared-clusters`
+## `jvm-access-in-shared-clusters`
 
 You cannot access Spark Driver JVM on Unity Catalog clusters in Shared Access mode. If you have code like this:
 
@@ -852,7 +1069,7 @@ you need to change it to use Python equivalents.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `legacy-context-in-shared-clusters`
+## `legacy-context-in-shared-clusters`
 
 SparkContext (`sc`) is not supported on Unity Catalog clusters in Shared access mode. Rewrite it using SparkSession
 (`spark`). Example code that triggers this message:
@@ -869,13 +1086,13 @@ sc.parallelize([1, 2, 3])
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `not-supported`
+## `not-supported`
 
 Installing eggs is no longer supported on Databricks 14.0 or higher.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `notebook-run-cannot-compute-value`
+## `notebook-run-cannot-compute-value`
 
 Path for `dbutils.notebook.run` cannot be computed and requires adjusting the notebook path.
 It is not clear for automated code analysis where the notebook is located, so you need to simplify the code like:
@@ -894,7 +1111,7 @@ dbutils.notebook.run(a)
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `python-udf-in-shared-clusters`
+## `python-udf-in-shared-clusters`
 
 `applyInPandas` requires DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode. Example:
 
@@ -919,7 +1136,7 @@ spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `rdd-in-shared-clusters`
+## `rdd-in-shared-clusters`
 
 RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use mapInArrow() or Pandas UDFs instead.
 
@@ -929,7 +1146,7 @@ df.rdd.mapPartitions(myUdf)
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `spark-logging-in-shared-clusters`
+## `spark-logging-in-shared-clusters`
 
 Cannot set Spark log level directly from code on Unity Catalog clusters in Shared access mode. Remove the call and set
 the cluster spark conf `spark.log.level` instead:
@@ -954,27 +1171,27 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `sql-parse-error`
+## `sql-parse-error`
 
 This is a generic message indicating that the SQL query could not be parsed. The user must manually check the SQL query.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `sys-path-cannot-compute-value`
+## `sys-path-cannot-compute-value`
 
 Path for `sys.path.append` cannot be computed and requires adjusting the path. It is not clear for automated code
 analysis where the path is located.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `table-migrated-to-uc`
+## `table-migrated-to-uc`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `to-json-in-shared-clusters`
+## `to-json-in-shared-clusters`
 
 `toJson()` is not available on Unity Catalog clusters in Shared access mode. Use `toSafeJson()` on DBR 13.3 LTS or
 above to get a subset of command context information. Example code that triggers this message:
@@ -985,22 +1202,9 @@ dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()
 
 [[back to top](#databricks-labs-ucx)]
 
-#### `unsupported-magic-line`
+## `unsupported-magic-line`
 
 This message indicates the code that could not be analysed by UCX. User must check the code manually.
-
-[[back to top](#databricks-labs-ucx)]
-
-## [EXPERIMENTAL] Migration Progress Workflow
-
-The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
-workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
-progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
-
-- `workflow_runs`: Tracks the status of the workflow runs.
-
-_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
-the [assessment workflow](#assessment-workflow)._
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1268,6 +1472,7 @@ or [Azure CLI](#access-for-azure-storage-accounts) to be installed and authentic
 identifies all the storage accounts used by tables in the workspace and their permissions on each storage account.
 Once you're done running this command, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
+The "prefix" refers to the start - i.e. prefix - of table locations that point to the cloud storage location.
 
 [[back to top](#databricks-labs-ucx)]
 
