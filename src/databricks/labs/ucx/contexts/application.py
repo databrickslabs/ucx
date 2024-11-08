@@ -278,19 +278,23 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def default_securable_ownership(self) -> DefaultSecurableOwnership:
-        # validate that the default_owner_group is set and is a valid group (the current user is a member)
+    def default_owner_group(self) -> str | None:
         owner_group = None
         if self.config.default_owner_group:
             if not self.group_manager.validate_owner_group(self.config.default_owner_group):
                 logger.warning("Default owner group is not valid, falling back to administrator ownership.")
             else:
                 owner_group = self.config.default_owner_group
-        # Returns a static table ownership resolver
+        return owner_group
+
+    @cached_property
+    def default_securable_ownership(self) -> DefaultSecurableOwnership:
+        # validate that the default_owner_group is set and is a valid group (the current user is a member)
+
         return DefaultSecurableOwnership(
             self.administrator_locator,
             self.tables_crawler,
-            owner_group,
+            self.default_owner_group,
             lambda: self.workspace_client.current_user.me().user_name,
         )
 

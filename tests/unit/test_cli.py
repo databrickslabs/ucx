@@ -1292,5 +1292,3 @@ def test_assign_owner_group(tmp_path, workspace_clients, acc_client, run_as_coll
     for workspace_client in workspace_clients:
         args, _ = workspace_client.workspace.upload.call_args_list[-1]
         assert "default_owner_group: test_group" in args[1].decode('utf-8')
-
-

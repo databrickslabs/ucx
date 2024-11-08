@@ -16,6 +16,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
+from databricks.labs.ucx.hive_metastore.ownership import DefaultSecurableOwnership
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
@@ -222,7 +223,7 @@ def test_crawler_crawl() -> None:
             "SHOW GRANTS ON CATALOG `hive_metastore`": SHOW_GRANTS[("princ1", "USE", "CATALOG$", "hive_metastore"),],
             "SHOW GRANTS ON DATABASE `hive_metastore`\\.`database_one`": SHOW_GRANTS[
                 ("princ2", "OWN", "DATABASE", "database_one"),
-                # Enumerating database grants can include some grants for the catalog.
+                    # Enumerating database grants can include some grants for the catalog.
                 ("princ1", "SELECT", "CATALOG$", None),
             ],
             "SHOW GRANTS ON VIEW `hive_metastore`\\.`database_one`\\.`table_one`": SHOW_GRANTS[
@@ -958,14 +959,21 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     assert rows == [history_record]
 
 
-def test_default_owner() -> None:
+@pytest.mark.parametrize(
+    "member, expected",
+    [
+        ("me@example.com", "owners"),
+        ("not_me@example.com", None)
+    ]
+)
+def test_default_owner(member, expected) -> None:
     ws = mock_workspace_client()
     download_yaml = {
         'config.yml': yaml.dump(
             {
                 'version': 2,
                 'inventory_database': 'ucx',
-                'default_owner_group': 'fake_admin_group',
+                'default_owner_group': 'owners',
                 'connect': {
                     'host': '...',
                     'token': '...',
@@ -974,14 +982,14 @@ def test_default_owner() -> None:
         ),
         'workspaces.json': None,
     }
+
     ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
-    account_admins_group = Group(id="1234", display_name="account users", members=[ComplexValue(display="fake_admin_group", value="1")])
+    account_admins_group = Group(id="1234",
+                                 display_name="owners",
+                                 members=[ComplexValue(display=member, value="1")])
     ws.api_client.do.return_value = {
         "Resources": [account_admins_group.as_dict()],
     }
     ctx = WorkspaceContext(ws)
-    default_owner = ctx.default_securable_ownership
-    config = ctx.config
-    print(config)
-    assert default_owner
-
+    default_owner = ctx.default_owner_group
+    assert default_owner == expected
