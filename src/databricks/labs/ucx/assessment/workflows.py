@@ -165,6 +165,8 @@ class Assessment(Workflow):
 
         It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
         It accepts starting path as the parameter defaulted to the root path '/'."""
+        if not ctx.config.use_legacy_permissions_migration:
+            return
         ctx.workspace_listing.snapshot()
 
     @job_task(depends_on=[crawl_grants, workspace_listing])
@@ -174,6 +176,8 @@ class Assessment(Workflow):
 
         This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
         This step includes preparing Legacy Table ACLs for local group migration."""
+        if not ctx.config.use_legacy_permissions_migration:
+            return
         permission_manager = ctx.permission_manager
         permission_manager.reset()
         permission_manager.snapshot()

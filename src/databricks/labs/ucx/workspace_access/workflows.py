@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class GroupMigration(Workflow):
     def __init__(self):
-        super().__init__('migrate-groups')
+        super().__init__('migrate-groups-legacy')
 
     @job_task(job_cluster="table_migration")
     def verify_metastore_attached(self, ctx: RuntimeContext):
@@ -55,7 +55,7 @@ class GroupMigration(Workflow):
 
 class PermissionsMigrationAPI(Workflow):
     def __init__(self):
-        super().__init__('migrate-groups-experimental')
+        super().__init__('migrate-groups')
 
     @job_task(job_cluster="table_migration")
     def verify_metastore_attached(self, ctx: RuntimeContext):
@@ -67,18 +67,18 @@ class PermissionsMigrationAPI(Workflow):
 
     @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] Renames workspace local groups by adding `db-temp-` prefix."""
+        """Renames workspace local groups by adding `db-temp-` prefix."""
         ctx.group_manager.rename_groups()
 
     @job_task(depends_on=[rename_workspace_local_groups])
     def reflect_account_groups_on_workspace(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
+        """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
         step to be successful. This process does not create the account level group(s)."""
         ctx.group_manager.reflect_account_groups_on_workspace()
 
     @job_task(depends_on=[reflect_account_groups_on_workspace])
     def apply_permissions(self, ctx: RuntimeContext):
-        """[EXPERIMENTAL] This task uses the new permission migration API which requires enrolment from Databricks.
+        """This task uses the new permission migration API which requires enrolment from Databricks.
         Fourth phase of the workspace-local group migration process. It does the following:
           - Assigns the full set of permissions of the original group to the account-level one
 
