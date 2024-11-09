@@ -28088,8 +28088,7 @@
     "pyspark.worker_util": []
   },
   "pytesseract": {
-    "pytesseract": [],
-    "pytesseract.pytesseract": []
+    "pytesseract": []
   },
   "pytest": {
     "_pytest": [],
