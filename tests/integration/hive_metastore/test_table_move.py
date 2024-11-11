@@ -25,7 +25,6 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     assert len(rec_results) == 1
 
 
-@pytest.mark.skip("ES-1302145")  # TODO: remove `test_move_tables` skip after ES-1302145 is resolved
 def test_move_tables(
     ws,
     sql_backend,
@@ -113,7 +112,6 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
         assert table.name == from_table_not_to_migrate.name
 
 
-@pytest.mark.skip("ES-1302145")  # TODO: remove `test_move_views` skip after ES-1302145 is resolved
 def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make_random):
     table_move = TableMove(ws, sql_backend)
     from_catalog = make_catalog()
@@ -149,7 +147,6 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
         assert view.name in [from_view_not_to_migrate.name, from_table.name]
 
 
-@pytest.mark.skip("ES-1302145")  # TODO: remove `test_alias_tables` skip after ES-1302145 is resolved
 def test_alias_tables(
     ws,
     sql_backend,
