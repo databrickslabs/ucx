@@ -9,6 +9,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
@@ -109,6 +110,18 @@ class PipelinesMigrator:
         self._pipeline_crawler = pipelines_crawler
         self._catalog_name = catalog_name
         self._skip_pipelines = skip_pipelines
+        self._job_pipeline_mapping = {}
+
+    def _create_job_pipeline_mapping(self) -> None:
+        jobs = self._ws.jobs.list()
+
+        for job in jobs:
+            job_details = self._ws.jobs.get(job.job_id)
+            if job_details.settings.tasks:
+                for task in job_details.settings.tasks:
+                    if task.pipeline_task:
+                        self._job_pipeline_mapping[task.pipeline_task.pipeline_id] = {"job_id": job.job_id, "task_key": task.task_key}
+            logger.info(f"Processing job {job.job_id} to find associated pipeline")
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         # TODO:
@@ -116,6 +129,7 @@ class PipelinesMigrator:
         return self._pipeline_crawler.snapshot()
 
     def migrate_pipelines(self) -> None:
+        self._create_job_pipeline_mapping()
         self._migrate_pipelines()
 
     def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
@@ -176,7 +190,18 @@ class PipelinesMigrator:
             'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
         )
 
+        if 'pipeline_id' not in res:
+            logger.warning(f"Failed to clone pipeline {pipeline.pipeline_id}")
+            return res
+
         # After successful clone, update jobs
+        if pipeline.pipeline_id in self._job_pipeline_mapping:
+            job_pipeline_mapping = self._job_pipeline_mapping[pipeline.pipeline_id]
+            self._ws.jobs.update(job_pipeline_mapping['job_id'],
+                                 new_settings=JobSettings(
+                                     tasks=[Task(pipeline_task=PipelineTask(pipeline_id=res['pipeline_id']),
+                                                 task_key=job_pipeline_mapping['task_key'])]))
+            logger.info(f"Updated job {job_pipeline_mapping['job_id']} with new pipeline {res['pipeline_id']}")
 
         # TODO:
         # Check the error from UI
