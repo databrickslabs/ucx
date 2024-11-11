@@ -65,22 +65,22 @@ def test_table_migration_job_refreshes_migration_status(
     assert not problems, failure_message
 
     # Ensure that the workflow populated the `workflow_runs` table.
-    query = (
-        f"SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs\n"
-        f"WHERE workspace_id = {installation_ctx.workspace_id}\n"
-        f"  AND workflow_run_id = {run_id}\n"
-        f"LIMIT 1\n"
-    )
+    query = f"""
+        SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs
+        WHERE workspace_id = {installation_ctx.workspace_id}
+          AND workflow_run_id = {run_id}
+        LIMIT 1
+    """
     assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
 
     # Ensure that the history file has table records written to it that correspond to this run.
-    query = (
-        f"SELECT 1 from {installation_ctx.ucx_catalog}.multiworkspace.historical\n"
-        f"WHERE workspace_id = {installation_ctx.workspace_id}\n"
-        f"  AND job_run_id = {run_id}\n"
-        f"  AND object_type = 'Table'\n"
-        f"LIMIT 1\n"
-    )
+    query = f"""
+        SELECT 1 from {installation_ctx.ucx_catalog}.multiworkspace.historical
+        WHERE workspace_id = {installation_ctx.workspace_id}
+          AND job_run_id = {run_id}
+          AND object_type = 'Table'
+        LIMIT 1
+    """
     assert any(installation_ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
 
 
