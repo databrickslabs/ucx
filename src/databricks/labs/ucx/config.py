@@ -83,9 +83,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] If specified, the large-scale scanners will only list the specified number of objects.
     debug_listing_upper_limit: int | None = None
 
-    # Skip ACL Migration
-    skip_grant_migration: bool = False
-
     # Default table owner, assigned to a group
     default_owner_group: str | None = None
 
