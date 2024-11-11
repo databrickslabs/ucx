@@ -19,7 +19,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher, TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -30,6 +30,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -143,15 +144,16 @@ class TablesMigrator:
         all_tasks = []
         # Every batch of views to migrate needs an up-to-date table migration index
         # to determine if the dependencies have been migrated
-        sequencer = ViewsMigrationSequencer(tables_to_migrate, migration_index=self.index(force_refresh=True))
+        migration_index = self.index(force_refresh=True)
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, migration_index=migration_index)
         batches = sequencer.sequence_batches()
         for batch in batches:
-            tasks = []
-            for view in batch:
-                tasks.append(partial(self._migrate_view, view))
+            # Avoid redundant refresh for first batch.
+            if all_tasks:
+                migration_index = self.index(force_refresh=True)
+            tasks = [partial(self._migrate_view, view, migration_index) for view in batch]
             Threads.strict("migrate views", tasks)
             all_tasks.extend(tasks)
-            self.index(force_refresh=True)
         return all_tasks
 
     @cached_property
@@ -234,25 +236,25 @@ class TablesMigrator:
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
-    def _migrate_view(self, src_view: ViewToMigrate):
+    def _migrate_view(self, src_view: ViewToMigrate, migration_index: TableMigrationIndex) -> bool:
         if self._table_already_migrated(src_view.rule.as_uc_table_key):
             logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
             return True
-        if self._view_can_be_migrated(src_view):
-            return self._migrate_view_table(src_view)
+        if self._view_can_be_migrated(src_view, migration_index):
+            return self._migrate_view_table(src_view, migration_index)
         logger.info(f"View {src_view.src.key} is not supported for migration")
         return True
 
-    def _view_can_be_migrated(self, view: ViewToMigrate):
+    def _view_can_be_migrated(self, view: ViewToMigrate, migration_index: TableMigrationIndex) -> bool:
         # dependencies have already been computed, therefore an empty dict is good enough
         for table in view.dependencies:
-            if not self.index().get(table.schema, table.name):
+            if not migration_index.get(table.schema, table.name):
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
 
-    def _migrate_view_table(self, src_view: ViewToMigrate):
-        view_migrate_sql = self._sql_migrate_view(src_view)
+    def _migrate_view_table(self, src_view: ViewToMigrate, migration_index: TableMigrationIndex):
+        view_migrate_sql = self._sql_migrate_view(src_view, migration_index)
         logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
         try:
             self._sql_backend.execute(view_migrate_sql)
@@ -265,13 +267,13 @@ class TablesMigrator:
             return False
         return self._migrate_grants.apply(src_view.src, src_view.rule.as_uc_table)
 
-    def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
+    def _sql_migrate_view(self, src_view: ViewToMigrate, migration_index: TableMigrationIndex) -> str:
         # We have to fetch create statement this way because of columns in:
         # CREATE VIEW x.y (col1, col2) AS SELECT * FROM w.t
         create_statement = self._sql_backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
         src_view.src.view_text = next(iter(create_statement))["createtab_stmt"]
         # this does not require the index to be refreshed because the dependencies have already been validated
-        return src_view.sql_migrate_view(self.index())
+        return src_view.sql_migrate_view(migration_index)
 
     @cached_property
     def _catalog(self):
