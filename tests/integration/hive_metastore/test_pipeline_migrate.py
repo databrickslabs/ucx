@@ -39,6 +39,12 @@ def test_pipeline_migrate(
         target=target_schemas[0].name,
         libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
     )
+    skip_pipeline = make_pipeline(
+        configuration=_PIPELINE_CONF,
+        name=f"skip-{pipeline_name}",
+        target=target_schemas[1].name,
+        libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
+    )
 
     pipelines = runtime_ctx.pipelines_crawler.snapshot()
     results = []
@@ -50,7 +56,7 @@ def test_pipeline_migrate(
     assert len(results) == 1
 
 
-    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, dst_catalog.name)
+    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, dst_catalog.name, skip_pipelines=[skip_pipeline.pipeline_id])
     pipelines_migrator.migrate_pipelines()
 
     # crawl pipeline in UC and check if it is migrated
