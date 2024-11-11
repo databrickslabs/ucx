@@ -211,7 +211,7 @@ def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
 
 @pytest.fixture
 def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
-    workspace_file = make_workspace_file(content=f'df = spark.read.csv("dbfs://folder/file.csv")')
+    workspace_file = make_workspace_file(content='df = spark.read.csv("dbfs://folder/file.csv")')
     query = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
         DirectFsAccess(
@@ -548,7 +548,7 @@ def test_migration_progress_query_data_asset_references_pending_migration_overvi
             total=2,
             total_migrated=1,
             total_not_migrated=1,
-        )
+        ),
     ]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
@@ -592,7 +592,7 @@ def test_migration_progress_query_data_asset_references_pending_migration(
             failure="Pending migration",
             is_read=False,
             is_write=True,
-            link=f"/#workspace{used_table.source_id}"
+            link=f"/#workspace{used_table.source_id}",
         )
         rows.append(row)
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
