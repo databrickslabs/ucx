@@ -100,7 +100,7 @@ class AWSResourcePermissions:
                         self._kms_key,
                     )
                     roles_created.append(role)
-            except (PermissionDenied, NotFound):
+            except (PermissionDenied, NotFound) as e:
                 logger.error(
                     "Error creating UC roles. Please review the error message and resolve the issue before "
                     "trying again. "
@@ -108,7 +108,7 @@ class AWSResourcePermissions:
                 )
                 for delete_role in roles_created:
                     self._aws_resources.delete_role(delete_role.role_name)
-                return None
+                raise e from None
 
         # We need to create a buffer between the role creation and the role update, Otherwise the update fails.
         for created_role in roles_created:

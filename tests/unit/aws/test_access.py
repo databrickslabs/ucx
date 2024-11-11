@@ -450,17 +450,12 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
-    role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
+    with pytest.raises(PermissionDenied):
+        role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
     assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
-    assert (
-        call('UC_ROLE_BUCKET1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
-        in aws.put_role_policy.call_args_list
-    )
-    assert (
-        call('UC_ROLE_BUCKET2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
-        in aws.put_role_policy.call_args_list
-    )
+    assert call('UC_ROLE_BUCKET1') in aws.delete_role.call_args_list
+
 
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
