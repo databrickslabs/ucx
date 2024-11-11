@@ -206,9 +206,9 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def pipeline_migrator(self) -> PipelinesMigrator:
+    def pipelines_migrator(self) -> PipelinesMigrator:
         pipeline_crawler = PipelinesCrawler(self.workspace_client, self.sql_backend, self.config.ucx_catalog)
-        return PipelinesMigrator(self.workspace_client, pipeline_crawler, self.pipeline_mapping)
+        return PipelinesMigrator(self.workspace_client, pipeline_crawler, self.config.ucx_catalog)
 
 
 class LocalCheckoutContext(WorkspaceContext):

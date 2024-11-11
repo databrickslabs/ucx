@@ -102,31 +102,40 @@ class PipelineMapping:
 
 
 class PipelinesMigrator:
-    def __init__(self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str,
-                 skip_pipelines=None):
+    def __init__(
+        self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str, skip_pipelines=None
+    ):
         if skip_pipelines is None:
             skip_pipelines = []
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
         self._catalog_name = catalog_name
         self._skip_pipelines = skip_pipelines
-        self._job_pipeline_mapping = {}
+        self._job_pipeline_mapping: dict[str, dict] = {}
 
     def _create_job_pipeline_mapping(self) -> None:
         jobs = self._ws.jobs.list()
 
         for job in jobs:
+            if not job.job_id:
+                continue
+
             job_details = self._ws.jobs.get(job.job_id)
-            if job_details.settings.tasks:
-                for task in job_details.settings.tasks:
-                    if task.pipeline_task:
-                        self._job_pipeline_mapping[task.pipeline_task.pipeline_id] = {"job_id": job.job_id, "task_key": task.task_key}
+            if not job_details.settings or not job_details.settings.tasks:
+                continue
+
+            for task in job_details.settings.tasks:
+                if task.pipeline_task:
+                    self._job_pipeline_mapping[task.pipeline_task.pipeline_id] = {
+                        "job_id": job.job_id,
+                        "task_key": task.task_key,
+                    }
             logger.info(f"Processing job {job.job_id} to find associated pipeline")
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         # TODO:
         # add skip logic and return only the pipelines that need to be migrated
-        return self._pipeline_crawler.snapshot()
+        return list(self._pipeline_crawler.snapshot())
 
     def migrate_pipelines(self) -> None:
         self._create_job_pipeline_mapping()
@@ -163,17 +172,21 @@ class PipelinesMigrator:
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
         get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
-        if get_pipeline.spec.catalog:
-            # Skip if the pipeline is already migrated to UC
-            logger.info(f"Pipeline {pipeline.pipeline_id} is already migrated to UC")
-            return []
-        self._ws.pipelines.update(pipeline.pipeline_id, name=f"{pipeline.pipeline_name} [OLD]",
-                                  clusters=get_pipeline.spec.clusters,
-                                  storage=get_pipeline.spec.storage,
-                                  continuous=get_pipeline.spec.continuous,
-                                  deployment=get_pipeline.spec.deployment,
-                                  target=get_pipeline.spec.target,
-                                  libraries=get_pipeline.spec.libraries)
+        if get_pipeline.spec:
+            if get_pipeline.spec.catalog:
+                # Skip if the pipeline is already migrated to UC
+                logger.info(f"Pipeline {pipeline.pipeline_id} is already migrated to UC")
+                return []
+            self._ws.pipelines.update(
+                pipeline.pipeline_id,
+                name=f"{pipeline.pipeline_name} [OLD]",
+                clusters=get_pipeline.spec.clusters if get_pipeline.spec.clusters else None,
+                storage=get_pipeline.spec.storage if get_pipeline.spec.storage else None,
+                continuous=get_pipeline.spec.continuous if get_pipeline.spec.continuous else None,
+                deployment=get_pipeline.spec.deployment if get_pipeline.spec.deployment else None,
+                target=get_pipeline.spec.target if get_pipeline.spec.target else None,
+                libraries=get_pipeline.spec.libraries if get_pipeline.spec.libraries else None,
+            )
 
         # Clone pipeline
         headers = {
@@ -189,7 +202,7 @@ class PipelinesMigrator:
         res = self._ws.api_client.do(
             'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
         )
-
+        assert isinstance(res, dict)
         if 'pipeline_id' not in res:
             logger.warning(f"Failed to clone pipeline {pipeline.pipeline_id}")
             return res
@@ -197,10 +210,17 @@ class PipelinesMigrator:
         # After successful clone, update jobs
         if pipeline.pipeline_id in self._job_pipeline_mapping:
             job_pipeline_mapping = self._job_pipeline_mapping[pipeline.pipeline_id]
-            self._ws.jobs.update(job_pipeline_mapping['job_id'],
-                                 new_settings=JobSettings(
-                                     tasks=[Task(pipeline_task=PipelineTask(pipeline_id=res['pipeline_id']),
-                                                 task_key=job_pipeline_mapping['task_key'])]))
+            self._ws.jobs.update(
+                job_pipeline_mapping['job_id'],
+                new_settings=JobSettings(
+                    tasks=[
+                        Task(
+                            pipeline_task=PipelineTask(pipeline_id=str(res.get('pipeline_id'))),
+                            task_key=job_pipeline_mapping['task_key'],
+                        )
+                    ]
+                ),
+            )
             logger.info(f"Updated job {job_pipeline_mapping['job_id']} with new pipeline {res['pipeline_id']}")
 
         # TODO:
