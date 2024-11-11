@@ -49,8 +49,7 @@ dependencies = ["databricks-sdk~=0.30",
                 "databricks-labs-blueprint>=0.9.1,<0.10",
                 "PyYAML>=6.0.0,<7.0.0",
                 "sqlglot>=25.5.0,<25.30",
-                "astroid>=3.3.1",
-                "py4j==0.10.9.7"]
+                "astroid>=3.3.1"]
 
 [project.optional-dependencies]
 pylsp = [

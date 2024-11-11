@@ -11,10 +11,10 @@ def dbfs_files(mocker):
     mock_jsc = mocker.Mock()
     mock_jvm = mocker.Mock()
     mock_filesystem = mocker.Mock()
-    mock_jvm.FileSystem.get.return_value = mock_filesystem
-    mock_jvm.Path.side_effect = lambda x: x
+    mock_jvm.jvm_filesystem.get.return_value = mock_filesystem
+    mock_jvm.jvm_path.side_effect = lambda x: x
     mock_spark._jsc = mock_jsc  # pylint: disable=protected-access
-    mock_spark._jvm = mock_jvm  # pylint: disable=protected-access
+    mock_spark.jvm = mock_jvm
 
     _dbfs_files = DbfsFiles(jvm_interface=mock_spark)
 

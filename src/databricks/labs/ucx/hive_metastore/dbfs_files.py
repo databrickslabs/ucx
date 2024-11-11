@@ -28,26 +28,18 @@ class DbfsFiles:
                 logger.error(f"Unable to get SparkSession: {err}")
                 raise err
 
-        # if a test-related jvm_interface is passed in, we don't use py4j's java_import
-        self._java_import = self._noop if jvm_interface else self._default_java_import
-
-    @staticmethod
-    def _noop(*args, **kwargs):
-        pass
-
-    @staticmethod
-    def _default_java_import(jvm, import_path: str):
-        # pylint: disable=import-outside-toplevel
-        from py4j.java_gateway import java_import  # type: ignore[import]
-
-        java_import(jvm, import_path)
+        # if a test-related jvm_interface is passed in, we don't use py4j's modules
+        if jvm_interface:
+            self.jvm_filesystem = jvm_interface.jvm.jvm_filesystem
+            self.jvm_path = jvm_interface.jvm.jvm_path
+        else:
+            self.jvm_filesystem = self._jvm.org.apache.hadoop.fs.FileSystem
+            self.jvm_path = self._jvm.org.apache.hadoop.fs.Path
 
     @cached_property
     def _jvm(self):
         try:
             _jvm = self._spark._jvm
-            self._java_import(_jvm, "org.apache.hadoop.fs.FileSystem")
-            self._java_import(_jvm, "org.apache.hadoop.fs.Path")
             return _jvm
         except Exception as err:
             logger.error(f"Cannot create Py4j proxy: {err}")
@@ -57,7 +49,7 @@ class DbfsFiles:
     def _fs(self):
         try:
             _jsc = self._spark._jsc  # pylint: disable=protected-access
-            return self._jvm.FileSystem.get(_jsc.hadoopConfiguration())
+            return self.jvm_filesystem.get(_jsc.hadoopConfiguration())
         except Exception as err:
             logger.error(f"Cannot create Py4j file system proxy: {err}")
             raise err
@@ -74,7 +66,7 @@ class DbfsFiles:
         return self._list_dir(path)
 
     def _list_dir(self, path_str: str) -> list[DbfsFileInfo]:
-        path = self._jvm.Path(path_str)
+        path = self.jvm_path(path_str)
         statuses = self._fs.listStatus(path)
         return [self._file_status_to_dbfs_file_info(status) for status in statuses]
 
