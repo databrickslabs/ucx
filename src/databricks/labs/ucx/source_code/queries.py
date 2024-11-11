@@ -50,12 +50,14 @@ class QueryLinter:
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
         include_dashboard_ids: list[str] | None,
+        debug_listing_upper_limit: int | None = None,
     ):
         self._ws = ws
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
         self._include_dashboard_ids = include_dashboard_ids
+        self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         assessment_start = datetime.now(timezone.utc)
@@ -106,7 +108,10 @@ class QueryLinter:
     def _lint_dashboards(self, context: _ReportingContext) -> None:
         dashboard_ids = self._dashboard_ids_in_scope()
         logger.info(f"Running {len(dashboard_ids)} linting tasks...")
-        for dashboard_id in dashboard_ids:
+        for i, dashboard_id in enumerate(dashboard_ids):
+            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
+                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
+                break
             dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
             problems, dfsas, tables = self._lint_and_collect_from_dashboard(dashboard, context.linted_queries)
             context.all_problems.extend(problems)
@@ -114,7 +119,10 @@ class QueryLinter:
             context.all_tables.extend(tables)
 
     def _lint_queries(self, context: _ReportingContext) -> None:
-        for query in self._queries_in_scope():
+        for i, query in enumerate(self._queries_in_scope()):
+            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
+                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
+                break
             assert query.id is not None
             if query.id in context.linted_queries:
                 continue
