@@ -78,6 +78,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     managed_table_external_storage: str = 'CLONE'
 
+    use_legacy_permission_migration: bool = False
+
     # [INTERNAL ONLY] If specified, the large-scale scanners will only list the specified number of objects.
     debug_listing_upper_limit: int | None = None
 
