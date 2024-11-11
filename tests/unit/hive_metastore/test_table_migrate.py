@@ -1378,37 +1378,31 @@ def test_revert_migrated_tables_failed(caplog, mock_pyspark):
 def test_refresh_migration_status_check_remaining_tables(ws, mock_backend, caplog) -> None:
     table_crawler = create_autospec(TablesCrawler)
     tables = (
-        (
-            Table(
-                object_type="EXTERNAL",
-                table_format="DELTA",
-                catalog="hive_metastore",
-                database="schema1",
-                name="table1",
-                location="s3://some_location/table1",
-                upgraded_to="ucx_default.db1_dst.dst_table1",
-            )
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+            location="s3://some_location/table1",
+            upgraded_to="ucx_default.db1_dst.dst_table1",
         ),
-        (
-            Table(
-                object_type="EXTERNAL",
-                table_format="DELTA",
-                catalog="hive_metastore",
-                database="schema1",
-                name="table2",
-                location="s3://some_location/table2",
-                upgraded_to="ucx_default.db1_dst.dst_table2",
-            )
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table2",
+            location="s3://some_location/table2",
+            upgraded_to="ucx_default.db1_dst.dst_table2",
         ),
-        (
-            Table(
-                object_type="EXTERNAL",
-                table_format="DELTA",
-                catalog="hive_metastore",
-                database="schema1",
-                name="table3",
-                location="s3://some_location/table3",
-            )
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table3",
+            location="s3://some_location/table3",
         ),
     )
     table_crawler.snapshot.return_value = tables
