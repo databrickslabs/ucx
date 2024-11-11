@@ -219,3 +219,16 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
+
+
+def _load_sources(*filenames: str):
+    # Load the contents of the files into a list of strings
+    contents = []
+    path_lookup = MockPathLookup()
+    for filename in filenames:
+        path = path_lookup.resolve(Path(filename))
+        # Read local file into a string
+        if path:
+            with open(path.as_posix(), 'r', encoding='utf-8') as f:
+                contents.append(f.read())
+    return contents
