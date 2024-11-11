@@ -443,7 +443,7 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     )
 
 
-def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role, backend, locations):
+def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role, locations):
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.create_uc_role.side_effect = ['123', PermissionDenied()]
@@ -454,8 +454,7 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
     assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_BUCKET1') in aws.delete_role.call_args_list
-
+    aws.delete_role.assert_called_once()
 
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
