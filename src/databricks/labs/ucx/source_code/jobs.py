@@ -393,7 +393,6 @@ class WorkflowLinter:
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
         include_job_ids: list[int] | None = None,
-        debug_listing_upper_limit: int | None = None,
     ):
         self._ws = ws
         self._resolver = resolver
@@ -402,16 +401,12 @@ class WorkflowLinter:
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
         self._include_job_ids = include_job_ids
-        self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         tasks = []
         all_jobs = list(self._ws.jobs.list())
         logger.info(f"Preparing {len(all_jobs)} linting tasks...")
-        for i, job in enumerate(all_jobs):
-            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
+        for job in all_jobs:
             if self._include_job_ids and job.job_id not in self._include_job_ids:
                 logger.info(f"Skipping job {job.job_id}...")
                 continue

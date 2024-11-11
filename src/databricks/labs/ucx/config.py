@@ -78,9 +78,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     managed_table_external_storage: str = 'CLONE'
 
-    use_legacy_permissions_migration: bool = False
-
-    debug_listing_upper_limit: int | None = None
+    use_legacy_permission_migration: bool = False
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
