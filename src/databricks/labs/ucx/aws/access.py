@@ -88,16 +88,28 @@ class AWSResourcePermissions:
             for path in role.resource_paths:
                 expanded_paths.add(path)
                 expanded_paths.add(f"{path}/*")
-            role_arn = self._aws_resources.create_uc_role(role.role_name)
-            if role_arn:
-                self._aws_resources.put_role_policy(
-                    role.role_name,
-                    role.policy_name,
-                    expanded_paths,
-                    self._aws_account_id,
-                    self._kms_key,
+            try:
+
+                role_arn = self._aws_resources.create_uc_role(role.role_name)
+                if role_arn:
+                    self._aws_resources.put_role_policy(
+                        role.role_name,
+                        role.policy_name,
+                        expanded_paths,
+                        self._aws_account_id,
+                        self._kms_key,
+                    )
+                    roles_created.append(role)
+            except (PermissionDenied, NotFound):
+                logger.error(
+                    "Error creating UC roles. Please review the error message and resolve the issue before "
+                    "trying again. "
+                    "Removing successfully created UC Roles."
                 )
-                roles_created.append(role)
+                for delete_role in roles_created:
+                    self._aws_resources.delete_role(delete_role.role_name)
+                return None
+
         # We need to create a buffer between the role creation and the role update, Otherwise the update fails.
         for created_role in roles_created:
             self._aws_resources.update_uc_role(
