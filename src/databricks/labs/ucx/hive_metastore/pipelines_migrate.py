@@ -149,6 +149,10 @@ class PipelinesMigrator:
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
         get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
+        if get_pipeline.spec.catalog:
+            # Skip if the pipeline is already migrated to UC
+            logger.info(f"Pipeline {pipeline.pipeline_id} is already migrated to UC")
+            return []
         self._ws.pipelines.update(pipeline.pipeline_id, name=f"{pipeline.pipeline_name} [OLD]",
                                   clusters=get_pipeline.spec.clusters,
                                   storage=get_pipeline.spec.storage,
