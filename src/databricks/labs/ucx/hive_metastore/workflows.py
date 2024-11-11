@@ -156,15 +156,3 @@ class MigrateTablesInMounts(Workflow):
     def update_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.get_remaining_tables()
-
-
-class PipelineMigration(Workflow):
-    def __init__(self):
-        super().__init__('migrate-dlt-pipelines')
-
-    @job_task(job_cluster="pipeline_migration", depends_on=[Assessment.assess_pipelines])
-    def migrate_dlt_pipelines(self, ctx: RuntimeContext):
-        """This workflow task migrates the dlt pipelines from the Hive Metastore
-        to the Unity Catalog using the clone API
-        """
-        ctx.pipeline_migrator.migrate_pipelines()

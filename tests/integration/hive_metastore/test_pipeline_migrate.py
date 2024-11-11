@@ -1,8 +1,7 @@
-import pytest
 from databricks.sdk.service.jobs import Task, PipelineTask
 from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 
 from ..assessment.test_assessment import _PIPELINE_CONF
 
@@ -10,7 +9,7 @@ _TEST_STORAGE_ACCOUNT = "storage_acct_1"
 _TEST_TENANT_ID = "directory_12345"
 
 
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals, too-many-arguments
 def test_pipeline_migrate(
     ws,
     make_pipeline,
@@ -21,7 +20,7 @@ def test_pipeline_migrate(
     inventory_schema,
     runtime_ctx,
     make_catalog,
-    make_job
+    make_job,
 ):
     dst_catalog = make_catalog()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
@@ -48,7 +47,11 @@ def test_pipeline_migrate(
         libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
     )
 
-    job_with_pipeline = make_job(tasks=[Task(pipeline_task=PipelineTask(pipeline_id=created_pipeline.pipeline_id), task_key=make_random(4).lower())])
+    job_with_pipeline = make_job(
+        tasks=[
+            Task(pipeline_task=PipelineTask(pipeline_id=created_pipeline.pipeline_id), task_key=make_random(4).lower())
+        ]
+    )
     pipelines = runtime_ctx.pipelines_crawler.snapshot()
     results = []
     for pipeline in pipelines:
@@ -58,8 +61,9 @@ def test_pipeline_migrate(
             results.append(pipeline)
     assert len(results) == 1
 
-
-    pipelines_migrator = PipelinesMigrator(ws, runtime_ctx.pipelines_crawler, dst_catalog.name, skip_pipelines=[skip_pipeline.pipeline_id])
+    pipelines_migrator = PipelinesMigrator(
+        ws, runtime_ctx.pipelines_crawler, dst_catalog.name, skip_pipelines=[skip_pipeline.pipeline_id]
+    )
     pipelines_migrator.migrate_pipelines()
 
     # crawl pipeline in UC and check if it is migrated
