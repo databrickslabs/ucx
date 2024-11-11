@@ -11,7 +11,7 @@ from databricks.sdk.service.iam import MigratePermissionsResponse
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.workflows import (
     RemoveWorkspaceLocalGroups,
-    GroupMigration,
+    LegacyGroupMigration,
     PermissionsMigrationAPI,
 )
 from tests.unit import GROUPS, PERMISSIONS
@@ -23,13 +23,13 @@ def test_runtime_delete_backup_groups(run_workflow) -> None:
 
 
 def test_runtime_apply_permissions_to_account_groups(run_workflow) -> None:
-    ctx = run_workflow(GroupMigration.apply_permissions_to_account_groups)
-    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
+    ctx = run_workflow(LegacyGroupMigration.apply_permissions_to_account_groups)
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' not in ctx.sql_backend.queries
 
 
 def test_rename_workspace_local_group(run_workflow) -> None:
-    ctx = run_workflow(GroupMigration.rename_workspace_local_groups)
-    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' in ctx.sql_backend.queries
+    ctx = run_workflow(LegacyGroupMigration.rename_workspace_local_groups)
+    assert 'SELECT * FROM `hive_metastore`.`ucx`.`groups`' not in ctx.sql_backend.queries
 
 
 def test_reflect_account_groups_on_workspace(run_workflow) -> None:
