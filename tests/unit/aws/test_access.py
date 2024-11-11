@@ -1,13 +1,13 @@
 import json
 import logging
-from unittest.mock import MagicMock, call, create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist, PermissionDenied
+from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
@@ -23,7 +23,7 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
@@ -517,14 +517,7 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
         aws,
         locations,
     )
-    # TODO: this is bad practice, we should not be mocking load() methon on a MockInstallation class
-    mock_installation.load = MagicMock(
-        side_effect=[
-            ResourceDoesNotExist(),
-            [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
-        ]
-    )
-    aws_resource_permissions.load_uc_compatible_roles()
+    aws_resource_permissions.save_uc_compatible_roles()
     mock_installation.assert_file_written(
         'uc_roles_access.csv',
         [
