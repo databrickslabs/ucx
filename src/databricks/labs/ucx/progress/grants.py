@@ -25,8 +25,8 @@ class GrantProgressEncoder(ProgressEncoder[Grant]):
     ) -> None:
         super().__init__(sql_backend, ownership, Grant, run_id, workspace_id, catalog, schema, table)
 
-    def _encode_record_as_historical(self, record: Grant, snapshot_context: None) -> Historical:
-        historical = super()._encode_record_as_historical(record, snapshot_context)
+    def _encode_record_as_historical(self, record: Grant) -> Historical:
+        historical = super()._encode_record_as_historical(record)
         failures = []
         if not record.uc_grant_sql():
             type_, key = record.this_type_and_key()

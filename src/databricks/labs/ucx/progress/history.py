@@ -3,10 +3,9 @@ import dataclasses
 import datetime as dt
 import json
 import logging
-from contextlib import contextmanager
 from enum import Enum, EnumMeta
-from collections.abc import Iterable, Sequence, Generator
-from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints, final
+from collections.abc import Iterable, Sequence
+from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -280,29 +279,13 @@ class ProgressEncoder(Generic[Record]):
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    @final
     def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
-        with self._snapshot_context() as ctx:
-            history_records = [self._encode_record_as_historical(record, ctx) for record in snapshot]
-            logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
-            # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
-            self._sql_backend.save_table(
-                escape_sql_identifier(self.full_name), history_records, Historical, mode="append"
-            )
+        history_records = [self._encode_record_as_historical(record) for record in snapshot]
+        logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
+        # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
+        self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
 
-    SC: ClassVar = type(None)
-
-    @contextmanager
-    def _snapshot_context(self) -> Generator[SC, None, None]:
-        """A context manager that is held open while a snapshot is underway.
-
-        The context itself is passed as a parameter to :method:`_encode_record_as_historical`. As a manager, preparation
-        and cleanup can take place before and after the snapshot takes place.
-        """
-        yield
-
-    def _encode_record_as_historical(self, record: Record, snapshot_context: SC) -> Historical:
+    def _encode_record_as_historical(self, record: Record) -> Historical:
         """Encode a snapshot record as a historical log entry."""
         # Snapshot context not needed with default implementation.
-        _ = snapshot_context
         return self._encoder.to_historical(record)
