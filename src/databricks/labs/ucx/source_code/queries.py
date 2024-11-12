@@ -56,12 +56,24 @@ class QueryLinter:
     ):
         self._ws = ws
         self._sql_backend = sql_backend
-        self._inventory_database = inventory_database
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
         self._include_dashboard_ids = include_dashboard_ids
         self._debug_listing_upper_limit = debug_listing_upper_limit
+
+        self._catalog = "hive_metastore"
+        self._schema = inventory_database
+        self._table = "query_problems"
+
+    @property
+    def _full_name(self) -> str:
+        """Generates the full name of the table.
+
+        Returns:
+            str: The full table name.
+        """
+        return f"{self._catalog}.{self._schema}.{self._table}"
 
     def refresh_report(self) -> None:
         assessment_start = datetime.now(timezone.utc)
@@ -76,7 +88,7 @@ class QueryLinter:
     def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
         logger.info(f"Saving {len(problems)} linting problems...")
         self._sql_backend.save_table(
-            f'{escape_sql_identifier(self._inventory_database)}.query_problems',
+            escape_sql_identifier(self._full_name),
             problems,
             QueryProblem,
             mode='overwrite',
