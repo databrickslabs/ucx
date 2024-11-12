@@ -17,7 +17,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue, DatabricksError
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.jobs import Source
@@ -165,11 +165,15 @@ class WorkflowTaskContainer(SourceContainer):
     @classmethod
     @contextmanager
     def _temporary_copy(cls, path: Path) -> Generator[Path, None, None]:
-        with tempfile.TemporaryDirectory() as directory:
-            temporary_path = Path(directory) / path.name
-            with path.open("rb") as src, temporary_path.open("wb") as dst:
-                shutil.copyfileobj(src, dst)
-            yield temporary_path
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                temporary_path = Path(directory) / path.name
+                with path.open("rb") as src, temporary_path.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                yield temporary_path
+        except DatabricksError as e:
+            # Cover cases like `ResourceDoesNotExist: Path (/Volumes/...-py3-none-any.whl) doesn't exist.`
+            raise InvalidPath(f"Cannot load file: {path}") from e
 
     def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:

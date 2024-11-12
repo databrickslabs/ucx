@@ -52,7 +52,7 @@ class SqlExpression:
         # Sqlglot uses db instead of schema, watch out for that
         src_schema = table.db if table.db else session_state.schema
         if not src_schema:
-            logger.error(f"Could not determine schema for table {table.name}")
+            logger.warning(f"Could not determine schema for table {table.name}")
             return None
         return UsedTable(
             catalog_name=catalog_name,
