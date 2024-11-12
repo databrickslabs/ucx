@@ -719,6 +719,40 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
             False,
             True,
         ),
+        (
+            [],
+            [
+                UsedTable(
+                    source_id="123",
+                    source_lineage=[LineageAtom("NOTEBOOK", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=False,
+                )
+            ],
+            "an_admin",
+            True,
+            False,
+            False,
+        ),
+        (
+            [],
+            [
+                UsedTable(
+                    source_id="123",
+                    source_lineage=[LineageAtom("UNKNOWN", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=False,
+                )
+            ],
+            "an_admin",
+            True,
+            False,
+            False,
+        ),
     ],
 )
 def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_query, workspace_path) -> None:
