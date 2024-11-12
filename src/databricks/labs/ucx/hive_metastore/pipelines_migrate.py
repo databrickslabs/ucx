@@ -165,10 +165,6 @@ class PipelinesMigrator:
             return False
 
     def _clone_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO:
-        # Stop HMS pipeline
-        self._ws.pipelines.stop(pipeline.pipeline_id)
-        # Rename old pipeline first
-
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
         get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
@@ -177,6 +173,10 @@ class PipelinesMigrator:
                 # Skip if the pipeline is already migrated to UC
                 logger.info(f"Pipeline {pipeline.pipeline_id} is already migrated to UC")
                 return []
+
+            # Stop HMS pipeline
+            self._ws.pipelines.stop(pipeline.pipeline_id)
+            # Rename old pipeline first
             self._ws.pipelines.update(
                 pipeline.pipeline_id,
                 name=f"{pipeline.pipeline_name} [OLD]",

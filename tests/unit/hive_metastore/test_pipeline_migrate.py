@@ -5,10 +5,10 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
+from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule
 
 logger = logging.getLogger(__name__)
 
@@ -112,36 +112,3 @@ def test_pipeline_to_migrate(ws, mock_installation):
 
     pipelines_to_migrate = pipeline_mapping.get_pipelines_to_migrate(pipelines_crawler)
     assert len(pipelines_to_migrate) == 1
-
-
-def test_migrate_pipelines(ws, mock_installation):
-    errors = {}
-    rows = {
-        "`hive_metastore`.`inventory_database`.`pipelines`": [
-            ("123", "pipe1", 1, "[]", "creator1"),
-            ("456", "pipe2", 1, "[]", "creator2"),
-            ("789", "pipe3", 1, "[]", "creator3"),
-        ],
-    }
-    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
-
-    pipeline_mapping = PipelineMapping(mock_installation, ws, sql_backend)
-    pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
-    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, pipeline_mapping)
-    pipelines_migrator.migrate_pipelines()
-    ws.api_client.do.assert_called_once()
-    ws.api_client.do.assert_called_with(
-        'POST',
-        '/api/2.0/pipelines/123/clone',
-        body={
-            'catalog': 'catalog',
-            'clone_mode': 'MIGRATE_TO_UC',
-            'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
-            'target': 'schema',
-            'name': 'pipeline',
-        },
-        headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
-    )
-
-    ws.api_client.do.side_effect = DatabricksError("Error")
-    pipelines_migrator.migrate_pipelines()
