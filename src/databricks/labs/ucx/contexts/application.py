@@ -44,7 +44,8 @@ from databricks.labs.ucx.hive_metastore.grants import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership
+from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
     TablesMigrator,
