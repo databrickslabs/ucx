@@ -406,17 +406,19 @@ class WorkflowLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         tasks = []
-        all_jobs = list(self._ws.jobs.list())
-        logger.info(f"Preparing {len(all_jobs)} linting tasks...")
-        for i, job in enumerate(all_jobs):
-            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
+        items_listed = 0
+        for job in self._ws.jobs.list():
+            if self._include_job_ids and job.job_id not in self._include_job_ids:
+                logger.info(f"Skipping job_id={job.job_id}")
+                continue
+            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
                 logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
                 break
-            if self._include_job_ids and job.job_id not in self._include_job_ids:
-                logger.info(f"Skipping job {job.job_id}...")
-                continue
+            if job.settings is not None and job.settings.name is not None:
+                logger.info(f"Found job_id={job.job_id}: {job.settings.name}")
             tasks.append(functools.partial(self.lint_job, job.job_id))
-        logger.info(f"Running {tasks} linting tasks in parallel...")
+            items_listed += 1
+        logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
         job_dfsas: list[DirectFsAccess] = []

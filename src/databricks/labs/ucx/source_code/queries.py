@@ -106,26 +106,20 @@ class QueryLinter:
         self._used_tables_crawler.dump_all(processed_tables)
 
     def _lint_dashboards(self, context: _ReportingContext) -> None:
-        dashboard_ids = self._dashboard_ids_in_scope()
-        logger.info(f"Running {len(dashboard_ids)} linting tasks...")
-        for i, dashboard_id in enumerate(dashboard_ids):
-            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
+        for dashboard_id in self._dashboard_ids_in_scope():
             dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
+            logger.info(f"Linting dashboard_id={dashboard_id}: {dashboard.name}")
             problems, dfsas, tables = self._lint_and_collect_from_dashboard(dashboard, context.linted_queries)
             context.all_problems.extend(problems)
             context.all_dfsas.extend(dfsas)
             context.all_tables.extend(tables)
 
     def _lint_queries(self, context: _ReportingContext) -> None:
-        for i, query in enumerate(self._queries_in_scope()):
-            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
+        for query in self._queries_in_scope():
             assert query.id is not None
             if query.id in context.linted_queries:
                 continue
+            logger.info(f"Linting query_id={query.id}: {query.name}")
             context.linted_queries.add(query.id)
             problems = self.lint_query(query)
             context.all_problems.extend(problems)
@@ -137,14 +131,32 @@ class QueryLinter:
     def _dashboard_ids_in_scope(self) -> list[str]:
         if self._include_dashboard_ids is not None:  # an empty list is accepted
             return self._include_dashboard_ids
-        all_dashboards = self._ws.dashboards.list()
-        return [dashboard.id for dashboard in all_dashboards if dashboard.id]
+        items_listed = 0
+        dashboard_ids = []
+        # redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
+        # to a small number of items in debug mode for the assessment workflow just to complete.
+        for dashboard in self._ws.dashboards.list():
+            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
+                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
+                break
+            if dashboard.id is None:
+                continue
+            dashboard_ids.append(dashboard.id)
+            items_listed += 1
+        return dashboard_ids
 
     def _queries_in_scope(self) -> list[LegacyQuery]:
         if self._include_dashboard_ids is not None:  # an empty list is accepted
             return []
-        all_queries = self._ws.queries_legacy.list()
-        return [query for query in all_queries if query.id]
+        items_listed = 0
+        legacy_queries = []
+        for query in self._ws.queries_legacy.list():
+            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
+                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
+                break
+            legacy_queries.append(query)
+            items_listed += 1
+        return legacy_queries
 
     def _lint_and_collect_from_dashboard(
         self, dashboard: Dashboard, linted_queries: set[str]
