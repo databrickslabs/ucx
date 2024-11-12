@@ -97,11 +97,11 @@ class DefaultSecurableOwnership(Ownership[Table]):
         self,
         administrator_locator: AdministratorLocator,
         table_crawler: TablesCrawler,
-        fixed_owner_group: str | None,
+        default_owner_group: str | None,
         app_principal_resolver: Callable[[], str | None],
     ) -> None:
         self._tables_crawler = table_crawler
-        self._fixed_owner_group = fixed_owner_group
+        self._fixed_owner_group = default_owner_group
         self._app_principal_resolver = app_principal_resolver
         super().__init__(administrator_locator)
 

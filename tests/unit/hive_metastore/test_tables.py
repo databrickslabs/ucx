@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     What,
 )
-from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import TableOwnership, DefaultSecurableOwnership
 from databricks.labs.ucx.source_code.base import UsedTable, LineageAtom
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
@@ -786,6 +786,84 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
     assert admin_locator.get_workspace_administrator.called == workspace_owner
     assert legacy_query_ownership.owner_of.called == legacy_query
     assert workspace_path_ownership.owner_of_path.called == workspace_path
+
+
+@pytest.mark.parametrize(
+    'default_owner_group, grants',
+    [
+        (
+            "admin_group",
+            [
+                Grant(
+                    principal='admin_group',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    table='bar',
+                ),
+                Grant(
+                    principal='admin_group',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    view='baz',
+                ),
+                Grant(
+                    principal='admin_group',
+                    action_type='OWN',
+                    catalog='hive_metastore',
+                    database='foo',
+                ),
+            ],
+        ),
+        (
+            None,
+            [
+                Grant(
+                    principal='ws_admin',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    table='bar',
+                ),
+                Grant(
+                    principal='ws_admin',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    view='baz',
+                ),
+                Grant(
+                    principal='ws_admin',
+                    action_type='OWN',
+                    catalog='hive_metastore',
+                    database='foo',
+                ),
+            ],
+        ),
+    ],
+)
+def test_default_securable_ownership(default_owner_group, grants) -> None:
+    """Verify that the owner of a crawled table is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "ws_admin"
+    table_crawler = create_autospec(TablesCrawler)
+    table_crawler.snapshot.return_value = [
+        Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA"),
+        Table(
+            catalog="main",
+            database="foo",
+            name="baz",
+            object_type="VIEW",
+            table_format="UNKNOWN",
+            view_text="select * from bar",
+        ),
+    ]
+
+    ownership = DefaultSecurableOwnership(admin_locator, table_crawler, default_owner_group, lambda: "current_user")
+
+    grants = list(ownership.load())
+    assert grants == grants
 
 
 @pytest.mark.parametrize(
