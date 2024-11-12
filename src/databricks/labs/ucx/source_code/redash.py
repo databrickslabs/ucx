@@ -49,7 +49,7 @@ class Redash:
                 return list(self._ws.dashboards.list())
             return [self._ws.dashboards.get(dashboard_id)]
         except DatabricksError as e:
-            logger.error(f"Cannot list dashboards: {e}")
+            logger.warning(f"Cannot list dashboards: {e}")
             return []
 
     def _fix_query(self, query: LegacyQuery) -> None:
