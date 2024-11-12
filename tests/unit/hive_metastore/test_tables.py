@@ -21,6 +21,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
+from databricks.labs.ucx.source_code.base import UsedTable, LineageAtom
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
@@ -672,14 +673,55 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
 
 
 @pytest.mark.parametrize(
-    'grants,expected,workspace_owner',
+    'grants,used_tables,expected,workspace_owner,legacy_query,workspace_path',
     [
-        ([], "an_admin", True),
-        ([Grant("grant_owner", "OWN", catalog="main", database="foo", table="bar")], "grant_owner", False),
-        ([Grant("grant_owner", "OWN", catalog="main", database="foo")], "grant_owner", False),
+        ([], [], "an_admin", True, False, False),
+        (
+            [Grant("grant_owner", "OWN", catalog="main", database="foo", table="bar")],
+            [],
+            "grant_owner",
+            False,
+            False,
+            False,
+        ),
+        ([Grant("grant_owner", "OWN", catalog="main", database="foo")], [], "grant_owner", False, False, False),
+        (
+            [],
+            [
+                UsedTable(
+                    source_id="123",
+                    source_lineage=[LineageAtom("QUERY", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=True,
+                )
+            ],
+            "query_owner",
+            False,
+            True,
+            False,
+        ),
+        (
+            [],
+            [
+                UsedTable(
+                    source_id="123",
+                    source_lineage=[LineageAtom("NOTEBOOK", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=True,
+                )
+            ],
+            "notebook_owner",
+            False,
+            False,
+            True,
+        ),
     ],
 )
-def test_table_owner(grants, expected, workspace_owner) -> None:
+def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_query, workspace_path) -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
@@ -689,9 +731,11 @@ def test_table_owner(grants, expected, workspace_owner) -> None:
     used_tables_in_paths = create_autospec(UsedTablesCrawler)
     used_tables_in_paths.snapshot.return_value = []
     used_tables_in_queries = create_autospec(UsedTablesCrawler)
-    used_tables_in_queries.snapshot.return_value = []
+    used_tables_in_queries.snapshot.return_value = used_tables
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
+    legacy_query_ownership.owner_of.return_value = "query_owner"
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    workspace_path_ownership.owner_of_path.return_value = "notebook_owner"
 
     ownership = TableOwnership(
         admin_locator,
@@ -706,8 +750,8 @@ def test_table_owner(grants, expected, workspace_owner) -> None:
 
     assert owner == expected
     assert admin_locator.get_workspace_administrator.called == workspace_owner
-    legacy_query_ownership.owner_of.assert_not_called()
-    workspace_path_ownership.owner_of.assert_not_called()
+    assert legacy_query_ownership.owner_of.called == legacy_query
+    assert workspace_path_ownership.owner_of_path.called == workspace_path
 
 
 @pytest.mark.parametrize(
