@@ -505,6 +505,7 @@ class GlobalContext(abc.ABC):
             self.directfs_access_crawler_for_paths,
             self.used_tables_crawler_for_paths,
             self.config.include_job_ids,
+            self.config.debug_listing_upper_limit,
         )
 
     @cached_property
@@ -515,6 +516,7 @@ class GlobalContext(abc.ABC):
             self.directfs_access_crawler_for_queries,
             self.used_tables_crawler_for_queries,
             self.config.include_dashboard_ids,
+            self.config.debug_listing_upper_limit,
         )
 
     @cached_property

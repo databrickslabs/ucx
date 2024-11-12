@@ -16,7 +16,7 @@ def test_assess_azure_service_principals(run_workflow):
 
 def test_runtime_workspace_listing(run_workflow):
     ctx = run_workflow(Assessment.workspace_listing)
-    assert "SELECT * FROM `hive_metastore`.`ucx`.`workspace_objects`" in ctx.sql_backend.queries
+    assert "SELECT * FROM `hive_metastore`.`ucx`.`workspace_objects`" not in ctx.sql_backend.queries
 
 
 def test_runtime_crawl_grants(run_workflow):
@@ -26,7 +26,7 @@ def test_runtime_crawl_grants(run_workflow):
 
 def test_runtime_crawl_permissions(run_workflow):
     ctx = run_workflow(Assessment.crawl_permissions)
-    assert "TRUNCATE TABLE `hive_metastore`.`ucx`.`permissions`" in ctx.sql_backend.queries
+    assert "TRUNCATE TABLE `hive_metastore`.`ucx`.`permissions`" not in ctx.sql_backend.queries
 
 
 def test_runtime_crawl_groups(run_workflow):

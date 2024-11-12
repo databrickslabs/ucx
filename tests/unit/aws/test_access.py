@@ -1,13 +1,13 @@
 import json
 import logging
-from unittest.mock import MagicMock, call, create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist, PermissionDenied
+from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
@@ -23,7 +23,7 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
@@ -443,6 +443,20 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     )
 
 
+def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role, locations):
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    aws.create_uc_role.side_effect = ['123', PermissionDenied()]
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
+    role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = []
+    with pytest.raises(PermissionDenied):
+        role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
+    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
+    aws.delete_role.assert_called_once()
+
+
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     external_locations = create_autospec(ExternalLocations)
     external_locations.snapshot.return_value = []
@@ -517,14 +531,7 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
         aws,
         locations,
     )
-    # TODO: this is bad practice, we should not be mocking load() methon on a MockInstallation class
-    mock_installation.load = MagicMock(
-        side_effect=[
-            ResourceDoesNotExist(),
-            [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
-        ]
-    )
-    aws_resource_permissions.load_uc_compatible_roles()
+    aws_resource_permissions.save_uc_compatible_roles()
     mock_installation.assert_file_written(
         'uc_roles_access.csv',
         [
