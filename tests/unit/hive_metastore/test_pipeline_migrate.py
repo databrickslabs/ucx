@@ -6,11 +6,9 @@ import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import NotFound, DatabricksError
-from databricks.sdk.service.pipelines import GetPipelineResponse
 
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
-from integration.conftest import installation_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +113,11 @@ def test_pipeline_to_migrate(ws, mock_installation):
     pipelines_to_migrate = pipeline_mapping.get_pipelines_to_migrate(pipelines_crawler)
     assert len(pipelines_to_migrate) == 1
 
+
 def test_migrate_pipelines(ws, mock_installation):
     errors = {}
     rows = {
-        "`hive_metastore`.`inventory_database`.`pipelines`": [
-            ("empty-spec", "pipe1", 1, "[]", "creator1")
-        ],
+        "`hive_metastore`.`inventory_database`.`pipelines`": [("empty-spec", "pipe1", 1, "[]", "creator1")],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
