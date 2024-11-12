@@ -7,7 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
 from databricks.labs.ucx.progress.history import ProgressEncoder
 
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, Grant
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
@@ -604,7 +604,6 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_moc
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -626,7 +625,6 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mock
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -651,7 +649,6 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker,
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -674,13 +671,21 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     assert "Test getTable warning" in caplog.text
 
 
-def test_table_owner() -> None:
+@pytest.mark.parametrize(
+    'grants,expected,workspace_owner',
+    [
+        ([], "an_admin", True),
+        ([Grant("grant_owner", "OWN", catalog="main", database="foo", table="bar")], "grant_owner", False),
+        ([Grant("grant_owner", "OWN", catalog="main", database="foo")], "grant_owner", False),
+    ],
+)
+def test_table_owner(grants, expected, workspace_owner) -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
 
     grants_crawler = create_autospec(GrantsCrawler)
-    grants_crawler.snapshot.return_value = []
+    grants_crawler.snapshot.return_value = grants
     used_tables_in_paths = create_autospec(UsedTablesCrawler)
     used_tables_in_paths.snapshot.return_value = []
     used_tables_in_queries = create_autospec(UsedTablesCrawler)
@@ -699,8 +704,8 @@ def test_table_owner() -> None:
     table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
     owner = ownership.owner_of(table)
 
-    assert owner == "an_admin"
-    admin_locator.get_workspace_administrator.assert_called_once()
+    assert owner == expected
+    assert admin_locator.get_workspace_administrator.called == workspace_owner
     legacy_query_ownership.owner_of.assert_not_called()
     workspace_path_ownership.owner_of.assert_not_called()
 
