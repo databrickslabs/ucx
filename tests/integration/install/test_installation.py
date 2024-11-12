@@ -90,7 +90,7 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-def test_experimental_permissions_migration_for_group_with_same_name(
+def test_permissions_migration_for_group_with_same_name(
     installation_ctx,
     make_cluster_policy,
     make_cluster_policy_permissions,
@@ -122,7 +122,7 @@ def test_experimental_permissions_migration_for_group_with_same_name(
     if {"USAGE", "OWN"} != new_schema_grants[migrated_group.name_in_account] or object_permissions[
         migrated_group.name_in_account
     ] != PermissionLevel.CAN_USE:
-        installation_ctx.deployed_workflows.relay_logs("migrate-groups-experimental")
+        installation_ctx.deployed_workflows.relay_logs("migrate-groups")
     assert {"USAGE", "OWN"} == new_schema_grants[
         migrated_group.name_in_account
     ], "Incorrect schema grants for migrated group"
