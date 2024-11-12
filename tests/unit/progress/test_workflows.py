@@ -78,7 +78,7 @@ def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
     mock_linter = create_autospec(linter_class)
     linter_name = linter.attrname
     ctx = run_workflow(task, **{linter_name: mock_linter})
-    mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
+    mock_linter.refresh_report.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:

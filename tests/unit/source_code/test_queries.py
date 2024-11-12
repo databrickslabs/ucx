@@ -24,12 +24,14 @@ from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
         ),
     ],
 )
-def test_query_linter_collects_dfsas_from_queries(name, query, dfsa_paths, is_read, is_write, migration_index) -> None:
+def test_query_linter_collects_dfsas_from_queries(
+    name, query, dfsa_paths, is_read, is_write, migration_index, mock_backend
+) -> None:
     ws = create_autospec(WorkspaceClient)
     dfsa_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     query = LegacyQuery.from_dict({"parent": "workspace", "name": name, "query": query})
-    linter = QueryLinter(ws, migration_index, dfsa_crawler, used_tables_crawler, None)
+    linter = QueryLinter(ws, mock_backend, "test", migration_index, dfsa_crawler, used_tables_crawler, None)
     dfsas = linter.collect_dfsas_from_query("no-dashboard-id", query)
     ws.assert_not_called()
     dfsa_crawler.assert_not_called()
@@ -43,9 +45,9 @@ def test_query_linter_refresh_report_writes_query_problems(migration_index, mock
     ws = create_autospec(WorkspaceClient)
     dfsa_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
-    linter = QueryLinter(ws, migration_index, dfsa_crawler, used_tables_crawler, None)
+    linter = QueryLinter(ws, mock_backend, "test", migration_index, dfsa_crawler, used_tables_crawler, None)
 
-    linter.refresh_report(mock_backend, inventory_database="test")
+    linter.refresh_report()
 
     assert mock_backend.has_rows_written_for("`test`.query_problems")
     ws.dashboards.list.assert_called_once()
@@ -60,8 +62,8 @@ def test_lints_queries(migration_index, mock_backend) -> None:
         ws = create_autospec(WorkspaceClient)
         dfsa_crawler = create_autospec(DirectFsAccessCrawler)
         used_tables_crawler = create_autospec(UsedTablesCrawler)
-        linter = QueryLinter(ws, migration_index, dfsa_crawler, used_tables_crawler, ["1"])
-        linter.refresh_report(mock_backend, inventory_database="test")
+        linter = QueryLinter(ws, mock_backend, "test", migration_index, dfsa_crawler, used_tables_crawler, ["1"])
+        linter.refresh_report()
 
         assert mock_backend.has_rows_written_for("`test`.query_problems")
         ws.dashboards.list.assert_not_called()
