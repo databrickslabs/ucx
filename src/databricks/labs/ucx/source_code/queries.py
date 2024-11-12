@@ -139,6 +139,8 @@ class QueryLinter:
             if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
                 logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
                 break
+            if dashboard.id is None:
+                continue
             dashboard_ids.append(dashboard.id)
             items_listed += 1
         return dashboard_ids
