@@ -789,10 +789,11 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
 
 
 @pytest.mark.parametrize(
-    'default_owner_group, grants',
+    'default_owner_group, cli_user, grants',
     [
         (
             "admin_group",
+            None,
             [
                 Grant(
                     principal='admin_group',
@@ -818,23 +819,24 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
         ),
         (
             None,
+            "current_user",
             [
                 Grant(
-                    principal='ws_admin',
+                    principal='current_user',
                     action_type='OWN',
                     catalog='main',
                     database='foo',
                     table='bar',
                 ),
                 Grant(
-                    principal='ws_admin',
+                    principal='current_user',
                     action_type='OWN',
                     catalog='main',
                     database='foo',
                     view='baz',
                 ),
                 Grant(
-                    principal='ws_admin',
+                    principal='current_user',
                     action_type='OWN',
                     catalog='hive_metastore',
                     database='foo',
@@ -843,7 +845,7 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
         ),
     ],
 )
-def test_default_securable_ownership(default_owner_group, grants) -> None:
+def test_default_securable_ownership(default_owner_group: str, cli_user: str, grants: list[Grant]) -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "ws_admin"
@@ -860,10 +862,10 @@ def test_default_securable_ownership(default_owner_group, grants) -> None:
         ),
     ]
 
-    ownership = DefaultSecurableOwnership(admin_locator, table_crawler, default_owner_group, lambda: "current_user")
+    ownership = DefaultSecurableOwnership(admin_locator, table_crawler, default_owner_group, lambda: cli_user)
 
-    grants = list(ownership.load())
-    assert grants == grants
+    inferred_grants = list(ownership.load())
+    assert inferred_grants == grants
 
 
 @pytest.mark.parametrize(

@@ -101,7 +101,7 @@ class DefaultSecurableOwnership(Ownership[Table]):
         app_principal_resolver: Callable[[], str | None],
     ) -> None:
         self._tables_crawler = table_crawler
-        self._fixed_owner_group = default_owner_group
+        self._default_owner_group = default_owner_group
         self._app_principal_resolver = app_principal_resolver
         super().__init__(administrator_locator)
 
@@ -111,8 +111,8 @@ class DefaultSecurableOwnership(Ownership[Table]):
 
     @cached_property
     def _static_owner(self) -> str | None:
-        if self._fixed_owner_group:
-            return self._fixed_owner_group
+        if self._default_owner_group:
+            return self._default_owner_group
         return self._application_principal
 
     def load(self) -> Iterable[Grant]:
