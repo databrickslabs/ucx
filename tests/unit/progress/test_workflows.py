@@ -11,6 +11,10 @@ from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
 
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.progress.tables import UsedTableProgressEncoder
+from databricks.labs.ucx.source_code.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.queries import QueryLinter
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 @pytest.mark.parametrize(
@@ -66,19 +70,30 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
     mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    "task, linter",
-    (
-        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
-        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
-    ),
-)
-def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
-    linter_class = get_type_hints(linter.func)["return"]
-    mock_linter = create_autospec(linter_class)
-    linter_name = linter.attrname
-    ctx = run_workflow(task, **{linter_name: mock_linter})
-    mock_linter.refresh_report.assert_called_once_with(ctx.sql_backend, ctx.inventory_database)
+def test_migration_progress_assess_dashboards_refreshes_report(run_workflow) -> None:
+    query_linter = create_autospec(QueryLinter)
+    used_table_progress_encoder = create_autospec(UsedTableProgressEncoder)
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+
+    run_workflow(
+        MigrationProgress.assess_dashboards,
+        named_parameters={"parent_run_id": 1},
+        query_linter=query_linter,
+        used_table_progress=used_table_progress_encoder,
+        used_tables_crawler_for_queries=used_tables_crawler,
+    )
+
+    query_linter.refresh_report.assert_called_once()
+    used_tables_crawler.snapshot.assert_called_once()
+    used_table_progress_encoder.append_inventory_snapshot.assert_called_once()
+
+
+def test_migration_progress_assess_workflows_refreshes_report(run_workflow) -> None:
+    workflow_linter = create_autospec(WorkflowLinter)
+
+    run_workflow(MigrationProgress.assess_workflows, workflow_linter=workflow_linter)
+
+    workflow_linter.refresh_report.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:
