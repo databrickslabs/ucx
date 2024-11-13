@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -20,6 +21,12 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +44,10 @@ class QueryProblem:
     # TODO: @JCZuurmond verify these are the correct id attributes.
     # Note: Do we deduplicate the messages for a query?
     __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> Self:
+        return cls(**data)
 
 
 @dataclass

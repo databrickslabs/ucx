@@ -12,6 +12,28 @@ from databricks.labs.ucx.source_code.queries import QueryLinter, QueryProblem, Q
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
+def test_query_problem_from_dict() -> None:
+    query_problem = QueryProblem.from_dict({
+        "dashboard_id": "dashboard_id",
+        "dashboard_parent": "dashboard_parent",
+        "dashboard_name": "dashboard_name",
+        "query_id": "query_id",
+        "query_parent": "query_parent",
+        "query_name": "query_name",
+        "code": "code",
+        "message": "message",
+    })
+
+    assert query_problem.dashboard_id == "dashboard_id"
+    assert query_problem.dashboard_parent == "dashboard_parent"
+    assert query_problem.dashboard_name == "dashboard_name"
+    assert query_problem.query_id == "query_id"
+    assert query_problem.query_parent == "query_parent"
+    assert query_problem.query_name == "query_name"
+    assert query_problem.code == "code"
+    assert query_problem.message == "message"
+
+
 def test_query_problem_ownership_defers_to_legacy_query_ownership() -> None:
     administrator_locator = create_autospec(AdministratorLocator)
     administrator_locator.get_workspace_administrator.return_value = "John Doe"
