@@ -6,7 +6,8 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Convention,
     Deprecation,
-    Failure, UsedTable,
+    Failure,
+    UsedTable,
 )
 
 
