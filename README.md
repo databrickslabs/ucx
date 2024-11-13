@@ -123,6 +123,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
+* [Pipeline migration commands](#pipeline-migration-commands)
+  * [`migrate-dlt-pipelines` command](#migrate-dlt-pipelines-command)
 * [Code migration commands](#code-migration-commands)
   * [`lint-local-code` command](#lint-local-code-command)
   * [`migrate-local-code` command](#migrate-local-code-command)
@@ -1806,10 +1808,10 @@ It can also be used to debug issues related to table aliasing.
 
 These commands are used to migrate pipelines from the old HMS catalog to the new UCX catalog.
 
-## `migrate_dlt_pipelines` command
+## `migrate-dlt-pipelines` command
 
 ```text
-databricks labs ucx migrate_dlt_pipelines [--skip-pipelines <pipeline_id1>, <pipeline_id2>]
+databricks labs ucx migrate-dlt-pipelines [--skip-pipelines <pipeline_id1>, <pipeline_id2>]
 ```
 Run this command to migrated DLT pipelines from HMS to UC. If any jobs use the DLT pipelines, the references will be updated to point to the new migrated UC pipelines.
 The older pipeline name will be updated to <pipeline_name> [OLD] and the new pipeline will be created with the same name as the old pipeline.
