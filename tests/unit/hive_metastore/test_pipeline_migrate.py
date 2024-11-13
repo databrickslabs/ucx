@@ -6,7 +6,7 @@ import pytest
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import NotFound, DatabricksError
-from databricks.sdk.service.jobs import BaseJob
+from databricks.sdk.service.jobs import BaseJob, JobSettings, Task, PipelineTask
 
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping, PipelineRule, PipelinesMigrator
@@ -119,13 +119,23 @@ def test_migrate_pipelines(ws, mock_installation):
     errors = {}
     rows = {
         "`hive_metastore`.`inventory_database`.`pipelines`": [("empty-spec", "pipe1", 1, "[]", "creator1")],
-        "`hive_metastore`.`inventory_database`.`jobs`": [("536591785949415", 1, [], "single-job", "anonymous@databricks.com")],
+        "`hive_metastore`.`inventory_database`.`jobs`": [
+            ("536591785949415", 1, [], "single-job", "anonymous@databricks.com")
+        ],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
     pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name")
 
     ws.jobs.list.return_value = [BaseJob(job_id=536591785949415)]
+    ws.jobs.get.return_value = BaseJob(
+        job_id=536591785949415,
+        settings=JobSettings(
+            name="single-job", tasks=[Task(pipeline_task=PipelineTask(pipeline_id="empty-spec"), task_key="task_key")]
+        ),
+    )
+    ws.api_client.do.return_value = {"pipeline_id": "new-pipeline-id"}
+
     pipelines_migrator.migrate_pipelines()
 
     ws.api_client.do.assert_called_once()
