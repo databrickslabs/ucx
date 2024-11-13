@@ -43,7 +43,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
     def _encode_record_as_historical(self, record: Table) -> Historical:
         """Encode record as historical.
 
-        A table failure means that the table is pending migration. Grants are purposefully lef out, because a grant
+        A table failure means that the table is pending migration. Grants are purposefully left out, because a grant
         might not be mappable to UC, like `READ_METADATA`, thus possibly resulting in false "pending migration" failure
         for tables that are migrated to UC with their relevant grants also being migrated.
         """
