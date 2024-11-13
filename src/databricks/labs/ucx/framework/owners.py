@@ -201,7 +201,7 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         super().__init__(administrator_locator)
         self._ws = ws
 
-    def owner_of_path(self, path: str) -> str:  # TODO: Why is this `owner_of_path` and not
+    def owner_of_path(self, path: str) -> str:  # TODO: Why is this `owner_of_path` and not `owner_of`
         return self.owner_of(WorkspacePath(self._ws, path))
 
     @retried(on=[InternalError], timeout=timedelta(minutes=1))
