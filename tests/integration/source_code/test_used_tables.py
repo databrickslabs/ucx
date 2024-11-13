@@ -40,6 +40,9 @@ def test_used_table_ownership_is_workspace_admin_if_not_in_used_tables_snapshot(
     owner = ownership.owner_of(UsedTable())
 
     assert owner == "John Doe"
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    legacy_query_ownership.owner_of.assert_not_called()
+    workspace_path_ownership.owner_of_path.assert_not_called()
 
 
 def test_used_table_ownership_is_workspace_admin_if_not_write(used_table: UsedTable) -> None:
@@ -62,6 +65,9 @@ def test_used_table_ownership_is_workspace_admin_if_not_write(used_table: UsedTa
     owner = ownership.owner_of(used_table)
 
     assert owner == "John Doe"
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    legacy_query_ownership.owner_of.assert_not_called()
+    workspace_path_ownership.owner_of_path.assert_not_called()
 
 
 @pytest.mark.parametrize("object_type", ["QUERY", "NOTEBOOK", "FILE"])
@@ -88,6 +94,14 @@ def test_used_table_ownership_from_code(used_table: UsedTable, object_type: str)
     owner = ownership.owner_of(used_table)
 
     assert owner == "Mary Jane"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    if object_type == "QUERY":
+        legacy_query_ownership.owner_of.assert_called_once_with(used_table.query_id)
+        workspace_path_ownership.owner_of_path.assert_not_called()
+    else:
+        legacy_query_ownership.owner_of.assert_not_called()
+        workspace_path_ownership.owner_of_path.assert_called_once_with(used_table.source_id)
+
 
 
 def test_used_table_ownership_from_unknown_code_type(caplog, used_table: UsedTable) -> None:
@@ -114,3 +128,6 @@ def test_used_table_ownership_from_unknown_code_type(caplog, used_table: UsedTab
         owner = ownership.owner_of(used_table)
     assert owner == "John Doe"
     assert f"Unknown source type 'UNKNOWN' for {used_table.source_id}" in caplog.messages
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    legacy_query_ownership.owner_of.assert_not_called()
+    workspace_path_ownership.owner_of_path.assert_not_called()
