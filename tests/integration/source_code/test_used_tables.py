@@ -1,10 +1,6 @@
 from unittest.mock import create_autospec
 
-from databricks.labs.ucx.framework.owners import (
-    AdministratorLocator,
-    LegacyQueryOwnership,
-    WorkspacePathOwnership
-)
+from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnership, WorkspacePathOwnership
 from databricks.labs.ucx.source_code.base import LineageAtom, UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTableOwnership, UsedTablesCrawler
 
