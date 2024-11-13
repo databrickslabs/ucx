@@ -62,7 +62,10 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
 
 
 class UsedTableOwnership(Ownership[UsedTable]):
-    """Used table ownership."""
+    """Used table ownership.
+
+    Ownership of code resources propagate to the `UsedTable` if that resource writes to the table.
+    """
 
     def __init__(
         self,
