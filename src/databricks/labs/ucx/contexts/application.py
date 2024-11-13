@@ -409,7 +409,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def table_migration_ownership(self) -> TableMigrationOwnership:
-        return TableMigrationOwnership(self.tables_crawler, self.table_ownership)
+        return TableMigrationOwnership(self.administrator_locator, self.tables_crawler, self.table_ownership)
 
     @cached_property
     def iam_credential_manager(self) -> CredentialManager:

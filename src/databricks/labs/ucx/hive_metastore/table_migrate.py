@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import DatabricksError
 
-from databricks.labs.ucx.framework.owners import Ownership
+from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import MigrateGrants
@@ -607,8 +607,13 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
     This is the owner of the source table, if (and only if) the source table is present in the inventory.
     """
 
-    def __init__(self, tables_crawler: TablesCrawler, table_ownership: TableOwnership) -> None:
-        super().__init__(table_ownership._administrator_locator)  # TODO: Fix this
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        tables_crawler: TablesCrawler,
+        table_ownership: TableOwnership,
+    ) -> None:
+        super().__init__(administrator_locator)
         self._tables_crawler = tables_crawler
         self._table_ownership = table_ownership
         self._indexed_tables: dict[tuple[str, str], Table] | None = None

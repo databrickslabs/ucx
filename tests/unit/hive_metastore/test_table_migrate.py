@@ -1450,10 +1450,9 @@ def test_table_migration_status_owner() -> None:
     )
     tables_crawler.snapshot.return_value = [the_table]
     table_ownership = create_autospec(TableOwnership)
-    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
     table_ownership.owner_of.return_value = "bob"
 
-    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+    ownership = TableMigrationOwnership(admin_locator, tables_crawler, table_ownership)
     owner = ownership.owner_of(
         TableMigrationStatus(
             src_schema="foo",
@@ -1493,10 +1492,9 @@ def test_table_migration_status_owner_caches_tables_snapshot() -> None:
     )
     tables_crawler.snapshot.return_value = [a_table, b_table]
     table_ownership = create_autospec(TableOwnership)
-    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
     table_ownership.owner_of.return_value = "bob"
 
-    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+    ownership = TableMigrationOwnership(admin_locator, tables_crawler, table_ownership)
 
     # Verify the snapshot() hasn't been loaded yet: it isn't needed.
     tables_crawler.snapshot.assert_not_called()
@@ -1519,9 +1517,8 @@ def test_table_migration_status_source_table_unknown() -> None:
     tables_crawler = create_autospec(TablesCrawler)
     tables_crawler.snapshot.return_value = []
     table_ownership = create_autospec(TableOwnership)
-    table_ownership._administrator_locator = admin_locator  # pylint: disable=protected-access
 
-    ownership = TableMigrationOwnership(tables_crawler, table_ownership)
+    ownership = TableMigrationOwnership(admin_locator, tables_crawler, table_ownership)
 
     unknown_table = TableMigrationStatus(
         src_schema="foo",
