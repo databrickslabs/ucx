@@ -61,15 +61,19 @@ def test_used_table_ownership_is_workspace_admin_if_not_write(used_table: UsedTa
     assert owner == "John Doe"
 
 
-def test_used_table_ownership_from_query(used_table: UsedTable) -> None:
+@pytest.mark.parametrize("object_type", ["QUERY", "NOTEBOOK", "FILE"])
+def test_used_table_ownership_from_code(used_table: UsedTable, object_type: str) -> None:
+    source_lineage = [LineageAtom(object_type=object_type, object_id="dashboard/query")]
+    used_table = dataclasses.replace(used_table, source_lineage=source_lineage)
     administrator_locator = create_autospec(AdministratorLocator)
     administrator_locator.get_workspace_administrator.return_value = "John Doe"
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     used_tables_crawler.snapshot.return_value = [used_table]
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
-    legacy_query_ownership.owner_of.side_effect = lambda id_: "Query Owner" if id_ == used_table.query_id else None
-
+    legacy_query_ownership.owner_of.side_effect = lambda id_: "Mary Jane" if id_ == used_table.query_id else None
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    workspace_path_ownership.owner_of_path.side_effect = lambda id_: "Mary Jane" if id_ == used_table.source_id else None
+
     ownership = UsedTableOwnership(
         administrator_locator,
         used_tables_crawler,
@@ -80,4 +84,4 @@ def test_used_table_ownership_from_query(used_table: UsedTable) -> None:
 
     owner = ownership.owner_of(used_table)
 
-    assert owner == "Query Owner"
+    assert owner == "Mary Jane"
