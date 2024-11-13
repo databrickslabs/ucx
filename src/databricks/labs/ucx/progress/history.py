@@ -284,7 +284,7 @@ class ProgressEncoder(Generic[Record]):
     def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
         history_records = [self._encode_record_as_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
-        # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
+        # The mode is 'append'. This is documented as conflict-free.
         self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
 
     def _encode_record_as_historical(self, record: Record) -> Historical:
