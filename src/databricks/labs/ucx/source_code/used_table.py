@@ -98,5 +98,5 @@ class UsedTableOwnership(Ownership[UsedTable]):
             return self._legacy_query_ownership.owner_of(used_table.query_id)
         if used_table.source_type in {'NOTEBOOK', 'FILE'}:
             return self._workspace_path_ownership.owner_of_path(used_table.source_id)
-        logger.warning(f"Unknown source type {used_table.source_type} for {used_table.source_id}")
+        logger.warning(f"Unknown source type '{used_table.source_type}' for {used_table.source_id}")
         return None
