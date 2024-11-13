@@ -18,8 +18,9 @@ from sqlglot.errors import SqlglotError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
-
 from databricks.labs.blueprint.paths import WorkspacePath
+
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 if sys.version_info >= (3, 11):
@@ -258,6 +259,17 @@ class UsedTable(SourceInfo):
             schema_name = default_schema
         return UsedTable(
             catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0], is_read=is_read, is_write=is_write
+        )
+
+    @classmethod
+    def from_table(cls, table: Table, *, is_read: bool, is_write: bool) -> UsedTable:
+        """Create a `:class:UsedTable` from a Hive `:class:Table`."""
+        return cls(
+            catalog_name=table.catalog,
+            schema_name=table.database,
+            table_name=table.name,
+            is_read=is_read,
+            is_write=is_write,
         )
 
     catalog_name: str = SourceInfo.UNKNOWN
