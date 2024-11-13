@@ -28,6 +28,7 @@ def test_used_table_ownership_is_workspace_admin_if_not_in_used_tables_snapshot(
     used_tables_crawler.snapshot.return_value = [used_table]
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+
     ownership = UsedTableOwnership(
         administrator_locator,
         used_tables_crawler,
@@ -49,6 +50,7 @@ def test_used_table_ownership_is_workspace_admin_if_not_write(used_table: UsedTa
     used_tables_crawler.snapshot.return_value = [used_table]
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+
     ownership = UsedTableOwnership(
         administrator_locator,
         used_tables_crawler,
@@ -71,9 +73,9 @@ def test_used_table_ownership_from_code(used_table: UsedTable, object_type: str)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     used_tables_crawler.snapshot.return_value = [used_table]
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
-    legacy_query_ownership.owner_of.side_effect = lambda id_: "Mary Jane" if id_ == used_table.query_id else None
+    legacy_query_ownership.owner_of.side_effect = lambda i: "Mary Jane" if i == used_table.query_id else None
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
-    workspace_path_ownership.owner_of_path.side_effect = lambda id_: "Mary Jane" if id_ == used_table.source_id else None
+    workspace_path_ownership.owner_of_path.side_effect = lambda i: "Mary Jane" if i == used_table.source_id else None
 
     ownership = UsedTableOwnership(
         administrator_locator,
@@ -96,9 +98,9 @@ def test_used_table_ownership_from_unknown_code_type(caplog, used_table: UsedTab
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     used_tables_crawler.snapshot.return_value = [used_table]
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
-    legacy_query_ownership.owner_of.side_effect = lambda id_: "Mary Jane" if id_ == used_table.query_id else None
+    legacy_query_ownership.owner_of.side_effect = lambda i: "Mary Jane" if i == used_table.query_id else None
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
-    workspace_path_ownership.owner_of_path.side_effect = lambda id_: "Mary Jane" if id_ == used_table.source_id else None
+    workspace_path_ownership.owner_of_path.side_effect = lambda i: "Mary Jane" if i == used_table.source_id else None
 
     ownership = UsedTableOwnership(
         administrator_locator,
@@ -107,7 +109,6 @@ def test_used_table_ownership_from_unknown_code_type(caplog, used_table: UsedTab
         legacy_query_ownership,
         workspace_path_ownership,
     )
-
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.used_table"):
         owner = ownership.owner_of(used_table)
