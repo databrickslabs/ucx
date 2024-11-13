@@ -228,7 +228,7 @@ class LocalFileMigrator:
             try:
                 code = f.read()
             except UnicodeDecodeError as e:
-                logger.error(f"Could not decode file {path}: {e}")
+                logger.warning(f"Could not decode file {path}: {e}")
                 return False
             applied = False
             # Lint the code and apply fixes

@@ -97,7 +97,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
             for old_table in self._dependent_tables(statement):
                 src_schema = old_table.db if old_table.db else self._session_state.schema
                 if not src_schema:
-                    logger.error(f"Could not determine schema for table {old_table.name}")
+                    logger.warning(f"Could not determine schema for table {old_table.name}")
                     continue
                 dst = self._index.get(src_schema, old_table.name)
                 if not dst:
