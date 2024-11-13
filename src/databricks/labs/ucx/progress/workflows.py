@@ -55,7 +55,7 @@ class MigrationProgress(Workflow):
         """Update the history log with the latest tables inventory snapshot."""
         # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
         # history log.
-        # WARNING: this will fail if the tables inventory is empty, because it will then try to perform a crawl.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
         history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         history_log.append_inventory_snapshot(tables_snapshot)
