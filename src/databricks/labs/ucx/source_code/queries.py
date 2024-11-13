@@ -48,7 +48,9 @@ class QueryProblemOwnership(Ownership[QueryProblem]):
     Defer query problem ownership to query owner.
     """
 
-    def __init__(self, administrator_locator: AdministratorLocator, legacy_query_ownership: LegacyQueryOwnership) -> None:
+    def __init__(
+        self, administrator_locator: AdministratorLocator, legacy_query_ownership: LegacyQueryOwnership
+    ) -> None:
         super().__init__(administrator_locator)
         self._legacy_query_ownership = legacy_query_ownership
 
