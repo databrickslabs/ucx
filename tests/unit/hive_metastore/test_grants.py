@@ -11,7 +11,6 @@ from databricks.labs.lsql.core import Row
 from databricks.sdk.service.iam import ComplexValue, Group
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
-from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
@@ -19,7 +18,6 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.workspace_access.groups import GroupManager
-from tests.integration.hive_metastore.test_ext_hms import sql_backend
 from tests.unit import mock_workspace_client
 
 
