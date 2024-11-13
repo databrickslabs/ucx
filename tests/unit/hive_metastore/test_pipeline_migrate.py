@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Generator
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, call
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
@@ -118,38 +118,89 @@ def test_pipeline_to_migrate(ws, mock_installation):
 def test_migrate_pipelines(ws, mock_installation):
     errors = {}
     rows = {
-        "`hive_metastore`.`inventory_database`.`pipelines`": [("empty-spec", "pipe1", 1, "[]", "creator1")],
+        "`hive_metastore`.`inventory_database`.`pipelines`": [
+            ("empty-spec", "pipe1", 1, "[]", "creator1"),
+            ("migrated-dlt-spec", "pipe2", 1, "[]", "creator2"),
+            ("spec-with-spn", "pipe3", 1, "[]", "creator3"),
+            ("skip-pipeline", "pipe3", 1, "[]", "creator3"),
+        ],
         "`hive_metastore`.`inventory_database`.`jobs`": [
             ("536591785949415", 1, [], "single-job", "anonymous@databricks.com")
         ],
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
-    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name")
+    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name", skip_pipelines=["skip-pipeline"])
 
-    ws.jobs.list.return_value = [BaseJob(job_id=536591785949415)]
-    ws.jobs.get.return_value = BaseJob(
-        job_id=536591785949415,
-        settings=JobSettings(
-            name="single-job", tasks=[Task(pipeline_task=PipelineTask(pipeline_id="empty-spec"), task_key="task_key")]
+    ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
+    ws.jobs.get.side_effect = [
+        BaseJob(
+            job_id=536591785949415,
+            settings=JobSettings(
+                name="single-job",
+                tasks=[Task(pipeline_task=PipelineTask(pipeline_id="empty-spec"), task_key="task_key")],
+            ),
         ),
-    )
-    ws.api_client.do.return_value = {"pipeline_id": "new-pipeline-id"}
+        BaseJob(
+            job_id=536591785949417,
+        ),
+    ]
 
+    ws.api_client.do.side_effect = [{"pipeline_id": "new-pipeline-id"}, {}]
     pipelines_migrator.migrate_pipelines()
 
-    ws.api_client.do.assert_called_once()
-    ws.api_client.do.assert_called_with(
-        'POST',
-        '/api/2.0/pipelines/empty-spec/clone',
-        body={
-            'catalog': 'catalog_name',
-            'clone_mode': 'MIGRATE_TO_UC',
-            'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
-            'name': '[]',
-        },
-        headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+    assert ws.api_client.do.call_count == 2
+    ws.api_client.do.assert_has_calls(
+        [
+            call(
+                'POST',
+                '/api/2.0/pipelines/empty-spec/clone',
+                body={
+                    'catalog': 'catalog_name',
+                    'clone_mode': 'MIGRATE_TO_UC',
+                    'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
+                    'name': '[]',
+                },
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+            ),
+            call(
+                'POST',
+                '/api/2.0/pipelines/spec-with-spn/clone',
+                body={
+                    'catalog': 'catalog_name',
+                    'clone_mode': 'MIGRATE_TO_UC',
+                    'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
+                    'name': '[]',
+                },
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+            ),
+        ],
+        any_order=True,
     )
 
-    ws.api_client.do.side_effect = DatabricksError("Error")
+    ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
+    ws.jobs.get.side_effect = [
+        BaseJob(
+            job_id=536591785949415,
+            settings=JobSettings(
+                name="single-job",
+                tasks=[Task(pipeline_task=PipelineTask(pipeline_id="empty-spec"), task_key="task_key")],
+            ),
+        ),
+        BaseJob(
+            job_id=536591785949417,
+        ),
+    ]
+
+    ws.api_client.do.side_effect = DatabricksError("error")  # # pylint: disable=redefined-variable-type
+    pipelines_migrator.migrate_pipelines()
+
+
+def test_migrate_pipelines_no_pipelines(ws, mock_installation):
+    errors = {}
+    rows = {}
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
+    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name")
+    ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
     pipelines_migrator.migrate_pipelines()
