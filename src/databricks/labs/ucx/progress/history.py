@@ -289,5 +289,4 @@ class ProgressEncoder(Generic[Record]):
 
     def _encode_record_as_historical(self, record: Record) -> Historical:
         """Encode a snapshot record as a historical log entry."""
-        # Snapshot context not needed with default implementation.
         return self._encoder.to_historical(record)
