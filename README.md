@@ -1802,6 +1802,21 @@ It can also be used to debug issues related to table aliasing.
 
 [[back to top](#databricks-labs-ucx)]
 
+# Pipeline migration commands
+
+These commands are used to migrate pipelines from the old HMS catalog to the new UCX catalog.
+
+## `migrate_dlt_pipelines` command
+
+```text
+databricks labs ucx migrate_dlt_pipelines [--skip-pipelines <pipeline_id1>, <pipeline_id2>]
+```
+Run this command to migrated DLT pipelines from HMS to UC. If any jobs use the DLT pipelines, the references will be updated to point to the new migrated UC pipelines.
+The older pipeline name will be updated to <pipeline_name> [OLD] and the new pipeline will be created with the same name as the old pipeline.
+The optional `--skip-pipelines` flag can be used to skip migrating specific pipelines.
+
+[[back to top](#databricks-labs-ucx)]
+
 # Code migration commands
 
 See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
