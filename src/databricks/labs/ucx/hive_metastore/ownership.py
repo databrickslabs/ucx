@@ -14,6 +14,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -97,10 +98,12 @@ class DefaultSecurableOwnership(Ownership[Table]):
         self,
         administrator_locator: AdministratorLocator,
         table_crawler: TablesCrawler,
+        group_manager: GroupManager,
         default_owner_group: str | None,
         app_principal_resolver: Callable[[], str | None],
     ) -> None:
         self._tables_crawler = table_crawler
+        self._group_manager = group_manager
         self._default_owner_group = default_owner_group
         self._app_principal_resolver = app_principal_resolver
         super().__init__(administrator_locator)
@@ -111,12 +114,16 @@ class DefaultSecurableOwnership(Ownership[Table]):
 
     @cached_property
     def _static_owner(self) -> str | None:
+        # If the default owner group is not valid, fall back to the application principal
         if self._default_owner_group:
-            return self._default_owner_group
+            if self._group_manager.validate_owner_group(self._default_owner_group):
+                logger.warning("Default owner group is not valid, falling back to administrator ownership.")
+                return self._default_owner_group
         return self._application_principal
 
     def load(self) -> Iterable[Grant]:
         databases = set()
+        catalogs = set()
         owner = self._static_owner
         if not owner:
             logger.warning("No owner found for tables and databases")
@@ -126,6 +133,8 @@ class DefaultSecurableOwnership(Ownership[Table]):
 
             if table.database not in databases:
                 databases.add(table.database)
+            if table.catalog not in catalogs:
+                catalogs.add(table.catalog)
             yield Grant(
                 principal=owner,
                 action_type='OWN',
@@ -140,6 +149,16 @@ class DefaultSecurableOwnership(Ownership[Table]):
                 action_type='OWN',
                 catalog="hive_metastore",
                 database=database,
+                table=None,
+                view=None,
+            )
+
+        for catalog in catalogs:
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=catalog,
+                database=None,
                 table=None,
                 view=None,
             )

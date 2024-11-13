@@ -23,6 +23,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership, DefaultSecurableOwnership
 from databricks.labs.ucx.source_code.base import UsedTable, LineageAtom
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
 def test_is_delta_true():
@@ -789,11 +790,12 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
 
 
 @pytest.mark.parametrize(
-    'default_owner_group, cli_user, grants',
+    'default_owner_group, cli_user, valid_admin, grants',
     [
         (
             "admin_group",
             None,
+            True,
             [
                 Grant(
                     principal='admin_group',
@@ -814,12 +816,18 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
                     action_type='OWN',
                     catalog='hive_metastore',
                     database='foo',
+                ),
+                Grant(
+                    principal='admin_group',
+                    action_type='OWN',
+                    catalog='main',
                 ),
             ],
         ),
         (
             None,
             "current_user",
+            False,
             [
                 Grant(
                     principal='current_user',
@@ -841,11 +849,50 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
                     catalog='hive_metastore',
                     database='foo',
                 ),
+                Grant(
+                    principal='current_user',
+                    action_type='OWN',
+                    catalog='main',
+                ),
+            ],
+        ),
+        (
+            "admin_group",
+            "current_user",
+            False,
+            [
+                Grant(
+                    principal='current_user',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    table='bar',
+                ),
+                Grant(
+                    principal='current_user',
+                    action_type='OWN',
+                    catalog='main',
+                    database='foo',
+                    view='baz',
+                ),
+                Grant(
+                    principal='current_user',
+                    action_type='OWN',
+                    catalog='hive_metastore',
+                    database='foo',
+                ),
+                Grant(
+                    principal='current_user',
+                    action_type='OWN',
+                    catalog='main',
+                ),
             ],
         ),
     ],
 )
-def test_default_securable_ownership(default_owner_group: str, cli_user: str, grants: list[Grant]) -> None:
+def test_default_securable_ownership(
+    default_owner_group: str, cli_user: str, valid_admin: bool, grants: list[Grant]
+) -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "ws_admin"
@@ -861,8 +908,12 @@ def test_default_securable_ownership(default_owner_group: str, cli_user: str, gr
             view_text="select * from bar",
         ),
     ]
+    group_manager = create_autospec(GroupManager)
+    group_manager.validate_owner_group.return_value = valid_admin
 
-    ownership = DefaultSecurableOwnership(admin_locator, table_crawler, default_owner_group, lambda: cli_user)
+    ownership = DefaultSecurableOwnership(
+        admin_locator, table_crawler, group_manager, default_owner_group, lambda: cli_user
+    )
 
     inferred_grants = list(ownership.load())
     assert inferred_grants == grants
