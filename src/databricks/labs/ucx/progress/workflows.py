@@ -149,6 +149,7 @@ class MigrationProgress(Workflow):
         Also stores direct filesystem accesses for display in the migration dashboard."""
         # TODO: Ensure these are captured in the history log.
         ctx.query_linter.refresh_report()
+        ctx.query_problem_progress.append_inventory_snapshot(ctx.query_linter.snapshot())
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):
