@@ -103,7 +103,6 @@ def test_used_table_ownership_from_code(used_table: UsedTable, object_type: str)
         workspace_path_ownership.owner_of_path.assert_called_once_with(used_table.source_id)
 
 
-
 def test_used_table_ownership_from_unknown_code_type(caplog, used_table: UsedTable) -> None:
     source_lineage = [LineageAtom(object_type="UNKNOWN", object_id="dashboard/query")]
     used_table = dataclasses.replace(used_table, source_lineage=source_lineage)
