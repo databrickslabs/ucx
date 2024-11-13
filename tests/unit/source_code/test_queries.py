@@ -6,9 +6,34 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import LegacyQuery
 
+from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnership
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
-from databricks.labs.ucx.source_code.queries import QueryLinter
+from databricks.labs.ucx.source_code.queries import QueryLinter, QueryProblem, QueryProblemOwnership
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+
+
+def test_query_problem_ownership_defers_to_legacy_query_ownership() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    administrator_locator.get_workspace_administrator.return_value = "John Doe"
+    legacy_query_ownership = create_autospec(LegacyQueryOwnership)
+    legacy_query_ownership.owner_of.side_effect = lambda id_: "Mary Jane" if id_ == "query_id" else None
+    ownership = QueryProblemOwnership(administrator_locator, legacy_query_ownership)
+    query_problem = QueryProblem(
+        "dashboard_id",
+        "dashboard_parent",
+        "dashboard_name",
+        "query_id",
+        "query_parent",
+        "query_name",
+        "code",
+        "message",
+    )
+
+    owner = ownership.owner_of(query_problem)
+
+    assert owner == "Mary Jane"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    legacy_query_ownership.owner_of.assert_called_once_with("query_id")
 
 
 @pytest.mark.parametrize(
