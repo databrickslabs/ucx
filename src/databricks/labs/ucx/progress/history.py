@@ -1,6 +1,7 @@
 from __future__ import annotations
 import dataclasses
 import datetime as dt
+import typing
 import json
 import logging
 from enum import Enum, EnumMeta
@@ -105,7 +106,7 @@ class HistoricalEncoder(Generic[Record]):
         # are produced automatically in a __future__.__annotations__ context). Unfortunately the dataclass mechanism
         # captures the type hints prior to resolution (which happens later in the class initialization process).
         # As such, we rely on dataclasses.fields() for the set of field names, but not the types which we fetch directly.
-        klass_type_hints = get_type_hints(klass)
+        klass_type_hints = typing.get_type_hints(klass)
         field_names = [field.name for field in dataclasses.fields(klass)]
         field_names_with_types = {field_name: klass_type_hints[field_name] for field_name in field_names}
         if "failures" not in field_names_with_types:
