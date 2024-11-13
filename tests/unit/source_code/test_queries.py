@@ -151,3 +151,7 @@ def test_query_linter_snapshot(migration_index, mock_backend) -> None:
     assert query_problem.query_name == "query_name"
     assert query_problem.code == "code"
     assert query_problem.message == "message"
+
+    ws.assert_not_called()
+    dfsa_crawler.dump_all.assert_not_called()
+    used_tables_crawler.dump_all.assert_not_called()
