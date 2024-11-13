@@ -61,10 +61,7 @@ class TableMigration(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
-
-        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
-        """
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(
@@ -133,10 +130,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
-
-        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
-        """
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(depends_on=[verify_prerequisites, migrate_views])
@@ -201,10 +195,7 @@ class MigrateExternalTablesCTAS(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
-
-        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
-        """
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(depends_on=[verify_prerequisites, migrate_views, migrate_hive_serde_ctas, migrate_other_external_ctas])
@@ -252,10 +243,7 @@ class ScanTablesInMounts(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
-
-        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
-        """
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(job_cluster="table_migration", depends_on=[verify_prerequisites, scan_tables_in_mounts_experimental])
@@ -290,10 +278,7 @@ class MigrateTablesInMounts(Workflow):
 
     @job_task(job_cluster="table_migration")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
-        """Verify the prerequisites for running this job on the table migration cluster are fulfilled.
-
-        We will wait up to 1 hour for the assessment run to finish if it is running or pending.
-        """
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
     @job_task(depends_on=[verify_prerequisites, migrate_tables_in_mounts_experimental])
