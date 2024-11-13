@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO
+from typing import Any, BinaryIO, ClassVar, TextIO
 
 from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
@@ -277,6 +277,8 @@ class UsedTable(SourceInfo):
     table_name: str = SourceInfo.UNKNOWN
     is_read: bool = True
     is_write: bool = False
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("catalog_name", "schema_name", "table_name")
 
 
 class TableCollector(ABC):
