@@ -19,7 +19,7 @@ from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessOwnership
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler, UsedTableOwnership
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -263,15 +263,18 @@ class GlobalContext(abc.ABC):
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
-    def table_ownership(self) -> TableOwnership:
-        return TableOwnership(
+    def used_table_ownership(self) -> UsedTableOwnership:
+        return UsedTableOwnership(
             self.administrator_locator,
-            self.grants_crawler,
             self.used_tables_crawler_for_paths,
             self.used_tables_crawler_for_queries,
             self.legacy_query_ownership,
             self.workspace_path_ownership,
         )
+
+    @cached_property
+    def table_ownership(self) -> TableOwnership:
+        return TableOwnership(self.administrator_locator, self.grants_crawler, self.used_table_ownership)
 
     @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:

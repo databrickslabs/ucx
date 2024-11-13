@@ -21,7 +21,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
-from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler, UsedTableOwnership
 
 
 def test_is_delta_true():
@@ -688,13 +688,17 @@ def test_table_owner() -> None:
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
 
-    ownership = TableOwnership(
+    used_table_ownership = UsedTableOwnership(
         admin_locator,
-        grants_crawler,
         used_tables_in_paths,
         used_tables_in_queries,
         legacy_query_ownership,
         workspace_path_ownership,
+    )
+    ownership = TableOwnership(
+        admin_locator,
+        grants_crawler,
+        used_table_ownership,
     )
     table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
     owner = ownership.owner_of(table)
