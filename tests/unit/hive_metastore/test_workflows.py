@@ -3,6 +3,9 @@ from collections.abc import Sequence
 
 import pytest
 
+from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
+from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
+
 from databricks.labs.ucx.framework.tasks import Workflow
 from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
@@ -65,6 +68,31 @@ _migration_workflows: Sequence[type[Workflow]] = (
     ScanTablesInMounts,
     MigrateTablesInMounts,
 )
+
+
+@pytest.mark.parametrize(
+    "task",
+    [getattr(workflow, "verify_prerequisites") for workflow in _migration_workflows],
+    ids=[workflow.__name__ for workflow in _migration_workflows],
+)
+def test_with_valid_prerequisites(ws, run_workflow, task) -> None:
+    ws.metastores.current.return_value = MetastoreAssignment(metastore_id="test", workspace_id=123456789)
+    ws.catalogs.get.return_value = CatalogInfo()
+    ws.jobs.list_runs.return_value = [BaseRun(state=RunState(result_state=RunResultState.SUCCESS))]
+    run_workflow(task, workspace_client=ws)
+    # run_workflow will raise RuntimeError if the prerequisites could not be verified.
+
+
+@pytest.mark.parametrize(
+    "task",
+    [getattr(workflow, "verify_prerequisites") for workflow in _migration_workflows],
+    ids=[workflow.__name__ for workflow in _migration_workflows],
+)
+def test_with_invalid_prerequisites(ws, run_workflow, task) -> None:
+    """All invalid prerequisites permutations are tested for `VerifyProgressTracking` separately."""
+    ws.metastores.current.return_value = None
+    with pytest.raises(RuntimeWarning, match="Metastore not attached to workspace."):
+        run_workflow(task, workspace_client=ws)
 
 
 @pytest.mark.parametrize(

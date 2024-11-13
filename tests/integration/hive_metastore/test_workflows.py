@@ -31,6 +31,12 @@ def test_table_migration_job_refreshes_migration_status(
     ctx.workspace_installation.run()
     ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test these workflows.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     run_id = ctx.deployed_workflows.run_workflow(workflow)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
@@ -100,8 +106,14 @@ def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-
     ctx.workspace_installation.run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow(workflow)
 
     for table in tables.values():
@@ -126,6 +138,13 @@ def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_ta
         },
     )
     ctx.workspace_installation.run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
     # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-external-hiveserde-tables-in-place-experimental")
@@ -146,6 +165,13 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
         },
     )
     ctx.workspace_installation.run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
     # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
@@ -172,6 +198,13 @@ def test_table_migration_job_publishes_remaining_tables(
         table_format="UNKNOWN",
     )
     installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     installation_ctx.deployed_workflows.run_workflow("migrate-tables")
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
