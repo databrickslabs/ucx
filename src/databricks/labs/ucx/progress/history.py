@@ -6,7 +6,7 @@ import json
 import logging
 from enum import Enum, EnumMeta
 from collections.abc import Iterable, Sequence
-from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints, final
+from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -280,7 +280,6 @@ class ProgressEncoder(Generic[Record]):
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    @final
     def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
         history_records = [self._encode_record_as_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")

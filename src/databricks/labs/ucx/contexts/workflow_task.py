@@ -225,7 +225,7 @@ class RuntimeContext(GlobalContext):
         return TableProgressEncoder(
             self.sql_backend,
             self.table_ownership,
-            self.migration_status_refresher.index(force_refresh=False),
+            self.migration_status_refresher,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
