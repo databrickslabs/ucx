@@ -64,12 +64,17 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
     mock_history_log.append_inventory_snapshot.assert_not_called()
 
     # The second part of a 3-step update: updating table migration status without updating the history log.
+    task_dependencies = getattr(MigrationProgress.refresh_table_migration_status, "__task__").depends_on
+    assert MigrationProgress.crawl_tables.__name__ in task_dependencies
     run_workflow(MigrationProgress.refresh_table_migration_status, **context_replacements)
     mock_migration_status_refresher.snapshot.assert_called_once_with(force_refresh=True)
     mock_migration_status_refresher.snapshot.reset_mock()
     mock_history_log.append_inventory_snapshot.assert_not_called()
 
     # The final part of the 3-step update: updating the history log (without a forced crawl).
+    task_dependencies = getattr(MigrationProgress.update_tables_history_log, "__task__").depends_on
+    assert MigrationProgress.crawl_tables.__name__ in task_dependencies
+    assert MigrationProgress.refresh_table_migration_status.__name__ in task_dependencies
     run_workflow(MigrationProgress.update_tables_history_log, **context_replacements)
     mock_tables_crawler.snapshot.assert_called_once_with()
     # migration_status_refresher is not directly used within step 3, so interactions don't need to be checked.
