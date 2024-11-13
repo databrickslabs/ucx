@@ -120,6 +120,10 @@ class QueryLinter:
         self._dump_dfsas(context.all_dfsas, assessment_start, assessment_end)
         self._dump_used_tables(context.all_tables, assessment_start, assessment_end)
 
+    def snapshot(self) -> Iterable[QueryProblem]:
+        """Snapshot of the query problems."""
+        return self._try_fetch_problems()  # TODO: Should the query linter follow the crawler snapshot pattern?
+
     def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
         logger.info(f"Saving {len(problems)} linting problems...")
         self._sql_backend.save_table(
@@ -128,6 +132,11 @@ class QueryLinter:
             QueryProblem,
             mode='overwrite',
         )
+
+    def _try_fetch_problems(self) -> Iterable[QueryProblem]:
+        sql = f"SELECT * FROM {escape_sql_identifier(self._full_name)}"
+        for row in self._sql_backend.fetch(sql):
+            yield QueryProblem.from_dict(row.asDict())
 
     def _dump_dfsas(
         self,

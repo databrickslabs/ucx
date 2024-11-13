@@ -5,6 +5,7 @@ import pytest
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import LegacyQuery
+from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnership
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
@@ -13,16 +14,18 @@ from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 def test_query_problem_from_dict() -> None:
-    query_problem = QueryProblem.from_dict({
-        "dashboard_id": "dashboard_id",
-        "dashboard_parent": "dashboard_parent",
-        "dashboard_name": "dashboard_name",
-        "query_id": "query_id",
-        "query_parent": "query_parent",
-        "query_name": "query_name",
-        "code": "code",
-        "message": "message",
-    })
+    query_problem = QueryProblem.from_dict(
+        {
+            "dashboard_id": "dashboard_id",
+            "dashboard_parent": "dashboard_parent",
+            "dashboard_name": "dashboard_name",
+            "query_id": "query_id",
+            "query_parent": "query_parent",
+            "query_name": "query_name",
+            "code": "code",
+            "message": "message",
+        }
+    )
 
     assert query_problem.dashboard_id == "dashboard_id"
     assert query_problem.dashboard_parent == "dashboard_parent"
@@ -116,3 +119,35 @@ def test_lints_queries(migration_index, mock_backend) -> None:
         ws.dashboards.list.assert_not_called()
         dfsa_crawler.assert_not_called()
         used_tables_crawler.assert_not_called()
+
+
+def test_query_linter_snapshot(migration_index, mock_backend) -> None:
+    column_names = (
+        "dashboard_id",
+        "dashboard_parent",
+        "dashboard_name",
+        "query_id",
+        "query_parent",
+        "query_name",
+        "code",
+        "message",
+    )
+    rows = MockBackend.rows(*column_names)
+    mock_backend = MockBackend(rows={"SELECT \\* FROM `hive_metastore`.`test`.`query_problems`": rows[[column_names]]})
+    ws = create_autospec(WorkspaceClient)
+    dfsa_crawler = create_autospec(DirectFsAccessCrawler)
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    linter = QueryLinter(ws, mock_backend, "test", migration_index, dfsa_crawler, used_tables_crawler, None)
+
+    snapshot = list(linter.snapshot())
+
+    assert len(snapshot) == 1
+    query_problem = snapshot[0]
+    assert query_problem.dashboard_id == "dashboard_id"
+    assert query_problem.dashboard_parent == "dashboard_parent"
+    assert query_problem.dashboard_name == "dashboard_name"
+    assert query_problem.query_id == "query_id"
+    assert query_problem.query_parent == "query_parent"
+    assert query_problem.query_name == "query_name"
+    assert query_problem.code == "code"
+    assert query_problem.message == "message"
