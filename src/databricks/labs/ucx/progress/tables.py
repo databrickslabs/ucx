@@ -1,18 +1,12 @@
-import logging
-from collections.abc import Iterable
 from dataclasses import replace
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
-
-logger = logging.getLogger(__name__)
 
 
 class TableProgressEncoder(ProgressEncoder[Table]):
@@ -27,7 +21,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         self,
         sql_backend: SqlBackend,
         ownership: TableOwnership,
-        migration_status_refresher: CrawlerBase[TableMigrationStatus],
+        table_migration_index: TableMigrationIndex,
         run_id: int,
         workspace_id: int,
         catalog: str,
@@ -44,17 +38,10 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             schema,
             table,
         )
-        self._migration_status_refresher = migration_status_refresher
+        self._table_migration_index = table_migration_index
 
-    def append_inventory_snapshot(self, snapshot: Iterable[Table]) -> None:
-        migration_index = TableMigrationIndex(self._migration_status_refresher.snapshot())
-        history_records = [self._encode_table_as_historical(record, migration_index) for record in snapshot]
-        logger.debug(f"Appending {len(history_records)} {self._klass} table record(s) to history.")
-        # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
-        self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
-
-    def _encode_table_as_historical(self, record: Table, migration_index: TableMigrationIndex) -> Historical:
-        """Encode a table record, enriching with the migration status.
+    def _encode_record_as_historical(self, record: Table) -> Historical:
+        """Encode record as historical.
 
         A table failure means that the table is pending migration. Grants are purposefully left out, because a grant
         might not be mappable to UC, like `READ_METADATA`, thus possibly resulting in false "pending migration" failure
@@ -62,6 +49,6 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         """
         historical = super()._encode_record_as_historical(record)
         failures = []
-        if not migration_index.is_migrated(record.database, record.name):
+        if not self._table_migration_index.is_migrated(record.database, record.name):
             failures.append("Pending migration")
         return replace(historical, failures=historical.failures + failures)
