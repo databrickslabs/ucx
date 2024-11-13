@@ -31,12 +31,7 @@ class MigrationProgress(Workflow):
         """
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
-    @job_task(job_cluster="tacl")
-    def setup_tacl(self, ctx: RuntimeContext):
-        """(Optimization) Allow the TACL job cluster to be started while we're verifying the prerequisites for
-        refreshing everything."""
-
-    @job_task(depends_on=[verify_prerequisites, setup_tacl], job_cluster="tacl")
+    @job_task(depends_on=[verify_prerequisites])
     def crawl_tables(self, ctx: RuntimeContext) -> None:
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
