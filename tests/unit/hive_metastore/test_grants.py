@@ -1,12 +1,17 @@
 import dataclasses
+import io
 import logging
+import os
 from unittest.mock import create_autospec
 
 import pytest
+import yaml
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
+from databricks.sdk.service.iam import ComplexValue, Group
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.owners import AdministratorLocator
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog, Schema
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, MigrateGrants, GrantOwnership
@@ -14,6 +19,8 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.workspace_access.groups import GroupManager
+from tests.integration.hive_metastore.test_ext_hms import sql_backend
+from tests.unit import mock_workspace_client
 
 
 def test_type_and_key_table() -> None:
@@ -949,3 +956,35 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     rows = mock_backend.rows_written_for("`a_catalog`.`multiworkspace`.`historical`", mode="append")
 
     assert rows == [history_record]
+
+
+# Testing the validation in retrival of the default owner group. 666 is the current_user user_id.
+@pytest.mark.parametrize("user_id, expected", [("666", True), ("777", False)])
+def test_default_owner(user_id, expected) -> None:
+    sql_backend = MockBackend()
+    ws = mock_workspace_client()
+    download_yaml = {
+        'config.yml': yaml.dump(
+            {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'default_owner_group': 'owners',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+        'workspaces.json': None,
+    }
+
+    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    account_admins_group = Group(
+        id="1234", display_name="owners", members=[ComplexValue(display="User Name", value=user_id)]
+    )
+    ws.api_client.do.return_value = {
+        "Resources": [account_admins_group.as_dict()],
+    }
+
+    group_manager = GroupManager(sql_backend, ws, "ucx")
+    assert group_manager.validate_owner_group("owners") == expected
