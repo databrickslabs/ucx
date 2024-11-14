@@ -1,5 +1,6 @@
 import collections
 import logging
+from enum import Enum
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
@@ -8,7 +9,6 @@ from databricks.sdk.service.catalog import (
     ConnectionType,
     ConnectionInfo,
     SecurableType,
-    Privilege,
     PermissionsChange,
     CatalogInfo,
 )
@@ -19,6 +19,56 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 logger = logging.getLogger(__name__)
+
+
+## TODO: point to sdk once create foreign securable is implemented
+class Privilege(Enum):
+
+    ACCESS = 'ACCESS'
+    ALL_PRIVILEGES = 'ALL_PRIVILEGES'
+    APPLY_TAG = 'APPLY_TAG'
+    CREATE = 'CREATE'
+    CREATE_CATALOG = 'CREATE_CATALOG'
+    CREATE_CONNECTION = 'CREATE_CONNECTION'
+    CREATE_EXTERNAL_LOCATION = 'CREATE_EXTERNAL_LOCATION'
+    CREATE_EXTERNAL_TABLE = 'CREATE_EXTERNAL_TABLE'
+    CREATE_EXTERNAL_VOLUME = 'CREATE_EXTERNAL_VOLUME'
+    CREATE_FOREIGN_CATALOG = 'CREATE_FOREIGN_CATALOG'
+    CREATE_FOREIGN_SECURABLE = 'CREATE_FOREIGN_SECURABLE'
+    CREATE_FUNCTION = 'CREATE_FUNCTION'
+    CREATE_MANAGED_STORAGE = 'CREATE_MANAGED_STORAGE'
+    CREATE_MATERIALIZED_VIEW = 'CREATE_MATERIALIZED_VIEW'
+    CREATE_MODEL = 'CREATE_MODEL'
+    CREATE_PROVIDER = 'CREATE_PROVIDER'
+    CREATE_RECIPIENT = 'CREATE_RECIPIENT'
+    CREATE_SCHEMA = 'CREATE_SCHEMA'
+    CREATE_SERVICE_CREDENTIAL = 'CREATE_SERVICE_CREDENTIAL'
+    CREATE_SHARE = 'CREATE_SHARE'
+    CREATE_STORAGE_CREDENTIAL = 'CREATE_STORAGE_CREDENTIAL'
+    CREATE_TABLE = 'CREATE_TABLE'
+    CREATE_VIEW = 'CREATE_VIEW'
+    CREATE_VOLUME = 'CREATE_VOLUME'
+    EXECUTE = 'EXECUTE'
+    MANAGE = 'MANAGE'
+    MANAGE_ALLOWLIST = 'MANAGE_ALLOWLIST'
+    MODIFY = 'MODIFY'
+    READ_FILES = 'READ_FILES'
+    READ_PRIVATE_FILES = 'READ_PRIVATE_FILES'
+    READ_VOLUME = 'READ_VOLUME'
+    REFRESH = 'REFRESH'
+    SELECT = 'SELECT'
+    SET_SHARE_PERMISSION = 'SET_SHARE_PERMISSION'
+    USAGE = 'USAGE'
+    USE_CATALOG = 'USE_CATALOG'
+    USE_CONNECTION = 'USE_CONNECTION'
+    USE_MARKETPLACE_ASSETS = 'USE_MARKETPLACE_ASSETS'
+    USE_PROVIDER = 'USE_PROVIDER'
+    USE_RECIPIENT = 'USE_RECIPIENT'
+    USE_SCHEMA = 'USE_SCHEMA'
+    USE_SHARE = 'USE_SHARE'
+    WRITE_FILES = 'WRITE_FILES'
+    WRITE_PRIVATE_FILES = 'WRITE_PRIVATE_FILES'
+    WRITE_VOLUME = 'WRITE_VOLUME'
 
 
 class HiveMetastoreFederationEnabler:
@@ -101,8 +151,8 @@ class HiveMetastoreFederation:
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
         grants = self._location_grants(location_name)
-        if Privilege.CREATE_FOREIGN_CATALOG not in grants[current_user]:
-            change = PermissionsChange(principal=current_user, add=[Privilege.CREATE_FOREIGN_CATALOG])
+        if Privilege.CREATE_FOREIGN_SECURABLE not in grants[current_user]:
+            change = PermissionsChange(principal=current_user, add=[Privilege.CREATE_FOREIGN_SECURABLE])
             self._workspace_client.grants.update(SecurableType.EXTERNAL_LOCATION, location_name, changes=[change])
 
     def _location_grants(self, location_name: str) -> dict[str, set[Privilege]]:
