@@ -32,7 +32,9 @@ def test_table_migration_ownership(ws, runtime_ctx, inventory_schema, sql_backen
 
     # Verify for the table that the table owner and the migration status are a match.
     table_ownership = runtime_ctx.table_ownership
-    table_migration_ownership = TableMigrationOwnership(runtime_ctx.administrator_locator, tables_crawler, table_ownership)
+    table_migration_ownership = TableMigrationOwnership(
+        runtime_ctx.administrator_locator, tables_crawler, table_ownership
+    )
     assert table_migration_ownership.owner_of(table_migration_record) == table_ownership.owner_of(table_record)
 
     # Verify the owner of the migration record that corresponds to an unknown table.
