@@ -165,9 +165,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         """Returns all mounts, sorted by longest prefixes first."""
         return sorted(self._mounts_crawler.snapshot(), key=lambda _: (len(_.name), _.name), reverse=True)
 
-    def _external_locations(self) -> Iterable[ExternalLocation]:
+    def _common_locations(self, tables: Iterable[Table]):
         trie = LocationTrie()
-        for table in self._tables_crawler.snapshot():
+        for table in tables:
             table = self._resolve_location(table)
             if not table.location:
                 continue
@@ -179,7 +179,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             num_children = len(curr.children)  # 0 - take parent
             if curr.location and (num_children > 1 or num_children == 0):
                 # Checking if the parent location is a valid location for external location.
-                # If the table location is a leaf location (a foldermore than 2 levels from the root)
+                # If the table location is a leaf location (a folder more than 2 levels from the root)
                 # the parent folder will be considered as external location.
                 # If the table location is a root location (a folder at the root level) it will be considered as
                 # external location.
@@ -195,6 +195,18 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 continue
             queue.extend(curr.children.values())
         return sorted(external_locations, key=lambda _: _.location)
+
+    def _external_locations(self) -> Iterable[ExternalLocation]:
+        return sorted(self._common_locations(self._tables_crawler.snapshot()), key=lambda _: _.location)
+
+    def locations_by_database(self) -> dict[str, list[ExternalLocation]]:
+        location_by_database: dict[str, list[ExternalLocation]] = {}
+        tables = self._tables_crawler.snapshot()
+        databases = set(table.database for table in tables)
+        for database in databases:
+            db_tables = [table for table in tables if table.database == database]
+            location_by_database[database] = self._common_locations(db_tables)
+        return location_by_database
 
     def _resolve_location(self, table: Table) -> Table:
         location = table.location

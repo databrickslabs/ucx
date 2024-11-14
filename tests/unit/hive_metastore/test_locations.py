@@ -156,9 +156,9 @@ def test_mount_inventory_warning_on_incompatible_compute(caplog):
     assert expected_warning in caplog.text
 
 
-def table_factory(args):
+def table_factory(args, **kwargs):
     location, storage_properties = args
-    return Table('', '', '', '', '', location=location, storage_properties=storage_properties)
+    return Table('', kwargs.get("db"), '', '', '', location=location, storage_properties=storage_properties)
 
 
 def test_external_locations():
@@ -304,6 +304,31 @@ def test_match_table_external_locations():
         ExternalLocation("abfss://cont1@storagetest1/a", 2),
         ExternalLocation("gcs://test_location2/a/b", 1),
     ] == missing_locations
+
+
+def test_external_locations_by_db():
+    ws = create_autospec(WorkspaceClient)
+    sql_backend = MockBackend()
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://test_location/a/b/c/table1", ""], db="db1"),
+        table_factory(["s3://test_location/a/b/c/table2", ""], db="db1"),
+        table_factory(["s3://test_location/a/b/d/table3", ""], db="db1"),
+        table_factory(["s3://test_location/a/b/e/table1", ""], db="db2"),
+        table_factory(["s3://test_location2/x/y/z/table1", ""], db="db2"),
+    ]
+    mounts_crawler = create_autospec(MountsCrawler)
+    mounts_crawler.snapshot.return_value = []
+    location_crawler = ExternalLocations(ws, sql_backend, "test", tables_crawler, mounts_crawler)
+    locations = location_crawler.locations_by_database()
+    ws.external_locations.list.assert_not_called()
+    assert locations == {
+        'db1': [ExternalLocation(location='s3://test_location/a/b', table_count=3)],
+        'db2': [
+            ExternalLocation(location='s3://test_location/a/b/e', table_count=1),
+            ExternalLocation(location='s3://test_location2/x/y/z', table_count=1),
+        ],
+    }
 
 
 def test_mount_listing_multiple_folders() -> None:
@@ -842,7 +867,6 @@ def test_mount_dont_list_partitions():
 
 
 def test_mount_invalid_partition_char():
-
     client = create_autospec(WorkspaceClient)
 
     folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", 0, "")

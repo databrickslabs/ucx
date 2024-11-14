@@ -51,7 +51,7 @@ class HiveMetastoreFederation:
         connection_info = self._get_or_create_connection(name)
         assert connection_info.name is not None
         try:
-            return self._workspace_client.catalogs.create(
+            catalog_info = self._workspace_client.catalogs.create(
                 name=connection_info.name,
                 connection_name=connection_info.name,
                 options={"authorized_paths": self._get_authorized_paths()},
