@@ -12,13 +12,8 @@ from databricks.labs.ucx.progress.tables import TableProgressEncoder, UsedTableP
 from databricks.labs.ucx.source_code.used_table import UsedTable
 
 
-@pytest.mark.parametrize(
-    "table",
-    [
-        Table("hive_metastore", "schema", "table", "MANAGED", "DELTA"),
-    ],
-)
-def test_table_progress_encoder_no_failures(mock_backend, table: Table) -> None:
+def test_table_progress_encoder_no_failures(mock_backend) -> None:
+    table = Table("hive_metastore", "schema", "table", "MANAGED", "DELTA")
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     table_migration_index = create_autospec(TableMigrationIndex)
@@ -38,13 +33,8 @@ def test_table_progress_encoder_no_failures(mock_backend, table: Table) -> None:
     grant_progress_encoder.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "table",
-    [
-        Table("hive_metastore", "schema", "table", "MANAGED", "DELTA"),
-    ],
-)
-def test_table_progress_encoder_pending_migration_failure(mock_backend, table: Table) -> None:
+def test_table_progress_encoder_pending_migration_failure(mock_backend) -> None:
+    table = Table("hive_metastore", "schema", "table", "MANAGED", "DELTA")
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     table_migration_index = create_autospec(TableMigrationIndex)
@@ -64,21 +54,16 @@ def test_table_progress_encoder_pending_migration_failure(mock_backend, table: T
     grant_progress_encoder.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "used_table",
-    [
-        UsedTable(
-            catalog_name="catalog",
-            schema_name="schema",
-            table_name="table",
-            source_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
-        ),
-    ],
-)
-def test_used_table_progress_encoder_no_failures(mock_backend, used_table: UsedTable) -> None:
+def test_used_table_progress_encoder_no_failures(mock_backend) -> None:
     """No failures when the table is not in the Hive metastore."""
+    used_table = UsedTable(
+        catalog_name="catalog",
+        schema_name="schema",
+        table_name="table",
+        source_timestamp=dt.datetime.now(dt.timezone.utc),
+        assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
+        assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
+    )
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     encoder = UsedTableProgressEncoder(mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test")
@@ -91,21 +76,16 @@ def test_used_table_progress_encoder_no_failures(mock_backend, used_table: UsedT
     ownership.owner_of.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    "used_table",
-    [
-        UsedTable(
-            catalog_name="hive_metastore",
-            schema_name="schema",
-            table_name="table",
-            source_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
-            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
-        ),
-    ],
-)
-def test_used_table_progress_encoder_pending_migration_failure(mock_backend, used_table: UsedTable) -> None:
+def test_used_table_progress_encoder_pending_migration_failure(mock_backend) -> None:
     """Failures when the table is in the Hive metastore."""
+    used_table = UsedTable(
+        catalog_name="hive_metastore",
+        schema_name="schema",
+        table_name="table",
+        source_timestamp=dt.datetime.now(dt.timezone.utc),
+        assessment_start_timestamp=dt.datetime.now(dt.timezone.utc),
+        assessment_end_timestamp=dt.datetime.now(dt.timezone.utc),
+    )
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
     encoder = UsedTableProgressEncoder(mock_backend, ownership, run_id=1, workspace_id=123456789, catalog="test")
