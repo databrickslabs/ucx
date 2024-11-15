@@ -25,6 +25,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.directfs_access import DirectFsAccessProgressEncoder
 from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
@@ -237,6 +238,16 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.udf_ownership,
             Udf,
+            self.parent_run_id,
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def directfs_access_progress(self) -> DirectFsAccessProgressEncoder:
+        return DirectFsAccessProgressEncoder(
+            self.sql_backend,
+            self.directfs_access_ownership,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
