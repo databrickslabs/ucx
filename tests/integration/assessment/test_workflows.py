@@ -8,15 +8,12 @@ from databricks.sdk.service.iam import PermissionLevel
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     installation_ctx,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
     make_dashboard,
     sql_backend,
 ) -> None:
     ws_group, _ = installation_ctx.make_ucx_group()
-    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
+    cluster_policy = installation_ctx.make_cluster_policy
+    installation_ctx.make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
