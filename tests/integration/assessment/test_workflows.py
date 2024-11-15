@@ -12,7 +12,7 @@ def test_running_real_assessment_job(
     sql_backend,
 ) -> None:
     ws_group, _ = installation_ctx.make_ucx_group()
-    cluster_policy = installation_ctx.make_cluster_policy
+    cluster_policy = installation_ctx.make_cluster_policy()
     installation_ctx.make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
