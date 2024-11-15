@@ -5,7 +5,7 @@
 --overrides '{"spec":{
     "encodings":{
       "columns": [
-        {"fieldName": "database", "booleanValues": ["false", "true"], "linkUrlTemplate": "/#workspace//explore/data/hive_metastore/{{ database }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "database"},
+        {"fieldName": "database", "booleanValues": ["false", "true"], "linkUrlTemplate": "/explore/data/hive_metastore/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "database"},
         {"fieldName": "upgrade", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "upgrade"},
         {"fieldName": "tables", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "tables"},
         {"fieldName": "views", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "views"},
