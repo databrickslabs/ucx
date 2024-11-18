@@ -5,6 +5,8 @@ from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+
 
 def test_running_real_migrate_groups_job(
     installation_ctx,
@@ -94,3 +96,44 @@ def test_running_legacy_validate_groups_permissions_job(
 
     # assert the job does not throw any exception
     installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
+
+
+def test_permissions_migration_for_group_with_same_name(
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+):
+    ws_group, acc_group = installation_ctx.make_ucx_group()
+    migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=migrated_group.name_in_workspace,
+    )
+
+    schema_a = installation_ctx.make_schema()
+    table_a = installation_ctx.make_table(schema_name=schema_a.name)
+    installation_ctx.make_grant(migrated_group.name_in_workspace, 'USAGE', schema_info=schema_a)
+    installation_ctx.make_grant(migrated_group.name_in_workspace, 'OWN', schema_info=schema_a)
+    installation_ctx.make_grant(migrated_group.name_in_workspace, 'SELECT', table_info=table_a)
+
+    installation_ctx.workspace_installation.run()
+
+    installation_ctx.deployed_workflows.run_workflow("migrate-groups")
+
+    object_permissions = installation_ctx.generic_permissions_support.load_as_dict(
+        "cluster-policies", cluster_policy.policy_id
+    )
+    new_schema_grants = installation_ctx.grants_crawler.for_schema_info(schema_a)
+
+    if {"USAGE", "OWN"} != new_schema_grants[migrated_group.name_in_account] or object_permissions[
+        migrated_group.name_in_account
+    ] != PermissionLevel.CAN_USE:
+        installation_ctx.deployed_workflows.relay_logs("migrate-groups")
+    assert {"USAGE", "OWN"} == new_schema_grants[
+        migrated_group.name_in_account
+    ], "Incorrect schema grants for migrated group"
+    assert (
+        object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
+    ), "Incorrect permissions for migrated group"

@@ -473,6 +473,8 @@ def test_endpoints(
     assert after[migrated_group.name_in_account] == PermissionLevel.CAN_QUERY
 
 
+# TODO: Uncomment this test when the feature store is available in the test infra again
+@pytest.mark.skip("Workspace Feature Store has been deprecated in the current workspace.")
 @pytest.mark.parametrize("is_experimental", [True, False])
 def test_feature_tables(
     ws: WorkspaceClient,
