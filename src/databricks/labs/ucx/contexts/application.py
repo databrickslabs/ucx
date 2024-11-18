@@ -44,7 +44,11 @@ from databricks.labs.ucx.hive_metastore.grants import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import (
+    TableMigrationOwnership,
+    TableOwnership,
+    TableOwnershipGrantLoader,
+)
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
     TablesMigrator,
@@ -317,8 +321,14 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def table_ownership_grant_loader(self) -> TableOwnershipGrantLoader:
+        return TableOwnershipGrantLoader(self.tables_crawler, self.table_ownership)
+
+    @cached_property
     def migrate_grants(self) -> MigrateGrants:
+        # owner grants have to come first
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
+            self.table_ownership_grant_loader.load,
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
         ]
