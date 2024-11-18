@@ -154,7 +154,7 @@ def mock_workspace_client(
 ):
     ws = create_autospec(WorkspaceClient)
     ws.current_user.me.side_effect = lambda: iam.User(
-        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
+        id="666", user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
     )
     ws.api_client.do.return_value = {}
     ws.permissions.get.return_value = {}

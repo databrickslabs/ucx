@@ -1,5 +1,6 @@
 import logging
 import sys
+from datetime import datetime
 from unittest.mock import create_autospec
 
 import pytest
@@ -7,7 +8,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
 from databricks.labs.ucx.progress.history import ProgressEncoder
 
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, Grant
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
@@ -20,8 +21,10 @@ from databricks.labs.ucx.hive_metastore.tables import (
     TablesCrawler,
     What,
 )
-from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import TableOwnership, DefaultSecurableOwnership
+from databricks.labs.ucx.source_code.base import UsedTable, LineageAtom
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
 def test_is_delta_true():
@@ -604,7 +607,6 @@ def test_fast_table_scan_crawler_crawl_new(caplog, mocker, spark_table_crawl_moc
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -626,7 +628,6 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_databases(caplog, mock
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -651,7 +652,6 @@ def test_fast_table_scan_crawler_crawl_test_warnings_list_tables(caplog, mocker,
 
 
 def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, spark_table_crawl_mocker):
-
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
 
@@ -674,19 +674,100 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     assert "Test getTable warning" in caplog.text
 
 
-def test_table_owner() -> None:
+@pytest.mark.parametrize(
+    'grants,used_tables,expected,workspace_owner,legacy_query,workspace_path',
+    [
+        ([], [], "an_admin", True, False, False),
+        ([Grant("grant_owner", "OWN", "main", "foo", "bar")], [], "grant_owner", False, False, False),
+        ([Grant("grant_owner", "OWN", catalog="main", database="foo")], [], "grant_owner", False, False, False),
+        (
+            [],
+            [
+                UsedTable(
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("QUERY", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=True,
+                )
+            ],
+            "query_owner",
+            False,
+            True,
+            False,
+        ),
+        (
+            [],
+            [
+                UsedTable(
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("NOTEBOOK", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=True,
+                )
+            ],
+            "notebook_owner",
+            False,
+            False,
+            True,
+        ),
+        (
+            [],
+            [
+                UsedTable(
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("NOTEBOOK", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=False,
+                )
+            ],
+            "an_admin",
+            True,
+            False,
+            False,
+        ),
+        (
+            [],
+            [
+                UsedTable(
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("UNKNOWN", "345/678")],
+                    catalog_name="main",
+                    schema_name="foo",
+                    table_name="bar",
+                    is_write=False,
+                )
+            ],
+            "an_admin",
+            True,
+            False,
+            False,
+        ),
+    ],
+)
+def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_query, workspace_path) -> None:
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
-
     grants_crawler = create_autospec(GrantsCrawler)
-    grants_crawler.snapshot.return_value = []
+    grants_crawler.snapshot.return_value = grants
     used_tables_in_paths = create_autospec(UsedTablesCrawler)
     used_tables_in_paths.snapshot.return_value = []
     used_tables_in_queries = create_autospec(UsedTablesCrawler)
-    used_tables_in_queries.snapshot.return_value = []
+    used_tables_in_queries.snapshot.return_value = used_tables
     legacy_query_ownership = create_autospec(LegacyQueryOwnership)
+    legacy_query_ownership.owner_of.return_value = "query_owner"
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    workspace_path_ownership.owner_of_path.return_value = "notebook_owner"
 
     ownership = TableOwnership(
         admin_locator,
@@ -699,10 +780,70 @@ def test_table_owner() -> None:
     table = Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA")
     owner = ownership.owner_of(table)
 
-    assert owner == "an_admin"
-    admin_locator.get_workspace_administrator.assert_called_once()
-    legacy_query_ownership.owner_of.assert_not_called()
-    workspace_path_ownership.owner_of.assert_not_called()
+    assert owner == expected
+    assert admin_locator.get_workspace_administrator.called == workspace_owner
+    assert legacy_query_ownership.owner_of.called == legacy_query
+    assert workspace_path_ownership.owner_of_path.called == workspace_path
+
+
+@pytest.mark.parametrize(
+    'default_owner_group, cli_user, valid_admin, grants',
+    [
+        (
+            "admin_group",
+            None,
+            True,
+            [
+                Grant('admin_group', 'OWN', 'main', 'foo', 'bar'),
+                Grant('admin_group', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('admin_group', 'OWN', 'hive_metastore', 'foo'),
+                Grant('admin_group', 'OWN', 'main'),
+            ],
+        ),
+        (
+            None,
+            "current_user",
+            False,
+            [
+                Grant('current_user', 'OWN', 'main', 'foo', 'bar'),
+                Grant('current_user', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('current_user', 'OWN', 'hive_metastore', 'foo'),
+                Grant('current_user', 'OWN', 'main'),
+            ],
+        ),
+        (
+            "admin_group",
+            "current_user",
+            False,
+            [
+                Grant('current_user', 'OWN', 'main', 'foo', 'bar'),
+                Grant('current_user', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('current_user', 'OWN', 'hive_metastore', 'foo'),
+                Grant('current_user', 'OWN', 'main'),
+            ],
+        ),
+    ],
+)
+def test_default_securable_ownership(
+    default_owner_group: str, cli_user: str, valid_admin: bool, grants: list[Grant]
+) -> None:
+    """Verify that the owner of a crawled table is an administrator."""
+    admin_locator = create_autospec(AdministratorLocator)
+    admin_locator.get_workspace_administrator.return_value = "ws_admin"
+    table_crawler = create_autospec(TablesCrawler)
+    table_crawler.snapshot.return_value = [
+        Table("main", "foo", "bar", "TABLE", "DELTA"),
+        Table("main", "foo", "baz", "VIEW", "UNKNOWN", None, "select * from bar"),
+    ]
+    group_manager = create_autospec(GroupManager)
+    group_manager.validate_owner_group.return_value = valid_admin
+
+    ownership = DefaultSecurableOwnership(
+        admin_locator, table_crawler, group_manager, default_owner_group, lambda: cli_user
+    )
+
+    inferred_grants = list(ownership.load())
+    assert inferred_grants == grants
 
 
 @pytest.mark.parametrize(

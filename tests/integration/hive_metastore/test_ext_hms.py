@@ -40,6 +40,7 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
             r"Choose a cluster policy": "0",
         },
     )
+
     ext_hms_ctx.workspace_installation.run()
     ext_hms_ctx.deployed_workflows.run_workflow("migrate-tables")
     # assert the workflow is successful

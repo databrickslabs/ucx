@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from unittest.mock import call, create_autospec
 
 import pytest
@@ -178,7 +179,13 @@ def prepare_test(  # pylint: disable=too-complex
 
     group_manager = create_autospec(GroupManager)
     group_manager.snapshot.return_value = []
-    migrate_grants = MigrateGrants(backend, group_manager, [interactive_cluster_grants_loader, hive_grants_loader])
+
+    def no_owner() -> Iterable[Grant]:
+        return []
+
+    migrate_grants = MigrateGrants(
+        backend, group_manager, [no_owner, interactive_cluster_grants_loader, hive_grants_loader]
+    )
 
     return CatalogSchema(ws, table_mapping, migrate_grants, "ucx", timeout=None)
 

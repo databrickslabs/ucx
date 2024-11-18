@@ -624,6 +624,50 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
+    def pick_owner_group(self, prompt: Prompts) -> str | None:
+        # This method is used to select the group that will be used as the owner group.
+        # The owner group will be assigned by default to all migrated tables/schemas
+        user_id = self._ws.current_user.me().id
+        if not user_id:
+            logger.error("Couldn't find the user id of the current user.")
+            return None
+        groups = self._user_account_groups(user_id)
+        if not groups:
+            logger.warning("No account groups found for the current user.")
+            return None
+        if len(groups) == 1:
+            return groups[0].display_name
+        group_names = [group.display_name for group in groups]
+        return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
+
+    def validate_owner_group(self, group_name: str) -> bool:
+        # This method is used to validate that the current owner is a member of the group
+        user_id = self._ws.current_user.me().id
+        if not user_id:
+            logger.warning("No user found for the current session.")
+            return False
+        groups = self._user_account_groups(user_id)
+        if not groups:
+            logger.warning("No account groups found for the current user.")
+            return False
+        group_names = [group.display_name for group in groups]
+        return group_name in group_names
+
+    def _user_account_groups(self, user_id: str) -> list[Group]:
+        # This method is used to find all the account groups that a user is a member of.
+        groups: list[Group] = []
+        account_groups = self._list_account_groups("id,displayName,externalId,members")
+        if not account_groups:
+            return groups
+        for group in account_groups:
+            if not group.members:
+                continue
+            for member in group.members:
+                if member.value == user_id:
+                    groups.append(group)
+                    break
+        return groups
+
     def _try_fetch(self) -> Iterable[MigratedGroup]:
         state = []
         for row in self._sql_backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
@@ -794,7 +838,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 continue
             account_groups.append(group)
         logger.info(f"Found {len(account_groups)} account groups")
-        sorted_groups: list[iam.Group] = sorted(account_groups, key=lambda _: _.display_name)  # type: ignore[arg-type,return-value]
+        sorted_groups: list[iam.Group] = sorted(
+            account_groups, key=lambda _: _.display_name if _.display_name else ""
+        )  # type: ignore[arg-type,return-value]
         return sorted_groups
 
     def _delete_workspace_group_and_wait_for_deletion(self, group_id: str, display_name: str) -> str:

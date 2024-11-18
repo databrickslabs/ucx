@@ -119,12 +119,12 @@ class Grant:
 
     @property
     def order(self) -> int:
-        """Order of the grants to be upheld when applying."""
-        match self.action_type:
-            case "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
-                return 1
-            case _:
-                return 0
+        """Apply Ownership First, then the rest.
+        Consider Revising When we properly apply manage permission"""
+
+        if self.action_type == "OWN":  # Apply ownership as last to avoid losing permissions for applying grants
+            return 0
+        return 1
 
     def this_type_and_key(self):
         return self.type_and_key(
@@ -780,10 +780,12 @@ class MigrateGrants:
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
+        # List of grant loaders, the assumption that the first one is a loader for ownership grants
         self._grant_loaders = grant_loaders
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
-        for grant in self._match_grants(src):
+        grants = self._match_grants(src)
+        for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -801,8 +803,9 @@ class MigrateGrants:
         return True
 
     def retrieve(self, src: SecurableObject, dst: SecurableObject) -> list[Grant]:
-        grants = []
-        for grant in self._match_grants(src):
+        grants = self._match_grants(src)
+        discover_grants = []
+        for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)
             if acl_migrate_sql is None:
                 logger.warning(
@@ -811,8 +814,8 @@ class MigrateGrants:
                 )
                 continue
             logger.debug(f"Retrieving acls on {dst.full_name} using SQL query: {acl_migrate_sql}")
-            grants.append(grant)
-        return grants
+            discover_grants.append(grant)
+        return discover_grants
 
     @cached_property
     def _workspace_to_account_group_names(self) -> dict[str, str]:
@@ -820,9 +823,14 @@ class MigrateGrants:
 
     @cached_property
     def _grants(self) -> list[Grant]:
+        # Accumulate grants from all loaders skips ownership grants
         grants = []
-        for loader in self._grant_loaders:
+        for index, loader in enumerate(self._grant_loaders):
             for grant in loader():
+                # Skip ownership grants for all loaders other than the first one
+                # The assumption is that the first one will be designated as the ownership loader
+                if index != 0 and grant.action_type == "OWN":
+                    continue
                 grants.append(grant)
         return grants
 
@@ -840,6 +848,26 @@ class MigrateGrants:
         if not target_principal:
             return grant
         return replace(grant, principal=target_principal)
+
+    def _apply_ownership(self, dst: SecurableObject, owner: str):
+        owner = escape_sql_identifier(owner)
+        destination = escape_sql_identifier(dst.full_name)
+        if dst.kind == "TABLE":
+            sql = f"ALTER TABLE {destination} " f"SET OWNER TO {owner}"
+        elif dst.kind == "VIEW":
+            sql = f"ALTER VIEW {destination} " f"SET OWNER TO {owner}"
+        elif dst.kind in {"SCHEMA", "DATABASE"}:
+            sql = f"ALTER SCHEMA {destination} " f"SET OWNER TO {owner}"
+        elif dst.kind == "CATALOG":
+            sql = f"ALTER CATALOG {destination} " f"SET OWNER TO {owner}"
+        else:
+            logger.warning(f"Unknown object type {dst.kind} for ownership migration")
+            return
+        logger.debug(f"Applying ownership on {dst.full_name} using SQL query: {sql}")
+        try:
+            self._sql_backend.execute(sql)
+        except DatabricksError as e:
+            logger.warning(f"Failed to apply ownership on {dst.full_name}", exc_info=e)
 
 
 class ACLMigrator(CrawlerBase[Grant]):
