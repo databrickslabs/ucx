@@ -22,7 +22,7 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam
+from databricks.sdk.service import iam, dashboards
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
@@ -118,10 +118,12 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         else:
             display_name = f"created_by_ucx_{make_random()}_{watchdog_purge_suffix}"
         dashboard = ws.lakeview.create(
-            display_name,
-            serialized_dashboard=json.dumps(serialized_dashboard),
-            warehouse_id=warehouse_id,
-        )
+            dashboard=dashboards.Dashboard(
+                display_name=display_name,
+                serialized_dashboard=json.dumps(serialized_dashboard),
+                warehouse_id=warehouse_id,
+            ).as_dict()
+        )  # type: ignore
         ws.lakeview.publish(dashboard.dashboard_id)
         return dashboard
 
