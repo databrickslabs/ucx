@@ -1,5 +1,6 @@
 import logging
 import sys
+from datetime import datetime
 from unittest.mock import create_autospec
 
 import pytest
@@ -677,21 +678,15 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
     'grants,used_tables,expected,workspace_owner,legacy_query,workspace_path',
     [
         ([], [], "an_admin", True, False, False),
-        (
-            [Grant("grant_owner", "OWN", catalog="main", database="foo", table="bar")],
-            [],
-            "grant_owner",
-            False,
-            False,
-            False,
-        ),
+        ([Grant("grant_owner", "OWN", "main", "foo", "bar")], [], "grant_owner", False, False, False),
         ([Grant("grant_owner", "OWN", catalog="main", database="foo")], [], "grant_owner", False, False, False),
         (
             [],
             [
                 UsedTable(
-                    source_id="123",
-                    source_lineage=[LineageAtom("QUERY", "345/678")],
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("QUERY", "345/678")],
                     catalog_name="main",
                     schema_name="foo",
                     table_name="bar",
@@ -707,8 +702,9 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
             [],
             [
                 UsedTable(
-                    source_id="123",
-                    source_lineage=[LineageAtom("NOTEBOOK", "345/678")],
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("NOTEBOOK", "345/678")],
                     catalog_name="main",
                     schema_name="foo",
                     table_name="bar",
@@ -724,8 +720,9 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
             [],
             [
                 UsedTable(
-                    source_id="123",
-                    source_lineage=[LineageAtom("NOTEBOOK", "345/678")],
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("NOTEBOOK", "345/678")],
                     catalog_name="main",
                     schema_name="foo",
                     table_name="bar",
@@ -741,8 +738,9 @@ def test_fast_table_scan_crawler_crawl_test_warnings_get_table(caplog, mocker, s
             [],
             [
                 UsedTable(
-                    source_id="123",
-                    source_lineage=[LineageAtom("UNKNOWN", "345/678")],
+                    "123",
+                    datetime.now(),
+                    [LineageAtom("UNKNOWN", "345/678")],
                     catalog_name="main",
                     schema_name="foo",
                     table_name="bar",
@@ -760,7 +758,6 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
     """Verify that the owner of a crawled table is an administrator."""
     admin_locator = create_autospec(AdministratorLocator)
     admin_locator.get_workspace_administrator.return_value = "an_admin"
-
     grants_crawler = create_autospec(GrantsCrawler)
     grants_crawler.snapshot.return_value = grants
     used_tables_in_paths = create_autospec(UsedTablesCrawler)
@@ -797,31 +794,10 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
             None,
             True,
             [
-                Grant(
-                    principal='admin_group',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    table='bar',
-                ),
-                Grant(
-                    principal='admin_group',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    view='baz',
-                ),
-                Grant(
-                    principal='admin_group',
-                    action_type='OWN',
-                    catalog='hive_metastore',
-                    database='foo',
-                ),
-                Grant(
-                    principal='admin_group',
-                    action_type='OWN',
-                    catalog='main',
-                ),
+                Grant('admin_group', 'OWN', 'main', 'foo', 'bar'),
+                Grant('admin_group', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('admin_group', 'OWN', 'hive_metastore', 'foo'),
+                Grant('admin_group', 'OWN', 'main'),
             ],
         ),
         (
@@ -829,31 +805,10 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
             "current_user",
             False,
             [
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    table='bar',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    view='baz',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='hive_metastore',
-                    database='foo',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                ),
+                Grant('current_user', 'OWN', 'main', 'foo', 'bar'),
+                Grant('current_user', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('current_user', 'OWN', 'hive_metastore', 'foo'),
+                Grant('current_user', 'OWN', 'main'),
             ],
         ),
         (
@@ -861,31 +816,10 @@ def test_table_owner(grants, used_tables, expected, workspace_owner, legacy_quer
             "current_user",
             False,
             [
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    table='bar',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                    database='foo',
-                    view='baz',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='hive_metastore',
-                    database='foo',
-                ),
-                Grant(
-                    principal='current_user',
-                    action_type='OWN',
-                    catalog='main',
-                ),
+                Grant('current_user', 'OWN', 'main', 'foo', 'bar'),
+                Grant('current_user', 'OWN', 'main', 'foo', None, 'baz'),
+                Grant('current_user', 'OWN', 'hive_metastore', 'foo'),
+                Grant('current_user', 'OWN', 'main'),
             ],
         ),
     ],
@@ -898,15 +832,8 @@ def test_default_securable_ownership(
     admin_locator.get_workspace_administrator.return_value = "ws_admin"
     table_crawler = create_autospec(TablesCrawler)
     table_crawler.snapshot.return_value = [
-        Table(catalog="main", database="foo", name="bar", object_type="TABLE", table_format="DELTA"),
-        Table(
-            catalog="main",
-            database="foo",
-            name="baz",
-            object_type="VIEW",
-            table_format="UNKNOWN",
-            view_text="select * from bar",
-        ),
+        Table("main", "foo", "bar", "TABLE", "DELTA"),
+        Table("main", "foo", "baz", "VIEW", "UNKNOWN", None, "select * from bar"),
     ]
     group_manager = create_autospec(GroupManager)
     group_manager.validate_owner_group.return_value = valid_admin

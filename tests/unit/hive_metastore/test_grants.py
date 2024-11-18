@@ -1,11 +1,8 @@
 import dataclasses
-import io
 import logging
-import os
 from unittest.mock import create_autospec
 
 import pytest
-import yaml
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
 from databricks.sdk.service.iam import ComplexValue, Group
@@ -961,22 +958,7 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
 def test_default_owner(user_id, expected) -> None:
     sql_backend = MockBackend()
     ws = mock_workspace_client()
-    download_yaml = {
-        'config.yml': yaml.dump(
-            {
-                'version': 2,
-                'inventory_database': 'ucx',
-                'default_owner_group': 'owners',
-                'connect': {
-                    'host': '...',
-                    'token': '...',
-                },
-            }
-        ),
-        'workspaces.json': None,
-    }
 
-    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
     account_admins_group = Group(
         id="1234", display_name="owners", members=[ComplexValue(display="User Name", value=user_id)]
     )

@@ -624,9 +624,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
-    def pick_owner_group(self, prompt: Prompts, user_id: str) -> str | None:
+    def pick_owner_group(self, prompt: Prompts) -> str | None:
         # This method is used to select the group that will be used as the owner group.
         # The owner group will be assigned by default to all migrated tables/schemas
+        user_id = self._ws.current_user.me().id
+        if not user_id:
+            logger.error("Couldn't find the user id of the current user.")
+            return None
         groups = self._user_account_groups(user_id)
         if not groups:
             logger.warning("No account groups found for the current user.")

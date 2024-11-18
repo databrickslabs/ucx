@@ -102,11 +102,11 @@ class DefaultSecurableOwnership(Ownership[Table]):
         default_owner_group: str | None,
         app_principal_resolver: Callable[[], str | None],
     ) -> None:
+        super().__init__(administrator_locator)
         self._tables_crawler = table_crawler
         self._group_manager = group_manager
         self._default_owner_group = default_owner_group
         self._app_principal_resolver = app_principal_resolver
-        super().__init__(administrator_locator)
 
     @cached_property
     def _application_principal(self) -> str | None:
@@ -115,10 +115,9 @@ class DefaultSecurableOwnership(Ownership[Table]):
     @cached_property
     def _static_owner(self) -> str | None:
         # If the default owner group is not valid, fall back to the application principal
-        if self._default_owner_group:
-            if self._group_manager.validate_owner_group(self._default_owner_group):
-                logger.warning("Default owner group is not valid, falling back to administrator ownership.")
-                return self._default_owner_group
+        if self._default_owner_group and self._group_manager.validate_owner_group(self._default_owner_group):
+            logger.warning("Default owner group is not valid, falling back to administrator ownership.")
+            return self._default_owner_group
         return self._application_principal
 
     def load(self) -> Iterable[Grant]:

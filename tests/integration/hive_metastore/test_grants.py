@@ -142,5 +142,5 @@ def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend, make_ra
 
     # Test default group ownership
     test_config = replace(runtime_ctx.config, default_owner_group=admin_group_name)
-    default_owner_group = runtime_ctx.replace(config=test_config).default_owner_group
+    default_owner_group = runtime_ctx.replace(config=test_config).config.default_owner_group
     assert default_owner_group == admin_group_name
