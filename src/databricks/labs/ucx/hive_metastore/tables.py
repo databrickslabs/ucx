@@ -547,7 +547,7 @@ class FasterTableScanCrawler(TablesCrawler):
             if "py4j.security.Py4JSecurityException" in str(err):
                 logger.error(
                     "Failed to list databases due to Py4JSecurityException. "
-                    "Ensure that the cluster is configured correctly."
+                    "Update or reinstall UCX to resolve this issue."
                     f"Error details: {err}",
                     exc_info=True,
                 )
@@ -562,7 +562,7 @@ class FasterTableScanCrawler(TablesCrawler):
             if "py4j.security.Py4JSecurityException" in str(err):
                 logger.error(
                     "Failed to list databases due to Py4JSecurityException. "
-                    "Ensure that the cluster is configured correctly."
+                    "Update or reinstall UCX to resolve this issue."
                     f"Error details: {err}",
                     exc_info=True,
                 )
