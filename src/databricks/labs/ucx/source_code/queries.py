@@ -1,8 +1,10 @@
 import dataclasses
 import logging
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import ClassVar
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Dashboard, LegacyQuery
@@ -11,12 +13,19 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.framework.owners import AdministratorLocator, LegacyQueryOwnership, Ownership
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +41,14 @@ class QueryProblem:
     code: str
     message: str
 
+    # TODO: @JCZuurmond verify these are the correct id attributes.
+    # Note: Do we deduplicate the messages for a query?
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("query_id", "message")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> Self:
+        return cls(**data)
+
 
 @dataclass
 class _ReportingContext:
@@ -39,6 +56,24 @@ class _ReportingContext:
     all_problems: list[QueryProblem] = field(default_factory=list)
     all_dfsas: list[DirectFsAccess] = field(default_factory=list)
     all_tables: list[UsedTable] = field(default_factory=list)
+
+
+class QueryProblemOwnership(Ownership[QueryProblem]):
+    """Query ownership given a query problem.
+
+    Defer query problem ownership to query owner.
+    """
+
+    def __init__(
+        self, administrator_locator: AdministratorLocator, legacy_query_ownership: LegacyQueryOwnership
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._legacy_query_ownership = legacy_query_ownership
+
+    def _maybe_direct_owner(self, record: QueryProblem) -> str | None:
+        # This call defers the `administrator_locator` to the one of `LegacyQueryOwnership`,
+        # we expect them to be the same
+        return self._legacy_query_ownership.owner_of(record.query_id)
 
 
 class QueryLinter:
@@ -85,6 +120,10 @@ class QueryLinter:
         self._dump_dfsas(context.all_dfsas, assessment_start, assessment_end)
         self._dump_used_tables(context.all_tables, assessment_start, assessment_end)
 
+    def snapshot(self) -> Iterable[QueryProblem]:
+        """Snapshot of the query problems."""
+        return self._try_fetch_problems()  # TODO: Should the query linter follow the crawler snapshot pattern?
+
     def _dump_problems(self, problems: Sequence[QueryProblem]) -> None:
         logger.info(f"Saving {len(problems)} linting problems...")
         self._sql_backend.save_table(
@@ -93,6 +132,11 @@ class QueryLinter:
             QueryProblem,
             mode='overwrite',
         )
+
+    def _try_fetch_problems(self) -> Iterable[QueryProblem]:
+        sql = f"SELECT * FROM {escape_sql_identifier(self._full_name)}"
+        for row in self._sql_backend.fetch(sql):
+            yield QueryProblem.from_dict(row.asDict())
 
     def _dump_dfsas(
         self,
