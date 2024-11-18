@@ -29,6 +29,8 @@ from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)
 
+SYSTEM_GROUPS: list[str] = ["users", "admins", "account users"]
+
 
 @dataclass
 class MigratedGroup:
@@ -402,7 +404,6 @@ class GroupRenameIncompleteError(RuntimeError):
 
 
 class GroupManager(CrawlerBase[MigratedGroup]):
-    _SYSTEM_GROUPS: ClassVar[list[str]] = ["users", "admins", "account users"]
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -430,6 +431,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._account_group_regex = account_group_regex
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
+        self._account_groups_lookup = AccountGroupLookup(ws)
 
     def rename_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
@@ -624,22 +626,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
-    def pick_owner_group(self, prompt: Prompts) -> str | None:
-        # This method is used to select the group that will be used as the owner group.
-        # The owner group will be assigned by default to all migrated tables/schemas
-        user_id = self._ws.current_user.me().id
-        if not user_id:
-            logger.error("Couldn't find the user id of the current user.")
-            return None
-        groups = self._user_account_groups(user_id)
-        if not groups:
-            logger.warning("No account groups found for the current user.")
-            return None
-        if len(groups) == 1:
-            return groups[0].display_name
-        group_names = [group.display_name for group in groups]
-        return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
-
     def validate_owner_group(self, group_name: str) -> bool:
         # This method is used to validate that the current owner is a member of the group
         user_id = self._ws.current_user.me().id
@@ -652,21 +638,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return False
         group_names = [group.display_name for group in groups]
         return group_name in group_names
-
-    def _user_account_groups(self, user_id: str) -> list[Group]:
-        # This method is used to find all the account groups that a user is a member of.
-        groups: list[Group] = []
-        account_groups = self._list_account_groups("id,displayName,externalId,members")
-        if not account_groups:
-            return groups
-        for group in account_groups:
-            if not group.members:
-                continue
-            for member in group.members:
-                if member.value == user_id:
-                    groups.append(group)
-                    break
-        return groups
 
     def _try_fetch(self) -> Iterable[MigratedGroup]:
         state = []
@@ -771,8 +742,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             groups[group.display_name] = group
         return groups
 
-    def _is_group_out_of_scope(self, group: iam.Group, resource_type: str) -> bool:
-        if group.display_name in self._SYSTEM_GROUPS:
+    @staticmethod
+    def _is_group_out_of_scope(group: iam.Group, resource_type: str) -> bool:
+        if group.display_name in SYSTEM_GROUPS:
             return True
         meta = group.meta
         if not meta:
@@ -825,23 +797,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             # the given group has been removed from the account after getting the group and before running this method
             logger.warning(f"Group with ID {group_id} does not exist anymore in the Databricks account.")
             return None
-
-    def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
-        # TODO: we should avoid using this method, as it's not documented
-        # get account-level groups even if they're not (yet) assigned to a workspace
-        logger.info(f"Listing account groups with {scim_attributes}...")
-        account_groups = []
-        raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
-        for resource in raw.get("Resources", []):  # type: ignore[union-attr]
-            group = iam.Group.from_dict(resource)
-            if group.display_name in self._SYSTEM_GROUPS:
-                continue
-            account_groups.append(group)
-        logger.info(f"Found {len(account_groups)} account groups")
-        sorted_groups: list[iam.Group] = sorted(
-            account_groups, key=lambda _: _.display_name if _.display_name else ""
-        )  # type: ignore[arg-type,return-value]
-        return sorted_groups
 
     def _delete_workspace_group_and_wait_for_deletion(self, group_id: str, display_name: str) -> str:
         logger.debug(f"Deleting workspace group: {display_name} (id={group_id})")
@@ -973,6 +928,60 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             renamed_groups_prefix=self._renamed_group_prefix,
             include_group_names=self._include_group_names,
         )
+
+
+class AccountGroupLookup:
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
+
+    def pick_owner_group(self, prompt: Prompts) -> str | None:
+        # This method is used to select the group that will be used as the owner group.
+        # The owner group will be assigned by default to all migrated tables/schemas
+        user_id = self._ws.current_user.me().id
+        if not user_id:
+            logger.error("Couldn't find the user id of the current user.")
+            return None
+        groups = self._user_account_groups(user_id)
+        if not groups:
+            logger.warning("No account groups found for the current user.")
+            return None
+        if len(groups) == 1:
+            return groups[0].display_name
+        group_names = [group.display_name for group in groups]
+        return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
+
+    def _user_account_groups(self, user_id: str) -> list[Group]:
+        # This method is used to find all the account groups that a user is a member of.
+        groups: list[Group] = []
+        account_groups = self._list_account_groups("id,displayName,externalId,members")
+        if not account_groups:
+            return groups
+        for group in account_groups:
+            if not group.members:
+                continue
+            for member in group.members:
+                if member.value == user_id:
+                    groups.append(group)
+                    break
+        return groups
+
+    def _list_account_groups(self, scim_attributes: str) -> list[iam.Group]:
+        # TODO: we should avoid using this method, as it's not documented
+        # get account-level groups even if they're not (yet) assigned to a workspace
+        logger.info(f"Listing account groups with {scim_attributes}...")
+        account_groups = []
+        raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
+        for resource in raw.get("Resources", []):  # type: ignore[union-attr]
+            group = iam.Group.from_dict(resource)
+            if group.display_name in self._SYSTEM_GROUPS:
+                continue
+            account_groups.append(group)
+        logger.info(f"Found {len(account_groups)} account groups")
+        sorted_groups: list[iam.Group] = sorted(
+            account_groups, key=lambda _: _.display_name if _.display_name else ""
+        )  # type: ignore[arg-type,return-value]
+        return sorted_groups
+
 
 
 class ConfigureGroups:
