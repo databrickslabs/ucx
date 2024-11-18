@@ -1,4 +1,26 @@
-/* --title 'Database Summary' --filter database --width 6 */
+/*
+--title 'Database Summary'
+--filter database
+--width 6
+--overrides '{"spec":{
+    "encodings":{
+      "columns": [
+        {"fieldName": "database", "booleanValues": ["false", "true"], "linkUrlTemplate": "/explore/data/hive_metastore/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "database"},
+        {"fieldName": "upgrade", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "upgrade"},
+        {"fieldName": "tables", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "tables"},
+        {"fieldName": "views", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "views"},
+        {"fieldName": "dbfs_root", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "dbfs_root"},
+        {"fieldName": "delta_tables", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "delta_tables"},
+        {"fieldName": "total_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "total_grants"},
+        {"fieldName": "granted_principals", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "granted_principals"},
+        {"fieldName": "database_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "database_grants"},
+        {"fieldName": "table_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "table_grants"},
+        {"fieldName": "service_principal_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "service_principal_grants"},
+        {"fieldName": "user_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "user_grants"},
+        {"fieldName": "group_grants", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "group_grants"}
+      ]}
+  }}'
+*/
 WITH table_stats AS (
   SELECT
     `database`,

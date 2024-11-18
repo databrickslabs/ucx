@@ -31,24 +31,21 @@ class MigrationProgress(Workflow):
         """
         ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
 
-    @job_task(job_cluster="tacl")
-    def setup_tacl(self, ctx: RuntimeContext):
-        """(Optimization) Allow the TACL job cluster to be started while we're verifying the prerequisites for
-        refreshing everything."""
-
-    @job_task(depends_on=[verify_prerequisites, setup_tacl], job_cluster="tacl")
+    @job_task(depends_on=[verify_prerequisites])
     def crawl_tables(self, ctx: RuntimeContext) -> None:
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the table named
         `$inventory_database.tables`. The metadata stored is then used in the subsequent tasks and workflows to, for
         example, find all Hive Metastore tables that cannot easily be migrated to Unity Catalog."""
-        # The TACL cluster is not UC-enabled, so the snapshot cannot be written immediately to the history log.
-        # Step 1 of 2: Just refresh the inventory.
+        # The table inventory cannot be (quickly) crawled from the table_migration cluster, and the main cluster is not
+        # UC-enabled, so we cannot both snapshot and update the history log from the same location.
+        # Step 1 of 3: Just refresh the inventory.
         ctx.tables_crawler.snapshot(force_refresh=True)
 
     @job_task(depends_on=[verify_prerequisites, crawl_tables], job_cluster="table_migration")
     def refresh_table_migration_status(self, ctx: RuntimeContext) -> None:
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
         ctx.migration_status_refresher.snapshot(force_refresh=True)
 
     @job_task(
@@ -56,9 +53,9 @@ class MigrationProgress(Workflow):
     )
     def update_tables_history_log(self, ctx: RuntimeContext) -> None:
         """Update the history log with the latest tables inventory snapshot."""
-        # The table migration cluster is not legacy-ACL enabled, so we can't crawl from here.
-        # Step 2 of 2: Assuming (due to depends-on) the inventory was refreshed, capture into the history log.
-        # WARNING: this will fail if the inventory is empty, because it will then try to perform a crawl.
+        # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
+        # history log.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
         history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         history_log.append_inventory_snapshot(tables_snapshot)
