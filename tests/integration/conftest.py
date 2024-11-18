@@ -24,6 +24,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.iam import Group
 from databricks.sdk.service.jobs import Job, SparkPythonTask
@@ -463,6 +464,8 @@ class MockRuntimeContext(
         make_notebook_fixture,
         make_query_fixture,
         make_dashboard_fixture,
+        make_cluster_policy_fixture,
+        make_cluster_policy_permissions_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
@@ -483,6 +486,8 @@ class MockRuntimeContext(
         self._make_notebook = make_notebook_fixture
         self._make_query = make_query_fixture
         self._make_dashboard = make_dashboard_fixture
+        self._make_cluster_policy = make_cluster_policy_fixture
+        self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
@@ -556,6 +561,12 @@ class MockRuntimeContext(
             self.sql_backend.execute(query)
         self._grants.append(grant)
         return grant
+
+    def make_cluster_policy(self, **kwargs) -> CreatePolicyResponse:
+        return self._make_cluster_policy(**kwargs)
+
+    def make_cluster_policy_permissions(self, **kwargs):
+        return self._make_cluster_policy_permissions(**kwargs)
 
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
@@ -759,6 +770,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
     make_notebook,
     make_query,
     make_dashboard,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
     env_or_skip,
     make_random,
 ) -> MockRuntimeContext:
@@ -772,6 +785,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
         make_notebook,
         make_query,
         make_dashboard,
+        make_cluster_policy,
+        make_cluster_policy_permissions,
         env_or_skip,
         ws,
         make_random,
@@ -910,6 +925,8 @@ class MockInstallationContext(MockRuntimeContext):
         make_notebook_fixture,
         make_query_fixture,
         make_dashboard_fixture,
+        make_cluster_policy,
+        make_cluster_policy_permissions,
         ws_fixture,
         watchdog_purge_suffix,
     ):
@@ -923,6 +940,8 @@ class MockInstallationContext(MockRuntimeContext):
             make_notebook_fixture,
             make_query_fixture,
             make_dashboard_fixture,
+            make_cluster_policy,
+            make_cluster_policy_permissions,
             env_or_skip_fixture,
             ws_fixture,
             make_random_fixture,
@@ -1103,6 +1122,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_notebook,
     make_query,
     make_dashboard,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
@@ -1119,6 +1140,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_notebook,
         make_query,
         make_dashboard,
+        make_cluster_policy,
+        make_cluster_policy_permissions,
         ws,
         watchdog_purge_suffix,
     )

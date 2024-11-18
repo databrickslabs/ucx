@@ -17,7 +17,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, InvalidParameterValue, DatabricksError
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.jobs import Source
@@ -165,11 +165,15 @@ class WorkflowTaskContainer(SourceContainer):
     @classmethod
     @contextmanager
     def _temporary_copy(cls, path: Path) -> Generator[Path, None, None]:
-        with tempfile.TemporaryDirectory() as directory:
-            temporary_path = Path(directory) / path.name
-            with path.open("rb") as src, temporary_path.open("wb") as dst:
-                shutil.copyfileobj(src, dst)
-            yield temporary_path
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                temporary_path = Path(directory) / path.name
+                with path.open("rb") as src, temporary_path.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                yield temporary_path
+        except DatabricksError as e:
+            # Cover cases like `ResourceDoesNotExist: Path (/Volumes/...-py3-none-any.whl) doesn't exist.`
+            raise InvalidPath(f"Cannot load file: {path}") from e
 
     def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
@@ -406,17 +410,19 @@ class WorkflowLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         tasks = []
-        all_jobs = list(self._ws.jobs.list())
-        logger.info(f"Preparing {len(all_jobs)} linting tasks...")
-        for i, job in enumerate(all_jobs):
-            if self._debug_listing_upper_limit is not None and i >= self._debug_listing_upper_limit:
+        items_listed = 0
+        for job in self._ws.jobs.list():
+            if self._include_job_ids and job.job_id not in self._include_job_ids:
+                logger.info(f"Skipping job_id={job.job_id}")
+                continue
+            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
                 logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
                 break
-            if self._include_job_ids and job.job_id not in self._include_job_ids:
-                logger.info(f"Skipping job {job.job_id}...")
-                continue
+            if job.settings is not None and job.settings.name is not None:
+                logger.info(f"Found job_id={job.job_id}: {job.settings.name}")
             tasks.append(functools.partial(self.lint_job, job.job_id))
-        logger.info(f"Running {tasks} linting tasks in parallel...")
+            items_listed += 1
+        logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
         job_dfsas: list[DirectFsAccess] = []

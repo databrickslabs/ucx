@@ -166,7 +166,7 @@ class KnownList:
             try:
                 cls._analyze_file(known_distributions, library_root, dist_info, module_path)
             except RecursionError:
-                logger.error(f"Recursion error in {module_path}")
+                logger.warning(f"Recursion error in {module_path}")
                 continue
 
     @classmethod

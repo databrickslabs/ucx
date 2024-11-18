@@ -18,7 +18,6 @@ from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
-    ResourceConflict,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
@@ -91,9 +90,10 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
-    installation_ctx, make_cluster_policy, make_cluster_policy_permissions
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
 ):
     ws_group, acc_group = installation_ctx.make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
@@ -112,7 +112,7 @@ def test_experimental_permissions_migration_for_group_with_same_name(
 
     installation_ctx.workspace_installation.run()
 
-    installation_ctx.deployed_workflows.run_workflow("migrate-groups-experimental")
+    installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
     object_permissions = installation_ctx.generic_permissions_support.load_as_dict(
         "cluster-policies", cluster_policy.policy_id
