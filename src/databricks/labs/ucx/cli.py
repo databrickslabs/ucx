@@ -3,6 +3,7 @@ from io import BytesIO
 import json
 import webbrowser
 from pathlib import Path
+from configparser import ParsingError
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
@@ -34,7 +35,11 @@ def _get_workspace_contexts(
 ) -> list[WorkspaceContext]:
     """Get workspace contexts to the workspaces for which the user has access"""
     if not a:
-        a = AccountClient(product='ucx', product_version=__version__)
+        try:
+            a = AccountClient(product='ucx', product_version=__version__)
+        except ParsingError as e:
+            logger.error("Could not create account client", exc_info=e)
+            return []
     account_installer = AccountInstaller(a)
     workspace_contexts = account_installer.get_workspace_contexts(w, run_as_collection, **named_parameters)
     return workspace_contexts
