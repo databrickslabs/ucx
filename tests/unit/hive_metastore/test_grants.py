@@ -14,7 +14,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, Migr
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager, AccountGroupLookup
 from tests.unit import mock_workspace_client
 
 
@@ -956,7 +956,6 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
 # Testing the validation in retrival of the default owner group. 666 is the current_user user_id.
 @pytest.mark.parametrize("user_id, expected", [("666", True), ("777", False)])
 def test_default_owner(user_id, expected) -> None:
-    sql_backend = MockBackend()
     ws = mock_workspace_client()
 
     account_admins_group = Group(
@@ -966,5 +965,5 @@ def test_default_owner(user_id, expected) -> None:
         "Resources": [account_admins_group.as_dict()],
     }
 
-    group_manager = GroupManager(sql_backend, ws, "ucx")
-    assert group_manager.validate_owner_group("owners") == expected
+    account_group_lookup = AccountGroupLookup(ws)
+    assert account_group_lookup.validate_owner_group("owners") == expected

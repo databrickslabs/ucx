@@ -20,6 +20,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCh
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -657,7 +658,7 @@ def assign_owner_group(
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
 
-    owner_group = workspace_contexts[0].group_manager.pick_owner_group(prompts)
+    owner_group = AccountGroupLookup(workspace_contexts[0].workspace_client).pick_owner_group(prompts)
     if not owner_group:
         return
     for workspace_context in workspace_contexts:

@@ -6,7 +6,6 @@ from abc import abstractmethod
 from collections.abc import Iterable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import ClassVar
 
 from databricks.labs.blueprint.limiter import rate_limited
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -486,6 +485,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Wait for enumeration to also reflect the updated information.
         self._wait_for_renamed_groups(renamed_groups)
 
+    def validate_owner_group(self, group_name: str) -> bool:
+        return self._account_groups_lookup.validate_owner_group(group_name)
+
     def _rename_group(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
         logger.debug(f"Renaming group: {old_group_name} (id={group_id}) -> {new_group_name}")
         self._rate_limited_rename_group_with_retry(group_id, new_group_name)
@@ -557,7 +559,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
-        account_groups_in_account = self._account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
@@ -626,19 +628,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Confirm that enumeration no longer returns the deleted groups.
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
-    def validate_owner_group(self, group_name: str) -> bool:
-        # This method is used to validate that the current owner is a member of the group
-        user_id = self._ws.current_user.me().id
-        if not user_id:
-            logger.warning("No user found for the current session.")
-            return False
-        groups = self._user_account_groups(user_id)
-        if not groups:
-            logger.warning("No account groups found for the current user.")
-            return False
-        group_names = [group.display_name for group in groups]
-        return group_name in group_names
-
     def _try_fetch(self) -> Iterable[MigratedGroup]:
         state = []
         for row in self._sql_backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
@@ -661,13 +650,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _crawl(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         yield from strategy.generate_migrated_groups()
 
     def validate_group_membership(self) -> list[dict]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         migrated_groups = list(strategy.generate_migrated_groups())
         mismatch_group = []
@@ -729,15 +718,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         for group in self._list_workspace_groups("Group", "id,displayName,externalId,meta"):
             if not group.display_name:
                 logger.debug(f"Ignoring account group in workspace without name: {group.id}")
-                continue
-            groups[group.display_name] = group
-        return groups
-
-    def _account_groups_in_account(self) -> dict[str, Group]:
-        groups = {}
-        for group in self._list_account_groups("id,displayName,externalId"):
-            if not group.display_name:
-                logger.debug(f"Ignoring account group in without name: {group.id}")
                 continue
             groups[group.display_name] = group
         return groups
@@ -950,6 +930,19 @@ class AccountGroupLookup:
         group_names = [group.display_name for group in groups]
         return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
 
+    def validate_owner_group(self, group_name: str) -> bool:
+        # This method is used to validate that the current owner is a member of the group
+        user_id = self._ws.current_user.me().id
+        if not user_id:
+            logger.warning("No user found for the current session.")
+            return False
+        groups = self._user_account_groups(user_id)
+        if not groups:
+            logger.warning("No account groups found for the current user.")
+            return False
+        group_names = [group.display_name for group in groups]
+        return group_name in group_names
+
     def _user_account_groups(self, user_id: str) -> list[Group]:
         # This method is used to find all the account groups that a user is a member of.
         groups: list[Group] = []
@@ -973,7 +966,7 @@ class AccountGroupLookup:
         raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
         for resource in raw.get("Resources", []):  # type: ignore[union-attr]
             group = iam.Group.from_dict(resource)
-            if group.display_name in self._SYSTEM_GROUPS:
+            if group.display_name in SYSTEM_GROUPS:
                 continue
             account_groups.append(group)
         logger.info(f"Found {len(account_groups)} account groups")
@@ -982,6 +975,14 @@ class AccountGroupLookup:
         )  # type: ignore[arg-type,return-value]
         return sorted_groups
 
+    def account_groups_in_account(self) -> dict[str, Group]:
+        groups = {}
+        for group in self._list_account_groups("id,displayName,externalId"):
+            if not group.display_name:
+                logger.debug(f"Ignoring account group in without name: {group.id}")
+                continue
+            groups[group.display_name] = group
+        return groups
 
 
 class ConfigureGroups:
