@@ -47,7 +47,12 @@ def test_pipeline_migrate(
         libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
     )
 
-    job_with_pipeline = make_job(
+    job_with_pipeline1 = make_job(
+        tasks=[
+            Task(pipeline_task=PipelineTask(pipeline_id=created_pipeline.pipeline_id), task_key=make_random(4).lower())
+        ]
+    )
+    job_with_pipeline2 = make_job(
         tasks=[
             Task(pipeline_task=PipelineTask(pipeline_id=created_pipeline.pipeline_id), task_key=make_random(4).lower())
         ]
@@ -75,4 +80,5 @@ def test_pipeline_migrate(
 
     assert len(results) == 1
 
-    assert ws.jobs.get(job_with_pipeline.job_id).settings.tasks[0].pipeline_task.pipeline_id == results[0].pipeline_id
+    assert ws.jobs.get(job_with_pipeline1.job_id).settings.tasks[0].pipeline_task.pipeline_id == results[0].pipeline_id
+    assert ws.jobs.get(job_with_pipeline2.job_id).settings.tasks[0].pipeline_task.pipeline_id == results[0].pipeline_id
