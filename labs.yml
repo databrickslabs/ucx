@@ -358,4 +358,5 @@ commands:
   - name: enable-hms-federation
     description: (EXPERIMENTAL) Enable HMS federation based migration flow. When this is enabled, UCX will create a federated HMS catalog which syncs from the workspace HMS.
 
-
+  - name: assign-owner-group
+    description: Assign owner group to the workspace. This group will be assigned as an owner to all migrated tables and views.

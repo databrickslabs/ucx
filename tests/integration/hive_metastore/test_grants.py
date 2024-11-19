@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from dataclasses import replace
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
@@ -115,15 +116,18 @@ def test_all_grants_for_other_objects(
     assert {"DENIED_SELECT"} == found_anonymous_function_grants[group_d.display_name]
 
 
-def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None:
-    """Verify the ownership can be determined for crawled grants."""
-    # This currently isn't very useful: we can't locate specific owners for grants.
+def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend, make_random, make_acc_group) -> None:
+    """Verify the ownership can be determined for crawled grants.
+    This currently isn't very useful: we can't locate specific owners for grants"""
 
     schema = runtime_ctx.make_schema()
     this_user = ws.current_user.me()
     sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`")
     table_crawler = TablesCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
     udf_crawler = UdfsCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
+    current_user = ws.current_user.me()
+    admin_group_name = f"admin_group_{make_random()}"
+    make_acc_group(display_name=admin_group_name, members=[current_user.id], wait_for_provisioning=True)
 
     # Produce the crawled records.
     crawler = GrantsCrawler(table_crawler, udf_crawler, include_databases=[schema.name])
@@ -135,3 +139,8 @@ def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend) -> None
     # Verify ownership can be made.
     ownership = GrantOwnership(runtime_ctx.administrator_locator)
     assert ownership.owner_of(grant_record) == runtime_ctx.administrator_locator.get_workspace_administrator()
+
+    # Test default group ownership
+    test_config = replace(runtime_ctx.config, default_owner_group=admin_group_name)
+    default_owner_group = runtime_ctx.replace(config=test_config).config.default_owner_group
+    assert default_owner_group == admin_group_name

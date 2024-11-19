@@ -13,12 +13,14 @@ def test_query_linter_lints_queries_and_stores_dfsas_and_tables(
     dashboards.append(make_dashboard(query=queries[1]))
     linter = QueryLinter(
         ws,
+        sql_backend,
+        simple_ctx.inventory_database,
         TableMigrationIndex([]),
         simple_ctx.directfs_access_crawler_for_queries,
         simple_ctx.used_tables_crawler_for_queries,
         None,
     )
-    linter.refresh_report(sql_backend, simple_ctx.inventory_database)
+    linter.refresh_report()
     all_problems = sql_backend.fetch("SELECT * FROM query_problems", schema=simple_ctx.inventory_database)
     problems = [row for row in all_problems if row["query_name"] == queries[0].name]
     assert len(problems) == 1
