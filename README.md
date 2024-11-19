@@ -535,7 +535,7 @@ Alternatively, manually create the external locations
 
 ##### Step 2: Create Catalogs and Schemas
 
-Create Uniyt Catalog [catalogs](https://learn.microsoft.com/en-us/azure/databricks/catalogs/) and
+Create Unity Catalog [catalogs](https://learn.microsoft.com/en-us/azure/databricks/catalogs/) and
 [schemas](https://learn.microsoft.com/en-us/azure/databricks/schemas/) to organize the destination tables and views in
 by running the
 [`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command creates the UC catalogs and
