@@ -887,8 +887,8 @@ def enable_hms_federation(w: WorkspaceClient, _: Prompts, ctx: WorkspaceContext 
 
 
 @ucx.command
-def migrate_dlt_pipelines(w: WorkspaceClient, _: Prompts, ctx: WorkspaceContext | None = None):
-    """Migrate DLT pipelines to UCX pipelines"""
+def migrate_dlt_pipelines(w: WorkspaceClient, ctx: WorkspaceContext | None = None) -> None:
+    """Migrate DLT pipelines to UC"""
     if not ctx:
         ctx = WorkspaceContext(w)
     ctx.pipelines_migrator.migrate_pipelines()
