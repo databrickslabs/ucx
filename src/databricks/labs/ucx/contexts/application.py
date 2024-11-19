@@ -44,7 +44,12 @@ from databricks.labs.ucx.hive_metastore.grants import (
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.hive_metastore.ownership import TableMigrationOwnership, TableOwnership
+from databricks.labs.ucx.hive_metastore.ownership import (
+    TableMigrationOwnership,
+    TableOwnership,
+    TableOwnershipGrantLoader,
+    DefaultSecurableOwnership,
+)
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
     TablesMigrator,
@@ -273,6 +278,18 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def default_securable_ownership(self) -> DefaultSecurableOwnership:
+        # validate that the default_owner_group is set and is a valid group (the current user is a member)
+
+        return DefaultSecurableOwnership(
+            self.administrator_locator,
+            self.tables_crawler,
+            self.group_manager,
+            self.config.default_owner_group,
+            lambda: self.workspace_client.current_user.me().user_name,
+        )
+
+    @cached_property
     def workspace_path_ownership(self) -> WorkspacePathOwnership:
         return WorkspacePathOwnership(self.administrator_locator, self.workspace_client)
 
@@ -317,8 +334,14 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def table_ownership_grant_loader(self) -> TableOwnershipGrantLoader:
+        return TableOwnershipGrantLoader(self.tables_crawler, self.default_securable_ownership)
+
+    @cached_property
     def migrate_grants(self) -> MigrateGrants:
+        # owner grants have to come first
         grant_loaders: list[Callable[[], Iterable[Grant]]] = [
+            self.default_securable_ownership.load,
             self.grants_crawler.snapshot,
             self.principal_acl.get_interactive_cluster_grants,
         ]
@@ -512,7 +535,9 @@ class GlobalContext(abc.ABC):
     def query_linter(self) -> QueryLinter:
         return QueryLinter(
             self.workspace_client,
-            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.sql_backend,
+            self.inventory_database,
+            TableMigrationIndex([]),
             self.directfs_access_crawler_for_queries,
             self.used_tables_crawler_for_queries,
             self.config.include_dashboard_ids,

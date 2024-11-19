@@ -118,6 +118,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`skip` command](#skip-command)
   * [`unskip` command](#unskip-command)
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
+  * [`assign-owner-group` command](#assign-owner-group-command)
   * [`migrate-tables` command](#migrate-tables-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`move` command](#move-command)
@@ -1312,6 +1313,7 @@ access the configuration file from the command line. Here's the description of c
   * `num_threads`: An optional integer representing the number of threads to use for migration.
   * `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
   * `default_catalog`: An optional string representing the default catalog name.
+  * `default_owner_group`: Assigns this group to all migrated objects (catalogs, databases, tables, views, etc.). The group has to be an account group and the user running the migration has to be a member of this group.
   * `log_level`: An optional string representing the log level.
   * `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.
   * `instance_profile`: An optional string representing the name of the instance profile.
@@ -1706,6 +1708,20 @@ the schema and catalog if at least one such table is migrated to it.
 For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
 the schema and catalog if at least one such table is migrated to it.
+[[back to top](#databricks-labs-ucx)]
+
+## `assign-owner-group` command
+
+```text
+databricks labs ucx assign-owner-group
+```
+
+This command assigns the owner group to the UCX catalog and all migrated tables.
+The owner group is an account group that will be designated as an owner to all migrated objects (catalogs, schemas, tables, views).
+The principal running the command and later, the migration workflows, is required to be a member of this group.
+The command will list all the groups the principal is a member of and allow the selection of the owner group.
+It sets the default_owner_group property in the config.yml file.
+
 [[back to top](#databricks-labs-ucx)]
 
 ## `migrate-tables` command

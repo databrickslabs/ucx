@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable, Callable
 from functools import cached_property
 
 from databricks.labs.ucx.framework.owners import (
@@ -8,11 +9,12 @@ from databricks.labs.ucx.framework.owners import (
     WorkspacePathOwnership,
 )
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, Grant
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +85,116 @@ class TableOwnership(Ownership[Table]):
     @cached_property
     def _grants_snapshot(self):
         return self._grants_crawler.snapshot()
+
+
+class DefaultSecurableOwnership(Ownership[Table]):
+    """Determine ownership of tables in the inventory based on the following rules:
+    -- If a global owner group is defined, then all tables are owned by that group.
+    -- If the user running the application can be identified, then all tables are owned by that user.
+    -- Otherwise, the table is owned by the administrator.
+    """
+
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        table_crawler: TablesCrawler,
+        group_manager: GroupManager,
+        default_owner_group: str | None,
+        app_principal_resolver: Callable[[], str | None],
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._tables_crawler = table_crawler
+        self._group_manager = group_manager
+        self._default_owner_group = default_owner_group
+        self._app_principal_resolver = app_principal_resolver
+
+    @cached_property
+    def _application_principal(self) -> str | None:
+        return self._app_principal_resolver()
+
+    @cached_property
+    def _static_owner(self) -> str | None:
+        # If the default owner group is not valid, fall back to the application principal
+        if self._default_owner_group and self._group_manager.validate_owner_group(self._default_owner_group):
+            logger.warning("Default owner group is not valid, falling back to administrator ownership.")
+            return self._default_owner_group
+        return self._application_principal
+
+    def load(self) -> Iterable[Grant]:
+        databases = set()
+        catalogs = set()
+        owner = self._static_owner
+        if not owner:
+            logger.warning("No owner found for tables and databases")
+            return
+        for table in self._tables_crawler.snapshot():
+            table_name, view_name = self._names(table)
+
+            if table.database not in databases:
+                databases.add(table.database)
+            if table.catalog not in catalogs:
+                catalogs.add(table.catalog)
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=table.catalog,
+                database=table.database,
+                table=table_name,
+                view=view_name,
+            )
+        for database in databases:
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog="hive_metastore",
+                database=database,
+                table=None,
+                view=None,
+            )
+
+        for catalog in catalogs:
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=catalog,
+                database=None,
+                table=None,
+                view=None,
+            )
+
+    @staticmethod
+    def _names(table: Table) -> tuple[str | None, str | None]:
+        if table.view_text:
+            return None, table.name
+        return table.name, None
+
+    def _maybe_direct_owner(self, record: Table) -> str | None:
+        return self._static_owner
+
+
+class TableOwnershipGrantLoader:
+    def __init__(self, tables_crawler: TablesCrawler, table_ownership: Ownership[Table]) -> None:
+        self._tables_crawler = tables_crawler
+        self._table_ownership = table_ownership
+
+    def load(self) -> Iterable[Grant]:
+        for table in self._tables_crawler.snapshot():
+            owner = self._table_ownership.owner_of(table)
+            table_name, view_name = self._names(table)
+            yield Grant(
+                principal=owner,
+                action_type='OWN',
+                catalog=table.catalog,
+                database=table.database,
+                table=table_name,
+                view=view_name,
+            )
+
+    @staticmethod
+    def _names(table: Table) -> tuple[str | None, str | None]:
+        if table.view_text:
+            return None, table.name
+        return table.name, None
 
 
 class TableMigrationOwnership(Ownership[TableMigrationStatus]):
