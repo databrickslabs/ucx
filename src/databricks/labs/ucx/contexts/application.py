@@ -340,7 +340,7 @@ class GlobalContext(abc.ABC):
         return TableOwnershipGrantLoader(self.tables_crawler, self.default_securable_ownership)
 
     @cached_property
-    def pipeline_migrator(self) -> PipelinesMigrator:
+    def pipelines_migrator(self) -> PipelinesMigrator:
         return PipelinesMigrator(self.workspace_client, self.pipelines_crawler, self.config.ucx_catalog)
 
     @cached_property
