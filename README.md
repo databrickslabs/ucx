@@ -1806,16 +1806,15 @@ It can also be used to debug issues related to table aliasing.
 
 # Pipeline migration commands
 
-These commands are used to migrate pipelines from the old HMS catalog to the new UCX catalog.
+These commands are used to migrate pipelines from the Hive Metastore to Unity Catalog.
 
 ## `migrate-dlt-pipelines` command
 
 ```text
-databricks labs ucx migrate-dlt-pipelines [--skip-pipelines <pipeline_id1>, <pipeline_id2>]
+databricks labs ucx migrate-dlt-pipelines [--skip-pipelines <pipeline_id1>,<pipeline_id2>]
 ```
-Run this command to migrated DLT pipelines from HMS to UC. If any jobs use the DLT pipelines, the references will be updated to point to the new migrated UC pipelines.
-The older pipeline name will be updated to <pipeline_name> [OLD] and the new pipeline will be created with the same name as the old pipeline.
-The optional `--skip-pipelines` flag can be used to skip migrating specific pipelines.
+Run this command to migrate Delta Live Tables (DLT) pipelines from Hive Metastore to Unity Catalog. If any jobs use the DLT pipelines, the references will be updated to point to the new migrated UC pipelines.
+The existing pipeline is renamed to `<pipeline name> [OLD]` and the created pipeline that uses UC gets the name of the existing pipeline `<pipeline name>`.The optional `--skip-pipelines` flag can be used to skip migrating specific pipelines.
 
 [[back to top](#databricks-labs-ucx)]
 
