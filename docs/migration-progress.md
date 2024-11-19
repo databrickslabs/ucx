@@ -10,6 +10,10 @@ following business resources:
 | Job                        | Jobs create data models supporting business process - not exclusively data models used by dashboards.                       |
 | Delta Live Table pipelines | Delta Live Table pipelines create data models supporting business process - not exclusively data models used by dashboards. |
 
+## Usage
+
+Use the migration progress through the [migration progress dashboard](../README.md#dashboards).
+
 ## Tracking
 
 UCX [workflows](./README#workflows) track the migration process and populate [migration progress tables](#persistence).
