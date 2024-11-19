@@ -33,6 +33,7 @@ class PipelinesMigrator:
             if not job_details.settings or not job_details.settings.tasks:
                 continue
 
+            logger.info(f"Processing job {job.job_id} to find associated pipeline")
             for task in job_details.settings.tasks:
                 if task.pipeline_task:
                     pipeline_id = task.pipeline_task.pipeline_id
@@ -41,7 +42,7 @@ class PipelinesMigrator:
                         self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
                     else:
                         self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
-            logger.info(f"Processing job {job.job_id} to find associated pipeline")
+                    logger.info(f"Found job {job.job_id} task {task.task_key} associated with pipeline {pipeline_id}")
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         # TODO:
