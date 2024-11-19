@@ -7,8 +7,10 @@
         {"fieldName": "job_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/jobs/{{ job_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "job_name"},
         {"fieldName": "creator", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "creator"},
         {"fieldName": "problem", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "problem"}
-      ]}
-  }}'
+      ]},
+      "invisibleColumns": [
+        {"name": "job_id", "booleanValues": ["false", "true"], "type": "integer", "displayAs": "number", "title": "job_id"}
+    ]  }}'
 */
 SELECT
   job_name,
