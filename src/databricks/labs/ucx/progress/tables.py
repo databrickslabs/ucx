@@ -11,6 +11,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,8 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         sql_backend: SqlBackend,
         ownership: TableOwnership,
         migration_status_refresher: CrawlerBase[TableMigrationStatus],
+        used_tables_crawler_for_paths: UsedTablesCrawler,
+        used_tables_crawler_for_queries: UsedTablesCrawler,
         run_id: int,
         workspace_id: int,
         catalog: str,
@@ -46,6 +49,8 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             table,
         )
         self._migration_status_refresher = migration_status_refresher
+        self._used_tables_for_paths = used_tables_crawler_for_paths
+        self._used_tables_for_queries = used_tables_crawler_for_queries
 
     def append_inventory_snapshot(self, snapshot: Iterable[Table]) -> None:
         migration_index = TableMigrationIndex(self._migration_status_refresher.snapshot())
