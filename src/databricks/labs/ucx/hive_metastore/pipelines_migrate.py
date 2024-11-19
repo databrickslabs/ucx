@@ -22,9 +22,9 @@ class PipelinesMigrator:
         self._pipeline_crawler = pipelines_crawler
         self._catalog_name = catalog_name
         self._skip_pipelines = skip_pipelines
-        self._job_pipeline_mapping: dict[str, dict] = {}
+        self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
 
-    def _create_job_pipeline_mapping(self) -> None:
+    def _populate_pipeline_job_tasks_mapping(self) -> None:
         jobs = self._ws.jobs.list()
 
         for job in jobs:
@@ -37,10 +37,12 @@ class PipelinesMigrator:
 
             for task in job_details.settings.tasks:
                 if task.pipeline_task:
-                    self._job_pipeline_mapping[task.pipeline_task.pipeline_id] = {
-                        "job_id": job.job_id,
-                        "task_key": task.task_key,
-                    }
+                    pipeline_id = task.pipeline_task.pipeline_id
+                    job_info = {"job_id": job.job_id, "task_key": task.task_key}
+                    if pipeline_id not in self._pipeline_job_tasks_mapping:
+                        self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
+                    else:
+                        self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
             logger.info(f"Processing job {job.job_id} to find associated pipeline")
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
@@ -49,7 +51,7 @@ class PipelinesMigrator:
         return list(self._pipeline_crawler.snapshot())
 
     def migrate_pipelines(self) -> None:
-        self._create_job_pipeline_mapping()
+        self._populate_pipeline_job_tasks_mapping()
         self._migrate_pipelines()
 
     def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
@@ -122,20 +124,20 @@ class PipelinesMigrator:
             return res
 
         # After successful clone, update jobs
-        if pipeline.pipeline_id in self._job_pipeline_mapping:
-            job_pipeline_mapping = self._job_pipeline_mapping[pipeline.pipeline_id]
-            self._ws.jobs.update(
-                job_pipeline_mapping['job_id'],
-                new_settings=JobSettings(
-                    tasks=[
-                        Task(
-                            pipeline_task=PipelineTask(pipeline_id=str(res.get('pipeline_id'))),
-                            task_key=job_pipeline_mapping['task_key'],
-                        )
-                    ]
-                ),
-            )
-            logger.info(f"Updated job {job_pipeline_mapping['job_id']} with new pipeline {res['pipeline_id']}")
+        if pipeline.pipeline_id in self._pipeline_job_tasks_mapping:
+            for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline.pipeline_id]:
+                self._ws.jobs.update(
+                    pipeline_job_task_mapping['job_id'],
+                    new_settings=JobSettings(
+                        tasks=[
+                            Task(
+                                pipeline_task=PipelineTask(pipeline_id=str(res.get('pipeline_id'))),
+                                task_key=pipeline_job_task_mapping['task_key'],
+                            )
+                        ]
+                    ),
+                )
+                logger.info(f"Updated job {pipeline_job_task_mapping['job_id']} with new pipeline {res['pipeline_id']}")
 
         # TODO:
         # Check the error from UI
