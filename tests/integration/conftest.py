@@ -47,7 +47,6 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelineMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
@@ -504,9 +503,6 @@ class MockRuntimeContext(
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
-
-    def with_pipeline_mapping_rules(self, rules):
-        self.installation.save(rules, filename=PipelineMapping.FILENAME)
 
     def with_workspace_info(self, workspace_info):
         self.installation.save(workspace_info, filename=AccountWorkspaces.SYNC_FILE_NAME)
