@@ -28,7 +28,7 @@ from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 from databricks.labs.ucx.progress.grants import GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
-from databricks.labs.ucx.progress.tables import TableProgressEncoder, UsedTableProgressEncoder
+from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
@@ -226,16 +226,6 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.table_ownership,
             self.migration_status_refresher.index(force_refresh=False),
-            self.parent_run_id,
-            self.workspace_id,
-            self.config.ucx_catalog,
-        )
-
-    @cached_property
-    def used_table_progress(self) -> UsedTableProgressEncoder:
-        return UsedTableProgressEncoder(
-            self.sql_backend,
-            self.used_table_ownership,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,

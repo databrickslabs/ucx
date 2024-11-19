@@ -7,7 +7,6 @@ from databricks.labs.ucx.hive_metastore.table_ownership import TableOwnership
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
-from databricks.labs.ucx.source_code.used_table import UsedTable, UsedTableOwnership
 
 
 class TableProgressEncoder(ProgressEncoder[Table]):
@@ -51,44 +50,5 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         historical = super()._encode_record_as_historical(record)
         failures = []
         if not self._table_migration_index.is_migrated(record.database, record.name):
-            failures.append("Pending migration")
-        return replace(historical, failures=historical.failures + failures)
-
-
-class UsedTableProgressEncoder(ProgressEncoder[UsedTable]):
-    """Encoder class:UsedTable to class:History.
-
-    A used table has a failure if its catalog is the hive_metastore.
-    """
-
-    def __init__(
-        self,
-        sql_backend: SqlBackend,
-        ownership: UsedTableOwnership,
-        run_id: int,
-        workspace_id: int,
-        catalog: str,
-        schema: str = "multiworkspace",
-        table: str = "historical",
-    ) -> None:
-        super().__init__(
-            sql_backend,
-            ownership,
-            UsedTable,
-            run_id,
-            workspace_id,
-            catalog,
-            schema,
-            table,
-        )
-
-    def _encode_record_as_historical(self, record: UsedTable) -> Historical:
-        """Encode record as historical.
-
-        A table failure means that the table is pending migration.
-        """
-        historical = super()._encode_record_as_historical(record)
-        failures = []
-        if record.catalog_name == "hive_metastore":
             failures.append("Pending migration")
         return replace(historical, failures=historical.failures + failures)
