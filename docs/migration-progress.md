@@ -16,11 +16,11 @@ Use the migration progress through the [migration progress dashboard](../README.
 
 ## Tracking
 
-UCX [workflows](./README#workflows) track the migration process and populate [migration progress tables](#persistence).
+UCX [workflows](../README.md#workflows) track the migration process and populate [migration progress tables](#persistence).
 
 ## Persistence
 
-The progress is persisted in the [UCX UC catalog](./README#create-ucx-catalog-command) so that migration progress can be
+The progress is persisted in the [UCX UC catalog](../README.md#create-ucx-catalog-command) so that migration progress can be
 tracked cross-workspace. The catalog contains the tables below.
 
 ### Historical
