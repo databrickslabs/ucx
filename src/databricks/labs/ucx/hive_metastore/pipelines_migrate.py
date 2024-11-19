@@ -161,6 +161,9 @@ class PipelinesMigrator:
         try:
             return self._clone_pipeline(pipeline)
         except DatabricksError as e:
+            if "Cloning from Hive Metastore to Unity Catalog is currently not supported" in str(e):
+                logger.error(f"{e}: Please contact Databricks to enable DLT HMS to UC migration API on this workspace")
+                return False
             logger.error(f"Failed to migrate pipeline {pipeline.pipeline_id}: {e}")
             return False
 
