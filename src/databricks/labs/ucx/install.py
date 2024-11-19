@@ -248,8 +248,10 @@ class WorkspaceInstaller(WorkspaceContext):
 
         # Checking if the user wants to define a default owner group.
         default_owner_group = None
-        if self.prompts.confirm("Do you want to define a default owner group for all tables and schemas? "
-                                "You can skip this step and define it later using the assign-owner-group CLI Command."):
+        if self.prompts.confirm(
+            "Do you want to define a default owner group for all tables and schemas? "
+            "You can skip this step and define it later using the assign-owner-group CLI Command."
+        ):
             default_owner_group = AccountGroupLookup(self.workspace_client).pick_owner_group(self.prompts)
 
         upload_dependencies = self.prompts.confirm(
