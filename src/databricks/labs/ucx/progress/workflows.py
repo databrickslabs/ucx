@@ -145,7 +145,7 @@ class MigrationProgress(Workflow):
         """Scans all dashboards for migration issues in SQL code of embedded widgets.
         Also stores direct filesystem accesses for display in the migration dashboard."""
         # TODO: Ensure these are captured in the history log.
-        ctx.query_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.query_linter.refresh_report()
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):

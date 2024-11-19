@@ -535,7 +535,9 @@ class GlobalContext(abc.ABC):
     def query_linter(self) -> QueryLinter:
         return QueryLinter(
             self.workspace_client,
-            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.sql_backend,
+            self.inventory_database,
+            TableMigrationIndex([]),
             self.directfs_access_crawler_for_queries,
             self.used_tables_crawler_for_queries,
             self.config.include_dashboard_ids,
