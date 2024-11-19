@@ -81,7 +81,7 @@ from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
-from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup, AccountGroupLookup
 
 TAG_STEP = "step"
 WAREHOUSE_PREFIX = "Unity Catalog Migration"
@@ -245,6 +245,13 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         include_databases = self._select_databases()
+
+        # Checking if the user wants to define a default owner group.
+        default_owner_group = None
+        if self.prompts.confirm("Do you want to define a default owner group for all tables and schemas? "
+                                "You can skip this step and define it later using the assign-owner-group CLI Command."):
+            default_owner_group = AccountGroupLookup(self.workspace_client).pick_owner_group(self.prompts)
+
         upload_dependencies = self.prompts.confirm(
             f"Does given workspace {self.workspace_client.get_workspace_id()} block Internet access?"
         )
@@ -267,6 +274,7 @@ class WorkspaceInstaller(WorkspaceContext):
             trigger_job=trigger_job,
             recon_tolerance_percent=recon_tolerance_percent,
             upload_dependencies=upload_dependencies,
+            default_owner_group=default_owner_group,
         )
 
     def _compare_remote_local_versions(self):
