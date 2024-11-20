@@ -53,7 +53,7 @@ class TableView:
 
 
 class TableMigrationIndex:
-    def __init__(self, tables: list[TableMigrationStatus]):
+    def __init__(self, tables: Iterable[TableMigrationStatus]):
         self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
     def is_migrated(self, schema: str, table: str) -> bool:
