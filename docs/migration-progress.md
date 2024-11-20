@@ -28,9 +28,15 @@ Use the migration progress through the [migration progress dashboard](../README.
 
 ### Failures
 
-A [key historical attribute](#historical) in migration progress are the failures that show the incompatibility issues
+A [key historical attribute](#historical) in migration progress are the `failures` that show the incompatibility issues
 with Unity Catalog. By resolving the failures for an object, UCX flags that object to be Unity Compatible. Thus,
 for Hive data objects, this means that the objects are migrated to Unity Catalog.
+
+### Owner
+
+Another [key historical attribute](#historical) in migration progress is the `owner` that shows who owns the object,
+thus who is key making the object Unity Catalog compatible. The ownership is a best effort basis; a concept made more
+central in [Unity Catalog](https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/ownership.html).
 
 ## Tracking
 
