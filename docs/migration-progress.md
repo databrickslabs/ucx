@@ -26,6 +26,12 @@ Furthermore, UCX tracks migration of the following Hive and workspace objects:
 
 Use the migration progress through the [migration progress dashboard](../README.md#dashboards).
 
+### Failures
+
+A [key historical attribute](#historical) in migration progress are the failures that show the incompatibility issues
+with Unity Catalog. By resolving the failures for an object, UCX flags that object to be Unity Compatible. Thus,
+for Hive data objects, this means that the objects are migrated to Unity Catalog.
+
 ## Tracking
 
 UCX [workflows](../README.md#workflows) track the migration process and populate [migration progress tables](#persistence).
