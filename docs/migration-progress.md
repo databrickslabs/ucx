@@ -97,3 +97,23 @@ objects relevant to the migration progress
 | failures     | list[string]            | The list of problems associated with the object that this inventory record covers. |
 | owner        | string                  | The identity that has ownership of the object.                                     |
 | ucx_version  | string                  | The UCX semantic version.                                                          |
+
+## Resource index
+
+| Hive or workspace object           | Description                                                                                                                | Dependent resources                     |
+|------------------------------------|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| Redash dashboard                   | The Redash dashboard                                                                                                       | Queries                                 |
+| Lakeview dashboard                 | The Lakeview dashboard                                                                                                     | Queries                                 |
+| Dashboard                          | The Redash or lakeview dashboard                                                                                           | Queries                                 |
+| Job                                | Jobs create data models supporting business process - not exclusively data models used by dashboards                       | Tasks, Cluster                          |
+| Job task                           | Job tasks, defined as part of the job definition                                                                           | Code                                    |
+| Delta Live Table pipelines         | Delta Live Table pipelines create data models supporting business process - not exclusively data models used by dashboards |                                         |
+| Tables and view (Hive data object) | Hive data objects                                                                                                          | Grant, Table migration stats            |
+| Grant                              | Data object privileges                                                                                                     | Legacy grant, Interactive cluster grant |
+| Legacy grant                       | Legacy Hive grant privileges managed through `GRANT`, `REVOKE` and `DENY` SQL statements                                   |                                         |
+| Interactive cluster grant          | Data object privileges inferred through interactive cluster data access                                                    |                                         |
+| User defined function (UDF)        | Hive user defined functions                                                                                                | UDF code definition                     |
+| Cluster                            | The job cluster, either job or interactive cluster                                                                         |                                         |
+| Cluster policies                   | The cluster policies                                                                                                       |                                         |
+| Table migration status             | Status of a table or view being migrated to Unity Catalog, or not                                                          |                                         |
+| Code                               | Code definitions either Python or SQL                                                                                      |                                         |
