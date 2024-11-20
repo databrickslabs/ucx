@@ -544,6 +544,13 @@ class FasterTableScanCrawler(TablesCrawler):
                 return list(self._iterator(self._external_catalog.listDatabases()))
             return self._include_database
         except Exception as err:  # pylint: disable=broad-exception-caught
+            if "py4j.security.Py4JSecurityException" in str(err):
+                logger.error(
+                    "Failed to list databases due to Py4JSecurityException. "
+                    "Update or reinstall UCX to resolve this issue.",
+                    exc_info=True,
+                )
+                return []
             logger.error(f"failed-table-crawl: listing databases -> catalog : {err}", exc_info=True)
             return []
 
@@ -551,6 +558,13 @@ class FasterTableScanCrawler(TablesCrawler):
         try:
             return list(self._iterator(self._external_catalog.listTables(database)))
         except Exception as err:  # pylint: disable=broad-exception-caught
+            if "py4j.security.Py4JSecurityException" in str(err):
+                logger.error(
+                    "Failed to list databases due to Py4JSecurityException. "
+                    "Update or reinstall UCX to resolve this issue.",
+                    exc_info=True,
+                )
+                return []
             logger.warning(f"failed-table-crawl: listing tables from database -> {database} : {err}", exc_info=True)
             return []
 
