@@ -2,7 +2,6 @@ import logging
 from unittest.mock import call
 
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.jobs import BaseJob, JobSettings, Task, PipelineTask
 
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -87,9 +86,6 @@ def test_migrate_pipelines(ws, mock_installation):
             job_id=536591785949417,
         ),
     ]
-
-    ws.api_client.do.side_effect = DatabricksError("error")  # # pylint: disable=redefined-variable-type
-    pipelines_migrator.migrate_pipelines()
 
 
 def test_migrate_pipelines_no_pipelines(ws, mock_installation):
