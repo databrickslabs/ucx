@@ -1,12 +1,14 @@
 import logging
 from collections.abc import Iterable, Callable
 from functools import cached_property
+from typing import Any
 
 from databricks.labs.ucx.framework.owners import (
     Ownership,
     AdministratorLocator,
     LegacyQueryOwnership,
     WorkspacePathOwnership,
+    LegacyQueryPath,
 )
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, Grant
@@ -42,6 +44,9 @@ class TableOwnership(Ownership[Table]):
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_path_ownership = workspace_path_ownership
 
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, Table)
+
     def _maybe_direct_owner(self, record: Table) -> str | None:
         owner = self._maybe_from_grants(record)
         if owner:
@@ -56,7 +61,7 @@ class TableOwnership(Ownership[Table]):
         if not used_table.is_write:
             return None
         if used_table.source_type == 'QUERY' and used_table.query_id:
-            return self._legacy_query_ownership.owner_of(used_table.query_id)
+            return self._legacy_query_ownership.owner_of(LegacyQueryPath(used_table.query_id))
         if used_table.source_type in {'NOTEBOOK', 'FILE'}:
             return self._workspace_path_ownership.owner_of_path(used_table.source_id)
         logger.warning(f"Unknown source type {used_table.source_type} for {used_table.source_id}")
@@ -209,7 +214,11 @@ class TableMigrationOwnership(Ownership[TableMigrationStatus]):
         self._table_ownership = table_ownership
         self._indexed_tables: dict[tuple[str, str], Table] | None = None
 
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, TableMigrationStatus)
+
     def _tables_snapshot_index(self, reindex: bool = False) -> dict[tuple[str, str], Table]:
+
         index = self._indexed_tables
         if index is None or reindex:
             snapshot = self._tables_crawler.snapshot()
