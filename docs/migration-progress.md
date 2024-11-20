@@ -62,6 +62,11 @@ the [`failures`](#failures) of the dependent resources.
 | Job                        | Cluster, cluster policies, cluster configurations, code resources |
 | Delta Live Table pipelines | TBD                                                               |
 
+### Dangling Hive or workspace objects
+
+Hive or workspace objects that are not referenced by [business resources](#roll-up-to-business-resources) are considered
+to be _dangling_ objects. For now, these objects are tracked separately, thus not rolled up to business resources.
+
 ## Persistence
 
 The progress is persisted in the [UCX UC catalog](../README.md#create-ucx-catalog-command) so that migration progress can be
