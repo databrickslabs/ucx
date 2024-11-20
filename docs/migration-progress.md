@@ -98,6 +98,20 @@ objects relevant to the migration progress
 | owner        | string                  | The identity that has ownership of the object.                                     |
 | ucx_version  | string                  | The UCX semantic version.                                                          |
 
+### Workflow run
+
+The auxiliary [`workflow_runs` table](../src/databricks/labs/ucx/progress/install.py) tracks UCX workflow runs.
+
+| Column               | Data type   | Description                                |
+|----------------------|-------------|--------------------------------------------|
+| started_at           | dt.datetime | The timestamp of the workflow run start    |
+| finished_at          | dt.datetime | The timestamp of the workflow run end      |
+| workspace_id         | int         | The workspace id in which the workflow ran |
+| workflow_name        | str         | The workflow name that ran                 |
+| workflow_id          | int         | The workflow id of the workflow that ran   |
+| workflow_run_id      | int         | The workflow run id                        |
+| workflow_run_attempt | int         | The workflow run attempt                   |
+
 ## Resource index
 
 | Hive or workspace object           | Description                                                                                                                | Dependent resources                     |

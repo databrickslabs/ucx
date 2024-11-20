@@ -915,12 +915,9 @@ The output is processed and displayed in the migration dashboard using the in `r
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
-The manually triggered `migration-progress-experimental` workflow updates a subset of the inventory tables to
-[track Unity Catalog compatability](docs/migration-progress.md) of Hive and workspace objects that need to be migrated.
-Besides updating the inventory tables, this workflow tracks the migration progress by updating the
-following [UCX catalog](#create-ucx-catalog-command) tables:
-
-- `workflow_runs`: Tracks the status of the workflow runs.
+The manually triggered `migration-progress-experimental` workflow updates a subset of
+the [inventory tables](#assessment-workflow) to [track Unity Catalog compatability](docs/migration-progress.md) of Hive
+and workspace objects that need to be migrated.
 
 _Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
 the [assessment workflow](#assessment-workflow)._
