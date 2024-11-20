@@ -50,6 +50,18 @@ central in [Unity Catalog](https://docs.databricks.com/en/data-governance/unity-
 The [(experimental) migration progress workflow](.../README.md#experimental-migration-progress-workflow) tracks the
 migration progress and populates [migration progress tables](#persistence).
 
+### Roll-up to business resources
+
+The migration process' main intent is to track if business resources are migrated to Unity Catalog. UCX rolls up the
+failures of dependent resources to the business resources so that the business resources show
+the [`failures`](#failures) of the dependent resources.
+
+| Business resource          | Dependent resources                                               |
+|----------------------------|-------------------------------------------------------------------|
+| Dashboard                  | Queries                                                           |
+| Job                        | Cluster, cluster policies, cluster configurations, code resources |
+| Delta Live Table pipelines | TBD                                                               |
+
 ## Persistence
 
 The progress is persisted in the [UCX UC catalog](../README.md#create-ucx-catalog-command) so that migration progress can be
