@@ -64,13 +64,13 @@ the [`failures`](#failures) of the dependent resources.
 
 Similarly, a roll-up for the failures of the Hive and workspace object are done:
 
-| Hive or workspace object           | Dependent resources |
-|------------------------------------|---------------------|
-| Tables and view (Hive data object) | Grants              |
-| Grant                              |                     |
-| User defined function (UDF)        |                     |
-| Cluster                            | Cluster policies    |
-| Cluster policies                   |                     |
+| Hive or workspace object           | Dependent resources          |
+|------------------------------------|------------------------------|
+| Tables and view (Hive data object) | Grants, TableMigrationStatus |
+| Grant                              |                              |
+| User defined function (UDF)        |                              |
+| Cluster                            | Cluster policies             |
+| Cluster policies                   |                              |
 
 ### Dangling Hive or workspace objects
 
