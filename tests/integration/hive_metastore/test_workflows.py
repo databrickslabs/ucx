@@ -107,6 +107,7 @@ def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_
         },
     )
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
@@ -138,6 +139,7 @@ def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_ta
         },
     )
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
@@ -165,6 +167,7 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
         },
     )
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
@@ -189,6 +192,7 @@ def test_table_migration_job_publishes_remaining_tables(
 ):
     tables, dst_schema = prepare_tables_for_migration
     installation_ctx.workspace_installation.run()
+    ProgressTrackingInstallation(installation_ctx.sql_backend, installation_ctx.ucx_catalog).run()
     second_table = list(tables.values())[1]
     table = Table(
         "hive_metastore",
