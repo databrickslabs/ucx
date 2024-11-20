@@ -8,6 +8,8 @@ from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,9 +42,14 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
             r"Choose a cluster policy": "0",
         },
     )
-
     ext_hms_ctx.workspace_installation.run()
-    ext_hms_ctx.deployed_workflows.run_workflow("migrate-tables")
+    ProgressTrackingInstallation(ext_hms_ctx.sql_backend, ext_hms_ctx.ucx_catalog).run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    ext_hms_ctx.deployed_workflows.run_workflow("assessment")
+    assert ext_hms_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
     # assert the workflow is successful
     assert ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")
 
