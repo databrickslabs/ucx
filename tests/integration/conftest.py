@@ -122,7 +122,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
                 display_name=display_name,
                 serialized_dashboard=json.dumps(serialized_dashboard),
                 warehouse_id=warehouse_id,
-            ).as_dict()
+            )
         )  # type: ignore
         ws.lakeview.publish(dashboard.dashboard_id)
         return dashboard
