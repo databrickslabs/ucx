@@ -45,8 +45,6 @@ class PipelinesMigrator:
                 logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
     def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
-        # TODO:
-        # add skip logic and return only the pipelines that need to be migrated
         return list(self._pipeline_crawler.snapshot())
 
     def migrate_pipelines(self) -> None:
