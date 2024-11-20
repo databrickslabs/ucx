@@ -47,7 +47,8 @@ central in [Unity Catalog](https://docs.databricks.com/en/data-governance/unity-
 
 ## Tracking
 
-UCX [workflows](../README.md#workflows) track the migration process and populate [migration progress tables](#persistence).
+The [(experimental) migration progress workflow](.../README.md#experimental-migration-progress-workflow) tracks the
+migration progress and populates [migration progress tables](#persistence).
 
 ## Persistence
 
