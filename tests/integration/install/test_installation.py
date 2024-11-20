@@ -131,17 +131,15 @@ def test_job_cluster_policy(ws, installation_ctx):
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
     ws_group_a, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
-
-    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.workspace_installation.run()
-
     installation_ctx.group_manager.snapshot()
     installation_ctx.group_manager.rename_groups()
     installation_ctx.group_manager.reflect_account_groups_on_workspace()
 
-    installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
+    workflow = "remove-workspace-local-backup-groups"
+    installation_ctx.deployed_workflows.run_workflow(workflow)
 
-    assert installation_ctx.deployed_workflows.validate_step("remove-workspace-local-backup-groups")
+    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
     # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
