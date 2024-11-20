@@ -4,6 +4,7 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
@@ -44,7 +45,41 @@ def test_migration_progress_runtime_refresh(run_workflow, task, crawler, history
     mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
-def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
+def test_migration_progress_runtime_tables_refresh_crawl_tables(run_workflow) -> None:
+    """Ensure that step 1 of the split crawl/update-history-log tasks performs its part of the refresh process."""
+    mock_tables_crawler = create_autospec(TablesCrawler)
+    mock_history_log = create_autospec(ProgressEncoder)
+    context_replacements = {
+        "tables_crawler": mock_tables_crawler,
+        "tables_progress": mock_history_log,
+        "named_parameters": {"parent_run_id": 53},
+    }
+
+    # The first part of a 3-step update: the table crawl without updating the history log.
+    run_workflow(MigrationProgress.crawl_tables, **context_replacements)
+    mock_tables_crawler.snapshot.assert_called_once_with(force_refresh=True)
+    mock_history_log.append_inventory_snapshot.assert_not_called()
+
+
+def test_migration_progress_runtime_tables_refresh_migration_status(run_workflow) -> None:
+    """Ensure that step 2 of the split crawl/update-history-log tasks performs its part of the refresh process."""
+    mock_migration_status_refresher = create_autospec(TableMigrationStatusRefresher)
+    mock_history_log = create_autospec(ProgressEncoder)
+    context_replacements = {
+        "migration_status_refresher": mock_migration_status_refresher,
+        "tables_progress": mock_history_log,
+        "named_parameters": {"parent_run_id": 53},
+    }
+
+    # The second part of a 3-step update: updating table migration status without updating the history log.
+    task_dependencies = getattr(MigrationProgress.refresh_table_migration_status, "__task__").depends_on
+    assert MigrationProgress.crawl_tables.__name__ in task_dependencies
+    run_workflow(MigrationProgress.refresh_table_migration_status, **context_replacements)
+    mock_migration_status_refresher.snapshot.assert_called_once_with(force_refresh=True)
+    mock_history_log.append_inventory_snapshot.assert_not_called()
+
+
+def test_migration_progress_runtime_tables_refresh_update_history_log(run_workflow) -> None:
     """Ensure that the split crawl and update-history-log tasks perform their part of the refresh process."""
     mock_tables_crawler = create_autospec(TablesCrawler)
     mock_history_log = create_autospec(ProgressEncoder)
@@ -54,13 +89,10 @@ def test_migration_progress_runtime_tables_refresh(run_workflow) -> None:
         "named_parameters": {"parent_run_id": 53},
     }
 
-    # The first part of a 2-step update: the crawl without updating the history log.
-    run_workflow(MigrationProgress.crawl_tables, **context_replacements)
-    mock_tables_crawler.snapshot.assert_called_once_with(force_refresh=True)
-    mock_history_log.append_inventory_snapshot.assert_not_called()
-
-    mock_tables_crawler.snapshot.reset_mock()
-    # The second part of the 2-step update: updating the history log (without a forced crawl).
+    # The final part of the 3-step update: updating the history log (without a forced crawl).
+    task_dependencies = getattr(MigrationProgress.update_tables_history_log, "__task__").depends_on
+    assert MigrationProgress.crawl_tables.__name__ in task_dependencies
+    assert MigrationProgress.refresh_table_migration_status.__name__ in task_dependencies
     run_workflow(MigrationProgress.update_tables_history_log, **context_replacements)
     mock_tables_crawler.snapshot.assert_called_once_with()
     mock_history_log.append_inventory_snapshot.assert_called_once()

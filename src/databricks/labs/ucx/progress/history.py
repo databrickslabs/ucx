@@ -1,12 +1,11 @@
 from __future__ import annotations
 import dataclasses
 import datetime as dt
-import typing
 import json
 import logging
 from enum import Enum, EnumMeta
 from collections.abc import Iterable, Sequence
-from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints, final
+from typing import Any, ClassVar, Generic, Protocol, TypeVar, get_type_hints
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -106,7 +105,7 @@ class HistoricalEncoder(Generic[Record]):
         # are produced automatically in a __future__.__annotations__ context). Unfortunately the dataclass mechanism
         # captures the type hints prior to resolution (which happens later in the class initialization process).
         # As such, we rely on dataclasses.fields() for the set of field names, but not the types which we fetch directly.
-        klass_type_hints = typing.get_type_hints(klass)
+        klass_type_hints = get_type_hints(klass)
         field_names = [field.name for field in dataclasses.fields(klass)]
         field_names_with_types = {field_name: klass_type_hints[field_name] for field_name in field_names}
         if "failures" not in field_names_with_types:
@@ -280,11 +279,10 @@ class ProgressEncoder(Generic[Record]):
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    @final
     def append_inventory_snapshot(self, snapshot: Iterable[Record]) -> None:
         history_records = [self._encode_record_as_historical(record) for record in snapshot]
         logger.debug(f"Appending {len(history_records)} {self._klass} record(s) to history.")
-        # This is the only writer, and the mode is 'append'. This is documented as conflict-free.
+        # The mode is 'append'. This is documented as conflict-free.
         self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
 
     def _encode_record_as_historical(self, record: Record) -> Historical:
