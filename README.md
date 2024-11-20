@@ -1802,8 +1802,6 @@ It can also be used to debug issues related to table aliasing.
 
 [[back to top](#databricks-labs-ucx)]
 
-
-
 # Code migration commands
 
 See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
