@@ -123,8 +123,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
-* [Pipeline migration commands](#pipeline-migration-commands)
-  * [`migrate-dlt-pipelines` command](#migrate-dlt-pipelines-command)
 * [Code migration commands](#code-migration-commands)
   * [`lint-local-code` command](#lint-local-code-command)
   * [`migrate-local-code` command](#migrate-local-code-command)
@@ -1804,19 +1802,7 @@ It can also be used to debug issues related to table aliasing.
 
 [[back to top](#databricks-labs-ucx)]
 
-# Pipeline migration commands
 
-These commands are used to migrate pipelines from the Hive Metastore to Unity Catalog.
-
-## `migrate-dlt-pipelines` command
-
-```text
-databricks labs ucx migrate-dlt-pipelines [--skip-pipelines <pipeline_id1>,<pipeline_id2>]
-```
-Run this command to migrate Delta Live Tables (DLT) pipelines from Hive Metastore to Unity Catalog. If any jobs use the DLT pipelines, the references will be updated to point to the new migrated UC pipelines.
-The existing pipeline is renamed to `<pipeline name> [OLD]` and the created pipeline that uses UC gets the name of the existing pipeline `<pipeline name>`.The optional `--skip-pipelines` flag can be used to skip migrating specific pipelines.
-
-[[back to top](#databricks-labs-ucx)]
 
 # Code migration commands
 
