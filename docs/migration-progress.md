@@ -1,14 +1,26 @@
 # Migration progress
 
-UCX tracks migration progress of _business_ resources: workspace resources that contribute to business value.
+UCX tracks migration progress of _business_ resources: workspace objects that contribute to business value.
 (The term "business resource" comes from the UCX team and is **not** Databricks terminology.) We identified the
 following business resources:
 
-| Workspace resource         | Motivation                                                                                                                  |
-|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| Dashboard                  | Dashboards visualize data models supporting business processes                                                              |
-| Job                        | Jobs create data models supporting business process - not exclusively data models used by dashboards.                       |
-| Delta Live Table pipelines | Delta Live Table pipelines create data models supporting business process - not exclusively data models used by dashboards. |
+| Business resource          | Motivation                                                                                                                 |
+|----------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Dashboard                  | Dashboards visualize data models supporting business processes                                                             |
+| Job                        | Jobs create data models supporting business process - not exclusively data models used by dashboards                       |
+| Delta Live Table pipelines | Delta Live Table pipelines create data models supporting business process - not exclusively data models used by dashboards |
+
+Furthermore, UCX tracks migration of the following Hive and workspace objects:
+
+| Hive or workspace object           |
+|------------------------------------|
+| Tables and view (Hive data object) |
+| Grant                              |
+| User defined function (UDF)        |
+| Cluster                            |
+| Cluster policies                   |
+
+> See the [assessment workflow](../README.md#assessment-workflow) for more details on the above objects.
 
 ## Usage
 
