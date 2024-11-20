@@ -26,6 +26,13 @@ Furthermore, UCX tracks migration of the following Hive and workspace objects:
 
 Use the migration progress through the [migration progress dashboard](../README.md#dashboards).
 
+### Pre-requisites
+
+The following pre-requisites need to be fulfilled for the dashboard to become populated:
+- [UC metastore attached to workspace](../README.md#assign-metastore-command)
+- [UCX catalog exists](../README.md#create-ucx-catalog-command)
+- [Assessment job ran successfully](../README.md#ensure-assessment-run-command)
+
 ### Failures
 
 A [key historical attribute](#historical) in migration progress are the `failures` that show the incompatibility issues
