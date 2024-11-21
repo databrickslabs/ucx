@@ -915,12 +915,14 @@ The output is processed and displayed in the migration dashboard using the in `r
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
-The manually triggered `migration-progress-experimental` workflow updates a subset of
+The manually triggered `migration-progress-experimental` workflow updates a **subset** of
 the [inventory tables](#assessment-workflow) to [track Unity Catalog compatability](docs/migration-progress.md) of Hive
 and workspace objects that need to be migrated.
 
-_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
-the [assessment workflow](#assessment-workflow)._
+The following pre-requisites need to be fulfilled before running the workflow:
+- [UC metastore attached to workspace](../README.md#assign-metastore-command)
+- [UCX catalog exists](../README.md#create-ucx-catalog-command)
+- [Assessment job ran successfully](../README.md#ensure-assessment-run-command)
 
 [[back to top](#databricks-labs-ucx)]
 

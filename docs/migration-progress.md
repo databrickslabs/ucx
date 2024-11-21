@@ -24,14 +24,8 @@ See the [resource index](#resource-index) for more details on the above objects.
 
 ## Usage
 
-Use the migration progress through the [migration progress dashboard](../README.md#dashboards).
-
-### Pre-requisites
-
-The following pre-requisites need to be fulfilled for the dashboard to become populated:
-- [UC metastore attached to workspace](../README.md#assign-metastore-command)
-- [UCX catalog exists](../README.md#create-ucx-catalog-command)
-- [Assessment job ran successfully](../README.md#ensure-assessment-run-command)
+Use the migration progress through the [migration progress dashboard](../README.md#dashboards) after running the
+[(experimental) migration progress workflow](../README.md#experimental-migration-progress-workflow).
 
 ### Failures
 
