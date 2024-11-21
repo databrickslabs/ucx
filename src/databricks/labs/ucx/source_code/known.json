@@ -12667,9 +12667,6 @@
   "opencensus": {
     "opencensus": []
   },
-  "opencensus-context": {
-    "opencensus": []
-  },
   "opencv-python": {
     "cv2": [],
     "cv2.config-3": [],
