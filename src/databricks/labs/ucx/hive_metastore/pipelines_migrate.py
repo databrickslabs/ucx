@@ -44,7 +44,7 @@ class PipelinesMigrator:
                     self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
                 logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
-    def get_pipelines_to_migrate(self) -> list[PipelineInfo]:
+    def _get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         return list(self._pipeline_crawler.snapshot())
 
     def migrate_pipelines(self) -> None:
@@ -53,7 +53,7 @@ class PipelinesMigrator:
 
     def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
         # get pipelines to migrate
-        pipelines_to_migrate = self.get_pipelines_to_migrate()
+        pipelines_to_migrate = self._get_pipelines_to_migrate()
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
