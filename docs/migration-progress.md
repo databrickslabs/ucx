@@ -20,7 +20,7 @@ Furthermore, UCX tracks migration of the following Hive and workspace objects:
 | Cluster                            |
 | Cluster policies                   |
 
-> See the [assessment workflow](../README.md#assessment-workflow) for more details on the above objects.
+See the [resource index](#resource-index) for more details on the above objects.
 
 ## Usage
 
