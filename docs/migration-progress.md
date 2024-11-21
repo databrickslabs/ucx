@@ -36,8 +36,8 @@ for Hive data objects, this means that the objects are migrated to Unity Catalog
 ### Owner
 
 Another [key historical attribute](#historical) in migration progress is the `owner` that shows who owns the object,
-thus who is key making the object Unity Catalog compatible. The ownership is a best effort basis; a concept made more
-central in [Unity Catalog](https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/ownership.html).
+thus who is key for making the object Unity Catalog compatible. The ownership is a best effort basis; a concept made
+more central in [Unity Catalog](https://docs.databricks.com/en/data-governance/unity-catalog/manage-privileges/ownership.html).
 
 ## Tracking
 
