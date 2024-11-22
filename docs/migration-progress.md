@@ -92,6 +92,12 @@ objects relevant to the migration progress
 | owner        | string                  | The identity that has ownership of the object.                                     |
 | ucx_version  | string                  | The UCX semantic version.                                                          |
 
+Example historical record:
+
+| workspace_id | job_run_id | object_type | object_id                             | data                                                                                                                                              | failures                           | owner                         | ucx_version |
+|--------------|------------|-------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------|-------------------------------|-------------|
+| 123456789    | 1          | 'Table'     | ['hive_metastore', 'schema', 'table'] | {'database': 'schem', 'name': 'table', 'catalog': 'hive_metastore', 'object_type': 'MANAGED', 'table_format': 'DELTA', 'is_partitioned': 'false'} | ['Used by NOTEBOOK: test/test.py'] | 'cor.zuurmond@databricks.com' | '0.50.0'    |
+
 ### Workflow run
 
 The auxiliary [`workflow_runs` table](../src/databricks/labs/ucx/progress/install.py) tracks UCX workflow runs.
