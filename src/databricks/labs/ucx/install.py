@@ -20,16 +20,11 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
-from databricks.labs.blueprint.wheels import (
-    ProductInfo,
-    Version,
-    find_project_root,
-)
+from databricks.labs.blueprint.wheels import ProductInfo, Version, find_project_root
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 from databricks.labs.lsql.deployment import SchemaDeployer
-from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.useragent import with_extra
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -37,11 +32,11 @@ from databricks.sdk.errors import (
     InternalError,
     InvalidParameterValue,
     NotFound,
+    OperationFailed,
     PermissionDenied,
     ResourceAlreadyExists,
     ResourceDoesNotExist,
     Unauthenticated,
-    OperationFailed,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service.dashboards import LifecycleState
@@ -51,7 +46,7 @@ from databricks.sdk.service.sql import (
     EndpointInfoWarehouseType,
     SpotInstancePolicy,
 )
-
+from databricks.sdk.useragent import with_extra
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
@@ -81,7 +76,7 @@ from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
-from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup, AccountGroupLookup
+from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup, ConfigureGroups, MigratedGroup
 
 TAG_STEP = "step"
 WAREHOUSE_PREFIX = "Unity Catalog Migration"
@@ -248,10 +243,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
         # Checking if the user wants to define a default owner group.
         default_owner_group = None
-        if self.prompts.confirm(
-            "Do you want to define a default owner group for all tables and schemas? "
-            "You can skip this step and define it later using the assign-owner-group CLI Command."
-        ):
+        if self.prompts.confirm("Do you want to define a default owner group for all tables and schemas? "):
             default_owner_group = AccountGroupLookup(self.workspace_client).pick_owner_group(self.prompts)
 
         upload_dependencies = self.prompts.confirm(

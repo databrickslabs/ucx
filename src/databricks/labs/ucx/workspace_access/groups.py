@@ -559,7 +559,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
-        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.list()
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
@@ -650,13 +650,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _crawl(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.list()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         yield from strategy.generate_migrated_groups()
 
     def validate_group_membership(self) -> list[dict]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_lookup.account_groups_in_account()
+        account_groups_in_account = self._account_groups_lookup.list()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         migrated_groups = list(strategy.generate_migrated_groups())
         mismatch_group = []
@@ -931,7 +931,7 @@ class AccountGroupLookup:
         return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
 
     def validate_owner_group(self, group_name: str) -> bool:
-        # This method is used to validate that the current owner is a member of the group
+        # This method is used to validate that the current user is a member of the group
         user_id = self._ws.current_user.me().id
         if not user_id:
             logger.warning("No user found for the current session.")
@@ -975,8 +975,8 @@ class AccountGroupLookup:
         )  # type: ignore[arg-type,return-value]
         return sorted_groups
 
-    def account_groups_in_account(self) -> dict[str, Group]:
-        groups = {}
+    def list(self) -> dict[str, Group]:
+        groups: dict[str, Group] = {}
         for group in self._list_account_groups("id,displayName,externalId"):
             if not group.display_name:
                 logger.debug(f"Ignoring account group in without name: {group.id}")
