@@ -64,7 +64,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
                     continue
                 job_id = direct_fs_access.source_lineage[0].object_id
                 task_key = direct_fs_access.source_lineage[1].object_id  # <job id>/<task key>
-                failure = f"Direct file system access by '{task_key}' in '{direct_fs_access.source_id} to '{direct_fs_access.path}'"
+                failure = f"Direct file system access by '{task_key}' in '{direct_fs_access.source_id}' to '{direct_fs_access.path}'"
                 index[job_id].append(failure)
         return index
 
