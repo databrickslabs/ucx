@@ -33801,7 +33801,5 @@
     "zipp.compat.py310": [],
     "zipp.glob": []
   },
-  "zstd": {
-
-  }
+  "zstd": {}
 }
