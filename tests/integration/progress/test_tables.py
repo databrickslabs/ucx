@@ -9,7 +9,13 @@ from databricks.labs.ucx.source_code.base import LineageAtom, UsedTable
 
 @pytest.mark.parametrize("is_migrated_table", [True, False])
 @pytest.mark.parametrize("is_used_table", [True, False])
-def test_table_progress_encoder_table_failures(runtime_ctx, az_cli_ctx, make_catalog, is_migrated_table: bool, is_used_table: bool, ) -> None:
+def test_table_progress_encoder_table_failures(
+    runtime_ctx,
+    az_cli_ctx,
+    make_catalog,
+    is_migrated_table: bool,
+    is_used_table: bool,
+) -> None:
     failures = []
     if not is_migrated_table:
         failures.append("Pending migration")

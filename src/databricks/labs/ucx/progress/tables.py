@@ -1,6 +1,8 @@
 import logging
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
+from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -11,6 +13,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.ownership import TableOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
+from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
@@ -18,12 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class TableProgressEncoder(ProgressEncoder[Table]):
-    """Encoder class:Table to class:History.
-
-    A progress failure for a table means:
-    - the table is not migrated yet
-    - the associated grants have a failure
-    """
+    """Encoder class:Table to class:History."""
 
     def __init__(
         self,
@@ -59,15 +57,30 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         # The mode is 'append'. This is documented as conflict-free.
         self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
 
-    def _encode_table_as_historical(self, record: Table, migration_index: TableMigrationIndex) -> Historical:
-        """Encode a table record, enriching with the migration status.
+    @cached_property
+    def _used_hive_tables(self) -> defaultdict[str, list[UsedTable]]:
+        used_tables: defaultdict[str, list[UsedTable]] = defaultdict(list[UsedTable])
+        for snapshot in self._used_tables_for_paths.snapshot, self._used_tables_for_queries.snapshot:
+            for used_table in snapshot():
+                if used_table.catalog_name == "hive_metastore":
+                    used_tables[used_table.full_name].append(used_table)
+        return used_tables
 
-        A table failure means that the table is pending migration. Grants are purposefully left out, because a grant
-        might not be mappable to UC, like `READ_METADATA`, thus possibly resulting in false "pending migration" failure
-        for tables that are migrated to UC with their relevant grants also being migrated.
+    def _encode_table_as_historical(self, record: Table, migration_index: TableMigrationIndex) -> Historical:
+        """Encode a table record, enriching with the migration status and used table references.
+
+        Possible failures, the table is
+        - Pending migration
+        - A Hive table referenced by code
+
+        Grants are purposefully left out, because a grant might not be mappable to UC, like `READ_METADATA`, thus
+        possibly resulting in false "pending migration" failure for tables that are migrated to UC with their relevant
+        grants also being migrated.
         """
         historical = super()._encode_record_as_historical(record)
         failures = []
         if not migration_index.is_migrated(record.database, record.name):
             failures.append("Pending migration")
+        for used_table in self._used_hive_tables.get(record.full_name, []):
+            failures.append(f"Used by {used_table.source_type}: {used_table.source_id}")
         return replace(historical, failures=historical.failures + failures)
