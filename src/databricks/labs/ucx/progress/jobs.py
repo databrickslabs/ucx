@@ -22,8 +22,6 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
         run_id: int,
         workspace_id: int,
         catalog: str,
-        schema: str = "multiworkspace",
-        table: str = "historical",
     ) -> None:
         super().__init__(
             sql_backend,
@@ -32,8 +30,8 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
             run_id,
             workspace_id,
             catalog,
-            schema,
-            table,
+            "multiworkspace",
+            "historical",
         )
         self._direct_fs_access_crawlers = direct_fs_access_crawlers
         self._inventory_database = inventory_database
