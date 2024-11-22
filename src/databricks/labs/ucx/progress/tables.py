@@ -40,7 +40,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             run_id,
             workspace_id,
             catalog,
-            "mutliworkspace",
+            "multiworkspace",
             "historical",
         )
         self._migration_status_refresher = migration_status_refresher
