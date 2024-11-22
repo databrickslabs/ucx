@@ -28,8 +28,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         sql_backend: SqlBackend,
         ownership: TableOwnership,
         migration_status_refresher: CrawlerBase[TableMigrationStatus],
-        used_tables_crawler_for_paths: UsedTablesCrawler,
-        used_tables_crawler_for_queries: UsedTablesCrawler,
+        used_tables_crawlers: list[UsedTablesCrawler],
         run_id: int,
         workspace_id: int,
         catalog: str,
@@ -47,8 +46,7 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             table,
         )
         self._migration_status_refresher = migration_status_refresher
-        self._used_tables_for_paths = used_tables_crawler_for_paths
-        self._used_tables_for_queries = used_tables_crawler_for_queries
+        self._used_tables_crawlers = used_tables_crawlers
 
     def append_inventory_snapshot(self, snapshot: Iterable[Table]) -> None:
         migration_index = TableMigrationIndex(self._migration_status_refresher.snapshot())
@@ -60,8 +58,8 @@ class TableProgressEncoder(ProgressEncoder[Table]):
     @cached_property
     def _used_hive_tables(self) -> defaultdict[str, list[UsedTable]]:
         used_tables: defaultdict[str, list[UsedTable]] = defaultdict(list[UsedTable])
-        for snapshot in self._used_tables_for_paths.snapshot, self._used_tables_for_queries.snapshot:
-            for used_table in snapshot():
+        for crawler in self._used_tables_crawlers:
+            for used_table in crawler.snapshot():
                 if used_table.catalog_name == "hive_metastore":
                     used_tables[used_table.full_name].append(used_table)
         return used_tables

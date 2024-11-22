@@ -27,8 +27,7 @@ def test_table_progress_encoder_no_failures(mock_backend) -> None:
         mock_backend,
         ownership,
         migration_status_crawler,
-        used_tables_crawler,
-        used_tables_crawler,
+        [used_tables_crawler],
         run_id=1,
         workspace_id=123456789,
         catalog="test",
@@ -41,7 +40,7 @@ def test_table_progress_encoder_no_failures(mock_backend) -> None:
     assert len(rows[0].failures) == 0
     ownership.owner_of.assert_called_once()
     migration_status_crawler.snapshot.assert_called_once()
-    used_tables_crawler.snapshot.assert_called()
+    used_tables_crawler.snapshot.assert_called_once()
 
 
 def test_table_progress_encoder_pending_migration_failure(mock_backend) -> None:
@@ -64,14 +63,11 @@ def test_table_progress_encoder_pending_migration_failure(mock_backend) -> None:
         assessment_end_timestamp=dt.datetime.now(tz=dt.timezone.utc),
     )
     used_tables_crawler_for_paths.snapshot.return_value = [used_table]
-    used_tables_crawler_for_queries = create_autospec(UsedTablesCrawler)
-    used_tables_crawler_for_queries.snapshot.return_value = []
     encoder = TableProgressEncoder(
         mock_backend,
         ownership,
         migration_status_crawler,
-        used_tables_crawler_for_paths,
-        used_tables_crawler_for_queries,
+        [used_tables_crawler_for_paths],
         run_id=1,
         workspace_id=123456789,
         catalog="test",
@@ -85,4 +81,3 @@ def test_table_progress_encoder_pending_migration_failure(mock_backend) -> None:
     ownership.owner_of.assert_called_once()
     migration_status_crawler.snapshot.assert_called_once()
     used_tables_crawler_for_paths.snapshot.assert_called_once()
-    used_tables_crawler_for_queries.snapshot.assert_called_once()
