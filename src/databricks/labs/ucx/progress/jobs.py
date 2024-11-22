@@ -12,6 +12,7 @@ from databricks.labs.ucx.source_code.jobs import JobProblem
 
 
 class JobsProgressEncoder(ProgressEncoder[JobInfo]):
+    """Encoder class:Grant to class:History."""
 
     def __init__(
         self,
@@ -68,6 +69,12 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
         return index
 
     def _encode_record_as_historical(self, record: JobInfo) -> Historical:
+        """Encode a job as a historical records.
+
+        Failures are detected by the WorkflowLinter:
+        - Job problems
+        - Direct filesystem access by code used in job
+        """
         historical = super()._encode_record_as_historical(record)
         failures = []
         failures.extend(self._job_problems.get(int(record.job_id), []))
