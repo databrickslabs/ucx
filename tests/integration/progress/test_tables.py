@@ -12,7 +12,14 @@ def test_table_progress_encoder_table_failures(runtime_ctx, az_cli_ctx) -> None:
         sql_backend=az_cli_ctx.sql_backend,
         ucx_catalog=az_cli_ctx.ucx_catalog,
     )
-    table = Table("hive_metastore", "schema", "name", "UNKNOWN", "UNKNOWN")
+    table_info = runtime_ctx.make_table()
+    table = Table(
+        table_info.catalog_name,
+        table_info.schema_name,
+        table_info.name,
+        table_info.table_type.value,
+        table_info.data_source_format.value,
+    )
     used_table = UsedTable(
         catalog_name=table.catalog,
         schema_name=table.database,
