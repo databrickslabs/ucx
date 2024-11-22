@@ -32,8 +32,6 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         run_id: int,
         workspace_id: int,
         catalog: str,
-        schema: str = "multiworkspace",
-        table: str = "historical",
     ) -> None:
         super().__init__(
             sql_backend,
@@ -42,8 +40,8 @@ class TableProgressEncoder(ProgressEncoder[Table]):
             run_id,
             workspace_id,
             catalog,
-            schema,
-            table,
+            "mutliworkspace",
+            "historical",
         )
         self._migration_status_refresher = migration_status_refresher
         self._used_tables_crawlers = used_tables_crawlers
