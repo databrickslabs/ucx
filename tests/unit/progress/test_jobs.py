@@ -3,9 +3,10 @@ from unittest.mock import create_autospec
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx import __version__
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
-from databricks.labs.ucx import __version__
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 
 
 def test_jobs_progress_encoder() -> None:
@@ -28,9 +29,12 @@ def test_jobs_progress_encoder() -> None:
     )
     job_ownership = create_autospec(JobOwnership)
     job_ownership.owner_of.return_value = "some_owner"
+    direct_fs_crawler = create_autospec(DirectFsAccessCrawler)
+    direct_fs_crawler.snapshot.return_value = []
     jobs_progress_encoder = JobsProgressEncoder(
         sql_backend,
         job_ownership,
+        direct_fs_crawler,
         "inventory",
         2,
         3,
@@ -64,3 +68,4 @@ def test_jobs_progress_encoder() -> None:
             ucx_version=__version__,
         )
     ]
+    direct_fs_crawler.snapshot.assert_called_once()
