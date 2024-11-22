@@ -41,7 +41,7 @@ more central in [Unity Catalog](https://docs.databricks.com/en/data-governance/u
 
 ## Tracking
 
-The [(experimental) migration progress workflow](.../README.md#experimental-migration-progress-workflow) tracks the
+The [(experimental) migration progress workflow](../README.md#experimental-migration-progress-workflow) tracks the
 migration progress and populates [migration progress tables](#persistence).
 
 ### Roll-up to business resources
