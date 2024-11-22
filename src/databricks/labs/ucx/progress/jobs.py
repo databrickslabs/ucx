@@ -17,7 +17,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
         self,
         sql_backend: SqlBackend,
         ownership: JobOwnership,
-        direct_fs_access_crawler: DirectFsAccessCrawler,
+        direct_fs_access_crawlers: list[DirectFsAccessCrawler],
         inventory_database: str,
         run_id: int,
         workspace_id: int,
@@ -35,7 +35,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
             schema,
             table,
         )
-        self._direct_fs_access_crawler = direct_fs_access_crawler
+        self._direct_fs_access_crawlers = direct_fs_access_crawlers
         self._inventory_database = inventory_database
 
     @cached_property
@@ -54,18 +54,19 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
     @cached_property
     def _direct_fs_accesses(self) -> dict[str, list[str]]:
         index = collections.defaultdict(list)
-        for direct_fs_access in self._direct_fs_access_crawler.snapshot():
-            # The workflow and task source lineage are added by the WorkflowLinter
-            if len(direct_fs_access.source_lineage) < 2:
-                continue
-            if direct_fs_access.source_lineage[0].object_type != "WORKFLOW":
-                continue
-            if direct_fs_access.source_lineage[1].object_type != "TASK":
-                continue
-            job_id = direct_fs_access.source_lineage[0].object_id
-            task_key = direct_fs_access.source_lineage[1].object_id  # <job id>/<task key>
-            failure = f"Direct file system access by '{task_key}' in '{direct_fs_access.source_id} to '{direct_fs_access.path}'"
-            index[job_id].append(failure)
+        for crawler in self._direct_fs_access_crawlers:
+            for direct_fs_access in crawler.snapshot():
+                # The workflow and task source lineage are added by the WorkflowLinter
+                if len(direct_fs_access.source_lineage) < 2:
+                    continue
+                if direct_fs_access.source_lineage[0].object_type != "WORKFLOW":
+                    continue
+                if direct_fs_access.source_lineage[1].object_type != "TASK":
+                    continue
+                job_id = direct_fs_access.source_lineage[0].object_id
+                task_key = direct_fs_access.source_lineage[1].object_id  # <job id>/<task key>
+                failure = f"Direct file system access by '{task_key}' in '{direct_fs_access.source_id} to '{direct_fs_access.path}'"
+                index[job_id].append(failure)
         return index
 
     def _encode_record_as_historical(self, record: JobInfo) -> Historical:

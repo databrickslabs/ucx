@@ -203,6 +203,7 @@ class RuntimeContext(GlobalContext):
         return JobsProgressEncoder(
             self.sql_backend,
             self.job_ownership,
+            [self.directfs_access_crawler_for_paths, self.directfs_access_crawler_for_queries],
             self.inventory_database,
             self.parent_run_id,
             self.workspace_id,

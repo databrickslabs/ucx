@@ -34,7 +34,7 @@ def test_jobs_progress_encoder() -> None:
     jobs_progress_encoder = JobsProgressEncoder(
         sql_backend,
         job_ownership,
-        direct_fs_crawler,
+        [direct_fs_crawler],
         "inventory",
         2,
         3,
