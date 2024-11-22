@@ -70,6 +70,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
 
     def _encode_record_as_historical(self, record: JobInfo) -> Historical:
         historical = super()._encode_record_as_historical(record)
-        failures = self._job_problems.get(int(record.job_id), [])
-        failures = self._direct_fs_accesses.get(record.job_id, [])
+        failures = []
+        failures.extend(self._job_problems.get(int(record.job_id), []))
+        failures.extend(self._direct_fs_accesses.get(record.job_id, []))
         return replace(historical, failures=historical.failures + failures)
