@@ -112,6 +112,12 @@ The auxiliary [`workflow_runs` table](../src/databricks/labs/ucx/progress/instal
 | workflow_run_id      | int         | The workflow run id                        |
 | workflow_run_attempt | int         | The workflow run attempt                   |
 
+Example workflow run record:
+
+| started_at                                                                | finished_at                                                               | workspace_id | workflow_name                       | workflow_id | workflow_run_id | workflow_run_attempt |
+|---------------------------------------------------------------------------|---------------------------------------------------------------------------|--------------|-------------------------------------|-------------|-----------------|----------------------|
+| datetime.datetime(2024, 11, 22, 13, 50, 37, tzinfo=datetime.timezone.utc) | datetime.datetime(2024, 11, 22, 13, 50, 58, tzinfo=datetime.timezone.utc) | 123456789    | 'Migration progress (experimental)' | 123         | 456             | 0                    |
+
 ## Resource index
 
 | Hive or workspace object           | Description                                                                                                                | Dependent resources                     |
