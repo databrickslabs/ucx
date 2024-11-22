@@ -52,7 +52,7 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
         return index
 
     @cached_property
-    def _direct_fs_accesses(self) -> dict[int, list[str]]:
+    def _direct_fs_accesses(self) -> dict[str, list[str]]:
         index = collections.defaultdict(list)
         for direct_fs_access in self._direct_fs_access_crawler.snapshot():
             # The workflow and task source lineage are added by the WorkflowLinter
@@ -71,5 +71,5 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
     def _encode_record_as_historical(self, record: JobInfo) -> Historical:
         historical = super()._encode_record_as_historical(record)
         failures = self._job_problems.get(int(record.job_id), [])
-        failures = self._direct_fs_accesses.get(int(record.job_id), [])
+        failures = self._direct_fs_accesses.get(record.job_id, [])
         return replace(historical, failures=historical.failures + failures)
