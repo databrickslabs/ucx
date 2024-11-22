@@ -31,17 +31,30 @@ def test_jobs_progress_encoder() -> None:
     job_ownership = create_autospec(JobOwnership)
     job_ownership.owner_of.return_value = "some_owner"
     direct_fs_access_crawler = create_autospec(DirectFsAccessCrawler)
-    direct_fs_access = DirectFsAccess(
-        source_id="/path/to/write_dfsa.py",
-        source_lineage=[
-            LineageAtom(object_type="WORKFLOW", object_id="1", other={"name": "test"}),
-            LineageAtom(object_type="TASK", object_id="1/write-dfsa"),
-        ],
-        path="dfsa:/path/to/data/",
-        is_read=False,
-        is_write=True
-    )
-    direct_fs_access_crawler.snapshot.return_value = [direct_fs_access]
+    direct_fs_accesses = [
+        DirectFsAccess(
+            source_id="/path/to/write_dfsa.py",
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="1", other={"name": "test"}),
+                LineageAtom(object_type="TASK", object_id="1/write-dfsa"),
+            ],
+            path="dfsa:/path/to/data/",
+            is_read=False,
+            is_write=True
+        ),
+        DirectFsAccess(
+            source_id="/path/to/write_dfsa.py",
+            source_lineage=[
+                # Dashboard with same id as job is unlikely, but here to test it is not included
+                LineageAtom(object_type="DASHBOARD", object_id="1", other={"parent": "parent", "name": "test"}),
+                LineageAtom(object_type="QUERY", object_id="1/query", other={"name": "test"}),
+            ],
+            path="dfsa:/path/to/data/",
+            is_read=False,
+            is_write=True
+        ),
+    ]
+    direct_fs_access_crawler.snapshot.return_value = direct_fs_accesses
     jobs_progress_encoder = JobsProgressEncoder(
         sql_backend,
         job_ownership,
