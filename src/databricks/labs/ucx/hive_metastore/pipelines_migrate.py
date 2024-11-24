@@ -125,6 +125,8 @@ class PipelinesMigrator:
             return res
 
         # After successful clone, update jobs
+        # Currently there is no SDK method available to migrate the DLT pipelines
+        # We are directly using the DLT Migration API in the interim, once the SDK method is available, we can replace this
         if pipeline.pipeline_id in self._pipeline_job_tasks_mapping:
             for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline.pipeline_id]:
                 self._ws.jobs.update(
