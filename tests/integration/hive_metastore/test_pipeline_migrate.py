@@ -74,7 +74,7 @@ def test_pipeline_migrate(
     assert len(results) == 1
 
     pipelines_migrator = PipelinesMigrator(
-        ws, runtime_ctx.pipelines_crawler, make_catalog().name, skip_pipelines=[created_pipelines[1].pipeline_id]
+        ws, runtime_ctx.pipelines_crawler, make_catalog().name, skip_pipeline_ids=[created_pipelines[1].pipeline_id]
     )
     pipelines_migrator.migrate_pipelines()
 

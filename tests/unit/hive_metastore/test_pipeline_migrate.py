@@ -25,7 +25,7 @@ def test_migrate_pipelines(ws, mock_installation):
     }
     sql_backend = MockBackend(fails_on_first=errors, rows=rows)
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
-    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name", skip_pipelines=["skip-pipeline"])
+    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, "catalog_name", skip_pipeline_ids=["skip-pipeline"])
 
     ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
     ws.jobs.get.side_effect = [
