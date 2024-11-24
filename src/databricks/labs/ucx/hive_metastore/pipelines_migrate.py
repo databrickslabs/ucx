@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 class PipelinesMigrator:
     def __init__(
-        self, ws: WorkspaceClient, pipelines_crawler: PipelinesCrawler, catalog_name: str, skip_pipelines=None
+        self,
+        ws: WorkspaceClient,
+        pipelines_crawler: PipelinesCrawler,
+        catalog_name: str,
+        skip_pipelines: list[str] | None = None,
     ):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
