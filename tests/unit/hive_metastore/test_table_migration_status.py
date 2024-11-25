@@ -26,7 +26,9 @@ def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_cata
 
 
 @pytest.mark.parametrize("error", [BadRequest(), NotFound()])
-def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_schemas_list(mock_backend, error: DatabricksError) -> None:
+def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_schemas_list(
+    mock_backend, error: DatabricksError
+) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.catalogs.list.return_value = [CatalogInfo(name="test")]
     ws.schemas.list.side_effect = error
@@ -44,7 +46,9 @@ def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_sche
 
 
 @pytest.mark.parametrize("error", [BadRequest(), NotFound()])
-def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_tables_list(mock_backend, error: DatabricksError) -> None:
+def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_tables_list(
+    mock_backend, error: DatabricksError
+) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.catalogs.list.return_value = [CatalogInfo(name="test")]
     ws.schemas.list.return_value = [SchemaInfo(catalog_name="test", name="test")]
