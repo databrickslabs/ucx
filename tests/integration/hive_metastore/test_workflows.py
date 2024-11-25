@@ -33,12 +33,14 @@ def test_table_migration_job_refreshes_migration_status(
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test these workflows.
-    installation_ctx.deployed_workflows.run_workflow("assessment")
-    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+    installation_ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
+    assessment_completed_correctly = installation_ctx.deployed_workflows.validate_step("assessment")
+    assert assessment_completed_correctly, "Workflow failed: assessment"
 
     # The workflow under test.
-    run_id = ctx.deployed_workflows.run_workflow(workflow)
-    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
+    run_id = ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
+    workflow_completed_correctly = installation_ctx.deployed_workflows.validate_step("assessment")
+    assert workflow_completed_correctly, f"Workflow failed: {workflow}"
 
     # Avoiding MigrationStatusRefresh as it will refresh the status before fetching.
     migration_status_query = f"SELECT * FROM {ctx.migration_status_refresher.full_name}"
