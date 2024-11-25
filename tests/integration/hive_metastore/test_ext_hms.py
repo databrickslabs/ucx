@@ -47,8 +47,9 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
-    ext_hms_ctx.deployed_workflows.run_workflow("assessment")
-    assert ext_hms_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+    ext_hms_ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
+    assessment_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("assessment")
+    assert assessment_completed_correctly, "Workflow failed: assessment"
 
     # assert the workflow is successful
     assert ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")

@@ -39,7 +39,7 @@ def test_table_migration_job_refreshes_migration_status(
 
     # The workflow under test.
     run_id = ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
-    workflow_completed_correctly = installation_ctx.deployed_workflows.validate_step("assessment")
+    workflow_completed_correctly = installation_ctx.deployed_workflows.validate_step(workflow)
     assert workflow_completed_correctly, f"Workflow failed: {workflow}"
 
     # Avoiding MigrationStatusRefresh as it will refresh the status before fetching.
