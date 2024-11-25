@@ -98,6 +98,9 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                     f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
                 )
                 continue
+            except DatabricksError as e:
+                logger.warning(f"Received error while listing tables in schema: {schema.full_name}", exc_info=e)
+                continue
             for table in tables:
                 if not table.properties:
                     continue
