@@ -1,5 +1,6 @@
 from databricks.sdk.service.jobs import Task, PipelineTask
-from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
+from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary, PipelineCluster
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 
@@ -24,10 +25,11 @@ def test_pipeline_migrate(
     dlt_notebook_path = f"{make_directory()}/dlt_notebook.py"
     src_table = runtime_ctx.make_table(catalog_name="hive_metastore", schema_name=src_schema.name, non_delta=True)
     make_notebook(
-        content=f"""create streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_table.name})""".encode(
+        content=f"""create or refresh streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_table.name})""".encode(
             "ASCII"
         ),
-        path=f"{make_directory()}/dlt_notebook.py",
+        path=dlt_notebook_path,
+        language=Language.SQL,
     )
 
     pipeline_name = f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}"
@@ -37,6 +39,14 @@ def test_pipeline_migrate(
             name=pipeline_name,
             target=runtime_ctx.make_schema(catalog_name="hive_metastore").name,
             libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_path))],
+            clusters=[
+                PipelineCluster(
+                    node_type_id=ws.clusters.select_node_type(local_disk=False, min_memory_gb=16),
+                    label="default",
+                    num_workers=1,
+                    custom_tags={"cluster_type": "default", "RemoveAfter": watchdog_purge_suffix},
+                )
+            ],
         ),
         make_pipeline(
             configuration=_PIPELINE_CONF,
