@@ -94,9 +94,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
                 tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
             except NotFound:
-                logger.warning(
-                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
-                )
+                logger.warning(f"Schema {schema.full_name} no longer exists. Skipping checking its migration status.")
                 continue
             except DatabricksError as e:
                 logger.warning(f"Received error while listing tables in schema: {schema.full_name}", exc_info=e)
