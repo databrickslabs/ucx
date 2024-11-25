@@ -52,7 +52,9 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
     assert assessment_completed_correctly, "Workflow failed: assessment"
 
     # assert the workflow is successful
-    assert ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")
+    ext_hms_ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
+    migrate_tables_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")
+    assert migrate_tables_completed_correctly, "Workflow failed: migrate-tables"
 
     # assert the tables are migrated
     for table in tables.values():
