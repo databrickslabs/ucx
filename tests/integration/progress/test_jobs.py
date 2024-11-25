@@ -48,7 +48,7 @@ def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
     job_info = JobInfo(
         str(job.job_id),
         success=1,
-        failures=0,
+        failures="[]",
         job_name=job.settings.name,
         creator=job.creator_user_name,
     )
