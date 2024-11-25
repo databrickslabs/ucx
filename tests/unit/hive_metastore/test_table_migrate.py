@@ -1044,7 +1044,10 @@ def test_table_status_seen_tables(caplog):
     client = create_autospec(WorkspaceClient)
     client.catalogs.list.return_value = [CatalogInfo(name="cat1"), CatalogInfo(name="deleted_cat")]
     client.schemas.list.side_effect = [
-        [SchemaInfo(catalog_name="cat1", name="schema1", full_name="cat1.schema1"), SchemaInfo(catalog_name="cat1", name="deleted_schema", full_name="cat1.deleted_schema")],
+        [
+            SchemaInfo(catalog_name="cat1", name="schema1", full_name="cat1.schema1"),
+            SchemaInfo(catalog_name="cat1", name="deleted_schema", full_name="cat1.deleted_schema"),
+        ],
         NotFound(),
     ]
     client.tables.list.side_effect = [
