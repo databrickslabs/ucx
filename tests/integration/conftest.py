@@ -1223,7 +1223,7 @@ def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo
 
 @pytest.fixture
 def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
+    installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
 ) -> tuple[dict[str, TableInfo], SchemaInfo]:
     # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
     # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
