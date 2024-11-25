@@ -674,7 +674,7 @@ class MockRuntimeContext(
             Grant,
         )
 
-    @cached_property
+    @property
     def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
         for udf_info in self._udfs:
@@ -699,29 +699,17 @@ class MockRuntimeContext(
                 created_databases.add(grant.database)
         return list(created_databases)
 
-    @cached_property
+    @property
     def created_groups(self) -> list[str]:
-        created_groups = []
-        for group in self._groups:
-            if group.display_name is not None:
-                created_groups.append(group.display_name)
-        return created_groups
+        return [group.display_name for group in self._groups if group.display_name is not None]
 
-    @cached_property
+    @property
     def created_jobs(self) -> list[int]:
-        created_jobs = []
-        for job in self._jobs:
-            if job.job_id is not None:
-                created_jobs.append(job.job_id)
-        return created_jobs
+        return [job.job_id for job in self._jobs if job.job_id is not None]
 
-    @cached_property
+    @property
     def created_dashboards(self) -> list[str]:
-        created_dashboards = []
-        for dashboard in self._dashboards:
-            if dashboard.id is not None:
-                created_dashboards.append(dashboard.id)
-        return created_dashboards
+        return [dashboard.id for dashboard in self._dashboards if dashboard.id is not None]
 
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
