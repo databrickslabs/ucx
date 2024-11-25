@@ -836,7 +836,7 @@ def test_default_securable_ownership(
         Table("main", "foo", "baz", "VIEW", "UNKNOWN", None, "select * from bar"),
     ]
     group_manager = create_autospec(GroupManager)
-    group_manager.validate_owner_group.return_value = valid_admin
+    group_manager.current_user_in_owner_group.return_value = valid_admin
 
     ownership = DefaultSecurableOwnership(
         admin_locator, table_crawler, group_manager, default_owner_group, lambda: cli_user

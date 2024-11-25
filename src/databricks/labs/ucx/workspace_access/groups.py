@@ -21,7 +21,7 @@ from databricks.sdk.errors.platform import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.iam import Group, User
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -485,8 +485,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # Step 3: Wait for enumeration to also reflect the updated information.
         self._wait_for_renamed_groups(renamed_groups)
 
-    def validate_owner_group(self, group_name: str) -> bool:
-        return self._account_groups_lookup.validate_owner_group(group_name)
+    def current_user_in_owner_group(self, group_name: str) -> bool:
+        return self._account_groups_lookup.user_in_group(group_name, self._ws.current_user.me())
 
     def _rename_group(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
         logger.debug(f"Renaming group: {old_group_name} (id={group_id}) -> {new_group_name}")
@@ -559,7 +559,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
-        account_groups_in_account = self._account_groups_lookup.list()
+        account_groups_in_account = self._account_groups_lookup.get_mapping()
         account_groups_in_workspace = self._account_groups_in_workspace()
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
         groups_to_migrate = self.get_migration_state().groups
@@ -650,13 +650,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _crawl(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_lookup.list()
+        account_groups_in_account = self._account_groups_lookup.get_mapping()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         yield from strategy.generate_migrated_groups()
 
     def validate_group_membership(self) -> list[dict]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
-        account_groups_in_account = self._account_groups_lookup.list()
+        account_groups_in_account = self._account_groups_lookup.get_mapping()
         strategy = self._get_strategy(workspace_groups_in_workspace, account_groups_in_account)
         migrated_groups = list(strategy.generate_migrated_groups())
         mismatch_group = []
@@ -930,9 +930,9 @@ class AccountGroupLookup:
         group_names = [group.display_name for group in groups]
         return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
 
-    def validate_owner_group(self, group_name: str) -> bool:
+    def user_in_group(self, group_name: str, user: User) -> bool:
         # This method is used to validate that the current user is a member of the group
-        user_id = self._ws.current_user.me().id
+        user_id = user.id
         if not user_id:
             logger.warning("No user found for the current session.")
             return False
@@ -975,7 +975,7 @@ class AccountGroupLookup:
         )  # type: ignore[arg-type,return-value]
         return sorted_groups
 
-    def list(self) -> dict[str, Group]:
+    def get_mapping(self) -> dict[str, Group]:
         groups: dict[str, Group] = {}
         for group in self._list_account_groups("id,displayName,externalId"):
             if not group.display_name:

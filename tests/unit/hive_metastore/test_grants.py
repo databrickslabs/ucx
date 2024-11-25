@@ -966,4 +966,4 @@ def test_default_owner(user_id, expected) -> None:
     }
 
     account_group_lookup = AccountGroupLookup(ws)
-    assert account_group_lookup.validate_owner_group("owners") == expected
+    assert account_group_lookup.user_in_group("owners",ws.current_user.me()) == expected
