@@ -40,7 +40,7 @@ def test_jobs_progress_encoder() -> None:
             ],
             path="dfsa:/path/to/data/",
             is_read=False,
-            is_write=True
+            is_write=True,
         ),
         DirectFsAccess(
             source_id="/path/to/write_dfsa.py",
@@ -51,7 +51,7 @@ def test_jobs_progress_encoder() -> None:
             ],
             path="dfsa:/path/to/data/",
             is_read=False,
-            is_write=True
+            is_write=True,
         ),
     ]
     direct_fs_access_crawler.snapshot.return_value = direct_fs_accesses
