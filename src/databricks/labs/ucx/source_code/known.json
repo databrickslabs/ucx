@@ -12664,6 +12664,9 @@
     "openai.types.shared_params.function_parameters": [],
     "openai.version": []
   },
+  "opencensus": {
+    "opencensus": []
+  },
   "opencv-python": {
     "cv2": [],
     "cv2.config-3": [],

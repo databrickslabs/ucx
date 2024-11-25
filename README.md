@@ -915,14 +915,14 @@ The output is processed and displayed in the migration dashboard using the in `r
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
-The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
-workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
-progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
+The manually triggered `migration-progress-experimental` workflow populates the tables visualized in the
+[migration progress dashboard](#dashboards) by updating a **subset** of the [inventory tables](#assessment-workflow)
+to [track Unity Catalog compatability](docs/migration-progress.md) of Hive and workspace objects that need to be migrated.
 
-- `workflow_runs`: Tracks the status of the workflow runs.
-
-_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
-the [assessment workflow](#assessment-workflow)._
+The following pre-requisites need to be fulfilled before running the workflow:
+- [UC metastore attached to workspace](../README.md#assign-metastore-command)
+- [UCX catalog exists](../README.md#create-ucx-catalog-command)
+- [Assessment job ran successfully](../README.md#ensure-assessment-run-command)
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -939,7 +939,7 @@ overview with a short description is given.
 | [Assessment \[Azure\]](./src/databricks/labs/ucx/queries/assessment/azure/00_0_azure_service_principals.md)     | Assessment outcomes specific to Azure              |
 | [Migration \[Main\]](./src/databricks/labs/ucx/queries/migration/main/00_0_migration_overview.md)               | Migration overview                                 |
 | [Migration \[Groups\]](./src/databricks/labs/ucx/queries/migration/groups/00_0_migration_overview.md)           | Group migration outcomes                           |
-| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | Migration progress                                 |
+| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | [Migration progress](./docs/migration-progress.md) |
 
 [[back to top](#databricks-labs-ucx)]
 
