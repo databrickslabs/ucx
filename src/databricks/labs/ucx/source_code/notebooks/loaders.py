@@ -73,6 +73,9 @@ class NotebookLoader(DependencyLoader, abc.ABC):
                 exc_info=True,
             )
             return None
+        except UnicodeDecodeError:
+            logger.warning(f"Cannot decode non-UTF-8 encoded notebook from workspace: {absolute_path}")
+            return None
         language = self._detect_language(absolute_path, content)
         if not language:
             logger.warning(f"Could not detect language for {absolute_path}")
