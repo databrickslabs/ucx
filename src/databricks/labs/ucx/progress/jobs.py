@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.jobs import JobProblem
 
 
 class JobsProgressEncoder(ProgressEncoder[JobInfo]):
-    """Encoder class:Grant to class:History."""
+    """Encoder class:Job to class:History."""
 
     def __init__(
         self,
