@@ -1,6 +1,7 @@
 from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
+from databricks.labs.ucx.source_code.jobs import JobProblem
 
 
 def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
@@ -14,6 +15,27 @@ def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
     job = runtime_ctx.make_job()
     assert job.job_id, "Expected job with id"
     assert job.settings and job.settings.tasks, "Expected job with tasks"
+
+    job_problems = [
+        JobProblem(
+            job_id=job.job_id,
+            job_name=job.settings.name,
+            task_key=job.settings.tasks[0].task_key,
+            path="parent/child.py",
+            code="sql-parse-error",
+            message="Could not parse SQL",
+            start_line=1234,
+            start_col=22,
+            end_line=1234,
+            end_col=32,
+        )
+    ]
+    runtime_ctx.sql_backend.save_table(
+        f'{runtime_ctx.inventory_database}.workflow_problems',
+        job_problems,
+        JobProblem,
+        mode='overwrite',
+    )
 
     dashboard = runtime_ctx.make_dashboard()
 
@@ -59,5 +81,6 @@ def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
 
     assert len(records) == 1, "Expected one historical entry"
     assert records[0].failures == [
+        f"sql-parse-error: {job.settings.tasks[0].task_key} task: parent/child.py: Could not parse SQL",
         f"Direct file system access by '{job.settings.tasks[0].task_key}' in '/path/to/write_dfsa.py' to 'dfsa:/path/to/data/'",
     ]
