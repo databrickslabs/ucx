@@ -13,6 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class PipelinesMigrator:
+    """
+    PipelinesMigrator is responsible for migrating pipelines from HMS to UC
+    It uses the DLT Migration API to migrate the pipelines and also updates the jobs associated with the pipelines if any
+    The class also provides an option to skip the pipelines that are already migrated or the ones that are explicitly skipped
+
+    :param ws: WorkspaceClient
+    :param pipelines_crawler: PipelinesCrawler
+    :param catalog_name: str
+    :param skip_pipeline_ids: list[str] | None
+    """
+
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -27,6 +38,10 @@ class PipelinesMigrator:
         self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
 
     def _populate_pipeline_job_tasks_mapping(self) -> None:
+        """
+        Populates the pipeline_job_tasks_mapping dictionary with the pipeline_id as key and the list of jobs associated with the pipeline
+        :return: None
+        """
         jobs = self._ws.jobs.list()
 
         for job in jobs:
@@ -49,13 +64,25 @@ class PipelinesMigrator:
                 logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
     def _get_pipelines_to_migrate(self) -> list[PipelineInfo]:
+        """
+        Returns the list of pipelines in the current workspace
+        :return: list[PipelineInfo]
+        """
         return list(self._pipeline_crawler.snapshot())
 
     def migrate_pipelines(self) -> None:
+        """
+        Migrate the pipelines from HMS to UC. Public method to be called to start the pipeline migration process
+        :return:
+        """
         self._populate_pipeline_job_tasks_mapping()
         self._migrate_pipelines()
 
     def _migrate_pipelines(self) -> list[partial[dict | bool | list | BinaryIO]]:
+        """
+        Create tasks to parallely migrate the pipelines
+        :return: list[partial[dict | bool | list | BinaryIO]]
+        """
         # get pipelines to migrate
         pipelines_to_migrate = self._get_pipelines_to_migrate()
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
@@ -72,6 +99,11 @@ class PipelinesMigrator:
         return tasks
 
     def _migrate_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO | bool:
+        """
+        Private method to clone the pipeline and handle the exceptions
+        :param pipeline:
+        :return: list[partial[dict | bool | list | BinaryIO]]
+        """
         try:
             return self._clone_pipeline(pipeline)
         except DatabricksError as e:
@@ -82,6 +114,14 @@ class PipelinesMigrator:
             return False
 
     def _clone_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO:
+        """
+        This method calls the DLT Migration API to clone the pipeline
+        Stop and rename the old pipeline before cloning the new pipeline
+        Call the DLT Migration API to clone the pipeline
+        Update the jobs associated with the pipeline to point to the new pipeline
+        :param pipeline:
+        :return:
+        """
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
         get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
