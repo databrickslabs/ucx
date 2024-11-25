@@ -24,10 +24,10 @@ def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
             path="parent/child.py",
             code="sql-parse-error",
             message="Could not parse SQL",
-            start_line=1234,
-            start_col=22,
-            end_line=1234,
-            end_col=32,
+            start_line=12,
+            start_col=0,
+            end_line=12,
+            end_col=20,
         )
     ]
     runtime_ctx.sql_backend.save_table(
@@ -82,5 +82,5 @@ def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
     assert len(records) == 1, "Expected one historical entry"
     assert records[0].failures == [
         f"sql-parse-error: {job.settings.tasks[0].task_key} task: parent/child.py: Could not parse SQL",
-        f"Direct file system access by '{job.settings.tasks[0].task_key}' in '/path/to/write_dfsa.py' to 'dfsa:/path/to/data/'",
+        f"direct-filesystem-access: {job.settings.tasks[0].task_key} task: /path/to/write_dfsa.py: The use of direct filesystem references is deprecated: dfsa:/path/to/data/",
     ]

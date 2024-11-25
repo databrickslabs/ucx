@@ -87,7 +87,7 @@ def test_jobs_progress_encoder() -> None:
                 'some failure from config',
                 'cannot-autofix-table-reference: a task: /some/path: some failure',
                 'catalog-api-in-shared-clusters: b task: /some/other: some failure',
-                "Direct file system access by '1/write-dfsa' in '/path/to/write_dfsa.py' to 'dfsa:/path/to/data/'",
+                "direct-filesystem-access: 1/write-dfsa task: /path/to/write_dfsa.py: The use of direct filesystem references is deprecated: dfsa:/path/to/data/",
             ],
             owner='some_owner',
             ucx_version=__version__,

@@ -64,7 +64,10 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
                     continue
                 job_id = direct_fs_access.source_lineage[0].object_id
                 task_key = direct_fs_access.source_lineage[1].object_id  # <job id>/<task key>
-                failure = f"Direct file system access by '{task_key}' in '{direct_fs_access.source_id}' to '{direct_fs_access.path}'"
+                # Follow same failure message structure as the JobProblems above and DirectFsAccessPyLinter deprecation
+                code = "direct-filesystem-access"
+                message = f"The use of direct filesystem references is deprecated: {direct_fs_access.path}"
+                failure = f"{code}: {task_key} task: {direct_fs_access.source_id}: {message}"
                 index[job_id].append(failure)
         return index
 
