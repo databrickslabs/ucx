@@ -6,7 +6,8 @@ from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.service.catalog import CatalogInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -153,8 +154,14 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield TableMigrationStatus(*row)
 
+    def _iter_catalogs(self) -> Iterable[CatalogInfo]:
+        try:
+            yield from self._ws.catalogs.list()
+        except DatabricksError as e:
+            logger.warning("Cannot list catalogs", exc_info=e)
+
     def _iter_schemas(self):
-        for catalog in self._ws.catalogs.list():
+        for catalog in self._iter_catalogs():
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
             except NotFound:
