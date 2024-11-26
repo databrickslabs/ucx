@@ -580,6 +580,12 @@ class MockRuntimeContext(
         self._dashboards.append(dashboard)
         return dashboard
 
+    def make_notebook(self, **kwargs):
+        return self._make_notebook(**kwargs)
+
+    def make_catalog(self, **kwargs):
+        return self._make_catalog(**kwargs)
+
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
         self.make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
