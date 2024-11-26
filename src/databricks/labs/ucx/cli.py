@@ -875,6 +875,7 @@ def create_federated_catalog(w: WorkspaceClient, prompts: Prompts):
     ctx = WorkspaceContext(w)
     ctx.federation.create_from_cli(prompts)
 
+
 @ucx.command
 def enable_hms_federation(w: WorkspaceClient, _: Prompts, ctx: WorkspaceContext | None = None):
     """(Experimental) Create federated catalog from current workspace Hive Metastore."""

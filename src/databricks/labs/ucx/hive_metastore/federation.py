@@ -1,7 +1,7 @@
 import collections
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -20,7 +20,6 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.secrets import SecretsMixin
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
@@ -30,13 +29,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExtHms:
     # This is a dataclass that represents the external Hive Metastore connection information
-    database: str
     db_type: str
     host: str
-    password: str
-    port: int
-    user: str
-    version: str
+    port: str
+    database: str
+    user: str | None
+    password: str | None
+    version: str | None
 
 
 class HiveMetastoreFederationEnabler:
@@ -69,17 +68,60 @@ class HiveMetastoreFederation(SecretsMixin):
     }
 
     def create_from_cli(self, prompts: Prompts):
+        if not self._enable_hms_federation:
+            raise RuntimeWarning('Run `databricks labs ucx enable-hms-federation` to enable HMS Federation')
+        name = self._workspace_info.current()
 
+        ext_hms = None
+        try:
+            ext_hms = self._get_ext_hms()
+        except ValueError:
+            logger.info('Failed to get external Hive Metastore connection information')
+
+        if ext_hms and prompts.confirm(
+            f'Identified a supported external Hive Metastore connection: {ext_hms.db_type}. Use this connection?'
+        ):
+            connection_info = self._get_or_create_ext_connection(name, ext_hms)
+        else:
+            connection_info = self._get_or_create_int_connection(name)
+        assert connection_info.name is not None
+        return self._register_federated_catalog(connection_info)
 
     def _get_ext_hms(self) -> ExtHms:
         config = self._installation.load(WorkspaceConfig)
-        if not config.spark_config:
+        if not config.spark_conf:
             raise ValueError('Spark config not found')
-        spark_config = config.spark_config
-        jdbc_url = self._get_value_from_config_key(spark_config,'spark.datasource.hive.metastore.jdbc.url')
+        spark_config = config.spark_conf
+        if not spark_config:
+            raise ValueError('Spark config not found')
+        jdbc_url = self._get_value_from_config_key(spark_config, 'spark.hadoop.javax.jdo.option.ConnectionURL')
+        if not jdbc_url:
+            raise ValueError('JDBC URL not found')
+        version = self._get_value_from_config_key(spark_config, 'spark.sql.hive.metastore.version')
+        if not version:
+            raise ValueError('Hive Metastore version not found')
+        ext_hms = replace(self._split_jdbc_url(jdbc_url), version=version)
+        supported_versions = self.supported_db_vers.get(ext_hms.db_type)
+        if not supported_versions:
+            raise ValueError(f'Unsupported Hive Metastore: {ext_hms.db_type}')
+        if version not in supported_versions:
+            raise ValueError(f'Unsupported Hive Metastore Version: {ext_hms.db_type} - {version}')
+        if not ext_hms.user:
+            ext_hms = replace(
+                ext_hms,
+                user=self._get_value_from_config_key(spark_config, 'spark.hadoop.javax.jdo.option.ConnectionUserName'),
+            )
+        if not ext_hms.password:
+            ext_hms = replace(
+                ext_hms,
+                password=self._get_value_from_config_key(
+                    spark_config, 'spark.hadoop.javax.jdo.option.ConnectionPassword'
+                ),
+            )
+        return ext_hms
 
     @classmethod
-    def _split_jdbc_url(cls, jdbc_url: str) -> tuple[str, str, int, str, str, str]:
+    def _split_jdbc_url(cls, jdbc_url: str) -> ExtHms:
         # Define the regex pattern to match the JDBC URL components
         pattern = re.compile(
             r'jdbc:(?P<db_type>[a-zA-Z0-9]+)://(?P<host>[^:/]+):(?P<port>\d+)/(?P<database>[^?]+)(\?user=(?P<user>[^&]+)&password=(?P<password>[^&]+))?'
@@ -90,20 +132,14 @@ class HiveMetastoreFederation(SecretsMixin):
 
         db_type = match.group('db_type')
         host = match.group('host')
-        port = int(match.group('port'))
+        port = match.group('port')
         database = match.group('database')
         user = match.group('user')
         password = match.group('password')
 
-        return db_type, host, port, database, user, password
+        return ExtHms(db_type, host, port, database, user, password, None)
 
-
-    def register_internal_hms_as_federated_catalog(self) -> CatalogInfo:
-        if not self._enable_hms_federation:
-            raise RuntimeWarning('Run `databricks labs ucx enable-hms-federation` to enable HMS Federation')
-        name = self._workspace_info.current()
-        connection_info = self._get_or_create_int_connection(name)
-        assert connection_info.name is not None
+    def _register_federated_catalog(self, connection_info) -> CatalogInfo:
         try:
             return self._ws.catalogs.create(
                 name=connection_info.name,
@@ -131,21 +167,25 @@ class HiveMetastoreFederation(SecretsMixin):
                     return connection
         raise NotFound(f'Connection {name} not found')
 
-    def _get_or_create_ext_connection(self, name:str, ext_hms: ExtHms) -> ConnectionInfo:
+    def _get_or_create_ext_connection(self, name: str, ext_hms: ExtHms) -> ConnectionInfo:
+        options: dict[str, str] = {
+            "builtin": "true",
+            "database": ext_hms.database,
+            "db_type": ext_hms.db_type,
+            "host": ext_hms.host,
+            "port": ext_hms.port,
+        }
+        if ext_hms.user:
+            options["user"] = ext_hms.user
+        if ext_hms.password:
+            options["password"] = ext_hms.password
+        if ext_hms.version:
+            options["version"] = ext_hms.version
         try:
             return self._ws.connections.create(
                 name=name,
                 connection_type=ConnectionType.HIVE_METASTORE,  # needs SDK change
-                options={
-                    "builtin": "true",
-                    "database": ext_hms.database,
-                    "db_type": ext_hms.db_type,
-                    "host": ext_hms.host,
-                    "password": ext_hms.password,
-                    "port": ext_hms.port,
-                    "user": ext_hms.user,
-                    "version": ext_hms.version,
-                },
+                options=options,
             )
         except AlreadyExists:
             for connection in self._ws.connections.list():
