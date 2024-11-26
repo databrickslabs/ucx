@@ -54,8 +54,8 @@ class TableProgressEncoder(ProgressEncoder[Table]):
         self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
 
     @cached_property
-    def _used_hive_tables(self) -> defaultdict[str, list[UsedTable]]:
-        used_tables: defaultdict[str, list[UsedTable]] = defaultdict(list[UsedTable])
+    def _used_hive_tables(self) -> dict[str, list[UsedTable]]:
+        used_tables: dict[str, list[UsedTable]] = defaultdict(list[UsedTable])
         for crawler in self._used_tables_crawlers:
             for used_table in crawler.snapshot():
                 if used_table.catalog_name == "hive_metastore":
