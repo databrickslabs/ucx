@@ -27,6 +27,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.iam import Group, ComplexValue
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
 
@@ -391,6 +392,47 @@ def test_configure_sets_expected_workspace_configuration_values(
     install.configure()
 
     workspace_config_expected = {**workspace_config_default, **workspace_config_overwrite}
+    mock_installation.assert_file_written("config.yml", workspace_config_expected)
+
+
+def test_configure_with_default_owner_group(
+    ws,
+    mock_installation,
+) -> None:
+    workspace_config_expected = {
+        "version": 2,
+        "default_catalog": "ucx_default",
+        "default_owner_group": "account_group",
+        "ucx_catalog": "ucx",
+        "inventory_database": "ucx",
+        "log_level": "INFO",
+        "num_threads": 8,
+        "min_workers": 1,
+        "max_workers": 10,
+        "policy_id": "foo",
+        "renamed_group_prefix": "db-temp-",
+        "warehouse_id": "abc",
+        "workspace_start_path": "/",
+        "num_days_submit_runs_history": 30,
+        "recon_tolerance_percent": 5,
+        "managed_table_external_storage": "CLONE",
+    }
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r"If hive_metastore contains managed table with external.*": "1",
+            r"Do you want to define a default owner group.*": "yes",
+            r"Select the group to be used.*": "0",
+            r".*": "",
+        }
+    )
+    group1 = Group(id="1", display_name="account_group", members=[ComplexValue(display="me@example.com", value="666")])
+    ws.api_client.do.return_value = {"Resources": [group1.as_dict()]}
+    install = WorkspaceInstaller(ws).replace(prompts=prompts, installation=mock_installation, product_info=PRODUCT_INFO)
+
+    install.configure()
+
     mock_installation.assert_file_written("config.yml", workspace_config_expected)
 
 

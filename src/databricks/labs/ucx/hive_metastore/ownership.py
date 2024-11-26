@@ -115,7 +115,7 @@ class DefaultSecurableOwnership(Ownership[Table]):
     @cached_property
     def _static_owner(self) -> str | None:
         # If the default owner group is not valid, fall back to the application principal
-        if self._default_owner_group and self._group_manager.validate_owner_group(self._default_owner_group):
+        if self._default_owner_group and self._group_manager.current_user_in_owner_group(self._default_owner_group):
             logger.warning("Default owner group is not valid, falling back to administrator ownership.")
             return self._default_owner_group
         return self._application_principal
