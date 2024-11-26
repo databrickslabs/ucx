@@ -352,6 +352,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
         ),
         (r"Min workers for auto-scale.*", "2", {"min_workers": 2}),
         (r"Max workers for auto-scale.*", "20", {"max_workers": 20}),
+        (r"Do you want to skip TACL.*", "yes", {"skip_tacl_migration": True}),
     ],
 )
 def test_configure_sets_expected_workspace_configuration_values(
