@@ -570,20 +570,26 @@ class MockRuntimeContext(
     def make_cluster_policy_permissions(self, **kwargs):
         return self._make_cluster_policy_permissions(**kwargs)
 
+    def make_job(self, **kwargs) -> Job:
+        job = self._make_job(**kwargs)
+        self._jobs.append(job)
+        return job
+
+    def make_dashboard(self, **kwargs) -> Dashboard:
+        dashboard = self._make_dashboard(**kwargs)
+        self._dashboards.append(dashboard)
+        return dashboard
+
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
-        notebook_job_1 = self._make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
-        notebook_job_2 = self._make_job(content="spark.table('old.stuff')")
-        file_job_1 = self._make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
-        file_job_2 = self._make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
+        self.make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
+        self.make_job(content="spark.table('old.stuff')")
+        self.make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
+        self.make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
         query_1 = self._make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
-        dashboard_1 = self._make_dashboard(query=query_1)
+        self._make_dashboard(query=query_1)
         query_2 = self._make_query(sql_query='SELECT * from my_schema.my_table')
-        dashboard_2 = self._make_dashboard(query=query_2)
-
-        self._jobs.extend([notebook_job_1, notebook_job_2, file_job_1, file_job_2])
-        self._dashboards.append(dashboard_1)
-        self._dashboards.append(dashboard_2)
+        self._make_dashboard(query=query_2)
 
     def add_table(self, table: TableInfo):
         self._tables.append(table)

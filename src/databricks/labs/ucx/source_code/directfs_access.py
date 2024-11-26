@@ -50,7 +50,8 @@ class DirectFsAccessCrawler(CrawlerBase[DirectFsAccess]):
         Providing a multi-entity crawler is out-of-scope of this PR
         """
         try:
-            # TODO until we historize data, we append all DFSAs
+            # TODO: Until we historize data, we append all DFSAs
+            # UPDATE: We historize DFSA from WorkflowLinter, not from QueryLinter yet
             self._update_snapshot(dfsas, mode="append")
         except DatabricksError as e:
             logger.error("Failed to store DFSAs", exc_info=e)
