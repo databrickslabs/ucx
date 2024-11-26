@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.graph import Dependency
@@ -24,9 +25,19 @@ def test_detects_language() -> None:
     assert not NotebookLoaderForTesting.detect_language(Path("hi"), "stuff")
 
 
-def test_notebook_loader_loads_dependency_with_permission_error(caplog) -> None:
+@pytest.mark.parametrize(
+    "error, message",
+    [
+        (PermissionError("Permission denied"), "Permission error while reading notebook from workspace"),
+        (
+            UnicodeDecodeError("utf-8", b"\x80\x81\x82", 0, 1, "invalid start byte"),
+            "Cannot decode non-UTF-8 encoded notebook from workspace",
+        ),
+    ],
+)
+def test_notebook_loader_loads_dependency_raises_error(caplog, error: Exception, message: str) -> None:
     path = create_autospec(Path)
-    path.read_text.side_effect = PermissionError("Permission denied")
+    path.read_text.side_effect = error
     path_lookup = create_autospec(PathLookup)
     path_lookup.resolve.return_value = path
     dependency = create_autospec(Dependency)
@@ -35,5 +46,5 @@ def test_notebook_loader_loads_dependency_with_permission_error(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.notebooks.loaders"):
         found = NotebookLoader().load_dependency(path_lookup, dependency)
 
-    assert f"Permission error while reading notebook from workspace: {path}" in caplog.text
+    assert f"{message}: {path}" in caplog.text
     assert found is None
