@@ -260,6 +260,10 @@ class UsedTable(SourceInfo):
             catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0], is_read=is_read, is_write=is_write
         )
 
+    @property
+    def full_name(self) -> str:
+        return ".".join([self.catalog_name, self.schema_name, self.table_name])
+
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
     table_name: str = SourceInfo.UNKNOWN

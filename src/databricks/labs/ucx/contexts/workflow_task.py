@@ -226,6 +226,7 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.table_ownership,
             self.migration_status_refresher,
+            [self.used_tables_crawler_for_paths, self.used_tables_crawler_for_queries],
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
