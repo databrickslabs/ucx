@@ -39,7 +39,12 @@ class LegacyGroupMigration(Workflow):
             return
         ctx.group_manager.reflect_account_groups_on_workspace()
 
-    @job_task(depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
+    @job_task(job_cluster="tacl")
+    def setup_tacl(self, ctx: RuntimeContext):
+        """(Optimization) Allow the TACL job cluster to be started while we're verifying the prerequisites for
+        refreshing everything."""
+
+    @job_task(depends_on=[reflect_account_groups_on_workspace, setup_tacl], job_cluster="tacl")
     def apply_permissions_to_account_groups(self, ctx: RuntimeContext):
         """Fourth phase of the workspace-local group migration process. It does the following:
           - Assigns the full set of permissions of the original group to the account-level one
