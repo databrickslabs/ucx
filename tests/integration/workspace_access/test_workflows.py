@@ -16,7 +16,7 @@ def test_running_real_migrate_groups_job(
     make_cluster_policy_permissions,
     make_secret_scope,
     make_secret_scope_acl,
-):
+) -> None:
     installation_ctx = installation_ctx.replace(
         config_transform=lambda wc: replace(
             wc,
