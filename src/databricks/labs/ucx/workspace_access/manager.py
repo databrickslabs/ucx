@@ -118,9 +118,11 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
         verifications, errors = Threads.strict("verify group permissions", verifier_tasks)
         if errors:
+            logger.error(f"Detected {len(errors)} errors while verifying permissions")
             raise ManyError(errors)
-        if not all(errors):
-            logger.info("Not all permissions validated successfully. No issues found.")
+        if not all(verifications):
+            unsuccessful_verifications = len(verifications) - sum(verifications)
+            logger.error(f"Detected {unsuccessful_verifications} invalidated permissions")
             return False
         logger.info("All permissions validated successfully. No issues found.")
         return True
