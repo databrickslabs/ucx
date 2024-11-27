@@ -27,7 +27,7 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
             wc,
             override_clusters={
                 "main": ext_hms_cluster_id,
-                "table_migration": ext_hms_cluster_id,
+                "user_isolation": ext_hms_cluster_id,
             },
         ),
         extend_prompts={

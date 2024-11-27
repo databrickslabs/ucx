@@ -11,7 +11,7 @@ class LegacyGroupMigration(Workflow):
     def __init__(self):
         super().__init__('migrate-groups-legacy')
 
-    @job_task(job_cluster="table_migration")
+    @job_task(job_cluster="user_isolation")
     def verify_metastore_attached(self, ctx: RuntimeContext):
         """Verifies if a metastore is attached to this workspace. If not, the workflow will fail.
 
@@ -72,7 +72,7 @@ class PermissionsMigrationAPI(Workflow):
     def __init__(self):
         super().__init__('migrate-groups')
 
-    @job_task(job_cluster="table_migration")
+    @job_task(job_cluster="user_isolation")
     def verify_metastore_attached(self, ctx: RuntimeContext):
         """Verifies if a metastore is attached to this workspace. If not, the workflow will fail.
 
