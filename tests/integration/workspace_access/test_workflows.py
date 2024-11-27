@@ -68,7 +68,7 @@ def test_running_real_migrate_groups_job(
     # The original workspace group should be renamed
     renamed_workspace_group_name = installation_ctx.renamed_group_prefix + ws_group_a.display_name
     assert wait_for_workspace_group_to_exists(renamed_workspace_group_name), f"Renamed workspace group not found: {renamed_workspace_group_name}"
-    if not installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name):  # Avoid wait on timeout
+    if installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name):  # Avoid wait on timeout
         with pytest.raises(TimeoutError):
             wait_for_workspace_group_to_exists(ws_group_a.display_name)  # Expect to NOT exists
 
