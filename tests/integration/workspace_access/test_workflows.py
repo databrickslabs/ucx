@@ -25,6 +25,7 @@ def test_running_real_migrate_groups_job(
     )
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
+    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
@@ -36,10 +37,12 @@ def test_running_real_migrate_groups_job(
     table = installation_ctx.make_table()
     installation_ctx.make_grant(ws_group_a.display_name, "SELECT", table_info=table)
 
+    # TODO: Move `make_secret_scope` and `make_secret_scope_acl` to context like other `make_` methods
     secret_scope = make_secret_scope()
     make_secret_scope_acl(scope=secret_scope, principal=ws_group_a.display_name, permission=AclPermission.WRITE)
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
+    # TODO: Move `include_object_permissions` to context like other `include_` attributes
     installation_ctx.__dict__['include_object_permissions'] = [
         f"cluster-policies:{cluster_policy.policy_id}",
         f"TABLE:{table.full_name}",
