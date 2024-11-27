@@ -7,8 +7,6 @@ from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-
 
 def test_running_real_migrate_groups_job(
     installation_ctx,
