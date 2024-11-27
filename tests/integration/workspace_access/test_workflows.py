@@ -60,24 +60,24 @@ def test_running_real_migrate_groups_job(
 
     # Wrapper functions to wait for eventual consistency of API
     @retried(on=[KeyError], timeout=dt.timedelta(minutes=1))
-    def has_workspace_group(display_name: str) -> bool:
+    def wait_for_workspace_group_to_exists(display_name: str) -> bool:
         if installation_ctx.group_manager.has_workspace_group(display_name):
             return True
         raise KeyError(f"Group not found {display_name}")
 
     @retried(on=[KeyError], timeout=dt.timedelta(minutes=1))
-    def has_account_group(display_name: str) -> bool:
+    def wait_for_account_group_to_exists(display_name: str) -> bool:
         if installation_ctx.group_manager.has_account_group(display_name):
             return True
         raise KeyError(f"Group not found {display_name}")
 
     # The account group should exist, not the original workspace group
     renamed_workspace_group_name = installation_ctx.renamed_group_prefix + ws_group_a.display_name
-    assert has_workspace_group(renamed_workspace_group_name), f"Renamed workspace group not found: {renamed_workspace_group_name}"
-    assert has_account_group(acc_group_a.display_name), f"Account group not found: {acc_group_a.display_name}"
-    if not has_workspace_group(ws_group_a.display_name):  # Avoid wait on timeout
+    assert wait_for_workspace_group_to_exists(renamed_workspace_group_name), f"Renamed workspace group not found: {renamed_workspace_group_name}"
+    assert wait_for_account_group_to_exists(acc_group_a.display_name), f"Account group not found: {acc_group_a.display_name}"
+    if not installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name):  # Avoid wait on timeout
         with pytest.raises(TimeoutError):
-            has_workspace_group(ws_group_a.display_name)  # Expect to NOT exists
+            wait_for_workspace_group_to_exists(ws_group_a.display_name)  # Expect to NOT exists
 
     # specific permissions api migrations are checked in different and smaller integration tests
     found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
