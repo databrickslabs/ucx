@@ -70,7 +70,10 @@ class LegacyGroupMigration(Workflow):
         if not ctx.config.use_legacy_permission_migration:
             logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
-        ctx.permission_manager.verify_group_permissions()
+        if not ctx.permission_manager.verify_group_permissions():
+            raise ValueError(
+                f"Some group permissions were not migrated successfully. Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
+            )
 
 
 class PermissionsMigrationAPI(Workflow):
@@ -147,7 +150,10 @@ class ValidateGroupPermissions(Workflow):
         if not ctx.config.use_legacy_permission_migration:
             logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
-        ctx.permission_manager.verify_group_permissions()
+        if not ctx.permission_manager.verify_group_permissions():
+            raise ValueError(
+                f"Some group permissions were not migrated successfully. Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
+            )
 
 
 class RemoveWorkspaceLocalGroups(Workflow):
