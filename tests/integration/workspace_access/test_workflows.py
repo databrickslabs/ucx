@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
-from databricks.sdk.service.iam import Group, PermissionLevel
+from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -67,7 +67,7 @@ def test_running_real_migrate_groups_job(
 
     # The original workspace group should be renamed
     renamed_workspace_group_name = installation_ctx.renamed_group_prefix + ws_group_a.display_name
-    assert wait_for_workspace_group_to_exists(renamed_workspace_group_name), f"Renamed workspace group not found: {renamed_workspace_group_name}"
+    assert wait_for_workspace_group_to_exists(renamed_workspace_group_name), f"Workspace group not found: {renamed_workspace_group_name}"
     if installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name):  # Avoid wait on timeout
         with pytest.raises(TimeoutError):
             wait_for_workspace_group_to_exists(ws_group_a.display_name)  # Expect to NOT exists
