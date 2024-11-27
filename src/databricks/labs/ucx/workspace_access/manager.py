@@ -116,7 +116,7 @@ class PermissionManager(CrawlerBase[Permissions]):
             verifier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
-        verifications, errors = Threads.strict("verify group permissions", verifier_tasks)
+        verifications, errors = Threads.gather("verify group permissions", verifier_tasks)
         if errors:
             logger.error(f"Detected {len(errors)} errors while verifying permissions")
             raise ManyError(errors)
