@@ -49,7 +49,7 @@ def test_running_real_migrate_groups_job(
     installation_ctx.workspace_installation.run()
 
     workflow = "migrate-groups-legacy"
-    installation_ctx.deployed_workflows.run_workflow(workflow)
+    installation_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     @retried(on=[KeyError], timeout=dt.timedelta(minutes=1))
