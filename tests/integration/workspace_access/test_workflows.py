@@ -43,7 +43,6 @@ def test_running_real_migrate_groups_job(
     secret_scope = make_secret_scope()
     make_secret_scope_acl(scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
 
-    installation_ctx.__dict__['include_group_names'] = [ws_group.display_name]
     # TODO: Move `include_object_permissions` to context like other `include_` attributes
     installation_ctx.__dict__['include_object_permissions'] = [
         f"cluster-policies:{cluster_policy.policy_id}",
