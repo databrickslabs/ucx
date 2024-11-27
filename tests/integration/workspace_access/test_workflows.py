@@ -32,6 +32,7 @@ def test_running_real_migrate_groups_job(
         group_name=ws_group_a.display_name,
     )
 
+    # TODO: Add assert for table
     table = installation_ctx.make_table()
     installation_ctx.make_grant(ws_group_a.display_name, "SELECT", table_info=table)
 
