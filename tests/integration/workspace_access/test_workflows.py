@@ -15,12 +15,6 @@ def test_running_real_migrate_groups_job(
     make_secret_scope,
     make_secret_scope_acl,
 ) -> None:
-    installation_ctx = installation_ctx.replace(
-        config_transform=lambda wc: replace(
-            wc,
-            use_legacy_permission_migration=True,
-        ),
-    )
     ws_group, acc_group = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
@@ -53,7 +47,7 @@ def test_running_real_migrate_groups_job(
     # Tables crawler fails on `tacl` cluster used by the apply and validate permission tasks
     installation_ctx.tables_crawler.snapshot(force_refresh=True)
 
-    workflow = "migrate-groups-legacy"
+    workflow = "migrate-groups"
     installation_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
@@ -66,7 +60,9 @@ def test_running_real_migrate_groups_job(
 
     # The original workspace group should be renamed
     renamed_workspace_group_name = installation_ctx.renamed_group_prefix + ws_group.display_name
-    assert wait_for_workspace_group_to_exists(renamed_workspace_group_name), f"Workspace group not found: {renamed_workspace_group_name}"
+    assert wait_for_workspace_group_to_exists(
+        renamed_workspace_group_name
+    ), f"Workspace group not found: {renamed_workspace_group_name}"
     if installation_ctx.group_manager.has_workspace_group(ws_group.display_name):  # Avoid wait on timeout
         with pytest.raises(TimeoutError):
             wait_for_workspace_group_to_exists(ws_group.display_name)  # Expect to NOT exists
@@ -75,7 +71,9 @@ def test_running_real_migrate_groups_job(
     assert {"USAGE", "OWN"} == schema_grants[acc_group.display_name], "Incorrect schema grants for migrated group"
 
     # specific permissions api migrations are checked in different and smaller integration tests
-    object_permissions = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    object_permissions = installation_ctx.generic_permissions_support.load_as_dict(
+        "cluster-policies", cluster_policy.policy_id
+    )
     assert acc_group.display_name in object_permissions, "Group not found in cluster policies"
     assert object_permissions[acc_group.display_name] == PermissionLevel.CAN_USE
 
