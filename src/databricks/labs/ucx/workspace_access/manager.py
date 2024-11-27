@@ -122,7 +122,7 @@ class PermissionManager(CrawlerBase[Permissions]):
             raise ManyError(errors)
         if not all(verifications):
             unsuccessful_verifications = len(verifications) - sum(verifications)
-            logger.error(f"Detected {unsuccessful_verifications} invalidated permissions")
+            logger.warning(f"Detected {unsuccessful_verifications} invalidated permissions")
             return False
         logger.info("All permissions validated successfully. No issues found.")
         return True
