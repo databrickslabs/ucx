@@ -116,9 +116,13 @@ class PermissionManager(CrawlerBase[Permissions]):
             verifier_tasks.extend(tasks_for_support)
 
         logger.info(f"Starting to verify permissions. Total tasks: {len(verifier_tasks)}")
-        Threads.strict("verify group permissions", verifier_tasks)
+        verifications, errors = Threads.strict("verify group permissions", verifier_tasks)
+        if errors:
+            raise ManyError(errors)
+        if not all(errors):
+            logger.info("Not all permissions validated successfully. No issues found.")
+            return False
         logger.info("All permissions validated successfully. No issues found.")
-
         return True
 
     def object_type_support(self) -> dict[str, AclSupport]:
