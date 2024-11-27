@@ -1,8 +1,10 @@
+import datetime as dt
 from dataclasses import replace
 
-
+import pytest
+from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
-from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.iam import Group, PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
@@ -15,6 +17,12 @@ def test_running_real_migrate_groups_job(
     make_secret_scope,
     make_secret_scope_acl,
 ):
+    installation_ctx = installation_ctx.replace(
+        config_transform=lambda wc: replace(
+            wc,
+            use_legacy_permission_migration=True,
+        ),
+    )
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     cluster_policy = make_cluster_policy()
@@ -39,7 +47,26 @@ def test_running_real_migrate_groups_job(
 
     installation_ctx.workspace_installation.run()
 
-    installation_ctx.deployed_workflows.run_workflow("migrate-groups")
+    installation_ctx.deployed_workflows.run_workflow("migrate-groups-legacy")
+
+    @retried(on=[KeyError], timeout=dt.timedelta(minutes=1))
+    def get_workspace_group(display_name: str) -> Group:
+        for grp in installation_ctx.workspace_client.groups.list():
+            if grp.display_name == display_name:
+                return grp
+        raise KeyError(f"Group not found {display_name}")
+
+    @retried(on=[KeyError], timeout=dt.timedelta(minutes=1))
+    def get_account_group(display_name: str) -> Group:
+        for grp in installation_ctx.account_client.groups.list():
+            if grp.display_name == display_name:
+                return grp
+        raise KeyError(f"Group not found {display_name}")
+
+    # The account group should exist, not the original workspace group
+    renamed_workspace_group_name = installation_ctx.renamed_group_prefix + ws_group_a.display_name
+    assert get_workspace_group(renamed_workspace_group_name), f"Renamed workspace group not found: {renamed_workspace_group_name}"
+    assert get_account_group(acc_group_a.display_name), f"Account group not found: {acc_group_a.display_name}"
 
     # specific permissions api migrations are checked in different and smaller integration tests
     found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -50,6 +77,10 @@ def test_running_real_migrate_groups_job(
         secret_scope, acc_group_a.display_name
     )
     assert scope_permission == AclPermission.WRITE
+
+    # The original workspace group should not exist, testing as last due to wait on timeout
+    with pytest.raises(TimeoutError):
+        get_workspace_group(ws_group_a.display_name)
 
 
 def test_running_legacy_validate_groups_permissions_job(
