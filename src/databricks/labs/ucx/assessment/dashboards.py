@@ -36,7 +36,9 @@ class RedashDashboard:
 class RedashDashBoardCrawler(CrawlerBase[RedashDashboard]):
     """Crawler for Redash dashboards."""
 
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None):
+    def __init__(
+        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", RedashDashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
@@ -93,7 +95,9 @@ class LakeviewDashboard:
 class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
     """Crawler for Lakeview dashboards."""
 
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None):
+    def __init__(
+        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", LakeviewDashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
