@@ -32,20 +32,38 @@ class Dashboard:
 class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
     """Crawler for Redash dashboards."""
 
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str):
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None):
         super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", Dashboard)
         self._ws = ws
+        self._include_dashboard_ids = include_dashboard_ids or []
 
     def _crawl(self) -> Iterable[Dashboard]:
         dashboards = [Dashboard.from_sql_dashboard(dashboard) for dashboard in self._list_dashboards()]
         return dashboards
 
-    def _list_dashboards(self):
+    def _list_dashboards(self) -> list[SqlDashboard]:
+        if self._include_dashboard_ids:
+            return self._get_dashboards(*self._include_dashboard_ids)
         try:
             return list(self._ws.dashboards.list())
         except DatabricksError as e:
             logger.warning("Cannot list dashboards", exc_info=e)
             return []
+
+    def _get_dashboards(self, *dashboard_ids: str) -> list[SqlDashboard]:
+        dashboards = []
+        for dashboard_id in dashboard_ids:
+            dashboard = self._get_dashboard(dashboard_id)
+            if dashboard:
+                dashboards.append(dashboard)
+        return dashboards
+
+    def _get_dashboard(self, dashboard_id: str) -> Dashboard | None:
+        try:
+            return self._ws.dashboards.get(dashboard_id)
+        except DatabricksError as e:
+            logger.warning(f"Cannot get dashboard: {dashboard_id}", exc_info=e)
+            return None
 
     def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
