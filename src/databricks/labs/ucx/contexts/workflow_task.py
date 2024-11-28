@@ -15,7 +15,7 @@ from databricks.labs.ucx.assessment.clusters import (
     PolicyInfo,
 )
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.dashboards import LakeviewDashboardCrawler, RedashDashBoardCrawler
+from databricks.labs.ucx.assessment.dashboards import LakeviewDashboardCrawler
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
 from databricks.labs.ucx.assessment.sequencing import MigrationSequencer
@@ -121,15 +121,6 @@ class RuntimeContext(GlobalContext):
         # Warning: Not all runtime contexts support the fast-scan implementation; it requires the JVM bridge to Spark
         # and that's not always available.
         return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
-
-    @cached_property
-    def redash_crawler(self) -> RedashDashBoardCrawler:
-        return RedashDashBoardCrawler(
-            self.workspace_client,
-            self.sql_backend,
-            self.inventory_database,
-            self.config.include_dashboard_ids,
-        )
 
     @cached_property
     def lakeview_crawler(self) -> LakeviewDashboardCrawler:
