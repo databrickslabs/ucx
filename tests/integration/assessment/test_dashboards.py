@@ -13,7 +13,7 @@ def test_redash_dashboard_crawler_crawls_dashboards(ws, make_dashboard, inventor
     dashboard: SdkRedashDashboard = make_dashboard()
     crawler = RedashDashBoardCrawler(ws, sql_backend, inventory_schema)
 
-    dashboards = crawler.snapshot()
+    dashboards = list(crawler.snapshot())
 
     assert len(dashboards) >= 1
     assert dashboard.id in {d.id for d in dashboards}, f"Missing dashboard: {dashboard.id}"
@@ -24,7 +24,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
     make_dashboard()  # Ignore second dashboard
     crawler = RedashDashBoardCrawler(ws, sql_backend, inventory_schema, include_dashboard_ids=[dashboard.id])
 
-    dashboards = crawler.snapshot()
+    dashboards = list(crawler.snapshot())
 
     assert len(dashboards) == 1
     assert dashboards[0] == RedashDashboard(id=dashboard.id)
@@ -36,7 +36,7 @@ def test_lakeview_dashboard_crawler_crawls_dashboards(
     dashboard: SdkLakeviewDashboard = make_lakeview_dashboard()
     crawler = LakeviewDashboardCrawler(ws, sql_backend, inventory_schema)
 
-    dashboards = crawler.snapshot()
+    dashboards = list(crawler.snapshot())
 
     assert len(dashboards) >= 1
     assert dashboard.dashboard_id in {d.id for d in dashboards}, f"Missing dashboard: {dashboard.id}"
@@ -51,7 +51,7 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
         ws, sql_backend, inventory_schema, include_dashboard_ids=[dashboard.dashboard_id]
     )
 
-    dashboards = crawler.snapshot()
+    dashboards = list(crawler.snapshot())
 
     assert len(dashboards) == 1
     assert dashboards[0] == LakeviewDashboard(id=dashboard.dashboard_id)
