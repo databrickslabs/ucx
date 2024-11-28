@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
+from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
 from databricks.sdk.service.sql import Dashboard as SqlDashboard
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -27,6 +28,11 @@ class Dashboard:
     def from_sql_dashboard(cls, dashboard: SqlDashboard) -> Dashboard:
         assert dashboard.id
         return cls(id=dashboard.id)
+
+    @classmethod
+    def from_sdk_dashboard(cls, dashboard: SDKDashboard) -> Dashboard:
+        assert dashboard.dashboard_id
+        return cls(id=dashboard.dashboard_id)
 
 
 class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
@@ -78,7 +84,15 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         self._ws = ws
 
     def _crawl(self) -> Iterable[Dashboard]:
-        return []
+        dashboards = [Dashboard.from_sdk_dashboard(dashboard) for dashboard in self._list_dashboards()]
+        return dashboards
+
+    def _list_dashboards(self) -> list[SDKDashboard]:
+        try:
+            return list(self._ws.lakeview.list())
+        except DatabricksError as e:
+            logger.warning("Cannot list dashboards", exc_info=e)
+            return []
 
     def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
