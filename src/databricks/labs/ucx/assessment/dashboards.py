@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -26,6 +26,15 @@ class RedashDashboard:
 
     id: str
     """The ID for this dashboard."""
+
+    name: str = "UNKNOWN"
+    """The title of the dashboard that appears in list views and at the top of the dashboard page."""
+
+    query_ids: list[str] = field(default_factory=list)
+    """The IDs of the queries referenced by this dashboard."""
+
+    tags: list[str] = field(default_factory=list)  # TODO: Do we want to persist the tags?
+    """The tags set on this dashboard."""
 
     @classmethod
     def from_sdk_dashboard(cls, dashboard: SdkRedashDashboard) -> RedashDashboard:
