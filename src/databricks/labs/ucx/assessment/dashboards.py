@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import DatabricksError
+from databricks.sdk.service.sql import Dashboard as SqlDashboard
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -16,6 +20,14 @@ logger = logging.getLogger(__name__)
 class Dashboard:
     """UCX representation of a dashboard"""
 
+    id: str
+    """The ID for this dashboard."""
+
+    @classmethod
+    def from_sql_dashboard(cls, dashboard: SqlDashboard) -> Dashboard:
+        assert dashboard.id
+        return cls(id=dashboard.id)
+
 
 class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
     """Crawler for Redash dashboards."""
@@ -25,7 +37,15 @@ class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
         self._ws = ws
 
     def _crawl(self) -> Iterable[Dashboard]:
-        return []
+        dashboards = [Dashboard.from_sql_dashboard(dashboard) for dashboard in self._list_dashboards()]
+        return dashboards
+
+    def _list_dashboards(self):
+        try:
+            return list(self._ws.dashboards.list())
+        except DatabricksError as e:
+            logger.warning("Cannot list dashboards", exc_info=e)
+            return []
 
     def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
