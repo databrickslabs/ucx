@@ -25,7 +25,7 @@ class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
         self._ws = ws
 
     def _crawl(self) -> Iterable[Dashboard]:
-        """TODO"""
+        return []
 
     def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
@@ -40,7 +40,7 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         self._ws = ws
 
     def _crawl(self) -> Iterable[Dashboard]:
-        """TODO"""
+        return []
 
     def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
