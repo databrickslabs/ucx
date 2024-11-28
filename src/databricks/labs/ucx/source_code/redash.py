@@ -1,13 +1,15 @@
 import logging
 from collections.abc import Iterator
 from dataclasses import replace
+from functools import cached_property
 
 from databricks.labs.blueprint.installation import Installation
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import Dashboard, LegacyQuery, UpdateQueryRequestQuery
+from databricks.sdk.service.sql import LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
+from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashBoardCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
@@ -18,39 +20,54 @@ logger = logging.getLogger(__name__)
 class Redash:
     MIGRATED_TAG = "Migrated by UCX"
 
-    def __init__(self, index: TableMigrationIndex, ws: WorkspaceClient, installation: Installation):
+    def __init__(
+        self,
+        index: TableMigrationIndex,
+        ws: WorkspaceClient,
+        installation: Installation,
+        dashboard_crawler: RedashDashBoardCrawler,
+    ):
         self._index = index
         self._ws = ws
         self._installation = installation
+        self._crawler = dashboard_crawler
 
-    def migrate_dashboards(self, dashboard_id: str | None = None) -> None:
-        for dashboard in self._list_dashboards(dashboard_id):
-            assert dashboard.id is not None
-            if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
+    def migrate_dashboards(self, *dashboard_ids: str) -> None:
+        for dashboard in self._list_dashboards(*dashboard_ids):
+            if self.MIGRATED_TAG in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} already migrated by UCX")
                 continue
             for query in self.get_queries_from_dashboard(dashboard):
                 self._fix_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
 
-    def revert_dashboards(self, dashboard_id: str | None = None) -> None:
-        for dashboard in self._list_dashboards(dashboard_id):
-            assert dashboard.id is not None
-            if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
+    def revert_dashboards(self, *dashboard_ids: str) -> None:
+        for dashboard in self._list_dashboards(*dashboard_ids):
+            if self.MIGRATED_TAG not in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} was not migrated by UCX")
                 continue
             for query in self.get_queries_from_dashboard(dashboard):
                 self._revert_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_original_tags(dashboard.tags))
 
-    def _list_dashboards(self, dashboard_id: str | None) -> list[Dashboard]:
-        try:
-            if dashboard_id is None:
-                return list(self._ws.dashboards.list())
-            return [self._ws.dashboards.get(dashboard_id)]
-        except DatabricksError as e:
-            logger.warning(f"Cannot list dashboards: {e}")
-            return []
+    @cached_property
+    def _dashboards(self) -> list[RedashDashboard]:
+        """Refresh the dashboards to get the latest tags."""
+        return list(self._crawler.snapshot(force_refresh=True))  # TODO: Can we avoid the refresh?
+
+    def _list_dashboards(self, *dashboard_ids: str) -> list[RedashDashboard]:
+        """List the Redash dashboards."""
+        if not dashboard_ids:
+            return self._dashboards
+        dashboards: list[RedashDashboard] = []
+        seen_dashboard_ids = set[str]()
+        for dashboard in self._dashboards:
+            for dashboard_id in set(dashboard_ids) - seen_dashboard_ids:
+                if dashboard.id == dashboard_id:
+                    dashboards.append(dashboard)
+                    seen_dashboard_ids.add(dashboard.id)
+                    break
+        return dashboards
 
     def _fix_query(self, query: LegacyQuery) -> None:
         assert query.id is not None
@@ -122,15 +139,9 @@ class Redash:
             return None
         return [tag for tag in tags if tag != self.MIGRATED_TAG]
 
-    @staticmethod
-    def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[LegacyQuery]:
-        if dashboard.widgets is None:
-            return
-        for widget in dashboard.widgets:
-            if widget is None:
-                continue
-            if widget.visualization is None:
-                continue
-            if widget.visualization.query is None:
-                continue
-            yield widget.visualization.query
+    def get_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[LegacyQuery]:
+        for query_id in dashboard.query_ids:
+            try:
+                yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non LegacyQuery
+            except DatabricksError as e:
+                logger.warning(f"Cannot get query: {query_id}", exc_info=e)
