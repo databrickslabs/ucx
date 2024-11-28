@@ -72,7 +72,9 @@ class LegacyGroupMigration(Workflow):
             return
         if not ctx.permission_manager.verify_group_permissions():
             raise ValueError(
-                f"Some group permissions were not migrated successfully. Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
+                "Some group permissions were not migrated successfully. The API is eventually consistent, use the "
+                "`validate-group-permissions` workflow to validate the permissions after the API caught up. "
+                f"Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
             )
 
 
