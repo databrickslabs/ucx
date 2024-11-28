@@ -71,7 +71,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
 
-    # [INTERNAL ONLY] Whether the assessment should lint only specific dashboards.
+    # [INTERNAL ONLY] Limit the dashboards to the given list
     include_dashboard_ids: list[str] | None = None
 
     enable_hms_federation: bool = False
