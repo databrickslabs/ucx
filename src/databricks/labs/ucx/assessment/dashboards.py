@@ -53,7 +53,7 @@ class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
         try:
             return list(self._ws.dashboards.list())
         except DatabricksError as e:
-            logger.warning("Cannot list dashboards", exc_info=e)
+            logger.warning("Cannot list Redash dashboards", exc_info=e)
             return []
 
     def _get_dashboards(self, *dashboard_ids: str) -> list[SqlDashboard]:
@@ -68,7 +68,7 @@ class RedashDashBoardCrawler(CrawlerBase[Dashboard]):
         try:
             return self._ws.dashboards.get(dashboard_id)
         except DatabricksError as e:
-            logger.warning(f"Cannot get dashboard: {dashboard_id}", exc_info=e)
+            logger.warning(f"Cannot get Redash dashboard: {dashboard_id}", exc_info=e)
             return None
 
     def _try_fetch(self) -> Iterable[Dashboard]:
@@ -94,7 +94,7 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         try:
             return list(self._ws.lakeview.list())
         except DatabricksError as e:
-            logger.warning("Cannot list dashboards", exc_info=e)
+            logger.warning("Cannot list Lakeview dashboards", exc_info=e)
             return []
 
     def _get_dashboards(self, *dashboard_ids: str) -> list[SDKDashboard]:
@@ -109,7 +109,7 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         try:
             return self._ws.lakeview.get(dashboard_id)
         except DatabricksError as e:
-            logger.warning(f"Cannot get dashboard: {dashboard_id}", exc_info=e)
+            logger.warning(f"Cannot get Lakeview dashboard: {dashboard_id}", exc_info=e)
             return None
 
     def _try_fetch(self) -> Iterable[Dashboard]:
