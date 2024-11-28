@@ -33,3 +33,14 @@ def test_lakeview_dashboard_crawler_crawls_dashboards(ws, make_lakeview_dashboar
 
     assert len(dashboards) >= 1
     assert dashboard.dashboard_id in {d.id for d in dashboards}, f"Missing dashboard: {dashboard.id}"
+
+
+def test_lakeview_dashboard_crawler_crawls_dashboard(ws, make_lakeview_dashboard, inventory_schema, sql_backend) -> None:
+    dashboard: SDKDashboard = make_lakeview_dashboard()
+    make_lakeview_dashboard()  # Ignore second dashboard
+    crawler = LakeviewDashboardCrawler(ws, sql_backend, inventory_schema, include_dashboard_ids=[dashboard.dashboard_id])
+
+    dashboards = crawler.snapshot()
+
+    assert len(dashboards) == 1
+    assert dashboards[0] == Dashboard(id=dashboard.dashboard_id)
