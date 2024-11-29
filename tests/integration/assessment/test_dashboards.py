@@ -5,13 +5,13 @@ from databricks.labs.ucx.assessment.dashboards import (
     LakeviewDashboard,
     LakeviewDashboardCrawler,
     RedashDashboard,
-    RedashDashBoardCrawler,
+    RedashDashboardCrawler,
 )
 
 
 def test_redash_dashboard_crawler_crawls_dashboards(ws, make_dashboard, inventory_schema, sql_backend) -> None:
     dashboard: SdkRedashDashboard = make_dashboard()
-    crawler = RedashDashBoardCrawler(ws, sql_backend, inventory_schema)
+    crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema)
 
     dashboards = list(crawler.snapshot())
 
@@ -23,7 +23,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
     dashboard: SdkRedashDashboard = make_dashboard()
     assert dashboard.id
     make_dashboard()  # Ignore second dashboard
-    crawler = RedashDashBoardCrawler(ws, sql_backend, inventory_schema, include_dashboard_ids=[dashboard.id])
+    crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema, include_dashboard_ids=[dashboard.id])
 
     dashboards = list(crawler.snapshot())
 
@@ -36,7 +36,7 @@ def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_lim
 ) -> None:
     for _ in range(2):  # Create two dashboards, expect on to be snapshotted due to upper limit below
         make_dashboard()
-    crawler = RedashDashBoardCrawler(ws, sql_backend, inventory_schema, debug_listing_upper_limit=1)
+    crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema, debug_listing_upper_limit=1)
 
     dashboards = list(crawler.snapshot())
 

@@ -42,7 +42,7 @@ class RedashDashboard:
         return cls(id=dashboard.id)
 
 
-class RedashDashBoardCrawler(CrawlerBase[RedashDashboard]):
+class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
     """Crawler for Redash dashboards."""
 
     def __init__(
