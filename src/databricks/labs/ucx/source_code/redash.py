@@ -9,7 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
-from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashBoardCrawler
+from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
@@ -25,7 +25,7 @@ class Redash:
         index: TableMigrationIndex,
         ws: WorkspaceClient,
         installation: Installation,
-        dashboard_crawler: RedashDashBoardCrawler,
+        dashboard_crawler: RedashDashboardCrawler,
     ):
         self._index = index
         self._ws = ws

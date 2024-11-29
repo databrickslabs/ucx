@@ -7,7 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import PermissionDenied, NotFound
 from databricks.sdk.service.sql import LegacyQuery, QueryOptions, UpdateQueryRequestQuery
 
-from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashBoardCrawler
+from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
 from databricks.labs.ucx.source_code.redash import Redash
 
 
@@ -61,7 +61,7 @@ def redash_installation():
 
 @pytest.fixture
 def redash_dashboard_crawler():
-    crawler = create_autospec(RedashDashBoardCrawler)
+    crawler = create_autospec(RedashDashboardCrawler)
     crawler.snapshot.return_value = [
         RedashDashboard(id="1", query_ids=["1"]),
         RedashDashboard(id="2", query_ids=["1", "2", "3"], tags=[Redash.MIGRATED_TAG]),

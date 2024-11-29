@@ -28,7 +28,7 @@ from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.dashboards import RedashDashBoardCrawler
+from databricks.labs.ucx.assessment.dashboards import RedashDashboardCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -286,8 +286,8 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def redash_crawler(self) -> RedashDashBoardCrawler:
-        return RedashDashBoardCrawler(
+    def redash_crawler(self) -> RedashDashboardCrawler:
+        return RedashDashboardCrawler(
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,
