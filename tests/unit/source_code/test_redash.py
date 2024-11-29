@@ -126,7 +126,7 @@ def test_get_queries_from_empty_dashboard(
     redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
     empty_dashboard = RedashDashboard(id="1")
 
-    queries = list(redash.get_queries_from_dashboard(empty_dashboard))
+    queries = list(redash._get_queries_from_dashboard(empty_dashboard))
 
     assert len(queries) == 0
     redash_dashboard_crawler.snapshot.assert_not_called()
@@ -138,7 +138,7 @@ def test_get_queries_from_dashboard_with_query(
     redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
     dashboard = RedashDashboard(id="1", query_ids=["1"])
 
-    queries = list(redash.get_queries_from_dashboard(dashboard))
+    queries = list(redash._get_queries_from_dashboard(dashboard))
 
     assert len(queries) == 1
     assert queries[0].id == "1"
@@ -152,7 +152,7 @@ def test_get_queries_from_dashboard_with_non_existing_query(
     dashboard = RedashDashboard(id="1", query_ids=["-1"])
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        queries = list(redash.get_queries_from_dashboard(dashboard))
+        queries = list(redash._get_queries_from_dashboard(dashboard))
 
     assert len(queries) == 0
     assert "Cannot get query: -1" in caplog.messages
