@@ -78,8 +78,13 @@ class AccountWorkspaces:
 
     def create_account_level_groups(self, prompts: Prompts, workspace_ids: list[int] | None = None):
         acc_groups = self._get_account_groups()
-        workspace_ids = self._get_valid_workspaces_ids(workspace_ids)
-        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
+        all_workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
+        valid_workspace_ids = []
+        for workspace_id in workspace_ids:
+            if workspace_id not in all_workspace_ids:
+                continue
+            valid_workspace_ids.append(workspace_id)
+        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, valid_workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
             acc_group = self._try_create_account_groups(group_name, acc_groups)
@@ -135,26 +140,6 @@ class AccountWorkspaces:
         except ResourceConflict:
             logger.info(f"Group {group_name} already exist in the account, ignoring")
             return None
-
-    def _get_valid_workspaces_ids(self, workspace_ids: list[int] | None = None) -> list[int]:
-        all_workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
-        if not workspace_ids:
-            return all_workspace_ids
-        # TODO: remove this method and rely on _include_workspace_ids
-
-        valid_workspace_ids = []
-        for workspace_id in workspace_ids:
-            if workspace_id in all_workspace_ids:
-                valid_workspace_ids.append(workspace_id)
-            else:
-                logger.info(f"Workspace id {workspace_id} not found on the account")
-
-        if not valid_workspace_ids:
-            raise ValueError("No workspace ids provided in the configuration found in the account")
-
-        workspace_ids_str = ','.join(str(x) for x in valid_workspace_ids)
-        logger.info(f"Creating account groups for workspaces IDs : {workspace_ids_str}")
-        return valid_workspace_ids
 
     def _add_members_to_acc_group(
         self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
