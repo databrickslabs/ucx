@@ -76,14 +76,12 @@ class AccountWorkspaces:
             except (PermissionDenied, NotFound, ValueError):
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
-    def create_account_level_groups(self, prompts: Prompts, workspace_ids: list[int] | None = None):
+    def create_account_level_groups(self, prompts: Prompts):
         acc_groups = self._get_account_groups()
-        all_workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
-        valid_workspace_ids = []
-        for workspace_id in workspace_ids:
-            if workspace_id not in all_workspace_ids:
-                continue
-            valid_workspace_ids.append(workspace_id)
+        workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
+
+        if not workspace_ids:
+            raise ValueError("")
         all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, valid_workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
