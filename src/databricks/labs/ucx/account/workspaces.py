@@ -79,10 +79,9 @@ class AccountWorkspaces:
     def create_account_level_groups(self, prompts: Prompts):
         acc_groups = self._get_account_groups()
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
-
         if not workspace_ids:
-            raise ValueError("")
-        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, valid_workspace_ids)
+            raise ValueError("No workspace ids provided in the configuration found in the account")
+        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
             acc_group = self._try_create_account_groups(group_name, acc_groups)

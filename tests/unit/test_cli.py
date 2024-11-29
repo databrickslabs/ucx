@@ -339,9 +339,10 @@ def test_create_account_groups():
     a = create_autospec(AccountClient)
     w = create_autospec(WorkspaceClient)
     a.get_workspace_client.return_value = w
+    a.workspaces.list.return_value = [Workspace(workspace_id=123)]
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
-    ctx = AccountContext(a).replace()
+    ctx = AccountContext(a, {"workspace_ids": "123,456"})
     create_account_groups(a, prompts, ctx=ctx)
     a.groups.list.assert_called_with(attributes="id")
 

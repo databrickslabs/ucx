@@ -38,7 +38,7 @@ def test_create_account_level_groups(
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"
     make_group(display_name=group_display_name, members=[make_user().id])
-    AccountWorkspaces(acc).create_account_level_groups(MockPrompts({}), [ws.get_workspace_id()])
+    AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
     @retried(on=[KeyError], timeout=timedelta(minutes=2))
     def get_group(display_name: str) -> Group:

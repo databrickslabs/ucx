@@ -81,8 +81,8 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 46])
+    account_workspaces = AccountWorkspaces(acc_client, [123, 46])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_called_with(
         display_name="de",
@@ -109,9 +109,9 @@ def test_create_acc_groups_should_throw_exception(acc_client):
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
-    account_workspaces = AccountWorkspaces(acc_client)
+    account_workspaces = AccountWorkspaces(acc_client, [123])
     with pytest.raises(ValueError):
-        account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+        account_workspaces.create_account_level_groups(MockPrompts({}))
 
     ws.groups.list.assert_not_called()
 
@@ -133,8 +133,8 @@ def test_create_acc_groups_should_filter_system_groups(acc_client):
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces = AccountWorkspaces(acc_client, [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_not_called()
 
@@ -164,7 +164,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_
     ]
 
     ws = create_autospec(WorkspaceClient)
-    account_workspaces = AccountWorkspaces(acc_client)
+    account_workspaces = AccountWorkspaces(acc_client, [123])
 
     group = Group(
         id="12",
@@ -203,7 +203,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.return_value = group
 
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_called_with(
         display_name="de",
@@ -276,8 +276,8 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account(acc_clie
     ws.groups.list.return_value = [group]
     ws.groups.get.return_value = group
     acc_client.get_workspace_client.return_value = ws
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces = AccountWorkspaces(acc_client, [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_not_called()
 
@@ -307,8 +307,8 @@ def test_create_acc_groups_should_create_groups_accross_workspaces(acc_client):
 
     acc_client.get_workspace_client.side_effect = get_workspace_client
 
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 456])
+    account_workspaces = AccountWorkspaces(acc_client, [123, 456])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_any_call(display_name="de")
     acc_client.groups.create.assert_any_call(display_name="security_grp")
@@ -342,8 +342,8 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
     acc_client.groups.create.return_value = group
     acc_client.get_workspace_client.side_effect = get_workspace_client
 
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123, 456])
+    account_workspaces = AccountWorkspaces(acc_client, [123, 456])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_called_once_with(display_name="de")
     acc_client.groups.patch.assert_called_once_with(
@@ -391,14 +391,13 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     ws2.groups.get.return_value = group_2
     acc_client.get_workspace_client.side_effect = get_workspace_client
 
-    account_workspaces = AccountWorkspaces(acc_client)
+    account_workspaces = AccountWorkspaces(acc_client, [123, 456])
     account_workspaces.create_account_level_groups(
         MockPrompts(
             {
                 r'Group de does not have the same amount of members in workspace ': 'yes',
             }
-        ),
-        [123, 456],
+        )
     )
 
     acc_client.groups.create.assert_any_call(display_name="de")
@@ -423,8 +422,8 @@ def test_acc_ws_get_should_not_throw(acc_client):
     ws.groups.list.return_value = [group]
     ws.groups.get.side_effect = NotFound
     acc_client.get_workspace_client.return_value = ws
-    account_workspaces = AccountWorkspaces(acc_client)
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces = AccountWorkspaces(acc_client, [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_not_called()
 
@@ -435,7 +434,7 @@ def test_create_acc_groups_should_not_throw_if_acc_grp_exists(acc_client):
     ]
 
     ws = create_autospec(WorkspaceClient)
-    account_workspaces = AccountWorkspaces(acc_client)
+    account_workspaces = AccountWorkspaces(acc_client, [123])
 
     group = Group(id="12", display_name="de", members=[ComplexValue(display="test-user-1", value="1")])
 
@@ -444,7 +443,7 @@ def test_create_acc_groups_should_not_throw_if_acc_grp_exists(acc_client):
     acc_client.get_workspace_client.return_value = ws
     acc_client.groups.create.side_effect = ResourceConflict
 
-    account_workspaces.create_account_level_groups(MockPrompts({}), [123])
+    account_workspaces.create_account_level_groups(MockPrompts({}))
 
     acc_client.groups.create.assert_called_with(display_name="de")
     acc_client.groups.patch.assert_not_called()
