@@ -41,8 +41,22 @@ class RedashDashboard:
 
     @classmethod
     def from_sdk_dashboard(cls, dashboard: SdkRedashDashboard) -> RedashDashboard:
-        assert dashboard.id
-        return cls(id=dashboard.id)
+        query_ids = []
+        for widget in dashboard.widgets or []:
+            if widget.visualization is None:
+                continue
+            if widget.visualization.query is None:
+                continue
+            if widget.visualization.query.id is None:
+                continue
+            query_ids.append(widget.visualization.query.id)
+        return cls(
+            id=dashboard.id or cls.id,
+            name=dashboard.name or cls.name,
+            parent=dashboard.parent or cls.parent,
+            query_ids=query_ids,
+            tags=dashboard.tags or [],
+        )
 
 
 class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
