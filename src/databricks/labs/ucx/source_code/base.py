@@ -436,7 +436,7 @@ def decode_with_bom(
     return io.TextIOWrapper(file, encoding=use_encoding, errors=errors, newline=newline)
 
 
-def read_text(path: Path, size: int = -1) -> str:
+def safe_read_text(path: Path, size: int = -1) -> str:
     """Read a file as text, decoding according to the BOM marker if that is present.
 
     This differs to the normal `.read_text()` method on path which does not support BOM markers.
@@ -476,7 +476,7 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     if content is not None:
         return content.startswith(magic_header)
     try:
-        file_header = read_text(path, size=len(magic_header))
+        file_header = safe_read_text(path, size=len(magic_header))
     except (FileNotFoundError, UnicodeDecodeError, PermissionError):
         logger.warning(f"Could not read file {path}")
         return False

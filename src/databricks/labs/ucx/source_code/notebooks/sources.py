@@ -21,7 +21,7 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     file_language,
     is_a_notebook,
-    read_text,
+    safe_read_text,
 )
 
 from databricks.labs.ucx.source_code.graph import (
@@ -297,7 +297,7 @@ class NotebookLinter:
         if language is not Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
-        source = read_text(resolved)
+        source = safe_read_text(resolved)
         return Notebook.parse(path, source, language)
 
     def _linter(self, language: Language) -> Linter:
@@ -315,7 +315,7 @@ class NotebookLinter:
         language = file_language(resolved)
         if language is not Language.PYTHON:
             return
-        source = read_text(resolved)
+        source = safe_read_text(resolved)
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             if isinstance(cell, RunCell):
@@ -393,7 +393,7 @@ class FileLinter:
     @cached_property
     def _source_code(self) -> str:
         if self._content is None:
-            self._content = read_text(self._path)
+            self._content = safe_read_text(self._path)
         return self._content
 
     def lint(self) -> Iterable[Advice]:
