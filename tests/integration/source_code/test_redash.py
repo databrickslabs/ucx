@@ -11,7 +11,7 @@ def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: MockInstallationCo
     installation_ctx.workspace_installation.run()
     installation_ctx.redash.migrate_dashboards(dashboard.id)
     # make sure the query is marked as migrated
-    queries = Redash.get_queries_from_dashboard(dashboard)
+    queries = Redash._get_queries_from_dashboard(dashboard)
     for query in queries:
         assert query.id is not None
         content = ws.queries.get(query.id)

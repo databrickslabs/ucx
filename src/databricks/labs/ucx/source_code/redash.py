@@ -37,7 +37,7 @@ class Redash:
             if self.MIGRATED_TAG in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} already migrated by UCX")
                 continue
-            for query in self.get_queries_from_dashboard(dashboard):
+            for query in self._get_queries_from_dashboard(dashboard):
                 self._fix_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
 
@@ -46,7 +46,7 @@ class Redash:
             if self.MIGRATED_TAG not in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} was not migrated by UCX")
                 continue
-            for query in self.get_queries_from_dashboard(dashboard):
+            for query in self._get_queries_from_dashboard(dashboard):
                 self._revert_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_original_tags(dashboard.tags))
 
@@ -139,7 +139,7 @@ class Redash:
             return None
         return [tag for tag in tags if tag != self.MIGRATED_TAG]
 
-    def get_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[LegacyQuery]:
+    def _get_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[LegacyQuery]:
         for query_id in dashboard.query_ids:
             try:
                 yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non LegacyQuery

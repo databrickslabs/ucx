@@ -182,7 +182,7 @@ class QueryLinter:
     def _lint_and_collect_from_dashboard(
         self, dashboard: Dashboard, linted_queries: set[str]
     ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
-        dashboard_queries = Redash.get_queries_from_dashboard(dashboard)
+        dashboard_queries = Redash._get_queries_from_dashboard(dashboard)
         query_problems: list[QueryProblem] = []
         query_dfsas: list[DirectFsAccess] = []
         query_tables: list[UsedTable] = []
