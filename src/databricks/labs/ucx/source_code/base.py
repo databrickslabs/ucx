@@ -459,17 +459,18 @@ def read_text(path: Path, size: int = -1) -> str:
         return f.read(size)
 
 
-def safe_read_text(path: Path, size: int = -1) -> str:
+def safe_read_text(path: Path, size: int = -1) -> str | None:
     """Safe read a text file by handling reading exceptions, see :func:_read_text.
 
     Returns
-        str : Content of file or empty string when error is raised during reading.
+        str : Content of file
+        None : If error occurred during reading.
     """
     try:
         return read_text(path, size=size)
     except (FileNotFoundError, UnicodeDecodeError, PermissionError) as e:
         logger.warning(f"Could not read file: {path}", exc_info=e)
-        return ""
+        return None
 
 
 # duplicated from CellLanguage to prevent cyclic import
