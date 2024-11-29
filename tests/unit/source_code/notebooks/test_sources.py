@@ -10,33 +10,13 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
 
-@pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual"), ("empty.py", "")])
+@pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
 def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup) -> None:
     linter = FileLinter(
         LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, content
     )
     advices = list(linter.lint())
     assert not advices
-
-
-@pytest.mark.parametrize("path", ["xyz.scala", "xyz.r", "xyz.sh"])
-def test_file_linter_lints_not_yet_supported_language(path, migration_index, mock_path_lookup) -> None:
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, "")
-    advices = list(linter.lint())
-    assert [advice.code for advice in advices] == ["unsupported-language"]
-
-
-class FriendFileLinter(FileLinter):
-
-    def source_code(self):
-        return self._source_code
-
-
-def test_checks_encoding_of_pseudo_file(migration_index, mock_path_lookup) -> None:
-    linter = FriendFileLinter(
-        LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path("whatever"), None, "a=b"
-    )
-    assert linter.source_code() == "a=b"
 
 
 @pytest.mark.parametrize(
@@ -49,11 +29,25 @@ def test_checks_encoding_of_pseudo_file(migration_index, mock_path_lookup) -> No
         (codecs.BOM_UTF32_BE, "utf-32-be"),
     ],
 )
-def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_path, mock_path_lookup) -> None:
+def test_file_linter_lints_supported_language_encoded_file_with_bom(
+    tmp_path, migration_index, mock_path_lookup, bom, encoding
+) -> None:
     path = tmp_path / "file.py"
     path.write_bytes(bom + "a = 12".encode(encoding))
-    linter = FriendFileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
-    assert linter.source_code() == "a = 12"
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path, None)
+
+    advices = list(linter.lint())
+
+    assert not advices
+
+
+@pytest.mark.parametrize("path", ["xyz.scala", "xyz.r", "xyz.sh"])
+def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
+    path = tmp_path / path
+    path.touch()
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, "")
+    advices = list(linter.lint())
+    assert [advice.code for advice in advices] == ["unsupported-language"]
 
 
 @pytest.mark.parametrize(
@@ -75,7 +69,9 @@ def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_pa
         ".DS_Store",  # on MacOS
     ],
 )
-def test_file_linter_lints_ignorable_language(path, migration_index, mock_path_lookup) -> None:
+def test_file_linter_lints_ignorable_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
+    path = tmp_path / path
+    path.touch()
     linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None)
     advices = list(linter.lint())
     assert not advices

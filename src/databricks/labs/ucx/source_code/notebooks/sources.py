@@ -4,7 +4,6 @@ import dataclasses
 import locale
 import logging
 from collections.abc import Iterable
-from functools import cached_property
 from pathlib import Path
 from typing import cast
 
@@ -14,14 +13,15 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
-    Advice,
-    Failure,
-    Linter,
-    CurrentSessionState,
-    Advisory,
     file_language,
     is_a_notebook,
     safe_read_text,
+    read_text,
+    Advice,
+    Advisory,
+    CurrentSessionState,
+    Failure,
+    Linter,
 )
 
 from databricks.labs.ucx.source_code.graph import (
@@ -394,16 +394,11 @@ class FileLinter:
         self._inherited_tree = inherited_tree
         self._content = content
 
-    @cached_property
-    def _source_code(self) -> str:
-        if self._content is None:
-            self._content = safe_read_text(self._path)
-        return self._content
-
     def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
         try:
-            is_notebook = self._is_notebook()
+            # Not using `safe_read_text` here to surface read errors
+            self._content = self._content or read_text(self._path)
         except FileNotFoundError:
             failure_message = f"File not found: {self._path}"
             yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
@@ -417,19 +412,21 @@ class FileLinter:
             yield Failure("file-permission", failure_message, 0, 0, 1, 1)
             return
 
-        if is_notebook:
+        if self._is_notebook():
             yield from self._lint_notebook()
         else:
             yield from self._lint_file()
 
     def _is_notebook(self) -> bool:
+        assert self._content is not None, "Content should be read from path before calling this method"
         # pre-check to avoid loading unsupported content
         language = file_language(self._path)
         if not language:
             return False
-        return is_a_notebook(self._path, self._source_code)
+        return is_a_notebook(self._path, self._content)
 
     def _lint_file(self) -> Iterable[Advice]:
+        assert self._content is not None, "Content should be read from path before calling this method"
         language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
@@ -444,17 +441,18 @@ class FileLinter:
                 linter = self._ctx.linter(language)
                 if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
                     linter.append_tree(self._inherited_tree)
-                yield from linter.lint(self._source_code)
+                yield from linter.lint(self._content)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
                 yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
     def _lint_notebook(self) -> Iterable[Advice]:
+        assert self._content is not None, "Content should be read from path before calling this method"
         language = file_language(self._path)
         if not language:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
-        notebook = Notebook.parse(self._path, self._source_code, language)
+        notebook = Notebook.parse(self._path, self._content, language)
         notebook_linter = NotebookLinter(
             self._ctx,
             self._path_lookup,

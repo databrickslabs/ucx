@@ -436,7 +436,7 @@ def decode_with_bom(
     return io.TextIOWrapper(file, encoding=use_encoding, errors=errors, newline=newline)
 
 
-def _read_text(path: Path, size: int = -1) -> str:
+def read_text(path: Path, size: int = -1) -> str:
     """Read a file as text, decoding according to the BOM marker if that is present.
 
     This differs to the normal `.read_text()` method on path which does not support BOM markers.
@@ -466,7 +466,7 @@ def safe_read_text(path: Path, size: int = -1) -> str:
         str : Content of file or empty string when error is raised during reading.
     """
     try:
-        return _read_text(path, size=size)
+        return read_text(path, size=size)
     except (FileNotFoundError, UnicodeDecodeError, PermissionError) as e:
         logger.warning(f"Could not read file: {path}", exc_info=e)
         return ""
