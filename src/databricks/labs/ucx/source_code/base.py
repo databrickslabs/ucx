@@ -488,9 +488,5 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
     if content is not None:
         return content.startswith(magic_header)
-    try:
-        file_header = safe_read_text(path, size=len(magic_header))
-    except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-        logger.warning(f"Could not read file {path}")
-        return False
+    file_header = safe_read_text(path, size=len(magic_header))
     return file_header == magic_header

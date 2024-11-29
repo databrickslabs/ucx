@@ -298,6 +298,8 @@ class NotebookLinter:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
         source = safe_read_text(resolved)
+        if not source:
+            return None
         return Notebook.parse(path, source, language)
 
     def _linter(self, language: Language) -> Linter:
@@ -316,6 +318,8 @@ class NotebookLinter:
         if language is not Language.PYTHON:
             return
         source = safe_read_text(resolved)
+        if not source:
+            return
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             if isinstance(cell, RunCell):

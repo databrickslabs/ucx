@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
 
-@pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
+@pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual"), ("empty.py", "")])
 def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup) -> None:
     linter = FileLinter(
         LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, content

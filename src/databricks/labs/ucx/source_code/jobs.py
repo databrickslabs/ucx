@@ -634,6 +634,8 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             return
         cell_language = CellLanguage.of_language(language)
         source = safe_read_text(dependency.path)
+        if not source:
+            return
         if is_a_notebook(dependency.path):
             yield from self._collect_from_notebook(source, cell_language, dependency.path, inherited_tree)
         elif dependency.path.is_file():
