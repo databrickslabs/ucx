@@ -569,7 +569,7 @@ class GlobalContext(abc.ABC):
             TableMigrationIndex([]),
             self.directfs_access_crawler_for_queries,
             self.used_tables_crawler_for_queries,
-            self.config.include_dashboard_ids,
+            self.redash_crawler,
             self.config.debug_listing_upper_limit,
         )
 
@@ -595,6 +595,7 @@ class GlobalContext(abc.ABC):
             self.migration_status_refresher.index(),
             self.workspace_client,
             self.installation,
+            self.redash_crawler,
         )
 
     @cached_property
