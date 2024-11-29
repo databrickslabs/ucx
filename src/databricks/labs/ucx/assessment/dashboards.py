@@ -30,6 +30,9 @@ class RedashDashboard:
     name: str = "UNKNOWN"
     """The title of the dashboard that appears in list views and at the top of the dashboard page."""
 
+    parent: str = "ORPHAN"
+    """The identifier of the workspace folder containing the object."""
+
     query_ids: list[str] = field(default_factory=list)
     """The IDs of the queries referenced by this dashboard."""
 
