@@ -46,11 +46,18 @@ class RedashDashBoardCrawler(CrawlerBase[RedashDashboard]):
     """Crawler for Redash dashboards."""
 
     def __init__(
-        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        schema: str,
+        *,
+        include_dashboard_ids: list[str] | None = None,
+        debug_listing_upper_limit: int | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", RedashDashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
+        self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def _crawl(self) -> Iterable[RedashDashboard]:
         dashboards = [RedashDashboard.from_sdk_dashboard(dashboard) for dashboard in self._list_dashboards()]
@@ -60,10 +67,24 @@ class RedashDashBoardCrawler(CrawlerBase[RedashDashboard]):
         if self._include_dashboard_ids:
             return self._get_dashboards(*self._include_dashboard_ids)
         try:
-            return list(self._ws.dashboards.list())
+            dashboards_iterator = self._ws.dashboards.list()
         except DatabricksError as e:
             logger.warning("Cannot list Redash dashboards", exc_info=e)
             return []
+        dashboards: list[SdkRedashDashboard] = []
+        while True:
+            # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
+            # to a small number of items in debug mode for the assessment workflow just to complete.
+            if self._debug_listing_upper_limit is not None and len(dashboards) >= self._debug_listing_upper_limit:
+                break
+            try:
+                dashboards.append(next(dashboards_iterator))
+            except StopIteration:
+                break
+            except DatabricksError as e:
+                logger.warning("Cannot list next Redash dashboards page", exc_info=e)
+                break
+        return dashboards
 
     def _get_dashboards(self, *dashboard_ids: str) -> list[SdkRedashDashboard]:
         dashboards = []
