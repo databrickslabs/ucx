@@ -766,7 +766,10 @@ def migrate_dbsql_dashboards(
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     for workspace_context in workspace_contexts:
-        workspace_context.redash.migrate_dashboards(dashboard_id)
+        if dashboard_id:
+            workspace_context.redash.migrate_dashboards(dashboard_id)
+        else:
+            workspace_context.redash.migrate_dashboards()
 
 
 @ucx.command
