@@ -1,21 +1,22 @@
 import dataclasses
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import Dashboard, LegacyQuery
+from databricks.sdk.errors import DatabricksError
+from databricks.sdk.service.sql import LegacyQuery
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccess
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ class QueryLinter:
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
-        include_dashboard_ids: list[str] | None,
+        dashboard_crawler: RedashDashboardCrawler,
         debug_listing_upper_limit: int | None = None,
     ):
         self._ws = ws
@@ -59,7 +60,7 @@ class QueryLinter:
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
-        self._include_dashboard_ids = include_dashboard_ids
+        self._dashboard_crawler = dashboard_crawler
         self._debug_listing_upper_limit = debug_listing_upper_limit
 
         self._catalog = "hive_metastore"
@@ -127,9 +128,8 @@ class QueryLinter:
         self._used_tables_crawler.dump_all(processed_tables)
 
     def _lint_dashboards(self, context: _ReportingContext) -> None:
-        for dashboard_id in self._dashboard_ids_in_scope():
-            dashboard = self._ws.dashboards.get(dashboard_id=dashboard_id)
-            logger.info(f"Linting dashboard_id={dashboard_id}: {dashboard.name}")
+        for dashboard in self._dashboard_crawler.snapshot():
+            logger.info(f"Linting dashboard: {dashboard.name} ({dashboard.id})")
             problems, dfsas, tables = self._lint_and_collect_from_dashboard(dashboard, context.linted_queries)
             context.all_problems.extend(problems)
             context.all_dfsas.extend(dfsas)
@@ -149,29 +149,11 @@ class QueryLinter:
             tables = self.collect_used_tables_from_query("no-dashboard-id", query)
             context.all_tables.extend(tables)
 
-    def _dashboard_ids_in_scope(self) -> list[str]:
-        if self._include_dashboard_ids is not None:  # an empty list is accepted
-            return self._include_dashboard_ids
-        items_listed = 0
-        dashboard_ids = []
-        # redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
-        # to a small number of items in debug mode for the assessment workflow just to complete.
-        for dashboard in self._ws.dashboards.list():
-            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
-            if dashboard.id is None:
-                continue
-            dashboard_ids.append(dashboard.id)
-            items_listed += 1
-        return dashboard_ids
-
     def _queries_in_scope(self) -> list[LegacyQuery]:
-        if self._include_dashboard_ids is not None:  # an empty list is accepted
-            return []
         items_listed = 0
         legacy_queries = []
         for query in self._ws.queries_legacy.list():
+            # TODO: Move query crawler to separate method
             if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
                 logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
                 break
@@ -179,10 +161,19 @@ class QueryLinter:
             items_listed += 1
         return legacy_queries
 
+    def _get_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[LegacyQuery]:
+        for query_id in dashboard.query_ids:
+            try:
+                yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non LegacyQuery
+            except DatabricksError as e:
+                logger.warning(f"Cannot get query: {query_id}", exc_info=e)
+
     def _lint_and_collect_from_dashboard(
-        self, dashboard: Dashboard, linted_queries: set[str]
+        self,
+        dashboard: RedashDashboard,
+        linted_queries: set[str],
     ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
-        dashboard_queries = Redash._get_queries_from_dashboard(dashboard)
+        dashboard_queries = self._get_queries_from_dashboard(dashboard)
         query_problems: list[QueryProblem] = []
         query_dfsas: list[DirectFsAccess] = []
         query_tables: list[UsedTable] = []
