@@ -8,7 +8,7 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
 
     # A dashboard with a query that contains a direct filesystem reference.
     query = make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
-    dashboard = make_dashboard(query=query)
+    dashboard = runtime_ctx.make_dashboard(query=query)
 
     # Produce a DFSA record for the query.
     linter = QueryLinter(
