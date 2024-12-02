@@ -181,7 +181,7 @@ def make_dashboard(
             ),
         )
         logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
-        return dashboard
+        return ws.dashboards.get(dashboard.id)  # Dashboard with widget
 
     def remove(dashboard: Dashboard) -> None:
         try:
