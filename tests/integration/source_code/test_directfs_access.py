@@ -18,16 +18,17 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
         TableMigrationIndex([]),
         runtime_ctx.directfs_access_crawler_for_queries,
         runtime_ctx.used_tables_crawler_for_queries,
-        include_dashboard_ids=[dashboard.id],
+        runtime_ctx.redash_crawler,
     )
     linter.refresh_report()
 
     # Find a record for the query.
-    records = runtime_ctx.directfs_access_crawler_for_queries.snapshot()
-    query_record = next(record for record in records if record.source_id == f"{dashboard.id}/{query.id}")
+    records = list(runtime_ctx.directfs_access_crawler_for_queries.snapshot())
+    query_records = [record for record in records if record.source_id == f"{dashboard.id}/{query.id}"]
+    assert len(query_records) == 1, f"Missing record for query: {dashboard.id}/{query.id}"
 
     # Verify ownership can be made.
-    owner = runtime_ctx.directfs_access_ownership.owner_of(query_record)
+    owner = runtime_ctx.directfs_access_ownership.owner_of(query_records[0])
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
