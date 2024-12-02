@@ -120,40 +120,42 @@ def test_revert_dashboards(redash_ws, empty_index, redash_installation, redash_d
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_get_queries_from_empty_dashboard(
+def test_migrate_dashboard_gets_no_queries_when_dashboard_is_empty(
     redash_ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
     empty_dashboard = RedashDashboard(id="1")
+    redash_dashboard_crawler.snapshot.return_value = [empty_dashboard]
+    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
 
-    queries = list(redash._get_queries_from_dashboard(empty_dashboard))
+    redash.migrate_dashboards()
 
-    assert len(queries) == 0
-    redash_dashboard_crawler.snapshot.assert_not_called()
+    redash_ws.queries_legacy.get.assert_not_called()
+    redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_get_queries_from_dashboard_with_query(
+def test_migrate_dashboard_gets_query_from_dashboard(
     redash_ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
     dashboard = RedashDashboard(id="1", query_ids=["1"])
+    redash_dashboard_crawler.snapshot.return_value = [dashboard]
+    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
 
-    queries = list(redash._get_queries_from_dashboard(dashboard))
+    redash.migrate_dashboards()
 
-    assert len(queries) == 1
-    assert queries[0].id == "1"
-    redash_dashboard_crawler.snapshot.assert_not_called()
+    redash_ws.queries_legacy.get.assert_called_once_with("1")
+    redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_get_queries_from_dashboard_with_non_existing_query(
+def test_migrate_dashboard_logs_warning_when_getting_non_existing_query(
     caplog, redash_ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
     dashboard = RedashDashboard(id="1", query_ids=["-1"])
+    redash_dashboard_crawler.snapshot.return_value = [dashboard]
+    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        queries = list(redash._get_queries_from_dashboard(dashboard))
+        redash.migrate_dashboards()
 
-    assert len(queries) == 0
     assert "Cannot get query: -1" in caplog.messages
-    redash_dashboard_crawler.snapshot.assert_not_called()
+    redash_ws.queries_legacy.get.assert_called_once_with("-1")
+    redash_dashboard_crawler.snapshot.assert_called_once()
