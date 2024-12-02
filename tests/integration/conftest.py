@@ -454,7 +454,7 @@ class CommonUtils:
 
 class MockRuntimeContext(
     CommonUtils, RuntimeContext
-):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
         self,
         make_catalog_fixture,
