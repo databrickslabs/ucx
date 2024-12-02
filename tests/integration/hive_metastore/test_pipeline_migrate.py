@@ -5,7 +5,6 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary, P
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
-from unit.source_code.samples.run_notebooks_with_fstring import notebook
 
 from ..assessment.test_assessment import _PIPELINE_CONF
 
@@ -27,20 +26,22 @@ def test_pipeline_migrate(
         ),
     ]
 
-    dlt_notebooks = [runtime_ctx.make_notebook(
-        content=f"""create or refresh streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[0].name})""".encode(
-            "ASCII"
+    dlt_notebooks = [
+        runtime_ctx.make_notebook(
+            content=f"""create or refresh streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[0].name})""".encode(
+                "ASCII"
+            ),
+            path=f"{make_directory()}/dlt_notebook_1",
+            language=Language.SQL,
         ),
-        path=f"{make_directory()}/dlt_notebook_1",
-        language=Language.SQL,
-    ),
-    runtime_ctx.make_notebook(
-        content=f"""create or refresh streaming table st2\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[1].name})""".encode(
-            "ASCII"
+        runtime_ctx.make_notebook(
+            content=f"""create or refresh streaming table st2\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[1].name})""".encode(
+                "ASCII"
+            ),
+            path=f"{make_directory()}/dlt_notebook_2",
+            language=Language.SQL,
         ),
-        path=f"{make_directory()}/dlt_notebook_2",
-        language=Language.SQL,
-    )]
+    ]
 
     pipeline_names = [
         f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}",
