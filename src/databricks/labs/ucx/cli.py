@@ -773,9 +773,9 @@ def migrate_dbsql_dashboards(
 
 
 @ucx.command
-def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
+def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None, ctx: WorkspaceContext | None = None):
     """Revert migrated DBSQL Dashboard queries back to their original state"""
-    ctx = WorkspaceContext(w)
+    ctx = ctx or WorkspaceContext(w)
     if dashboard_id:
         ctx.redash.revert_dashboards(dashboard_id)
     else:

@@ -73,6 +73,7 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.redash import Redash
 
 
 def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
@@ -1134,26 +1135,32 @@ def test_create_missing_principal_azure(ws, caplog, acc_client):
     assert str(failure.value) == "Unsupported cloud provider"
 
 
-@pytest.mark.parametrize("run_as_collection", [False, True])
-def test_migrate_dbsql_dashboards_list_dashboards(
-    run_as_collection,
-    workspace_clients,
-    acc_client,
-) -> None:
-    if not run_as_collection:
-        workspace_clients = [workspace_clients[0]]
-    migrate_dbsql_dashboards(
-        workspace_clients[0],
-        run_as_collection=run_as_collection,
-        a=acc_client,
-    )
-    for workspace_client in workspace_clients:
-        workspace_client.dashboards.list.assert_called_once()
+def test_migrate_dbsql_dashboards_calls_migrate_dashboards_on_redash(ws) -> None:
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    migrate_dbsql_dashboards(ws, ctx=ctx)
+    redash.migrate_dashboards.assert_called_once()
 
 
-def test_revert_dbsql_dashboards(ws, caplog):
-    revert_dbsql_dashboards(ws)
-    ws.dashboards.list.assert_called_once()
+def test_migrate_dbsql_dashboards_calls_migrate_dashboards_on_redash_with_dashboard_id(ws) -> None:
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    migrate_dbsql_dashboards(ws, dashboard_id="id", ctx=ctx)
+    redash.migrate_dashboards.assert_called_once_with("id")
+
+
+def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash(ws):
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    revert_dbsql_dashboards(ws, ctx=ctx)
+    redash.revert_dashboards.assert_called_once_with()
+
+
+def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash_with_dashboard_id(ws):
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    revert_dbsql_dashboards(ws, dashboard_id="id", ctx=ctx)
+    redash.revert_dashboards.assert_called_once_with("id")
 
 
 def test_cli_missing_awscli(ws, mocker, caplog):
