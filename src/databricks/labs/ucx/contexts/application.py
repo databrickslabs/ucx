@@ -91,7 +91,6 @@ else:
 # used throughout the application. That being said, we'll do best
 # effort of splitting the instances between Global, Runtime,
 # Workspace CLI, and Account CLI contexts.
-# pylint: disable=too-many-public-methods
 
 logger = logging.getLogger(__name__)
 
