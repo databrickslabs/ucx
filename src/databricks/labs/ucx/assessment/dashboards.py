@@ -77,7 +77,12 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def _crawl(self) -> Iterable[RedashDashboard]:
-        dashboards = [RedashDashboard.from_sdk_dashboard(dashboard) for dashboard in self._list_dashboards()]
+        dashboards = []
+        for sdk_dashboard in self._list_dashboards():
+            if sdk_dashboard.id is None:
+                continue
+            dashboard = RedashDashboard.from_sdk_dashboard(sdk_dashboard)
+            dashboards.append(dashboard)
         return dashboards
 
     def _list_dashboards(self) -> list[SdkRedashDashboard]:
