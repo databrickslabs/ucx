@@ -52,7 +52,7 @@ class QueryLinter:
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
-        dashboard_crawler: RedashDashboardCrawler,
+        dashboard_crawler: RedashDashboardCrawler,  # TODO: Lint LakeviewDashboards
         debug_listing_upper_limit: int | None = None,
     ):
         self._ws = ws
