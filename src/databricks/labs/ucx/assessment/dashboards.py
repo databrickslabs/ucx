@@ -145,9 +145,6 @@ class LakeviewDashboard:
     query_ids: list[str] = field(default_factory=list)
     """The IDs of the queries referenced by this dashboard."""
 
-    tags: list[str] = field(default_factory=list)
-    """The tags set on this dashboard."""
-
     @classmethod
     def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
         assert dashboard.dashboard_id
