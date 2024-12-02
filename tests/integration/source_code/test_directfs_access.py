@@ -18,7 +18,7 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
         TableMigrationIndex([]),
         runtime_ctx.directfs_access_crawler_for_queries,
         runtime_ctx.used_tables_crawler_for_queries,
-        runtime_ctx.redash_crawler,
+        [runtime_ctx.redash_crawler],
     )
     linter.refresh_report()
 

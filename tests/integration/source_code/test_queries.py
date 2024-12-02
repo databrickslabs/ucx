@@ -18,7 +18,7 @@ def test_query_linter_lints_queries_and_stores_dfsas_and_tables(
         TableMigrationIndex([]),
         simple_ctx.directfs_access_crawler_for_queries,
         simple_ctx.used_tables_crawler_for_queries,
-        None,
+        [],
     )
     linter.refresh_report()
     all_problems = sql_backend.fetch("SELECT * FROM query_problems", schema=simple_ctx.inventory_database)

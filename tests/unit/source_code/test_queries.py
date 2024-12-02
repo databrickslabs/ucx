@@ -40,7 +40,7 @@ def test_query_linter_collects_dfsas_from_queries(
         migration_index,
         dfsa_crawler,
         used_tables_crawler,
-        dashboard_crawler,
+        [dashboard_crawler],
     )
 
     dfsas = linter.collect_dfsas_from_query("no-dashboard-id", query)
@@ -66,7 +66,7 @@ def test_query_linter_refresh_report_writes_query_problems(migration_index, mock
         migration_index,
         dfsa_crawler,
         used_tables_crawler,
-        dashboard_crawler,
+        [dashboard_crawler],
     )
 
     linter.refresh_report()
@@ -97,7 +97,7 @@ def test_lints_queries(migration_index, mock_backend) -> None:
         migration_index,
         dfsa_crawler,
         used_tables_crawler,
-        dashboard_crawler,
+        [dashboard_crawler],
     )
 
     linter.refresh_report()
