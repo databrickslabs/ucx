@@ -79,7 +79,7 @@ class HiveMetastoreFederation(SecretsMixin):
             logger.info('Failed to get external Hive Metastore connection information')
 
         if ext_hms and prompts.confirm(
-            f'Identified a supported external Hive Metastore connection: {ext_hms.db_type}. Use this connection?'
+            f'A supported external Hive Metastore connection was identified: {ext_hms.db_type}. Use this connection?'
         ):
             connection_info = self._get_or_create_ext_connection(name, ext_hms)
         else:
@@ -92,8 +92,6 @@ class HiveMetastoreFederation(SecretsMixin):
         if not config.spark_conf:
             raise ValueError('Spark config not found')
         spark_config = config.spark_conf
-        if not spark_config:
-            raise ValueError('Spark config not found')
         jdbc_url = self._get_value_from_config_key(spark_config, 'spark.hadoop.javax.jdo.option.ConnectionURL')
         if not jdbc_url:
             raise ValueError('JDBC URL not found')
@@ -169,7 +167,7 @@ class HiveMetastoreFederation(SecretsMixin):
 
     def _get_or_create_ext_connection(self, name: str, ext_hms: ExtHms) -> ConnectionInfo:
         options: dict[str, str] = {
-            "builtin": "true",
+            "builtin": "false",
             "database": ext_hms.database,
             "db_type": ext_hms.db_type,
             "host": ext_hms.host,

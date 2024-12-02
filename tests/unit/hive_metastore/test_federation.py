@@ -1,6 +1,8 @@
+import base64
 from unittest.mock import create_autospec, call
 
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import AlreadyExists
 from databricks.sdk.service.catalog import (
@@ -14,6 +16,7 @@ from databricks.sdk.service.catalog import (
     ConnectionInfo,
 )
 from databricks.sdk.service.iam import User
+from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -26,7 +29,7 @@ from databricks.labs.ucx.hive_metastore.federation import (
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
-def test_create_federated_catalog():
+def test_create_federated_catalog_int(mock_installation):
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -47,8 +50,11 @@ def test_create_federated_catalog():
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 
-    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
-    hms_fed.register_internal_hms_as_federated_catalog()
+    hms_fed = HiveMetastoreFederation(
+        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+    )
+
+    hms_fed.create_from_cli(MockPrompts({}))
 
     workspace_client.connections.create.assert_called_with(
         name='a',
@@ -77,7 +83,75 @@ def test_create_federated_catalog():
     assert calls == workspace_client.grants.method_calls
 
 
-def test_already_existing_connection():
+def test_create_federated_catalog_ext(mock_installation):
+    workspace_client = create_autospec(WorkspaceClient)
+    external_locations = create_autospec(ExternalLocations)
+    workspace_info = create_autospec(WorkspaceInfo)
+
+    workspace_info.current.return_value = 'a'
+    external_locations.snapshot.return_value = [
+        ExternalLocation('s3://b/c/d', 1),
+    ]
+    workspace_client.current_user.me.return_value = User(user_name='serge')
+    workspace_client.connections.create.return_value = CatalogInfo(name='a')
+    workspace_client.secrets.get_secret.return_value = GetSecretResponse(
+        key='secret_key', value=base64.standard_b64encode('bar'.encode()).decode()
+    )
+    workspace_client.external_locations.list.return_value = [
+        ExternalLocationInfo(url='s3://b/c/d', name='b'),
+    ]
+    workspace_client.grants.get.return_value = PermissionsList(
+        privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
+    )
+    mock_installation.load = lambda _: WorkspaceConfig(
+        inventory_database='ucx',
+        spark_conf={
+            "spark.hadoop.javax.jdo.option.ConnectionDriverName": "org.mariadb.jdbc.Driver",
+            "spark.hadoop.javax.jdo.option.ConnectionPassword": "{{secrets/secret_scope/secret_key}}",
+            "spark.hadoop.javax.jdo.option.ConnectionURL": "jdbc:mysql://hostname.us-east-2.rds.amazonaws.com:3306/metastore",
+            "spark.hadoop.javax.jdo.option.ConnectionUserName": "foo",
+            "spark.sql.hive.metastore.jars": "maven",
+            "spark.sql.hive.metastore.version": "2.3.0",
+        },
+    )
+
+    hms_fed = HiveMetastoreFederation(
+        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+    )
+
+    hms_fed.create_from_cli(MockPrompts({"A supported external Hive Metastore.*": "yes"}))
+
+    workspace_client.connections.create.assert_called_with(
+        name='a',
+        connection_type=ConnectionType.HIVE_METASTORE,
+        options={
+            'builtin': 'false',
+            'database': 'metastore',
+            'db_type': 'mysql',
+            'host': 'hostname.us-east-2.rds.amazonaws.com',
+            'password': 'bar',
+            'port': '3306',
+            'user': 'foo',
+            'version': '2.3.0',
+        },
+    )
+    workspace_client.catalogs.create.assert_called_with(
+        name='a',
+        connection_name='a',
+        options={"authorized_paths": 's3://b/c/d'},
+    )
+    calls = [
+        call.get(SecurableType.EXTERNAL_LOCATION, 'b'),
+        call.update(
+            SecurableType.EXTERNAL_LOCATION,
+            'b',
+            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_CATALOG])],
+        ),
+    ]
+    assert calls == workspace_client.grants.method_calls
+
+
+def test_already_existing_connection(mock_installation):
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -99,8 +173,13 @@ def test_already_existing_connection():
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 
-    hms_fed = HiveMetastoreFederation(workspace_client, external_locations, workspace_info, enable_hms_federation=True)
-    hms_fed.register_internal_hms_as_federated_catalog()
+    hms_fed = HiveMetastoreFederation(
+        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+    )
+
+    prompts = MockPrompts({})
+
+    hms_fed.create_from_cli(prompts)
 
     workspace_client.connections.create.assert_called_with(
         name='a',
