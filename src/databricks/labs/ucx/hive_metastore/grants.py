@@ -777,13 +777,20 @@ class MigrateGrants:
         sql_backend: SqlBackend,
         group_manager: GroupManager,
         grant_loaders: list[Callable[[], Iterable[Grant]]],
+        *,
+        skip_tacl_migration: bool = False,
     ):
         self._sql_backend = sql_backend
         self._group_manager = group_manager
         # List of grant loaders, the assumption that the first one is a loader for ownership grants
         self._grant_loaders = grant_loaders
+        if skip_tacl_migration:
+            logger.warning("Skipping TACL migration")
+        self._skip_tacl_migration = skip_tacl_migration
 
     def apply(self, src: SecurableObject, dst: SecurableObject) -> bool:
+        if self._skip_tacl_migration:
+            return True
         grants = self._match_grants(src)
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(dst.kind, dst.full_name)

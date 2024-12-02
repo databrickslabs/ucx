@@ -1313,6 +1313,7 @@ access the configuration file from the command line. Here's the description of c
   * `num_threads`: An optional integer representing the number of threads to use for migration.
   * `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
   * `default_catalog`: An optional string representing the default catalog name.
+  * `skip_tacl_migration`: Optional flag, allow skipping TACL migration when migrating tables or creating catalogs and schemas.
   * `default_owner_group`: Assigns this group to all migrated objects (catalogs, databases, tables, views, etc.). The group has to be an account group and the user running the migration has to be a member of this group.
   * `log_level`: An optional string representing the log level.
   * `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.

@@ -86,6 +86,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Default table owner, assigned to a group
     default_owner_group: str | None = None
 
+    # Skip TACL migration during table migration
+    skip_tacl_migration: bool = False
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
