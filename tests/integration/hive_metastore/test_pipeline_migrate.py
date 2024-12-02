@@ -5,6 +5,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary, P
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
+from unit.source_code.samples.run_notebooks_with_fstring import notebook
 
 from ..assessment.test_assessment import _PIPELINE_CONF
 
@@ -14,9 +15,8 @@ _TEST_TENANT_ID = "directory_12345"
 
 def test_pipeline_migrate(
     ws, make_pipeline, make_random, watchdog_purge_suffix, make_directory, runtime_ctx, make_mounted_location
-):
+) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    dlt_notebook_paths = [f"{make_directory()}/dlt_notebook_1", f"{make_directory()}/dlt_notebook_2"]
 
     src_tables = [
         runtime_ctx.make_table(catalog_name="hive_metastore", schema_name=src_schema.name, non_delta=True),
@@ -26,20 +26,21 @@ def test_pipeline_migrate(
             columns=[("`foobar`", "STRING")],
         ),
     ]
-    runtime_ctx.make_notebook(
+
+    dlt_notebooks = [runtime_ctx.make_notebook(
         content=f"""create or refresh streaming table st1\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[0].name})""".encode(
             "ASCII"
         ),
-        path=dlt_notebook_paths[0],
+        path=f"{make_directory()}/dlt_notebook_1",
         language=Language.SQL,
-    )
+    ),
     runtime_ctx.make_notebook(
         content=f"""create or refresh streaming table st2\nas select * from stream(hive_metastore.{src_schema.name}.{src_tables[1].name})""".encode(
             "ASCII"
         ),
-        path=dlt_notebook_paths[1],
+        path=f"{make_directory()}/dlt_notebook_2",
         language=Language.SQL,
-    )
+    )]
 
     pipeline_names = [
         f"pipeline-{make_random(4).lower()}-{watchdog_purge_suffix}",
@@ -51,7 +52,7 @@ def test_pipeline_migrate(
             configuration=_PIPELINE_CONF,
             name=pipeline_names[0],
             target=runtime_ctx.make_schema(catalog_name="hive_metastore").name,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_paths[0]))],
+            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=str(dlt_notebooks[0])))],
             clusters=[
                 PipelineCluster(
                     node_type_id=ws.clusters.select_node_type(local_disk=False, min_memory_gb=16),
@@ -65,7 +66,7 @@ def test_pipeline_migrate(
             configuration=_PIPELINE_CONF,
             name=pipeline_names[1],
             target=runtime_ctx.make_schema(catalog_name="hive_metastore").name,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_paths[1]))],
+            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=str(dlt_notebooks[1])))],
             clusters=[
                 PipelineCluster(
                     node_type_id=ws.clusters.select_node_type(local_disk=False, min_memory_gb=16),
@@ -79,7 +80,7 @@ def test_pipeline_migrate(
             configuration=_PIPELINE_CONF,
             name=f"skip-{pipeline_names[2]}",
             target=runtime_ctx.make_schema(catalog_name="hive_metastore").name,
-            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=dlt_notebook_paths[0]))],
+            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=str(dlt_notebooks[0])))],
         ),
     ]
     ws.pipelines.start_update(created_pipelines[0].pipeline_id)
