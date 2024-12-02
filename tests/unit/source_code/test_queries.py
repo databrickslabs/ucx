@@ -72,6 +72,7 @@ def test_query_linter_refresh_report_writes_query_problems(migration_index, mock
     linter.refresh_report()
 
     assert mock_backend.has_rows_written_for("`hive_metastore`.`test`.`query_problems`")
+    ws.queries_legacy.list.assert_called_once()
     dfsa_crawler.assert_not_called()
     used_tables_crawler.assert_not_called()
     dashboard_crawler.snapshot.assert_called_once()
