@@ -97,7 +97,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 logger.warning(f"Schema {schema.full_name} no longer exists. Skipping checking its migration status.")
                 continue
             except DatabricksError as e:
-                logger.warning(f"Received error while listing tables in schema: {schema.full_name}", exc_info=e)
+                logger.warning(f"Error while listing tables in schema: {schema.full_name}", exc_info=e)
                 continue
             for table in tables:
                 if not table.properties:
@@ -159,7 +159,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         try:
             yield from self._ws.catalogs.list()
         except DatabricksError as e:
-            logger.warning("Cannot list catalogs", exc_info=e)
+            logger.error("Cannot list catalogs", exc_info=e)
 
     def _iter_schemas(self):
         for catalog in self._iter_catalogs():
@@ -169,5 +169,5 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
                 continue
             except DatabricksError as e:
-                logger.warning(f"Received error while listing schemas in catalog: {catalog.name}", exc_info=e)
+                logger.warning(f"Error while listing schemas in catalog: {catalog.name}", exc_info=e)
                 continue
