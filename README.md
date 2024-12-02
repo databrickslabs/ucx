@@ -764,6 +764,10 @@ See [this guide](docs/assessment.md) for more details.
 Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
 [migration process diagram](#migration-process).
 
+The UCX assessment workflow is designed to only run once, re-running will **not** update the existing results. If the
+inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx)
+and [installing](#install-ucx) it again.
+
 [[back to top](#databricks-labs-ucx)]
 
 ## Group migration workflow
