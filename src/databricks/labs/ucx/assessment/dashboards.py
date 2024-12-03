@@ -184,6 +184,8 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             return self._get_dashboards(*self._include_dashboard_ids)
         try:
             return list(self._ws.lakeview.list())
+            # If the API listing limit becomes an issue in testing, please see the `:class:RedashDashboardCrawler`
+            # for an example on how to implement a (debug) rate limit
         except DatabricksError as e:
             logger.warning("Cannot list Lakeview dashboards", exc_info=e)
             return []
