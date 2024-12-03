@@ -95,7 +95,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
                                     {
                                         "name": "main_query",
                                         "query": {
-                                            "datasetName": "fourtytwo",
+                                            "datasetName": "query",
                                             "fields": [{"name": "count", "expression": "`count`"}],
                                             "disaggregated": True,
                                         },
