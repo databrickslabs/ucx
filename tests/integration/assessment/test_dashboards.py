@@ -34,7 +34,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
 def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_limit(
     ws, make_dashboard, inventory_schema, sql_backend
 ) -> None:
-    for _ in range(2):  # Create two dashboards, expect on to be snapshotted due to upper limit below
+    for _ in range(2):  # Create two dashboards, expect one to be snapshotted due to upper limit below
         make_dashboard()
     crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema, debug_listing_upper_limit=1)
 
