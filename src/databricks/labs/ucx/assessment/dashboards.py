@@ -134,6 +134,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
+        yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
 
     def get_query(self, query_id: str, dashboard: RedashDashboard) -> LegacyQuery | None:
         """Get a query given its id and the corresponding dashboard.
