@@ -465,6 +465,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         make_notebook_fixture,
         make_query_fixture,
         make_dashboard_fixture,
+        make_lakeview_dashboard_fixture,
         make_cluster_policy_fixture,
         make_cluster_policy_permissions_fixture,
         env_or_skip_fixture,
@@ -487,6 +488,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._make_notebook = make_notebook_fixture
         self._make_query = make_query_fixture
         self._make_dashboard = make_dashboard_fixture
+        self._make_lakeview_dashboard = make_lakeview_dashboard_fixture
         self._make_cluster_policy = make_cluster_policy_fixture
         self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
         self._env_or_skip = env_or_skip_fixture
@@ -496,7 +498,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
         self._jobs: list[Job] = []
-        self._dashboards: list[SdkRedashDashboard] = []
+        self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
@@ -576,6 +578,11 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
 
     def make_dashboard(self, **kwargs) -> SdkRedashDashboard:
         dashboard = self._make_dashboard(**kwargs)
+        self._dashboards.append(dashboard)
+        return dashboard
+
+    def make_lakeview_dashboard(self, **kwargs) -> SdkLakeviewDashboard:
+        dashboard = self._make_lakeview_dashboard(**kwargs)
         self._dashboards.append(dashboard)
         return dashboard
 
@@ -771,6 +778,7 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
     make_notebook,
     make_query,
     make_dashboard,
+    make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
     env_or_skip,
@@ -786,6 +794,7 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
         make_notebook,
         make_query,
         make_dashboard,
+        make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
         env_or_skip,
