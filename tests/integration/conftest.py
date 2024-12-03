@@ -729,12 +729,12 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
     def created_dashboards(self) -> list[str]:
         dashboard_ids = []
         for dashboard in self._dashboards:
-            if isinstance(dashboard, SdkRedashDashboard):
+            if isinstance(dashboard, SdkRedashDashboard) and dashboard.id:
                 dashboard_ids.append(dashboard.id)
-            elif isinstance(dashboard, SdkLakeviewDashboard):
+            elif isinstance(dashboard, SdkLakeviewDashboard) and dashboard.dashboard_id:
                 dashboard_ids.append(dashboard.dashboard_id)
             else:
-                raise ValueError(f"Unsupported dashboard type: {type(dashboard)}")
+                raise ValueError(f"Unsupported dashboard: {dashboard}")
         return dashboard_ids
 
     @cached_property
