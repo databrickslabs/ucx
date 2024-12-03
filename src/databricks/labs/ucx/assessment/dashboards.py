@@ -206,11 +206,11 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
-        """List queries.
+    def list_legacy_queries(self, dashboard: DashboardType | None = None) -> Iterator[LegacyQuery]:
+        """List legacy queries.
 
         Args:
-            dashboard (Dashboard | None) : List queries for dashboard. If None, list all queries.
+            dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
                 Defaults to None.
 
         Note:
@@ -230,20 +230,32 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             except StopIteration:
                 break
 
-    def _list_all_queries(self) -> Iterator[Query]:
+    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
+        """List queries.
+
+        Args:
+            dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
+                Defaults to None.
+
+        Note:
+            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
+            another crawler for the queries by retrieving the queries every time they are requested.
+        """
+        for query in self.list_legacy_queries(dashboard):
+            yield Query.from_legacy_query(query)
+
+    def _list_all_queries(self) -> Iterator[LegacyQuery]:
         """List all queries."""
         try:
-            for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
-                yield Query.from_legacy_query(query)
+            yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def _list_queries_from_dashboard(self, dashboard: DashboardType) -> Iterator[Query]:
+    def _list_queries_from_dashboard(self, dashboard: DashboardType) -> Iterator[LegacyQuery]:
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
-                query = self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
-                yield Query.from_legacy_query(query)
+                yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
             except DatabricksError as e:
                 logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
 
@@ -322,7 +334,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         """List queries.
 
         Args:
-            dashboard (Dashboard | None) : List queries for dashboard. If None, list all queries.
+            dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
                 Defaults to None.
 
         Note:
