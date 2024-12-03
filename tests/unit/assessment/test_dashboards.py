@@ -176,6 +176,17 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
     ws.dashboards.list.assert_called_once()
 
 
+def test_redash_dashboard_crawler_list_queries(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.queries_legacy.list.return_value = [LegacyQuery(id="qid")]
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test")
+
+    queries = list(crawler.list_queries())
+
+    assert queries == [LegacyQuery(id="qid")]
+    ws.queries_legacy.list.assert_called_once()
+
+
 def test_redash_dashboard_crawler_get_query_calls_query_api_get(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
