@@ -125,6 +125,19 @@ def test_redash_dashboard_crawler_stops_when_debug_listing_upper_limit_reached(m
     ws.dashboards.list.assert_called_once()
 
 
+def test_redash_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.dashboards.get.return_value = SdkRedashDashboard(id="did1")
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", include_dashboard_ids=["did1"])
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    ws.dashboards.get.assert_called_once_with("did1")
+    ws.dashboards.list.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
