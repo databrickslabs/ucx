@@ -11,7 +11,12 @@ from databricks.sdk.errors import NotFound, PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
-from databricks.labs.ucx.assessment.dashboards import LakeviewDashboard, LakeviewDashboardCrawler, RedashDashboard, RedashDashboardCrawler
+from databricks.labs.ucx.assessment.dashboards import (
+    LakeviewDashboard,
+    LakeviewDashboardCrawler,
+    RedashDashboard,
+    RedashDashboardCrawler,
+)
 
 
 @pytest.mark.parametrize(
@@ -72,9 +77,7 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [
-        Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"])
-    ]
+    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"])]
     ws.dashboards.list.assert_called_once()
 
 
@@ -100,6 +103,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mo
         for dashboard in dashboards:
             yield dashboard
             raise TooManyRequests("Exceeded API limit")
+
     ws.dashboards.list.side_effect = list_dashboards
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 

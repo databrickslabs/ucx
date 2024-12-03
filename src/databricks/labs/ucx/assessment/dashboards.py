@@ -169,7 +169,12 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
     """Crawler for Lakeview dashboards."""
 
     def __init__(
-        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema: str, include_dashboard_ids: list[str] | None = None
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        schema: str,
+        *,
+        include_dashboard_ids: list[str] | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", LakeviewDashboard)
         self._ws = ws
