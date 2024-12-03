@@ -14,12 +14,12 @@ def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: MockInstallationCo
 
     installation_ctx.redash.migrate_dashboards(dashboard.id)
 
-    query_in_dashboard_migrated = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
-    assert Redash.MIGRATED_TAG in (query_in_dashboard_migrated.tags or [])
+    query_migrated = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
+    assert Redash.MIGRATED_TAG in (query_migrated.tags or [])
 
-    query_out_dashboard_not_migrated = ws.queries.get(query_outside_dashboard.id)
-    assert Redash.MIGRATED_TAG not in (query_out_dashboard_not_migrated.tags or [])
+    query_not_migrated = ws.queries.get(query_outside_dashboard.id)
+    assert Redash.MIGRATED_TAG not in (query_not_migrated.tags or [])
 
     installation_ctx.redash.revert_dashboards(dashboard.id)
-    query_in_dashboard_reverted = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
-    assert Redash.MIGRATED_TAG in (query_in_dashboard_reverted.tags or [])
+    query_reverted = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
+    assert Redash.MIGRATED_TAG in (query_reverted.tags or [])
