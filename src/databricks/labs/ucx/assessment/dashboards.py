@@ -6,17 +6,50 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard
+from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyQuery
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Query:
+    """UCX representation of a Query."""
+
+    id: str
+    """The ID for this query."""
+
+    name: str = "UNKNOWN"
+    """The title of this query that appears in list views, widget headings, and on the query page."""
+
+    query: str = ""
+    """The text of the query to be run."""
+
+    @classmethod
+    def from_legacy_query(cls, query: LegacyQuery) -> Query:
+        """Create query from a :class:LegacyQuery"""
+        assert query.id
+        return cls(
+            id=query.id,
+            name=query.name or cls.name,
+            query=query.query or cls.query,
+        )
+
+    @classmethod
+    def from_lakeview_dataset(cls, dataset: Dataset) -> Query:
+        """Create query from a :class:Dataset"""
+        return cls(
+            id=dataset.name,
+            name=dataset.display_name or cls.name,
+            query=dataset.query,
+        )
 
 
 @dataclass
@@ -127,7 +160,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterable[str]:
+    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterable[Query]:
         """List queries.
 
         Args:
@@ -147,8 +180,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         """List all queries."""
         try:
             for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
-                if query.query is not None:
-                    yield query.query
+                yield Query.from_legacy_query(query)
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
@@ -157,8 +189,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for query_id in dashboard.query_ids:
             try:
                 query = self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
-                if query.query:
-                    yield query.query
+                yield Query.from_legacy_query(query)
             except DatabricksError as e:
                 logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
 
@@ -265,7 +296,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield LakeviewDashboard(*row)
 
-    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterable[str]:
+    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterable[Query]:
         """List queries.
 
         Args:
@@ -288,4 +319,4 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for sdk_dashboard in sdk_dashboards:
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
-                yield dataset.query
+                yield Query.from_lakeview_dataset(dataset)
