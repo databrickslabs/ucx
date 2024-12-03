@@ -178,12 +178,12 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
 
 def test_redash_dashboard_crawler_list_queries(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
-    ws.queries_legacy.list.return_value = [LegacyQuery(id="qid")]
+    ws.queries_legacy.list.return_value = [LegacyQuery(id="qid", query="SELECT 42 AS count")]
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     queries = list(crawler.list_queries())
 
-    assert queries == [LegacyQuery(id="qid")]
+    assert queries == ["SELECT 42 AS count"]
     ws.queries_legacy.list.assert_called_once()
 
 

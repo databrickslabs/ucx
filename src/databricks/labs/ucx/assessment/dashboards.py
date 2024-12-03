@@ -127,7 +127,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self) -> Iterable[LegacyQuery]:
+    def list_queries(self) -> Iterable[str]:
         """List queries.
 
         Note:
@@ -135,11 +135,13 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             another crawler for the queries by retrieving the queries every time they are requested.
         """
         try:
-            yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
+            for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
+                if query.query is not None:
+                    yield query.query
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def get_query(self, query_id: str, dashboard: RedashDashboard) -> LegacyQuery | None:
+    def get_query(self, query_id: str, dashboard: RedashDashboard) -> str | None:
         """Get a query given its id and the corresponding dashboard.
 
         Note:
@@ -148,7 +150,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         """
         _ = dashboard
         try:
-            return self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+            return self._ws.queries_legacy.get(query_id).query  # TODO: Update this to non-legacy query
         except DatabricksError as e:
             logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
             return None
