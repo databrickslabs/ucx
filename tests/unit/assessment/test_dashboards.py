@@ -200,24 +200,24 @@ def test_redash_dashboard_crawler_list_queries_handles_permission_denied(caplog,
     ws.queries_legacy.list.assert_called_once()
 
 
-def test_redash_dashboard_crawler_get_queries_calls_query_api_get(mock_backend) -> None:
+def test_redash_dashboard_crawler_list_queries_from_dashboard(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
-    ws.queries_legacy.get.return_value = LegacyQuery(query="SELECT 42 AS count")
+    ws.queries_legacy.get.return_value = LegacyQuery(id="qid", query="SELECT 42 AS count")
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
-    queries = list(crawler.get_queries(RedashDashboard("did"), "qid"))
+    queries = list(crawler.list_queries(dashboard=RedashDashboard("did", query_ids=["qid"])))
 
     assert queries == ["SELECT 42 AS count"]
     ws.queries_legacy.get.assert_called_once_with("qid")
 
 
-def test_redash_dashboard_crawler_get_queries_handles_not_found(caplog, mock_backend) -> None:
+def test_redash_dashboard_crawler_list_queries_handles_not_found(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.queries_legacy.get.side_effect = NotFound("Query not found: qid")
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.get_queries(RedashDashboard("did"), "qid"))
+        queries = list(crawler.list_queries(dashboard=RedashDashboard("did", query_ids=["qid"])))
 
     assert len(queries) == 0
     assert "Cannot get Redash query: qid" in caplog.messages
@@ -393,7 +393,7 @@ def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_da
     ws.lakeview.list.assert_called_once()
 
 
-def test_lakeview_dashboard_crawler_get_queries_calls_query_api_get(mock_backend) -> None:
+def test_lakeview_dashboard_crawler_list_queries_calls_query_api_get(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboard = SdkLakeviewDashboard(
         serialized_dashboard=json.dumps(
@@ -403,26 +403,26 @@ def test_lakeview_dashboard_crawler_get_queries_calls_query_api_get(mock_backend
     ws.lakeview.get.return_value = dashboard
     crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
 
-    queries = list(crawler.get_queries(LakeviewDashboard("did"), "qid"))
+    queries = list(crawler.list_queries(LakeviewDashboard("did")))
 
     assert queries == ["SELECT 42 AS count"]
     ws.lakeview.get.assert_called_once_with("did")
 
 
-def test_lakeview_dashboard_crawler_get_queries_handles_not_found(caplog, mock_backend) -> None:
+def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.lakeview.get.side_effect = NotFound("Query not found: qid")
     crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.get_queries(LakeviewDashboard("did"), "qid"))
+        queries = list(crawler.list_queries(LakeviewDashboard("did")))
 
     assert len(queries) == 0
     assert "Cannot get Lakeview dashboard: did" in caplog.messages
     ws.lakeview.get.assert_called_once_with("did")
 
 
-def test_lakeview_dashboard_crawler_get_queries_handles_corrupted_serialized_dashboard(caplog, mock_backend) -> None:
+def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_dashboard(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboard = SdkLakeviewDashboard(
         dashboard_id="did", serialized_dashboard='{"invalid_lakeview": "serialized_dashboard"}'
@@ -431,7 +431,7 @@ def test_lakeview_dashboard_crawler_get_queries_handles_corrupted_serialized_das
     crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.get_queries(LakeviewDashboard("did"), "qid"))
+        queries = list(crawler.list_queries(LakeviewDashboard("did")))
 
     assert len(queries) == 0
     assert "Error when parsing Lakeview dashboard: did"
