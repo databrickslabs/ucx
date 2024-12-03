@@ -727,7 +727,15 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
 
     @property
     def created_dashboards(self) -> list[str]:
-        return [dashboard.id for dashboard in self._dashboards if dashboard.id is not None]
+        dashboard_ids = []
+        for dashboard in self._dashboards:
+            if isinstance(dashboard, SdkRedashDashboard):
+                dashboard_ids.append(dashboard.id)
+            elif isinstance(dashboard, SdkLakeviewDashboard):
+                dashboard_ids.append(dashboard.dashboard_id)
+            else:
+                raise ValueError(f"Unsupported dashboard type: {type(dashboard)}")
+        return dashboard_ids
 
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
