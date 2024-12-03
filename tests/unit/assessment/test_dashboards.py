@@ -107,6 +107,19 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(mock_backe
     ws.dashboards.list.assert_called_once()
 
 
+def test_redash_dashboard_crawler_stops_when_debug_listing_upper_limit_reached(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard(id="did2")]
+    ws.dashboards.list.side_effect = lambda: (dashboard for dashboard in dashboards)
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", debug_listing_upper_limit=1)
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    ws.dashboards.list.assert_called_once()
+
+
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
