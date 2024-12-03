@@ -211,13 +211,17 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
 def test_redash_dashboard_crawler_list_queries(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.queries_legacy.list.return_value = [
-        LegacyQuery(id="qid", name="Query", parent="parent", query="SELECT 42 AS count")
+        LegacyQuery(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count"),
+        LegacyQuery(id="qid2", name="Second query", parent="parent", query="SELECT 21 AS count"),
     ]
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     queries = list(crawler.list_queries())
 
-    assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
+    assert queries == [
+        Query("qid1", "First query", "parent", "SELECT 42 AS count"),
+        Query("qid2", "Second query", "parent", "SELECT 21 AS count"),
+    ]
     ws.queries_legacy.list.assert_called_once()
 
 
@@ -258,6 +262,18 @@ def test_redash_dashboard_crawler_list_queries_handles_not_found(caplog, mock_ba
     assert len(queries) == 0
     assert "Cannot get Redash query: qid" in caplog.messages
     ws.queries_legacy.get.assert_called_once_with("qid")
+
+
+def test_redash_dashboard_crawler_list_queries_stops_when_debug_listing_upper_limit_reached(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    legacy_queries = [LegacyQuery(id="qid1"), LegacyQuery(id="qid2")]
+    ws.queries_legacy.list.side_effect = lambda: (query for query in legacy_queries)
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", debug_listing_upper_limit=1)
+
+    queries = list(crawler.list_queries())
+
+    assert len(queries) == 1
+    ws.queries_legacy.list.assert_called_once()
 
 
 @pytest.mark.parametrize(
