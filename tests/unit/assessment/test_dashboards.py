@@ -1,11 +1,12 @@
 import json
 from unittest.mock import create_autospec
+from typing import Iterator
 
 import pytest
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
 from databricks.labs.lsql.backends import Row
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
@@ -85,6 +86,24 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_list(mock_backend)
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert len(rows) == 0
+    ws.dashboards.list.assert_called_once()
+
+
+def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard(id="did2")]
+
+    def list_dashboards() -> Iterator[SdkRedashDashboard]:
+        for dashboard in dashboards:
+            yield dashboard
+            raise TooManyRequests("Exceeded API limit")
+    ws.dashboards.list.side_effect = list_dashboards
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test")
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     ws.dashboards.list.assert_called_once()
 
 
