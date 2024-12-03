@@ -1126,7 +1126,7 @@ class MockInstallationContext(MockRuntimeContext):
 
 
 @pytest.fixture
-def installation_ctx(  # pylint: disable=too-many-arguments
+def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
     ws,
     sql_backend,
     make_catalog,
