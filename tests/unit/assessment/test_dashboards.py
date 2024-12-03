@@ -91,7 +91,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_list(caplog, mock_
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert len(rows) == 0
-    assert "Cannot list Redash dashboards" in caplog.text
+    assert "Cannot list Redash dashboards" in caplog.messages
     ws.dashboards.list.assert_called_once()
 
 
@@ -112,7 +112,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mo
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
-    assert "Cannot list next Redash dashboards page" in caplog.text
+    assert "Cannot list next Redash dashboards page" in caplog.messages
     ws.dashboards.list.assert_called_once()
 
 
@@ -295,7 +295,7 @@ def test_lakeview_dashboard_crawler_handles_databricks_error_on_list(caplog, moc
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
     assert len(rows) == 0
-    assert "Cannot list Lakeview dashboards" in caplog.text
+    assert "Cannot list Lakeview dashboards" in caplog.messages
     ws.lakeview.list.assert_called_once()
 
 
