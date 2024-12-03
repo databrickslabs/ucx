@@ -265,7 +265,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             for dataset in lsql_dashboard.datasets:
                yield dataset.query
 
-    def get_query(self, query_id: str, dashboard: LakeviewDashboard) -> Iterable[str]:
+    def get_query(self, query_id: str, dashboard: LakeviewDashboard) -> str | None:
         """Get a query given its id and the corresponding dashboard.
 
         Note:
