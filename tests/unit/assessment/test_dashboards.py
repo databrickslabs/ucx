@@ -159,6 +159,19 @@ def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_bac
     ws.dashboards.list.assert_not_called()
 
 
+def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard()]  # Second misses dashboard id
+    ws.dashboards.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test")
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    ws.dashboards.list.assert_called_once()
+
+
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
