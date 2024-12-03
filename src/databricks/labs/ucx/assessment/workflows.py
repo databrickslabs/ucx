@@ -197,7 +197,7 @@ class Assessment(Workflow):
     @job_task
     def crawl_lakeview_dashboards(self, ctx: RuntimeContext):
         """Scans all Lakeview dashboards."""
-        ctx.redash_crawler.snapshot()
+        ctx.lakeview_crawler.snapshot()
 
     @job_task(depends_on=[crawl_redash_dashboards, crawl_lakeview_dashboards])
     def assess_dashboards(self, ctx: RuntimeContext):
