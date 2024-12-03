@@ -267,7 +267,7 @@ def test_lakeview_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None
 def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
 
-    def get_dashboards(dashboard_id: str) -> SdkRedashDashboard:
+    def get_dashboards(dashboard_id: str) -> SdkLakeviewDashboard:
         if dashboard_id == "did1":
             return SdkLakeviewDashboard(dashboard_id="did1")
         raise NotFound(f"Did not find dashboard: {dashboard_id}")
