@@ -10,7 +10,7 @@ from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyQuery
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -156,7 +156,9 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
-                yield self._ws.queries_legacy.get(query_id).query  # TODO: Update this to non-legacy query
+                query = self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+                if query.query:
+                    yield query.query
             except DatabricksError as e:
                 logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
 
@@ -286,4 +288,4 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for sdk_dashboard in sdk_dashboards:
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
-               yield dataset.query
+                yield dataset.query
