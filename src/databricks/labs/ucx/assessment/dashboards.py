@@ -98,7 +98,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         dashboards: list[SdkRedashDashboard] = []
         # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
         # to a small number of items in debug mode for the assessment workflow just to complete.
-        while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit < len(dashboards):
+        while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit > len(dashboards):
             try:
                 dashboards.append(next(dashboards_iterator))
             except StopIteration:
