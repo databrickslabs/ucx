@@ -24,8 +24,11 @@ from databricks.labs.ucx.assessment.dashboards import (
     "legacy_query, expected",
     [
         (LegacyQuery(id="qid"), Query("qid")),
-        (LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count"), Query("qid", "Query", "SELECT 42 AS count")),
-    ]
+        (
+            LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count", parent="parent"),
+            Query("qid", "Query", "parent", "SELECT 42 AS count"),
+        ),
+    ],
 )
 def test_query_from_legacy_query(legacy_query: LegacyQuery, expected: Query) -> None:
     query = Query.from_legacy_query(legacy_query)
@@ -33,14 +36,18 @@ def test_query_from_legacy_query(legacy_query: LegacyQuery, expected: Query) -> 
 
 
 @pytest.mark.parametrize(
-    "dataset, expected",
+    "dataset, parent, expected",
     [
-        (Dataset("qid", "SELECT 42 AS count"), Query("qid", query="SELECT 42 AS count")),
-        (Dataset("qid", "SELECT 42 AS count", display_name="Query"), Query("qid", "Query", "SELECT 42 AS count")),
-    ]
+        (Dataset("qid", "SELECT 42 AS count"), None, Query("qid", query="SELECT 42 AS count")),
+        (
+            Dataset("qid", "SELECT 42 AS count", display_name="Query"),
+            "parent",
+            Query("qid", "Query", "parent", "SELECT 42 AS count"),
+        ),
+    ],
 )
-def test_query_from_lakeview_dataset(dataset: Dataset, expected: Query) -> None:
-    query = Query.from_lakeview_dataset(dataset)
+def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expected: Query) -> None:
+    query = Query.from_lakeview_dataset(dataset, parent=parent)
     assert query == expected
 
 
@@ -203,12 +210,12 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
 
 def test_redash_dashboard_crawler_list_queries(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
-    ws.queries_legacy.list.return_value = [LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count")]
+    ws.queries_legacy.list.return_value = [LegacyQuery(id="qid", name="Query", parent="parent", query="SELECT 42 AS count")]
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     queries = list(crawler.list_queries())
 
-    assert queries == [Query("qid", "Query", "SELECT 42 AS count")]
+    assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
     ws.queries_legacy.list.assert_called_once()
 
 
@@ -227,12 +234,12 @@ def test_redash_dashboard_crawler_list_queries_handles_permission_denied(caplog,
 
 def test_redash_dashboard_crawler_list_queries_from_dashboard(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
-    ws.queries_legacy.get.return_value = LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count")
+    ws.queries_legacy.get.return_value = LegacyQuery(id="qid", name="Query", parent="parent", query="SELECT 42 AS count")
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     queries = list(crawler.list_queries(dashboard=RedashDashboard("did", query_ids=["qid"])))
 
-    assert queries == [Query("qid", "Query", "SELECT 42 AS count")]
+    assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
     ws.queries_legacy.get.assert_called_once_with("qid")
 
 
@@ -375,6 +382,7 @@ def test_lakeview_dashboard_crawler_list_queries(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboards = [
         SdkLakeviewDashboard(
+            dashboard_id="parent",
             serialized_dashboard=json.dumps(
                 LsqlLakeviewDashboard(datasets=[Dataset("qid1", "SELECT 42 AS count", "Query")], pages=[]).as_dict()
             ),
@@ -385,7 +393,7 @@ def test_lakeview_dashboard_crawler_list_queries(mock_backend) -> None:
 
     queries = list(crawler.list_queries())
 
-    assert queries == [Query("qid1", "Query", "SELECT 42 AS count")]
+    assert queries == [Query("qid1", "Query", "parent", "SELECT 42 AS count")]
     ws.lakeview.list.assert_called_once()
 
 
@@ -419,6 +427,7 @@ def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_da
 def test_lakeview_dashboard_crawler_list_queries_calls_query_api_get(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboard = SdkLakeviewDashboard(
+        dashboard_id="parent",
         serialized_dashboard=json.dumps(
             LsqlLakeviewDashboard(datasets=[Dataset("qid", "SELECT 42 AS count", "Query")], pages=[]).as_dict()
         ),
@@ -428,7 +437,7 @@ def test_lakeview_dashboard_crawler_list_queries_calls_query_api_get(mock_backen
 
     queries = list(crawler.list_queries(LakeviewDashboard("did")))
 
-    assert queries == [Query("qid", "Query", "SELECT 42 AS count")]
+    assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
     ws.lakeview.get.assert_called_once_with("did")
 
 
