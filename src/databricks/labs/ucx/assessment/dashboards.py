@@ -127,13 +127,24 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self) -> Iterable[str]:
+    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterable[str]:
         """List queries.
+
+        Args:
+            dashboard (RedashDashboard | None) : List queries for dashboard. If None, list all queries.
+                Defaults to None.
 
         Note:
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
+        if dashboard:
+            yield from self._list_queries_from_dashboard(dashboard)
+        else:
+            yield from self._list_all_queries()
+
+    def _list_all_queries(self) -> Iterable[str]:
+        """List all queries."""
         try:
             for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
                 if query.query is not None:
@@ -141,15 +152,9 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def get_queries(self, dashboard: RedashDashboard, *query_ids: str) -> Iterable[str]:
-        """Get queries given for a dashboard.
-
-        Note:
-            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
-            another crawler for the queries by retrieving the queries every time they are requested.
-        """
-        _ = dashboard  # Redash has query API separate from the dashboard
-        for query_id in query_ids:
+    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterable[str]:
+        """List queries from dashboard."""
+        for query_id in dashboard.query_ids:
             try:
                 yield self._ws.queries_legacy.get(query_id).query  # TODO: Update this to non-legacy query
             except DatabricksError as e:
@@ -258,34 +263,27 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield LakeviewDashboard(*row)
 
-    def list_queries(self) -> Iterable[str]:
+    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterable[str]:
         """List queries.
 
+        Args:
+            dashboard (LakeviewDashboard | None) : List queries for dashboard. If None, list all queries.
+                Defaults to None.
+
         Note:
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
 
             Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
         """
-        for dashboard in self._list_dashboards():
-            lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
+        sdk_dashboards = []
+        if dashboard:
+            sdk_dashboard = self._get_dashboard(dashboard_id=dashboard.id)
+            if sdk_dashboard:
+                sdk_dashboards.append(sdk_dashboard)
+        else:
+            sdk_dashboards = self._list_dashboards()
+        for sdk_dashboard in sdk_dashboards:
+            lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
                yield dataset.query
-
-    def get_queries(self, dashboard: LakeviewDashboard, *query_ids: str) -> Iterable[str]:
-        """Get a query given its id and the corresponding dashboard.
-
-        Note:
-            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
-            another crawler for the queries by retrieving the queries every time they are requested.
-
-            Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
-        """
-        sdk_dashboard = self._get_dashboard(dashboard.id)
-        if sdk_dashboard is None:
-            return
-        lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
-        for query_id in query_ids:
-            for dataset in lsql_dashboard.datasets:
-                if dataset.name == query_id:
-                    yield dataset.query
