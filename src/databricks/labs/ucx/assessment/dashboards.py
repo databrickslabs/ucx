@@ -10,7 +10,7 @@ from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyQuery
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -126,6 +126,20 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
     def _try_fetch(self) -> Iterable[RedashDashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
+
+    def get_query(self, query_id: str, dashboard: RedashDashboard) -> LegacyQuery | None:
+        """Get a query given its id and the corresponding dashboard.
+
+        Note:
+            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
+            another crawler for the queries by retrieving the queries every time they are requested.
+        """
+        _ = dashboard
+        try:
+            return self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+        except DatabricksError as e:
+            logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
+            return None
 
 
 @dataclass
