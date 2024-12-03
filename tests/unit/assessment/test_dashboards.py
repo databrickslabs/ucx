@@ -388,7 +388,7 @@ def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_da
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
         queries = list(crawler.list_queries())
 
-    assert queries == []
+    assert len(queries) == 0
     assert "Error when parsing Lakeview dashboard: did"
     ws.lakeview.list.assert_called_once()
 
