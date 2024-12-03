@@ -349,7 +349,6 @@ def test_lakeview_dashboard_crawler_list_queries(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboards = [
         SdkLakeviewDashboard(
-            dashboard_id="did",
             serialized_dashboard=json.dumps(
                 LsqlLakeviewDashboard(datasets=[Dataset("qid1", "SELECT 42 AS count")], pages=[]).as_dict()
             ),
