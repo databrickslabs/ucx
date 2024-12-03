@@ -293,7 +293,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,
-            self.config.include_dashboard_ids,
+            include_dashboard_ids=self.config.include_dashboard_ids,
         )
 
     @cached_property
