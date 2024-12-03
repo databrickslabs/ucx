@@ -1,22 +1,14 @@
 import dataclasses
 import logging
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError
-from databricks.sdk.service.sql import LegacyQuery
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.assessment.dashboards import (
-    LakeviewDashboard,
-    LakeviewDashboardCrawler,
-    RedashDashboard,
-    RedashDashboardCrawler,
-)
+from databricks.labs.ucx.assessment.dashboards import DashboardType, DashboardCrawlerType, Query
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
@@ -47,24 +39,18 @@ class _ReportingContext:
     all_tables: list[UsedTable] = field(default_factory=list)
 
 
-Dashboard = LakeviewDashboard | RedashDashboard
-DashboardCrawler = LakeviewDashboardCrawler | RedashDashboardCrawler
-
-
 class QueryLinter:
 
     def __init__(
         self,
-        ws: WorkspaceClient,
         sql_backend: SqlBackend,
         inventory_database: str,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
-        dashboard_crawlers: list[DashboardCrawler],
+        dashboard_crawlers: list[DashboardCrawlerType],
         debug_listing_upper_limit: int | None = None,
     ):
-        self._ws = ws
         self._sql_backend = sql_backend
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
@@ -137,20 +123,29 @@ class QueryLinter:
         self._used_tables_crawler.dump_all(processed_tables)
 
     def _lint_dashboards(self, context: _ReportingContext) -> None:
+        for dashboard, queries in self._list_dashboards_with_queries():
+            logger.info(f"Linting dashboard: {dashboard.name} ({dashboard.id})")
+            queries_to_lint = []
+            for query in queries:
+                if query.id in context.linted_queries:
+                    continue
+                queries_to_lint.append(query)
+                context.linted_queries.add(query.id)
+            problems, dfsas, tables = self._lint_dashboard_with_queries(dashboard, queries_to_lint)
+            context.all_problems.extend(problems)
+            context.all_dfsas.extend(dfsas)
+            context.all_tables.extend(tables)
+
+    def _list_dashboards_with_queries(self) -> Iterable[tuple[DashboardType, list[Query]]]:
         for crawler in self._dashboard_crawlers:
             for dashboard in crawler.snapshot():
-                logger.info(f"Linting dashboard: {dashboard.name} ({dashboard.id})")
-                problems, dfsas, tables = self._lint_and_collect_from_dashboard(dashboard, context.linted_queries)
-                context.all_problems.extend(problems)
-                context.all_dfsas.extend(dfsas)
-                context.all_tables.extend(tables)
+                yield dashboard, list(crawler.list_queries(dashboard))
 
     def _lint_queries(self, context: _ReportingContext) -> None:
-        for query in self._queries_in_scope():
-            assert query.id is not None
+        for query in self._list_queries():
             if query.id in context.linted_queries:
                 continue
-            logger.info(f"Linting query_id={query.id}: {query.name}")
+            logger.info(f"Linting query: {query.name} ({query.id})")
             context.linted_queries.add(query.id)
             problems = self.lint_query(query)
             context.all_problems.extend(problems)
@@ -159,129 +154,80 @@ class QueryLinter:
             tables = self.collect_used_tables_from_query("no-dashboard-id", query)
             context.all_tables.extend(tables)
 
-    def _queries_in_scope(self) -> list[LegacyQuery]:
-        items_listed = 0
-        legacy_queries = []
-        for query in self._ws.queries_legacy.list():
-            # TODO: Move query crawler to separate method
-            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
-            legacy_queries.append(query)
-            items_listed += 1
-        return legacy_queries
+    def _list_queries(self) -> Iterable[Query]:
+        for crawler in self._dashboard_crawlers:
+            yield from crawler.list_queries()
 
-    def _get_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
-        for query_id in dashboard.query_ids:
-            try:
-                yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non LegacyQuery
-            except DatabricksError as e:
-                logger.warning(f"Cannot get query: {query_id}", exc_info=e)
-
-    def _lint_and_collect_from_dashboard(
-        self, dashboard: Dashboard, linted_queries: set[str]
+    def _lint_dashboard_with_queries(
+        self, dashboard: DashboardType, queries: list[Query]
     ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
-        dashboard_queries = self._get_queries_from_dashboard(dashboard)
         query_problems: list[QueryProblem] = []
         query_dfsas: list[DirectFsAccess] = []
         query_tables: list[UsedTable] = []
-        dashboard_id = dashboard.id or "<no-id>"
-        dashboard_parent = dashboard.parent or "<orphan>"
-        dashboard_name = dashboard.name or "<anonymous>"
-        for query in dashboard_queries:
-            if query.id is None:
-                continue
-            if query.id in linted_queries:
-                continue
-            linted_queries.add(query.id)
+        for query in queries:
             problems = self.lint_query(query)
             for problem in problems:
                 query_problems.append(
                     dataclasses.replace(
                         problem,
-                        dashboard_id=dashboard_id,
-                        dashboard_parent=dashboard_parent,
-                        dashboard_name=dashboard_name,
+                        dashboard_id=dashboard.id,
+                        dashboard_parent=dashboard.parent,
+                        dashboard_name=dashboard.name,
                     )
                 )
-            dfsas = self.collect_dfsas_from_query(dashboard_id, query)
+            dfsas = self.collect_dfsas_from_query(dashboard.id, query)
             for dfsa in dfsas:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
-                    object_id=dashboard_id,
-                    other={"parent": dashboard_parent, "name": dashboard_name},
+                    object_id=dashboard.id,
+                    other={"parent": dashboard.parent, "name": dashboard.name},
                 )
                 source_lineage = [atom] + dfsa.source_lineage
                 query_dfsas.append(dataclasses.replace(dfsa, source_lineage=source_lineage))
-            tables = self.collect_used_tables_from_query(dashboard_id, query)
+            tables = self.collect_used_tables_from_query(dashboard.id, query)
             for table in tables:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
-                    object_id=dashboard_id,
-                    other={"parent": dashboard_parent, "name": dashboard_name},
+                    object_id=dashboard.id,
+                    other={"parent": dashboard.parent, "name": dashboard.name},
                 )
                 source_lineage = [atom] + table.source_lineage
                 query_tables.append(dataclasses.replace(table, source_lineage=source_lineage))
         return query_problems, query_dfsas, query_tables
 
-    def lint_query(self, query: LegacyQuery) -> Iterable[QueryProblem]:
+    def lint_query(self, query: Query) -> Iterable[QueryProblem]:
         if not query.query:
             return
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         linter = ctx.linter(Language.SQL)
-        query_id = query.id or "<no-id>"
-        query_parent = query.parent or "<orphan>"
-        query_name = query.name or "<anonymous>"
         for advice in linter.lint(query.query):
             yield QueryProblem(
                 dashboard_id="",
                 dashboard_parent="",
                 dashboard_name="",
-                query_id=query_id,
-                query_parent=query_parent,
-                query_name=query_name,
+                query_id=query.id,
+                query_parent=query.parent,
+                query_name=query.name,
                 code=advice.code,
                 message=advice.message,
             )
 
-    def collect_dfsas_from_query(self, dashboard_id: str, query: LegacyQuery) -> Iterable[DirectFsAccess]:
-        if query.query is None:
+    def collect_dfsas_from_query(self, dashboard_id: str, query: Query) -> Iterable[DirectFsAccess]:
+        if not query.query:
             return
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         collector = ctx.dfsa_collector(Language.SQL)
         source_id = f"{dashboard_id}/{query.id}"
-        source_name = query.name or "<anonymous>"
-        source_timestamp = self._read_timestamp(query.updated_at)
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
+        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name})]
         for dfsa in collector.collect_dfsas(query.query):
-            yield dfsa.replace_source(
-                source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
-            )
+            yield dfsa.replace_source(source_id=source_id, source_lineage=source_lineage)
 
-    def collect_used_tables_from_query(self, dashboard_id: str, query: LegacyQuery) -> Iterable[UsedTable]:
-        if query.query is None:
+    def collect_used_tables_from_query(self, dashboard_id: str, query: Query) -> Iterable[UsedTable]:
+        if not query.query:
             return
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         collector = ctx.tables_collector(Language.SQL)
         source_id = f"{dashboard_id}/{query.id}"
-        source_name = query.name or "<anonymous>"
-        source_timestamp = self._read_timestamp(query.updated_at)
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": source_name})]
+        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name})]
         for table in collector.collect_tables(query.query):
-            yield table.replace_source(
-                source_id=source_id, source_timestamp=source_timestamp, source_lineage=source_lineage
-            )
-
-    @classmethod
-    def _read_timestamp(cls, timestamp: str | None) -> datetime:
-        if timestamp is not None:
-            methods = [
-                datetime.fromisoformat,
-                lambda s: datetime.fromisoformat(s[:-1]),  # ipython breaks on final 'Z'
-            ]
-            for method in methods:
-                try:
-                    return method(timestamp)
-                except ValueError:
-                    pass
-        return datetime.now()
+            yield table.replace_source(source_id=source_id, source_lineage=source_lineage)

@@ -12,7 +12,6 @@ def test_query_dfsa_ownership(
     redash_dashboard = runtime_ctx.make_dashboard(query=query)
     lakeview_dashboard = runtime_ctx.make_lakeview_dashboard(query=dfsa_query)
     linter = QueryLinter(
-        runtime_ctx.workspace_client,
         sql_backend,
         inventory_schema,
         TableMigrationIndex([]),
