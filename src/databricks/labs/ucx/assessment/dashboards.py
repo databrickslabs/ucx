@@ -174,7 +174,7 @@ def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> 
     if dashboard.serialized_dashboard is not None:
         try:
             lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
-        except (KeyError, ValueError, json.JSONDecodeError) as e:
+        except (KeyError, ValueError) as e:
             logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
     return lsql_dashboard
 
