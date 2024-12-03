@@ -176,16 +176,21 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         self._include_dashboard_ids = include_dashboard_ids or []
 
     def _crawl(self) -> Iterable[LakeviewDashboard]:
-        dashboards = [LakeviewDashboard.from_sdk_dashboard(dashboard) for dashboard in self._list_dashboards()]
+        dashboards = []
+        for sdk_dashboard in self._list_dashboards():
+            if sdk_dashboard.dashboard_id is None:
+                continue
+            dashboard = LakeviewDashboard.from_sdk_dashboard(sdk_dashboard)
+            dashboards.append(dashboard)
         return dashboards
 
     def _list_dashboards(self) -> list[SdkLakeviewDashboard]:
         if self._include_dashboard_ids:
             return self._get_dashboards(*self._include_dashboard_ids)
         try:
-            return list(self._ws.lakeview.list())
             # If the API listing limit becomes an issue in testing, please see the `:class:RedashDashboardCrawler`
             # for an example on how to implement a (debug) rate limit
+            return list(self._ws.lakeview.list())  # TODO: Add dashboard summary view?
         except DatabricksError as e:
             logger.warning("Cannot list Lakeview dashboards", exc_info=e)
             return []
