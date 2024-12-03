@@ -5,6 +5,7 @@ import pytest
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
 from databricks.labs.lsql.backends import Row
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
@@ -72,6 +73,18 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
     assert rows == [
         Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"])
     ]
+    ws.dashboards.list.assert_called_once()
+
+
+def test_redash_dashboard_crawler_handles_databricks_error_on_list(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.dashboards.list.side_effect = PermissionDenied("Missing permission")
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test")
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert len(rows) == 0
     ws.dashboards.list.assert_called_once()
 
 
