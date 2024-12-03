@@ -141,19 +141,19 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def get_query(self, query_id: str, dashboard: RedashDashboard) -> str | None:
-        """Get a query given its id and the corresponding dashboard.
+    def get_queries(self, dashboard: RedashDashboard, *query_ids: str) -> Iterable[str]:
+        """Get queries given for a dashboard.
 
         Note:
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
-        _ = dashboard
-        try:
-            return self._ws.queries_legacy.get(query_id).query  # TODO: Update this to non-legacy query
-        except DatabricksError as e:
-            logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
-            return None
+        _ = dashboard  # Redash has query API separate from the dashboard
+        for query_id in query_ids:
+            try:
+                yield self._ws.queries_legacy.get(query_id).query  # TODO: Update this to non-legacy query
+            except DatabricksError as e:
+                logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
 
 
 def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> LsqlLakeviewDashboard:
@@ -272,7 +272,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             for dataset in lsql_dashboard.datasets:
                yield dataset.query
 
-    def get_query(self, query_id: str, dashboard: LakeviewDashboard) -> str | None:
+    def get_queries(self, dashboard: LakeviewDashboard, *query_ids: str) -> Iterable[str]:
         """Get a query given its id and the corresponding dashboard.
 
         Note:
@@ -283,8 +283,9 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         """
         sdk_dashboard = self._get_dashboard(dashboard.id)
         if sdk_dashboard is None:
-            return None
+            return
         lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
-        for dataset in lsql_dashboard.datasets:
-            if dataset.name == query_id:
-                return dataset.query
+        for query_id in query_ids:
+            for dataset in lsql_dashboard.datasets:
+                if dataset.name == query_id:
+                    yield dataset.query
