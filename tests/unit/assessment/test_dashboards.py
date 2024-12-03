@@ -186,6 +186,19 @@ def test_redash_dashboard_crawler_get_query_calls_query_api_get(mock_backend) ->
     ws.queries_legacy.get.assert_called_once_with("qid")
 
 
+def test_redash_dashboard_crawler_get_query_handles_not_found(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.queries_legacy.get.side_effect = NotFound("Query not found: qid")
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        query = crawler.get_query("qid", RedashDashboard("did"))
+
+    assert query is None
+    assert "Cannot get Redash query: qid" in caplog.messages
+    ws.queries_legacy.get.assert_called_once_with("qid")
+
+
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
