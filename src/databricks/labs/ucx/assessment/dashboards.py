@@ -29,6 +29,9 @@ class Query:
     name: str = "UNKNOWN"
     """The title of this query that appears in list views, widget headings, and on the query page."""
 
+    parent: str = "ORPHAN"
+    """The identifier of the workspace folder containing the object."""
+
     query: str = ""
     """The text of the query to be run."""
 
@@ -39,15 +42,17 @@ class Query:
         return cls(
             id=query.id,
             name=query.name or cls.name,
+            parent=query.parent or cls.parent,
             query=query.query or cls.query,
         )
 
     @classmethod
-    def from_lakeview_dataset(cls, dataset: Dataset) -> Query:
+    def from_lakeview_dataset(cls, dataset: Dataset, *, parent: str | None = None) -> Query:
         """Create query from a :class:Dataset"""
         return cls(
             id=dataset.name,
             name=dataset.display_name or cls.name,
+            parent=parent or cls.parent,
             query=dataset.query,
         )
 
@@ -319,4 +324,4 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for sdk_dashboard in sdk_dashboards:
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
-                yield Query.from_lakeview_dataset(dataset)
+                yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
