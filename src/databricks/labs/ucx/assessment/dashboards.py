@@ -251,6 +251,8 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         Note:
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
+
+            Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
         """
         for dashboard in self._list_dashboards():
             if dashboard.serialized_dashboard is None:
