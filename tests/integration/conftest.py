@@ -22,13 +22,13 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, dashboards
+from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import CreatePolicyResponse
-from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.iam import Group
 from databricks.sdk.service.jobs import Job, SparkPythonTask
-from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
@@ -80,7 +80,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
     """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
 
-    def create(*, display_name: str = "", query: str = "SELECT 42 AS count") -> SDKDashboard:
+    def create(*, display_name: str = "", query: str = "SELECT 42 AS count") -> SdkLakeviewDashboard:
         serialized_dashboard = {
             "datasets": [{"name": "fourtytwo", "displayName": "count", "query": query}],
             "pages": [
@@ -119,7 +119,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         else:
             display_name = f"created_by_ucx_{make_random()}_{watchdog_purge_suffix}"
         dashboard = ws.lakeview.create(
-            dashboard=dashboards.Dashboard(
+            dashboard=SdkLakeviewDashboard(
                 display_name=display_name,
                 serialized_dashboard=json.dumps(serialized_dashboard),
                 warehouse_id=warehouse_id,
@@ -128,7 +128,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         ws.lakeview.publish(dashboard.dashboard_id)
         return dashboard
 
-    def delete(dashboard: SDKDashboard) -> None:
+    def delete(dashboard: SdkLakeviewDashboard) -> None:
         ws.lakeview.trash(dashboard.dashboard_id)
 
     yield from factory("dashboard", create, delete)
@@ -145,7 +145,7 @@ def make_dashboard(
     This fixture is used to test migrating legacy dashboards to Lakeview.
     """
 
-    def create(query: LegacyQuery | None = None) -> Dashboard:
+    def create(query: LegacyQuery | None = None) -> SdkRedashDashboard:
         if not query:
             query = make_query()
         assert query
@@ -184,7 +184,7 @@ def make_dashboard(
         logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
         return ws.dashboards.get(dashboard.id)  # Dashboard with widget
 
-    def remove(dashboard: Dashboard) -> None:
+    def remove(dashboard: SdkRedashDashboard) -> None:
         try:
             assert dashboard.id is not None
             ws.dashboards.delete(dashboard_id=dashboard.id)
@@ -496,7 +496,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
         self._jobs: list[Job] = []
-        self._dashboards: list[Dashboard] = []
+        self._dashboards: list[SdkRedashDashboard] = []
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
@@ -574,7 +574,7 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._jobs.append(job)
         return job
 
-    def make_dashboard(self, **kwargs) -> Dashboard:
+    def make_dashboard(self, **kwargs) -> SdkRedashDashboard:
         dashboard = self._make_dashboard(**kwargs)
         self._dashboards.append(dashboard)
         return dashboard
