@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
@@ -148,7 +150,19 @@ class LakeviewDashboard:
     @classmethod
     def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
         assert dashboard.dashboard_id
-        return cls(id=dashboard.dashboard_id)
+        lsql_dashboard = LsqlLakeviewDashboard([], [])
+        if dashboard.serialized_dashboard is not None:
+            try:
+                lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
+            except (KeyError, ValueError, json.JSONDecodeError) as e:
+                logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
+        query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
+        return cls(
+            id=dashboard.dashboard_id,
+            name=dashboard.display_name or cls.name,
+            parent=dashboard.parent_path or cls.parent,
+            query_ids=query_ids,
+        )
 
 
 class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
