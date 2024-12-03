@@ -4,15 +4,12 @@ from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
-def test_query_linter_lints_queries_and_stores_dfsas_and_tables(
-    simple_ctx, ws, sql_backend, make_query, make_dashboard
-):
+def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx, sql_backend, make_query, make_dashboard):
     queries = [make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")]
     dashboards = [make_dashboard(query=queries[0])]
     queries.append(make_query(sql_query="SELECT * from some_schema.some_table"))
     dashboards.append(make_dashboard(query=queries[1]))
     linter = QueryLinter(
-        ws,
         sql_backend,
         simple_ctx.inventory_database,
         TableMigrationIndex([]),

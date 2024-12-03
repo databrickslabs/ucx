@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Query:
-    """UCX representation of a Query."""
+    """UCX representation of a Query.
+
+    Note:
+        This class is not persisted into an inventory table. If you decide to persist this class, consider (future)
+        differences between Redash and Lakeview queries
+    """
 
     id: str
     """The ID for this query."""
@@ -100,6 +105,41 @@ class RedashDashboard:
         )
 
 
+@dataclass
+class LakeviewDashboard:
+    """UCX representation of a Lakeview dashboard.
+
+    Note: We prefer to keep this class similar to the :class:RedashDashboard.
+    """
+
+    id: str
+    """The ID for this dashboard."""
+
+    name: str = "UNKNOWN"
+    """The title of the dashboard that appears in list views and at the top of the dashboard page."""
+
+    parent: str = "ORPHAN"
+    """The identifier of the workspace folder containing the object."""
+
+    query_ids: list[str] = field(default_factory=list)
+    """The IDs of the queries referenced by this dashboard."""
+
+    @classmethod
+    def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
+        assert dashboard.dashboard_id
+        lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
+        query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
+        return cls(
+            id=dashboard.dashboard_id,
+            name=dashboard.display_name or cls.name,
+            parent=dashboard.parent_path or cls.parent,
+            query_ids=query_ids,
+        )
+
+
+DashboardType = LakeviewDashboard | RedashDashboard
+
+
 class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
     """Crawler for Redash dashboards."""
 
@@ -166,11 +206,11 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterator[Query]:
+    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:
-            dashboard (RedashDashboard | None) : List queries for dashboard. If None, list all queries.
+            dashboard (Dashboard | None) : List queries for dashboard. If None, list all queries.
                 Defaults to None.
 
         Note:
@@ -198,7 +238,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[Query]:
+    def _list_queries_from_dashboard(self, dashboard: DashboardType) -> Iterator[Query]:
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
@@ -222,38 +262,6 @@ def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> 
         except (KeyError, ValueError) as e:
             logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
     return lsql_dashboard
-
-
-@dataclass
-class LakeviewDashboard:
-    """UCX representation of a Lakeview dashboard.
-
-    Note: We prefer to keep this class similar to the :class:RedashDashboard.
-    """
-
-    id: str
-    """The ID for this dashboard."""
-
-    name: str = "UNKNOWN"
-    """The title of the dashboard that appears in list views and at the top of the dashboard page."""
-
-    parent: str = "ORPHAN"
-    """The identifier of the workspace folder containing the object."""
-
-    query_ids: list[str] = field(default_factory=list)
-    """The IDs of the queries referenced by this dashboard."""
-
-    @classmethod
-    def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
-        assert dashboard.dashboard_id
-        lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
-        query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
-        return cls(
-            id=dashboard.dashboard_id,
-            name=dashboard.display_name or cls.name,
-            parent=dashboard.parent_path or cls.parent,
-            query_ids=query_ids,
-        )
 
 
 class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
@@ -310,11 +318,11 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield LakeviewDashboard(*row)
 
-    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterator[Query]:
+    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:
-            dashboard (LakeviewDashboard | None) : List queries for dashboard. If None, list all queries.
+            dashboard (Dashboard | None) : List queries for dashboard. If None, list all queries.
                 Defaults to None.
 
         Note:
@@ -334,3 +342,6 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
                 yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
+
+
+DashboardCrawlerType = LakeviewDashboardCrawler | RedashDashboardCrawler

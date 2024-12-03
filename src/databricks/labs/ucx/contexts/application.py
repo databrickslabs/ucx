@@ -554,7 +554,6 @@ class GlobalContext(abc.ABC):
     @cached_property
     def query_linter(self) -> QueryLinter:
         return QueryLinter(
-            self.workspace_client,
             self.sql_backend,
             self.inventory_database,
             TableMigrationIndex([]),
