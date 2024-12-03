@@ -82,7 +82,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
 
     def create(*, display_name: str = "", query: str = "SELECT 42 AS count") -> SdkLakeviewDashboard:
         serialized_dashboard = {
-            "datasets": [{"name": "fourtytwo", "displayName": "count", "query": query}],
+            "datasets": [{"name": "query", "displayName": "count", "query": query}],
             "pages": [
                 {
                     "name": "count",
