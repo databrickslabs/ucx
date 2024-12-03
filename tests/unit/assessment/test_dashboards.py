@@ -1,3 +1,4 @@
+import logging
 import json
 from unittest.mock import create_autospec
 from typing import Iterator
@@ -77,19 +78,21 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
     ws.dashboards.list.assert_called_once()
 
 
-def test_redash_dashboard_crawler_handles_databricks_error_on_list(mock_backend) -> None:
+def test_redash_dashboard_crawler_handles_databricks_error_on_list(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.dashboards.list.side_effect = PermissionDenied("Missing permission")
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
-    crawler.snapshot()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert len(rows) == 0
+    assert "Cannot list Redash dashboards" in caplog.text
     ws.dashboards.list.assert_called_once()
 
 
-def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(mock_backend) -> None:
+def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard(id="did2")]
 
@@ -100,10 +103,12 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(mock_backe
     ws.dashboards.list.side_effect = list_dashboards
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
-    crawler.snapshot()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert "Cannot list next Redash dashboards page" in caplog.text
     ws.dashboards.list.assert_called_once()
 
 
