@@ -127,6 +127,14 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
+    def list_queries(self) -> Iterable[LegacyQuery]:
+        """List queries.
+
+        Note:
+            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
+            another crawler for the queries by retrieving the queries every time they are requested.
+        """
+
     def get_query(self, query_id: str, dashboard: RedashDashboard) -> LegacyQuery | None:
         """Get a query given its id and the corresponding dashboard.
 
