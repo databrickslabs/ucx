@@ -343,3 +343,35 @@ def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_bac
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
     ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_list_queries(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [
+        SdkLakeviewDashboard(
+            dashboard_id="did",
+            serialized_dashboard=json.dumps(
+                LsqlLakeviewDashboard(datasets=[Dataset("qid1", "SELECT 42 AS count")], pages=[]).as_dict()
+            ),
+        ),
+    ]
+    ws.lakeview.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    queries = list(crawler.list_queries())
+
+    assert queries == ["SELECT 42 AS count"]
+    ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_list_queries_handles_permission_denied(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.lakeview.list.side_effect = PermissionDenied("Missing permissions")
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        queries = list(crawler.list_queries())
+
+    assert len(queries) == 0
+    assert "Cannot list Lakeview queries" in caplog.messages
+    ws.queries_legacy.list.assert_called_once()
