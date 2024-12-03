@@ -112,7 +112,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         ],
     }
 
-    def create(display_name: str = "") -> SDKDashboard:
+    def create(*, display_name: str = "") -> SDKDashboard:
         if display_name:
             display_name = f"{display_name} ({make_random()})"
         else:
