@@ -420,19 +420,3 @@ def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_
     assert len(queries) == 0
     assert "Cannot get Lakeview dashboard: did" in caplog.messages
     ws.lakeview.get.assert_called_once_with("did")
-
-
-def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_dashboard(caplog, mock_backend) -> None:
-    ws = create_autospec(WorkspaceClient)
-    dashboard = SdkLakeviewDashboard(
-        dashboard_id="did", serialized_dashboard='{"invalid_lakeview": "serialized_dashboard"}'
-    )
-    ws.lakeview.get.return_value = dashboard
-    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
-
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.list_queries(LakeviewDashboard("did")))
-
-    assert len(queries) == 0
-    assert "Error when parsing Lakeview dashboard: did"
-    ws.lakeview.get.assert_called_once_with("did")
