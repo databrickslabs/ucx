@@ -1,7 +1,7 @@
 import logging
 import json
+from collections.abc import Iterator
 from unittest.mock import call, create_autospec
-from typing import Iterator
 
 import pytest
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
