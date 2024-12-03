@@ -1,11 +1,14 @@
 import dataclasses
 
+import pytest
+
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
     Convention,
     Deprecation,
     Failure,
+    UsedTable,
 )
 
 
@@ -40,3 +43,14 @@ def test_deprecation_initialization() -> None:
 def test_convention_initialization() -> None:
     convention = Convention('code5', 'This is a convention', 1, 1, 2, 2)
     assert isinstance(convention, Advice)
+
+
+@pytest.mark.parametrize(
+    "used_table, expected_name",
+    [
+        (UsedTable(), "unknown.unknown.unknown"),
+        (UsedTable(catalog_name="catalog", schema_name="schema", table_name="table"), "catalog.schema.table"),
+    ],
+)
+def test_used_table_full_name(used_table: UsedTable, expected_name: str) -> None:
+    assert used_table.full_name == expected_name

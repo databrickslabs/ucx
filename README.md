@@ -764,6 +764,10 @@ See [this guide](docs/assessment.md) for more details.
 Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
 [migration process diagram](#migration-process).
 
+The UCX assessment workflow is designed to only run once, re-running will **not** update the existing results. If the
+inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx)
+and [installing](#install-ucx) it again.
+
 [[back to top](#databricks-labs-ucx)]
 
 ## Group migration workflow
@@ -1313,6 +1317,7 @@ access the configuration file from the command line. Here's the description of c
   * `num_threads`: An optional integer representing the number of threads to use for migration.
   * `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
   * `default_catalog`: An optional string representing the default catalog name.
+  * `skip_tacl_migration`: Optional flag, allow skipping TACL migration when migrating tables or creating catalogs and schemas.
   * `default_owner_group`: Assigns this group to all migrated objects (catalogs, databases, tables, views, etc.). The group has to be an account group and the user running the migration has to be a member of this group.
   * `log_level`: An optional string representing the log level.
   * `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.

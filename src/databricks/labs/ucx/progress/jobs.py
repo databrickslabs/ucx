@@ -7,21 +7,22 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.jobs import JobProblem
 
 
 class JobsProgressEncoder(ProgressEncoder[JobInfo]):
+    """Encoder class:Job to class:History."""
 
     def __init__(
         self,
         sql_backend: SqlBackend,
         ownership: JobOwnership,
+        direct_fs_access_crawlers: list[DirectFsAccessCrawler],
         inventory_database: str,
         run_id: int,
         workspace_id: int,
         catalog: str,
-        schema: str = "multiworkspace",
-        table: str = "historical",
     ) -> None:
         super().__init__(
             sql_backend,
@@ -30,9 +31,10 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
             run_id,
             workspace_id,
             catalog,
-            schema,
-            table,
+            "multiworkspace",
+            "historical",
         )
+        self._direct_fs_access_crawlers = direct_fs_access_crawlers
         self._inventory_database = inventory_database
 
     @cached_property
@@ -48,7 +50,36 @@ class JobsProgressEncoder(ProgressEncoder[JobInfo]):
             index[job_problem.job_id].append(failure)
         return index
 
+    @cached_property
+    def _direct_fs_accesses(self) -> dict[str, list[str]]:
+        index = collections.defaultdict(list)
+        for crawler in self._direct_fs_access_crawlers:
+            for direct_fs_access in crawler.snapshot():
+                # The workflow and task source lineage are added by the WorkflowLinter
+                if len(direct_fs_access.source_lineage) < 2:
+                    continue
+                if direct_fs_access.source_lineage[0].object_type != "WORKFLOW":
+                    continue
+                if direct_fs_access.source_lineage[1].object_type != "TASK":
+                    continue
+                job_id = direct_fs_access.source_lineage[0].object_id
+                task_key = direct_fs_access.source_lineage[1].object_id  # <job id>/<task key>
+                # Follow same failure message structure as the JobProblems above and DirectFsAccessPyLinter deprecation
+                code = "direct-filesystem-access"
+                message = f"The use of direct filesystem references is deprecated: {direct_fs_access.path}"
+                failure = f"{code}: {task_key} task: {direct_fs_access.source_id}: {message}"
+                index[job_id].append(failure)
+        return index
+
     def _encode_record_as_historical(self, record: JobInfo) -> Historical:
+        """Encode a job as a historical records.
+
+        Failures are detected by the WorkflowLinter:
+        - Job problems
+        - Direct filesystem access by code used in job
+        """
         historical = super()._encode_record_as_historical(record)
-        failures = self._job_problems.get(int(record.job_id), [])
+        failures = []
+        failures.extend(self._job_problems.get(int(record.job_id), []))
+        failures.extend(self._direct_fs_accesses.get(record.job_id, []))
         return replace(historical, failures=historical.failures + failures)

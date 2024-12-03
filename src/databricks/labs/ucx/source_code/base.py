@@ -260,6 +260,10 @@ class UsedTable(SourceInfo):
             catalog_name=catalog_name, schema_name=schema_name, table_name=parts[0], is_read=is_read, is_write=is_write
         )
 
+    @property
+    def full_name(self) -> str:
+        return ".".join([self.catalog_name, self.schema_name, self.table_name])
+
     catalog_name: str = SourceInfo.UNKNOWN
     schema_name: str = SourceInfo.UNKNOWN
     table_name: str = SourceInfo.UNKNOWN
@@ -455,6 +459,20 @@ def read_text(path: Path, size: int = -1) -> str:
         return f.read(size)
 
 
+def safe_read_text(path: Path, size: int = -1) -> str | None:
+    """Safe read a text file by handling reading exceptions, see :func:_read_text.
+
+    Returns
+        str : Content of file
+        None : If error occurred during reading.
+    """
+    try:
+        return read_text(path, size=size)
+    except (FileNotFoundError, UnicodeDecodeError, PermissionError) as e:
+        logger.warning(f"Could not read file: {path}", exc_info=e)
+        return None
+
+
 # duplicated from CellLanguage to prevent cyclic import
 LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
 NOTEBOOK_HEADER = "Databricks notebook source"
@@ -471,9 +489,5 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"
     if content is not None:
         return content.startswith(magic_header)
-    try:
-        file_header = read_text(path, size=len(magic_header))
-    except (FileNotFoundError, UnicodeDecodeError, PermissionError):
-        logger.warning(f"Could not read file {path}")
-        return False
+    file_header = safe_read_text(path, size=len(magic_header))
     return file_header == magic_header

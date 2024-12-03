@@ -203,6 +203,7 @@ class RuntimeContext(GlobalContext):
         return JobsProgressEncoder(
             self.sql_backend,
             self.job_ownership,
+            [self.directfs_access_crawler_for_paths, self.directfs_access_crawler_for_queries],
             self.inventory_database,
             self.parent_run_id,
             self.workspace_id,
@@ -226,6 +227,7 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.table_ownership,
             self.migration_status_refresher,
+            [self.used_tables_crawler_for_paths, self.used_tables_crawler_for_queries],
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,

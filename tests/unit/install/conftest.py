@@ -77,7 +77,7 @@ def ws(clusters):
     workspace_client = create_autospec(WorkspaceClient)
 
     workspace_client.current_user.me = lambda: iam.User(
-        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
+        user_name="me@example.com", id="666", groups=[iam.ComplexValue(display="admins")]
     )
     workspace_client.config.host = "https://foo"
     workspace_client.config.is_aws = True

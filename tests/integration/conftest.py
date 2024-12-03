@@ -570,20 +570,26 @@ class MockRuntimeContext(
     def make_cluster_policy_permissions(self, **kwargs):
         return self._make_cluster_policy_permissions(**kwargs)
 
+    def make_job(self, **kwargs) -> Job:
+        job = self._make_job(**kwargs)
+        self._jobs.append(job)
+        return job
+
+    def make_dashboard(self, **kwargs) -> Dashboard:
+        dashboard = self._make_dashboard(**kwargs)
+        self._dashboards.append(dashboard)
+        return dashboard
+
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
-        notebook_job_1 = self._make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
-        notebook_job_2 = self._make_job(content="spark.table('old.stuff')")
-        file_job_1 = self._make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
-        file_job_2 = self._make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
+        self.make_job(content="spark.read.parquet('dbfs://mnt/notebook/')")
+        self.make_job(content="spark.table('old.stuff')")
+        self.make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
+        self.make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
         query_1 = self._make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
-        dashboard_1 = self._make_dashboard(query=query_1)
+        self._make_dashboard(query=query_1)
         query_2 = self._make_query(sql_query='SELECT * from my_schema.my_table')
-        dashboard_2 = self._make_dashboard(query=query_2)
-
-        self._jobs.extend([notebook_job_1, notebook_job_2, file_job_1, file_job_2])
-        self._dashboards.append(dashboard_1)
-        self._dashboards.append(dashboard_2)
+        self._make_dashboard(query=query_2)
 
     def add_table(self, table: TableInfo):
         self._tables.append(table)
@@ -674,7 +680,7 @@ class MockRuntimeContext(
             Grant,
         )
 
-    @cached_property
+    @property
     def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
         for udf_info in self._udfs:
@@ -699,29 +705,17 @@ class MockRuntimeContext(
                 created_databases.add(grant.database)
         return list(created_databases)
 
-    @cached_property
+    @property
     def created_groups(self) -> list[str]:
-        created_groups = []
-        for group in self._groups:
-            if group.display_name is not None:
-                created_groups.append(group.display_name)
-        return created_groups
+        return [group.display_name for group in self._groups if group.display_name is not None]
 
-    @cached_property
+    @property
     def created_jobs(self) -> list[int]:
-        created_jobs = []
-        for job in self._jobs:
-            if job.job_id is not None:
-                created_jobs.append(job.job_id)
-        return created_jobs
+        return [job.job_id for job in self._jobs if job.job_id is not None]
 
-    @cached_property
+    @property
     def created_dashboards(self) -> list[str]:
-        created_dashboards = []
-        for dashboard in self._dashboards:
-            if dashboard.id is not None:
-                created_dashboards.append(dashboard.id)
-        return created_dashboards
+        return [dashboard.id for dashboard in self._dashboards if dashboard.id is not None]
 
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:

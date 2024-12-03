@@ -14,7 +14,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, Migr
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.progress.history import ProgressEncoder
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager, AccountGroupLookup
 from tests.unit import mock_workspace_client
 
 
@@ -953,10 +953,44 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     assert rows == [history_record]
 
 
+def test_migrate_grants_skip():
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
+    grant = Grant("user", "SELECT")
+    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
+
+    def grant_loader() -> list[Grant]:
+        catalog = src.catalog
+        database = src.database
+        table = src.name
+        return [
+            dataclasses.replace(
+                grant,
+                catalog=catalog,
+                database=database,
+                table=table,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+        skip_tacl_migration=True,
+    )
+
+    migrate_grants.apply(src, dst)
+
+    for query in backend.queries:
+        assert not query.startswith("GRANT")
+    group_manager.assert_not_called()
+
+
 # Testing the validation in retrival of the default owner group. 666 is the current_user user_id.
 @pytest.mark.parametrize("user_id, expected", [("666", True), ("777", False)])
 def test_default_owner(user_id, expected) -> None:
-    sql_backend = MockBackend()
     ws = mock_workspace_client()
 
     account_admins_group = Group(
@@ -966,5 +1000,5 @@ def test_default_owner(user_id, expected) -> None:
         "Resources": [account_admins_group.as_dict()],
     }
 
-    group_manager = GroupManager(sql_backend, ws, "ucx")
-    assert group_manager.validate_owner_group("owners") == expected
+    account_group_lookup = AccountGroupLookup(ws)
+    assert account_group_lookup.user_in_group("owners", ws.current_user.me()) == expected
