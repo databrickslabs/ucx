@@ -264,3 +264,13 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
                 continue
             for dataset in lsql_dashboard.datasets:
                yield dataset.query
+
+    def get_query(self, query_id: str, dashboard: LakeviewDashboard) -> Iterable[str]:
+        """Get a query given its id and the corresponding dashboard.
+
+        Note:
+            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
+            another crawler for the queries by retrieving the queries every time they are requested.
+
+            Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
+        """
