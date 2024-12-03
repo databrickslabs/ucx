@@ -154,6 +154,22 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             return None
 
 
+def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> LsqlLakeviewDashboard:
+    """Parse a lsql Lakeview dashboard from an SDK Lakeview dashboard.
+
+    Returns :
+        LsqlLakeviewDashboard : The parsed dashboard. If the parsing fails, it is an empty dashboard, i.e. a
+            dashboard without datasets and pages.
+    """
+    lsql_dashboard = LsqlLakeviewDashboard([], [])
+    if dashboard.serialized_dashboard is not None:
+        try:
+            lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
+        except (KeyError, ValueError, json.JSONDecodeError) as e:
+            logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
+    return lsql_dashboard
+
+
 @dataclass
 class LakeviewDashboard:
     """UCX representation of a Lakeview dashboard.
@@ -176,12 +192,7 @@ class LakeviewDashboard:
     @classmethod
     def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
         assert dashboard.dashboard_id
-        lsql_dashboard = LsqlLakeviewDashboard([], [])
-        if dashboard.serialized_dashboard is not None:
-            try:
-                lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
-            except (KeyError, ValueError, json.JSONDecodeError) as e:
-                logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
+        lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
         query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
         return cls(
             id=dashboard.dashboard_id,
@@ -255,13 +266,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
         """
         for dashboard in self._list_dashboards():
-            if dashboard.serialized_dashboard is None:
-                continue
-            try:
-                lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
-            except (KeyError, ValueError, json.JSONDecodeError) as e:
-                logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
-                continue
+            lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
             for dataset in lsql_dashboard.datasets:
                yield dataset.query
 
@@ -277,11 +282,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         sdk_dashboard = self._get_dashboard(dashboard.id)
         if sdk_dashboard is None:
             return None
-        lsql_dashboard = LsqlLakeviewDashboard([], [])
-        try:
-            lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(sdk_dashboard.serialized_dashboard))
-        except (KeyError, ValueError, json.JSONDecodeError) as e:
-            logger.warning(f"Error when parsing Lakeview dashboard: {sdk_dashboard.dashboard_id}", exc_info=e)
+        lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
         for dataset in lsql_dashboard.datasets:
             if dataset.name == query_id:
                 return dataset.query

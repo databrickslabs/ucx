@@ -3,14 +3,14 @@ from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
-def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory_schema, sql_backend) -> None:
+def test_query_dfsa_ownership(
+    runtime_ctx, make_query, make_dashboard, inventory_schema, sql_backend, make_lakeview_dashboard
+) -> None:
     """Verify the ownership of a direct-fs record for a query."""
-
-    # A dashboard with a query that contains a direct filesystem reference.
-    query = make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
-    dashboard = runtime_ctx.make_dashboard(query=query)
-
-    # Produce a DFSA record for the query.
+    dfsa_query = "SELECT * from csv.`dbfs://some_folder/some_file.csv`"
+    query = make_query(sql_query=dfsa_query)
+    redash_dashboard = runtime_ctx.make_dashboard(query=query)
+    lakeview_dashboard = runtime_ctx.make_lakeview_dashboard(query=dfsa_query)
     linter = QueryLinter(
         runtime_ctx.workspace_client,
         sql_backend,
@@ -18,16 +18,17 @@ def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory
         TableMigrationIndex([]),
         runtime_ctx.directfs_access_crawler_for_queries,
         runtime_ctx.used_tables_crawler_for_queries,
-        [runtime_ctx.redash_crawler],
+        [runtime_ctx.redash_crawler, runtime_ctx.lakeview_crawler],
     )
+
     linter.refresh_report()
 
-    # Find a record for the query.
     records = list(runtime_ctx.directfs_access_crawler_for_queries.snapshot())
-    query_records = [record for record in records if record.source_id == f"{dashboard.id}/{query.id}"]
-    assert len(query_records) == 1, f"Missing record for query: {dashboard.id}/{query.id}"
+    # Lakeview query id is hardcoded in the fixture
+    query_ids = {f"{redash_dashboard.id}/{query.id}", f"{lakeview_dashboard.dashboard_id}/query"}
+    query_records = [record for record in records if record.source_id in query_ids]
+    assert len(query_records) == 2, f"Missing record for queries: {query_ids}"
 
-    # Verify ownership can be made.
     owner = runtime_ctx.directfs_access_ownership.owner_of(query_records[0])
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
