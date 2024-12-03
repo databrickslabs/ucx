@@ -374,3 +374,19 @@ def test_lakeview_dashboard_crawler_list_queries_handles_permission_denied(caplo
     assert len(queries) == 0
     assert "Cannot list Lakeview dashboards" in caplog.messages
     ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_dashboard(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [
+        SdkLakeviewDashboard(dashboard_id="did", serialized_dashboard='{"invalid_lakeview": "serialized_dashboard"}')
+    ]
+    ws.lakeview.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        queries = list(crawler.list_queries())
+
+    assert queries == []
+    assert "Error when parsing Lakeview dashboard: did"
+    ws.lakeview.list.assert_called_once()
