@@ -11,7 +11,7 @@ from databricks.sdk.errors import NotFound, PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
-from databricks.labs.ucx.assessment.dashboards import LakeviewDashboard, RedashDashboard, RedashDashboardCrawler
+from databricks.labs.ucx.assessment.dashboards import LakeviewDashboard, LakeviewDashboardCrawler, RedashDashboard, RedashDashboardCrawler
 
 
 @pytest.mark.parametrize(
@@ -206,3 +206,89 @@ def test_lakeview_dashboard_from_sdk_dashboard(
 ) -> None:
     dashboard = LakeviewDashboard.from_sdk_dashboard(sdk_dashboard)
     assert dashboard == expected
+
+
+def test_lakeview_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [
+        SdkLakeviewDashboard(
+            dashboard_id="did",
+            display_name="name",
+            parent_path="parent",
+            serialized_dashboard=json.dumps(
+                LsqlLakeviewDashboard(
+                    datasets=[Dataset("qid1", "SELECT 1"), Dataset("qid2", "SELECT 2")],
+                    pages=[],
+                ).as_dict()
+            ),
+        ),
+    ]
+    ws.lakeview.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"])]
+    ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_handles_databricks_error_on_list(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.lakeview.list.side_effect = PermissionDenied("Missing permission")
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert len(rows) == 0
+    assert "Cannot list Lakeview dashboards" in caplog.text
+    ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.lakeview.get.return_value = SdkLakeviewDashboard(dashboard_id="did1")
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test", include_dashboard_ids=["did1"])
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    ws.lakeview.get.assert_called_once_with("did1")
+    ws.lakeview.list.assert_not_called()
+
+
+def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+
+    def get_dashboards(dashboard_id: str) -> SdkRedashDashboard:
+        if dashboard_id == "did1":
+            return SdkLakeviewDashboard(dashboard_id="did1")
+        raise NotFound(f"Did not find dashboard: {dashboard_id}")
+
+    ws.lakeview.get.side_effect = get_dashboards
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test", include_dashboard_ids=["did1", "did2"])
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    assert "Cannot get Lakeview dashboard: did2" in caplog.messages
+    ws.lakeview.get.has_calls([call("did1"), call("did2")])
+    ws.lakeview.list.assert_not_called()
+
+
+def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [SdkLakeviewDashboard(dashboard_id="did1"), SdkLakeviewDashboard()]  # Second misses dashboard id
+    ws.lakeview.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    ws.lakeview.list.assert_called_once()
