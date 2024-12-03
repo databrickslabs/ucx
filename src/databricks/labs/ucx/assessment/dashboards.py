@@ -181,7 +181,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         else:
             yield from self._list_all_queries()
 
-    def _list_all_queries(self) -> Iterable[str]:
+    def _list_all_queries(self) -> Iterable[Query]:
         """List all queries."""
         try:
             for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
@@ -189,7 +189,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterable[str]:
+    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterable[Query]:
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
