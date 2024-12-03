@@ -390,3 +390,48 @@ def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_da
     assert queries == []
     assert "Error when parsing Lakeview dashboard: did"
     ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_get_query_calls_query_api_get(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboard = SdkLakeviewDashboard(
+        serialized_dashboard=json.dumps(
+            LsqlLakeviewDashboard(datasets=[Dataset("qid", "SELECT 42 AS count")], pages=[]).as_dict()
+        ),
+    )
+    ws.lakeview.get.return_value = dashboard
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    query = crawler.get_query("qid", LakeviewDashboard("did"))
+
+    assert query == "SELECT 42 AS count"
+    ws.lakeview.get.assert_called_once_with("did")
+
+
+def test_lakeview_dashboard_crawler_get_query_handles_not_found(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.lakeview.get.side_effect = NotFound("Query not found: qid")
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        query = crawler.get_query("qid", LakeviewDashboard("did"))
+
+    assert query is None
+    assert "Cannot get Lakeview dashboard: did" in caplog.messages
+    ws.lakeview.get.assert_called_once_with("did")
+
+
+def test_lakeview_dashboard_crawler_get_query_handles_corrupted_serialized_dashboard(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboard = SdkLakeviewDashboard(
+        dashboard_id="did", serialized_dashboard='{"invalid_lakeview": "serialized_dashboard"}'
+    )
+    ws.lakeview.get.return_value = dashboard
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        query = crawler.get_query("qid", LakeviewDashboard("did"))
+
+    assert query is None
+    assert "Error when parsing Lakeview dashboard: did"
+    ws.lakeview.get.assert_called_once_with("did")
