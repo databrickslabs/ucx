@@ -373,5 +373,5 @@ def test_lakeview_dashboard_crawler_list_queries_handles_permission_denied(caplo
         queries = list(crawler.list_queries())
 
     assert len(queries) == 0
-    assert "Cannot list Lakeview queries" in caplog.messages
-    ws.queries_legacy.list.assert_called_once()
+    assert "Cannot list Lakeview dashboards" in caplog.messages
+    ws.lakeview.list.assert_called_once()
