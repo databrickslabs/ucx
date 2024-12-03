@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import itertools
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -165,7 +166,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield RedashDashboard(*row)
 
-    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterable[Query]:
+    def list_queries(self, dashboard: RedashDashboard | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:
@@ -177,11 +178,19 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             another crawler for the queries by retrieving the queries every time they are requested.
         """
         if dashboard:
-            yield from self._list_queries_from_dashboard(dashboard)
+            queries_iterator = self._list_queries_from_dashboard(dashboard)
         else:
-            yield from self._list_all_queries()
+            queries_iterator = self._list_all_queries()
+        # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
+        # to a small number of items in debug mode for the assessment workflow just to complete.
+        counter = itertools.count()
+        while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit > next(counter):
+            try:
+                yield next(queries_iterator)
+            except StopIteration:
+                break
 
-    def _list_all_queries(self) -> Iterable[Query]:
+    def _list_all_queries(self) -> Iterator[Query]:
         """List all queries."""
         try:
             for query in self._ws.queries_legacy.list():  # TODO: Update this to non-legacy query
@@ -189,7 +198,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterable[Query]:
+    def _list_queries_from_dashboard(self, dashboard: RedashDashboard) -> Iterator[Query]:
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
@@ -301,7 +310,7 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield LakeviewDashboard(*row)
 
-    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterable[Query]:
+    def list_queries(self, dashboard: LakeviewDashboard | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:
