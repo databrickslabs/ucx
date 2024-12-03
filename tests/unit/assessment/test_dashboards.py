@@ -187,14 +187,16 @@ def test_redash_dashboard_crawler_list_queries(mock_backend) -> None:
     ws.queries_legacy.list.assert_called_once()
 
 
-def test_redash_dashboard_crawler_list_queries_handles_permission_denied(mock_backend) -> None:
+def test_redash_dashboard_crawler_list_queries_handles_permission_denied(caplog, mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.queries_legacy.list.side_effect = PermissionDenied("Missing permissions")
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
-    queries = list(crawler.list_queries())
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        queries = list(crawler.list_queries())
 
     assert len(queries) == 0
+    assert "Cannot list Redash queries" in caplog.messages
     ws.queries_legacy.list.assert_called_once()
 
 
