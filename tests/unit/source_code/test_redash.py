@@ -1,17 +1,26 @@
-import logging
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied, NotFound
+from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.sql import LegacyQuery, QueryOptions, UpdateQueryRequestQuery
 
 from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
 from databricks.labs.ucx.source_code.redash import Redash
 
 
-def get_query(query_id: str) -> LegacyQuery:
+@pytest.fixture
+def redash_installation():
+    installation = MockInstallation(
+        {
+            "backup/queries/1.json": {"id": "1", "query": "SELECT * FROM old.things"},
+            "backup/queries/3.json": {"id": "3", "query": "SELECT * FROM old.things", "tags": ["test_tag"]},
+        }
+    )
+    return installation
+
+
+def list_legacy_queries(dashboard: RedashDashboard) -> list[LegacyQuery]:
     queries = [
         LegacyQuery(
             id="1",
@@ -35,28 +44,13 @@ def get_query(query_id: str) -> LegacyQuery:
             tags=["test_tag", Redash.MIGRATED_TAG],
         ),
     ]
-    for query in queries:
-        if query.id == query_id:
-            return query
-    raise NotFound(f"Query not found: {query_id}")
-
-
-@pytest.fixture
-def redash_ws():
-    workspace_client = create_autospec(WorkspaceClient)
-    workspace_client.queries_legacy.get.side_effect = get_query
-    return workspace_client
-
-
-@pytest.fixture
-def redash_installation():
-    installation = MockInstallation(
-        {
-            "backup/queries/1.json": {"id": "1", "query": "SELECT * FROM old.things"},
-            "backup/queries/3.json": {"id": "3", "query": "SELECT * FROM old.things", "tags": ["test_tag"]},
-        }
-    )
-    return installation
+    query_mapping = {query.id: query for query in queries}
+    queries_matched = []
+    for query_id in dashboard.query_ids:
+        query = query_mapping.get(query_id)
+        if query:
+            queries_matched.append(query)
+    return queries_matched
 
 
 @pytest.fixture
@@ -67,11 +61,12 @@ def redash_dashboard_crawler():
         RedashDashboard(id="2", query_ids=["1", "2", "3"], tags=[Redash.MIGRATED_TAG]),
         RedashDashboard(id="3", tags=[]),
     ]
+    crawler.list_legacy_queries.side_effect = list_legacy_queries
     return crawler
 
 
-def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
+def test_migrate_all_dashboards(ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
+    redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
     redash.migrate_dashboards()
 
@@ -89,7 +84,7 @@ def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation, red
         query_text="SELECT * FROM old.things",
         tags=[Redash.MIGRATED_TAG, 'test_tag'],
     )
-    redash_ws.queries.update.assert_called_with(
+    ws.queries.update.assert_called_with(
         "1",
         update_mask="query_text,tags",
         query=query,
@@ -97,65 +92,50 @@ def test_migrate_all_dashboards(redash_ws, empty_index, redash_installation, red
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_revert_single_dashboard(caplog, redash_ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
-    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
+def test_revert_single_dashboard(caplog, ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
+    ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
+    redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
     redash.revert_dashboards("2")
 
     query = UpdateQueryRequestQuery(query_text="SELECT * FROM old.things", tags=["test_tag"])
-    redash_ws.queries.update.assert_called_with("3", update_mask="query_text,tags", query=query)
-    redash_ws.queries.update.side_effect = PermissionDenied("error")
+    ws.queries.update.assert_called_with("3", update_mask="query_text,tags", query=query)
+    ws.queries.update.side_effect = PermissionDenied("error")
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_revert_dashboards(redash_ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
-    redash_ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
+def test_revert_dashboards(ws, empty_index, redash_installation, redash_dashboard_crawler) -> None:
+    ws.queries.get.return_value = LegacyQuery(id="1", query="original_query")
+    redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
     redash.revert_dashboards()
 
     query = UpdateQueryRequestQuery(query_text="SELECT * FROM old.things", tags=["test_tag"])
-    redash_ws.queries.update.assert_called_with("3", update_mask="query_text,tags", query=query)
+    ws.queries.update.assert_called_with("3", update_mask="query_text,tags", query=query)
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
 def test_migrate_dashboard_gets_no_queries_when_dashboard_is_empty(
-    redash_ws, empty_index, redash_installation, redash_dashboard_crawler
+    ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
     empty_dashboard = RedashDashboard(id="1")
     redash_dashboard_crawler.snapshot.return_value = [empty_dashboard]
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
+    redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
     redash.migrate_dashboards()
 
-    redash_ws.queries_legacy.get.assert_not_called()
+    ws.queries_legacy.get.assert_not_called()
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_migrate_dashboard_gets_query_from_dashboard(
-    redash_ws, empty_index, redash_installation, redash_dashboard_crawler
+def test_migrate_dashboard_lists_legacy_queries_from_dashboard(
+    ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
     dashboard = RedashDashboard(id="1", query_ids=["1"])
     redash_dashboard_crawler.snapshot.return_value = [dashboard]
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
+    redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
     redash.migrate_dashboards()
 
-    redash_ws.queries_legacy.get.assert_called_once_with("1")
-    redash_dashboard_crawler.snapshot.assert_called_once()
-
-
-def test_migrate_dashboard_logs_warning_when_getting_non_existing_query(
-    caplog, redash_ws, empty_index, redash_installation, redash_dashboard_crawler
-) -> None:
-    dashboard = RedashDashboard(id="1", query_ids=["-1"])
-    redash_dashboard_crawler.snapshot.return_value = [dashboard]
-    redash = Redash(empty_index, redash_ws, redash_installation, redash_dashboard_crawler)
-
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.account.aggregate"):
-        redash.migrate_dashboards()
-
-    assert "Cannot get query: -1" in caplog.messages
-    redash_ws.queries_legacy.get.assert_called_once_with("-1")
+    redash_dashboard_crawler.list_legacy_queries.assert_called_with(dashboard)
     redash_dashboard_crawler.snapshot.assert_called_once()
