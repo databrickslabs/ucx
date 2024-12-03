@@ -252,3 +252,13 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
+        for dashboard in self._list_dashboards():
+            if dashboard.serialized_dashboard is None:
+                continue
+            try:
+                lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(dashboard.serialized_dashboard))
+            except (KeyError, ValueError, json.JSONDecodeError) as e:
+                logger.warning(f"Error when parsing Lakeview dashboard: {dashboard.dashboard_id}", exc_info=e)
+                continue
+            for dataset in lsql_dashboard.datasets:
+               yield dataset.query
