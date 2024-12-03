@@ -389,7 +389,7 @@ def test_lakeview_dashboard_crawler_list_queries_handles_corrupted_serialized_da
         queries = list(crawler.list_queries())
 
     assert len(queries) == 0
-    assert "Error when parsing Lakeview dashboard: did"
+    assert "Error when parsing Lakeview dashboard: did" in caplog.messages
     ws.lakeview.list.assert_called_once()
 
 
