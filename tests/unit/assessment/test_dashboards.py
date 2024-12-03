@@ -1,13 +1,13 @@
 import logging
 import json
-from unittest.mock import create_autospec
+from unittest.mock import call, create_autospec
 from typing import Iterator
 
 import pytest
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
 from databricks.labs.lsql.backends import Row
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied, TooManyRequests
+from databricks.sdk.errors import NotFound, PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
@@ -135,6 +135,27 @@ def test_redash_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None:
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     ws.dashboards.get.assert_called_once_with("did1")
+    ws.dashboards.list.assert_not_called()
+
+
+def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+
+    def get_dashboards(dashboard_id: str) -> SdkRedashDashboard:
+        if dashboard_id == "did1":
+            return SdkRedashDashboard(id="did1")
+        raise NotFound(f"Did not find dashboard: {dashboard_id}")
+
+    ws.dashboards.get.side_effect = get_dashboards
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", include_dashboard_ids=["did1", "did2"])
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert "Cannot get Redash dashboard: did2" in caplog.messages
+    ws.dashboards.get.has_calls([call("did1"), call("did2")])
     ws.dashboards.list.assert_not_called()
 
 
