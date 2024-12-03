@@ -79,40 +79,41 @@ def inventory_schema(make_schema):
 def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix):
     """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
-    serialized_dashboard = {
-        "datasets": [{"name": "fourtytwo", "displayName": "count", "query": "SELECT 42 AS count"}],
-        "pages": [
-            {
-                "name": "count",
-                "displayName": "Counter",
-                "layout": [
-                    {
-                        "widget": {
-                            "name": "counter",
-                            "queries": [
-                                {
-                                    "name": "main_query",
-                                    "query": {
-                                        "datasetName": "fourtytwo",
-                                        "fields": [{"name": "count", "expression": "`count`"}],
-                                        "disaggregated": True,
-                                    },
-                                }
-                            ],
-                            "spec": {
-                                "version": 2,
-                                "widgetType": "counter",
-                                "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
-                            },
-                        },
-                        "position": {"x": 0, "y": 0, "width": 1, "height": 3},
-                    }
-                ],
-            }
-        ],
-    }
 
-    def create(*, display_name: str = "") -> SDKDashboard:
+    def create(*, display_name: str = "", query: str = "SELECT 42 AS count") -> SDKDashboard:
+        serialized_dashboard = {
+            "datasets": [{"name": "fourtytwo", "displayName": "count", "query": query}],
+            "pages": [
+                {
+                    "name": "count",
+                    "displayName": "Counter",
+                    "layout": [
+                        {
+                            "widget": {
+                                "name": "counter",
+                                "queries": [
+                                    {
+                                        "name": "main_query",
+                                        "query": {
+                                            "datasetName": "fourtytwo",
+                                            "fields": [{"name": "count", "expression": "`count`"}],
+                                            "disaggregated": True,
+                                        },
+                                    }
+                                ],
+                                "spec": {
+                                    "version": 2,
+                                    "widgetType": "counter",
+                                    "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
+                                },
+                            },
+                            "position": {"x": 0, "y": 0, "width": 1, "height": 3},
+                        }
+                    ],
+                }
+            ],
+        }
+
         if display_name:
             display_name = f"{display_name} ({make_random()})"
         else:
