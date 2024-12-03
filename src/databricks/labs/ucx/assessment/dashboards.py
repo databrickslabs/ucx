@@ -274,3 +274,14 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
 
             Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
         """
+        sdk_dashboard = self._get_dashboard(dashboard.id)
+        if sdk_dashboard is None:
+            return None
+        lsql_dashboard = LsqlLakeviewDashboard([], [])
+        try:
+            lsql_dashboard = LsqlLakeviewDashboard.from_dict(json.loads(sdk_dashboard.serialized_dashboard))
+        except (KeyError, ValueError, json.JSONDecodeError) as e:
+            logger.warning(f"Error when parsing Lakeview dashboard: {sdk_dashboard.dashboard_id}", exc_info=e)
+        for dataset in lsql_dashboard.datasets:
+            if dataset.name == query_id:
+                return dataset.query
