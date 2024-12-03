@@ -8,7 +8,7 @@ from ..conftest import MockInstallationContext
 def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: MockInstallationContext, make_dashboard, make_query):
     query_in_dashboard, query_outside_dashboard = make_query(), make_query()
     assert query_in_dashboard.id and query_outside_dashboard.id, "Query from fixture misses id"
-    dashboard: Dashboard = make_dashboard(query=query_in_dashboard)
+    dashboard: Dashboard = installation_ctx.make_dashboard(query=query_in_dashboard)
     assert dashboard.id, "Dashboard from fixture misses id"
     installation_ctx.workspace_installation.run()
 
