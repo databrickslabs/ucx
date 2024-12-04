@@ -154,3 +154,5 @@ dev/cleanup.py
 .databricks-login.json
 *.out
 foo
+
+docs/ucx/public
