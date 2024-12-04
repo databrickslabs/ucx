@@ -33,12 +33,15 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
 
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_c.name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON SCHEMA {schema_c.name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON TABLE {table_e.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_b.full_name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON TABLE {table_b.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {empty_schema.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON VIEW {view_c.full_name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON VIEW {view_c.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"DENY MODIFY ON TABLE {view_d.full_name} TO `{group_b.display_name}`")
 
     all_grants = {}
@@ -47,14 +50,14 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
         object_type, object_key = grant.this_type_and_key()
         all_grants[f"{grant.principal}.{object_type}.{object_key}"] = grant.action_type
 
-    assert len(all_grants) >= 9, "must have at least nine grants"
+    assert len(all_grants) >= 12, "must have at least twelve grants"
     assert all_grants[f"{group_a.display_name}.DATABASE.hive_metastore.{schema_c.name}"] == "USAGE"
-    assert all_grants[f"{group_b.display_name}.DATABASE.hive_metastore.{schema_c.name}"] == "USAGE"
+    assert all_grants[f"{group_b.display_name}.DATABASE.hive_metastore.{schema_c.name}"] == ["USAGE", "BROWSE"]
     assert all_grants[f"{group_a.display_name}.TABLE.{table_a.full_name}"] == "SELECT"
-    assert all_grants[f"{group_b.display_name}.TABLE.{table_b.full_name}"] == "SELECT"
+    assert all_grants[f"{group_b.display_name}.TABLE.{table_b.full_name}"] == ["USAGE", "BROWSE"]
     assert all_grants[f"{group_b.display_name}.DATABASE.{schema_b.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.DATABASE.{empty_schema.full_name}"] == "MODIFY"
-    assert all_grants[f"{group_b.display_name}.VIEW.{view_c.full_name}"] == "MODIFY"
+    assert all_grants[f"{group_b.display_name}.VIEW.{view_c.full_name}"] == ["MODIFY", "BROWSE"]
     assert all_grants[f"{group_b.display_name}.VIEW.{view_d.full_name}"] == "DENIED_MODIFY"
     assert all_grants[f"{group_b.display_name}.TABLE.{table_e.full_name}"] == "MODIFY"
 
