@@ -22,15 +22,15 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
 def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip) -> None:
-    ext_hms_main_cluster_id = env_or_skip("TEST_EXT_HMS_NOUC_CLUSTER_ID")
-    ext_hms_table_migration_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
+    main_cluster_id = env_or_skip("TEST_EXT_HMS_NOUC_CLUSTER_ID")
+    table_migration_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
     tables, dst_schema = prepare_tables_for_migration
     ext_hms_ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
             override_clusters={
-                "main": ext_hms_main_cluster_id,
-                "user_isolation": ext_hms_table_migration_cluster_id,
+                "main": main_cluster_id,
+                "user_isolation": table_migration_cluster_id,
             },
         ),
         extend_prompts={
@@ -49,13 +49,13 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
     ext_hms_ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
-    assessment_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("assessment")
-    assert assessment_completed_correctly, "Workflow failed: assessment"
+    workflow_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("assessment")
+    assert workflow_completed_correctly, "Workflow failed: assessment"
 
     # assert the workflow is successful
     ext_hms_ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
-    migrate_tables_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")
-    assert migrate_tables_completed_correctly, "Workflow failed: migrate-tables"
+    workflow_completed_correctly = ext_hms_ctx.deployed_workflows.validate_step("migrate-tables")
+    assert workflow_completed_correctly, "Workflow failed: migrate-tables"
 
     # assert the tables are migrated
     for table in tables.values():
