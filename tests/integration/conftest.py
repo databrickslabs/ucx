@@ -1022,7 +1022,7 @@ class MockInstallationContext(MockRuntimeContext):
             override_clusters={
                 "main": default_cluster_id,
                 "tacl": tacl_cluster_id,
-                "table_migration": table_migration_cluster_id,
+                "user_isolation": table_migration_cluster_id,
             },
             workspace_start_path=self.installation.install_folder(),
             renamed_group_prefix=self.renamed_group_prefix,

@@ -6,11 +6,12 @@ from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.service.catalog import CatalogInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +94,10 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
                 tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
             except NotFound:
-                logger.warning(
-                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
-                )
+                logger.warning(f"Schema {schema.full_name} no longer exists. Skipping checking its migration status.")
+                continue
+            except DatabricksError as e:
+                logger.warning(f"Error while listing tables in schema: {schema.full_name}", exc_info=e)
                 continue
             for table in tables:
                 if not table.properties:
@@ -153,10 +155,19 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield TableMigrationStatus(*row)
 
+    def _iter_catalogs(self) -> Iterable[CatalogInfo]:
+        try:
+            yield from self._ws.catalogs.list()
+        except DatabricksError as e:
+            logger.error("Cannot list catalogs", exc_info=e)
+
     def _iter_schemas(self):
-        for catalog in self._ws.catalogs.list():
+        for catalog in self._iter_catalogs():
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
             except NotFound:
                 logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
+                continue
+            except DatabricksError as e:
+                logger.warning(f"Error while listing schemas in catalog: {catalog.name}", exc_info=e)
                 continue
