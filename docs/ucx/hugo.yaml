@@ -37,14 +37,17 @@ params:
 
 menu:
   main:
-    - name: Tutorial
-      pageRef: /tutorial
-      weight: 2
-    - name: Installation
-      pageRef: /installation
+    - name: Overview
+      pageRef: /docs
       weight: 1
+    - name: Installation
+      pageRef: /docs/installation
+      weight: 2
+    - name: Tutorial
+      pageRef: /docs/tutorial
+      weight: 2
     - name: Reference
-      pageRef: /reference
+      pageRef: /docs/reference
       weight: 3
     - name: Search
       weight: 4
