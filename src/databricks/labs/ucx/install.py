@@ -241,6 +241,8 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
 
+        skip_tacl_migration = self.prompts.confirm("Do you want to skip TACL migration when migrating tables?")
+
         # Checking if the user wants to define a default owner group.
         default_owner_group = None
         if self.prompts.confirm("Do you want to define a default owner group for all tables and schemas? "):
@@ -262,6 +264,7 @@ class WorkspaceInstaller(WorkspaceContext):
             group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
             include_group_names=configure_groups.include_group_names,
             renamed_group_prefix=configure_groups.renamed_group_prefix,
+            skip_tacl_migration=skip_tacl_migration,
             log_level=log_level,
             num_threads=num_threads,
             include_databases=include_databases,

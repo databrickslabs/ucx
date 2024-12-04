@@ -953,6 +953,41 @@ def test_grant_supports_history(mock_backend, grant_record: Grant, history_recor
     assert rows == [history_record]
 
 
+def test_migrate_grants_skip():
+    group_manager = create_autospec(GroupManager)
+    backend = MockBackend()
+
+    src = Table("hive_metastore", "database", "table", "MANAGED", "DELTA")
+    grant = Grant("user", "SELECT")
+    dst = Table("catalog", "database", "table", "MANAGED", "DELTA")
+
+    def grant_loader() -> list[Grant]:
+        catalog = src.catalog
+        database = src.database
+        table = src.name
+        return [
+            dataclasses.replace(
+                grant,
+                catalog=catalog,
+                database=database,
+                table=table,
+            ),
+        ]
+
+    migrate_grants = MigrateGrants(
+        backend,
+        group_manager,
+        [grant_loader],
+        skip_tacl_migration=True,
+    )
+
+    migrate_grants.apply(src, dst)
+
+    for query in backend.queries:
+        assert not query.startswith("GRANT")
+    group_manager.assert_not_called()
+
+
 # Testing the validation in retrival of the default owner group. 666 is the current_user user_id.
 @pytest.mark.parametrize("user_id, expected", [("666", True), ("777", False)])
 def test_default_owner(user_id, expected) -> None:
