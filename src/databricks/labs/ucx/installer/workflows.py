@@ -741,7 +741,7 @@ class WorkflowsDeployment(InstallationMixin):
             return spark_conf | conf_from_installation
         if cluster_key == "tacl":
             return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
-        if cluster_key == "table_migration":
+        if cluster_key == "user_isolation":
             return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
         return conf_from_installation
 
@@ -918,14 +918,13 @@ class WorkflowsDeployment(InstallationMixin):
                     ),
                 )
             )
-        if "table_migration" in names:
-            # TODO: rename to "user-isolation", so that we can use it in group migration workflows
+        if "user_isolation" in names:
             clusters.append(
                 jobs.JobCluster(
-                    job_cluster_key="table_migration",
+                    job_cluster_key="user_isolation",
                     new_cluster=compute.ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
-                        spark_conf=self._job_cluster_spark_conf("table_migration"),
+                        spark_conf=self._job_cluster_spark_conf("user_isolation"),
                         policy_id=self._config.policy_id,
                         autoscale=compute.AutoScale(
                             max_workers=self._config.max_workers,
