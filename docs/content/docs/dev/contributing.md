@@ -1,4 +1,7 @@
-# Contributing
+---
+linkTitle: "Contributing"
+title: "Contributing to UCX"
+---
 
 ## First Principles
 
@@ -214,7 +217,7 @@ with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugi
 IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during
 development. Please make sure that your test setup allows for easy debugging by following best practices.
 
-![debugging tests](docs/debugging-tests.gif)
+![debugging tests](/images/debugging-tests.gif)
 
 Adhering to these guidelines ensures that our integration tests are robust, efficient, and easily maintainable. This,
 in turn, contributes to the overall reliability and quality of our software.
@@ -263,7 +266,7 @@ HATCH_PYTHON="$(which python3.10)" make clean dev test
 ```
 
 Configure your IDE to use `.venv/bin/python` from the virtual environment when developing the project:
-![IDE Setup](docs/hatch-intellij.gif)
+![IDE Setup](/images/hatch-intellij.gif)
 
 
 Verify installation with
