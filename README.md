@@ -37,7 +37,6 @@ We welcome your feedback! Please submit an [an issue](https://github.com/databri
 
 [![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
 
-[[back to top](#databricks-labs-ucx)]
 
 # Project Support
 Please note that all projects in the databrickslabs GitHub account are provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs).  They are provided AS-IS, and we do not make any guarantees of any kind.  Please do not submit a support ticket relating to any issues arising from the use of these projects.

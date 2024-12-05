@@ -31,7 +31,7 @@ As UCX uses both job clusters and SQL Warehouses, it is important to ensure that
 external Hive metastore. If the SQL Warehouses are not configured for external Hive metastore, please manually update
 the data access configuration. See [Enable data access configuration](https://learn.microsoft.com/en-us/azure/databricks/admin/sql/data-access-configuration) for more details
 
-[[back to top](#external-hive-metastore-integration)]
+
 
 ## Manual Override
 
@@ -60,7 +60,7 @@ two options to manually enable this:
 If UCX does not prompt you to set up with an external metastore, you can manually override the default behavior by
 following the post-installation steps above.
 
-[[back to top](#external-hive-metastore-integration)]
+
 
 ## Assessment Workflow
 
@@ -73,7 +73,7 @@ database name for each UCX installation. This is to avoid conflicts between the 
 As the inventory database is stored in the external Hive metastore, it can only be queried from a cluster or SQL warehouse
 with external Hive metastore configuration. The assessment dashboard will also fail if the SQL warehouse is not configured correctly.
 
-[[back to top](#external-hive-metastore-integration)]
+
 
 ## Table Migration Workflow
 
@@ -81,7 +81,7 @@ Table migration workflow will upgrade tables & views from the external Hive meta
 only needs to be executed once per external Hive metastore. Running the workflow on other workspaces sharing the same
 metastore is redundant and will be a no-op.
 
-[[back to top](#external-hive-metastore-integration)]
+
 
 ## Additional Considerations
 
@@ -95,4 +95,4 @@ the SQL data access configuration, but it is a cleaner approach.
 - You can manually modify the cluster policy and SQL data access configuration to point to the correct external Hive
 metastore, after UCX has been installed. This is the most flexible approach, but requires manual intervention.
 
-[[back to top](#external-hive-metastore-integration)]
+

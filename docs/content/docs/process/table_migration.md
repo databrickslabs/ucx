@@ -240,4 +240,3 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 The [`revert-migrated-tables` command](#revert-migrated-tables-command) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
-[[back to top](#databricks-labs-ucx)]

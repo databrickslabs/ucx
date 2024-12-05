@@ -12,7 +12,7 @@ check the logs of the last run of a workflow and ensure that it was executed as 
 debugging purposes when a workflow is not behaving as expected. By default, only `INFO`, `WARNING`, and `ERROR` logs
 are displayed. To display `DEBUG` logs, use the `--debug` flag.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `ensure-assessment-run` command
 
@@ -25,7 +25,7 @@ This command will block until job finishes.
 Failed workflows can be fixed with the [`repair-run` command](#repair-run-command). Workflows and their status can be
 listed with the [`workflows` command](#workflows-command).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `update-migration-progress` command
 
@@ -41,7 +41,7 @@ it to complete.
 Workflows and their status can be listed with the [`workflows` command](#workflows-commandr), while failed workflows can
 be fixed with the [`repair-run` command](#repair-run-command).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `repair-run` command
 
@@ -54,7 +54,7 @@ want to repair a failed job. It can also be used to debug issues related to job 
 done via [user interface](https://docs.databricks.com/en/workflows/jobs/repair-job-failures.html). Workflows and their
 status can be listed with the [`workflows` command](#workflows-command).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `workflows` command
 
@@ -76,7 +76,7 @@ who want to check the status of UCX workflows and ensure that they have been exe
 for debugging purposes when a workflow is not behaving as expected. Failed workflows can be fixed with
 the [`repair-run` command](#repair-run-command).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `open-remote-config` command
 
@@ -110,7 +110,7 @@ access the configuration file from the command line. Here's the description of c
   * `policy_id`: An optional string representing the ID of the cluster policy.
   * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `installations` command
 
@@ -133,7 +133,7 @@ the installations where the `ucx` package is installed and prints their details 
 for administrators who want to see which users have installed `ucx` and where. It can also be used to debug issues
 related to multiple installations of `ucx` on the same workspace.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 
 ## `report-account-compatibility` command
@@ -157,7 +157,7 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 ## `export-assessment` command
 
 ```commandline
@@ -175,4 +175,4 @@ The export-assessment command is used to export UCX assessment results to a spec
         - `main`
     - **Default:** `main`
 
-[[back to top](#databricks-labs-ucx)]
+

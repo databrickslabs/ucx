@@ -63,4 +63,4 @@ For additional information see:
 - The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
   migration process.
 
-[[back to top](#databricks-labs-ucx)]
+

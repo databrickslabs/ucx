@@ -2,25 +2,25 @@ Table Upgrade
 ===
 
 <!-- TOC -->
-* [Table Upgrade](#table-upgrade)
-* [Migration dashboard](#migration-dashboard)
-* [Common considerations](#common-considerations)
-  * [Tables (Parquet/Delta) on DBFS root](#tables-parquetdelta-on-dbfs-root)
-  * [Tables (Parquet/Delta) on Cloud Storage](#tables-parquetdelta-on-cloud-storage)
-  * [Tables (None Parquet/Delta)](#tables-none-parquetdelta)
-  * [Views](#views)
-  * [Functions](#functions)
-  * [Account Consideration](#account-consideration)
-  * [Open Questions](#open-questions)
-* [Design](#design)
-  * [Data Access Permissions](#data-access-permissions)
-  * [External Storage](#external-storage)
-  * [Table Mapping](#table-mapping)
-  * [Migrating Tables](#migrating-tables)
-  * [Moving tables](#moving-tables)
-  * [Table Size Estimation](#table-size-estimation)
-  * [Table Crawler](#table-crawler)
-  * [Table](#table)
+- [Table Upgrade](#table-upgrade)
+- [Migration dashboard](#migration-dashboard)
+- [Common considerations](#common-considerations)
+  - [Tables (Parquet/Delta) on DBFS root](#tables-parquetdelta-on-dbfs-root)
+  - [Tables (Parquet/Delta) on Cloud Storage](#tables-parquetdelta-on-cloud-storage)
+  - [Tables (None Parquet/Delta)](#tables-none-parquetdelta)
+  - [Views](#views)
+  - [Functions](#functions)
+  - [Account Consideration](#account-consideration)
+  - [Open Questions](#open-questions)
+- [Design](#design)
+  - [Data Access Permissions](#data-access-permissions)
+  - [External Storage](#external-storage)
+  - [Table Mapping](#table-mapping)
+  - [Migrating Tables](#migrating-tables)
+  - [Moving tables](#moving-tables)
+  - [Table Size Estimation](#table-size-estimation)
+  - [Table Crawler](#table-crawler)
+  - [Table](#table)
 <!-- TOC -->
 
 The Hive Metastore migration process will upgrade the following Assets:
@@ -33,7 +33,7 @@ We don't expect this process to be a "one and done" process. The table migration
 and may require a few runs. The migration process is implemented within a workflow that can be invoked multiple times.
 Each time it will upgrade tables it can and report the ones it can't.
 
-[[back to top](#table-upgrade)]
+
 
 # Migration dashboard
 
@@ -42,7 +42,7 @@ upgrade. This feedback is presented in the migration dashboard:
 
 ![report](migration-report.png)
 
-[[back to top](#table-upgrade)]
+
 
 # Common considerations
 
@@ -82,7 +82,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. We should consider automating ACLs based on Instance Profiles / Service Principals and other legacy security
     mechanisms
 
-[[back to top](#table-upgrade)]
+
 
 ## Tables (Parquet/Delta) on DBFS root
 
@@ -93,7 +93,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. Allow overriding target to an external table
 1. Allow an exception list in case we want to skip certain tables
 
-[[back to top](#table-upgrade)]
+
 
 ## Tables (Parquet/Delta) on Cloud Storage
 
@@ -102,7 +102,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. Use sync to upgrade these tables "in place". Use the default or override catalog.database destination.
 1. Update the source table with "upgraded_to" property
 
-[[back to top](#table-upgrade)]
+
 
 ## Tables (None Parquet/Delta)
 
@@ -111,7 +111,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. Skip tables as needed based on size threshold or an exception list
 1. Update the source table with "upgraded_to" property
 
-[[back to top](#table-upgrade)]
+
 
 ## Views
 
@@ -122,14 +122,14 @@ upgrade. This feedback is presented in the migration dashboard:
 1. Handle or highlight other cases (functions/storage references/ETC)
 1. Create an exception list with views failures
 
-[[back to top](#table-upgrade)]
+
 
 ## Functions
 
 1. We should migrate (if possible) functions
 1. Address incompatibilities
 
-[[back to top](#table-upgrade)]
+
 
 ## Account Consideration
 
@@ -147,7 +147,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. Consider upgrading a workspace at a time. Highlight the conflict with prior upgrades.
 1. Allow workspace admins to upgrade more than one workspace.
 
-[[back to top](#table-upgrade)]
+
 
 ## Open Questions
 
@@ -156,7 +156,7 @@ upgrade. This feedback is presented in the migration dashboard:
 1. What mechanism do we use to map source to target databases
 1. How to list workspaces in Azure/AWS
 
-[[back to top](#table-upgrade)]
+
 
 # Design
 
@@ -174,7 +174,7 @@ that normalizes the input parameters and returns a tuple of the object type and 
 the specified object. The code also includes methods for generating SQL statements to grant and revoke privileges in
 Hive and Unity Catalog (UC) systems.
 
-[[back to top](#table-upgrade)]
+
 
 ## External Storage
 
@@ -189,7 +189,7 @@ rocesses the external locations based on certain conditions.
 as well as a method for creating a snapshot of the current mounts. The `_deduplicate_mounts` method removes any duplicate
 mounts based on their name and source.
 
-[[back to top](#table-upgrade)]
+
 
 ## Table Mapping
 
@@ -204,7 +204,7 @@ the mappings to a file, skipping tables and schemas, and checking if a table is 
 The `TableMapping` class is initialized with an `Installation` object, a `WorkspaceClient` object, and a `SqlBackend` object,
 which are used to interact with the Unity Catalog, the workspace, and to execute SQL queries.
 
-[[back to top](#table-upgrade)]
+
 
 ## Migrating Tables
 
@@ -224,7 +224,7 @@ The `_revert_migrated_table` method is responsible for reverting the migration o
 The `is_upgraded` method checks if a table has been upgraded or not. The `print_revert_report` method generates a report
 of the tables that can be reverted.
 
-[[back to top](#table-upgrade)]
+
 
 ## Moving tables
 
@@ -239,7 +239,7 @@ associated with the object. The `_reapply_grants` method reapplies the grants on
 that the necessary permissions are maintained. The `_recreate_table` and `_recreate_view` methods recreate the table or
 view in the destination schema, including any dependencies or permissions associated with the object.
 
-[[back to top](#table-upgrade)]
+
 
 ## Table Size Estimation
 
@@ -254,7 +254,7 @@ size. The `_try_load` method tries to load table information from the database a
 error if the table cannot be found. The `_crawl` method crawls and lists tables using the `tables_crawler` object and
 calculates the size of DBFS root tables, skipping tables that are not of type `TABLE` or are not DBFS root tables.
 
-[[back to top](#table-upgrade)]
+
 
 ## Table Crawler
 
@@ -262,7 +262,7 @@ The `TablesCrawler` is designed for crawling and listing tables within Hive Meta
 about each table, including the table's name, external location, and storage format. This information can be used to
 better understand the structure and contents of the tables in the Databricks workspace.
 
-[[back to top](#table-upgrade)]
+
 
 ## Table
 
@@ -282,4 +282,4 @@ The `Table` class has the following methods:
 * `sql_migrate_dbfs`: Returns an SQL command to migrate a table located in DBFS.
 * `sql_migrate_view`: Returns an SQL command to migrate a view.
 
-[[back to top](#table-upgrade)]
+

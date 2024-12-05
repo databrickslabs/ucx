@@ -35,6 +35,3 @@ The output is processed and displayed in the migration dashboard using the in `r
   - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
   - run the [`create-table-mapping` command](#create-table-mapping-command)
     - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
-
-
-[[back to top](#databricks-labs-ucx)]

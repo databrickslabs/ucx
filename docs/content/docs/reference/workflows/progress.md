@@ -9,4 +9,4 @@ progress by updating the following [UCX catalog](#create-ucx-catalog-command) ta
 _Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
 the [assessment workflow](#assessment-workflow)._
 
-[[back to top](#databricks-labs-ucx)]
+

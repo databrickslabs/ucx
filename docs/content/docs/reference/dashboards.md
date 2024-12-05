@@ -13,4 +13,4 @@ overview with a short description is given.
 | [Migration \[Groups\]](./src/databricks/labs/ucx/queries/migration/groups/00_0_migration_overview.md)           | Group migration outcomes                           |
 | [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | Migration progress                                 |
 
-[[back to top](#databricks-labs-ucx)]
+

@@ -82,4 +82,4 @@ See [this guide](docs/assessment.md) for more details.
 Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
 [migration process diagram](#migration-process).
 
-[[back to top](#databricks-labs-ucx)]
+
