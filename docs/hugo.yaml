@@ -14,8 +14,13 @@ build:
 
 params:
   theme:
-    default: system
+    default: dark
     displayToggle: true
+
+  footer:
+    enable: true
+    displayCopyright: true
+    displayPoweredBy: false
 
   search:
     enable: true
