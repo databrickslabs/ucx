@@ -1,6 +1,6 @@
 # Linter message codes
 
-![code compatibility problems](docs/code_compatibility_problems.png)
+![code compatibility problems](/images/code_compatibility_problems.png)
 
 Here's the detailed explanation of the linter message codes:
 

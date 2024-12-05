@@ -146,7 +146,7 @@ specific version of UCX, you can do it using the command
 
 **Workspace Level:** If you are facing authentication issues while
 setting up Databricks CLI, please refer to the
-[Cryptic errors on authentication](docs/troubleshooting.md#cryptic-errors-on-authentication)
+[Cryptic errors on authentication](./troubleshooting.md#cryptic-errors-on-authentication)
 section to resolve the common errors related to authentication,
 profiles, and tokens.
 

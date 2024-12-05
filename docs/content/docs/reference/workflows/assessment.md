@@ -75,7 +75,7 @@ the [assessment report](docs/assessment.md).
     [migration problems](#linter-message-codes).
 
 After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
-See [this guide](docs/assessment.md) for more details.
+See [this guide](../assessment.md) for more details.
 
 ![report](docs/assessment-report.png)
 

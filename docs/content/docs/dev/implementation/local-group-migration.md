@@ -16,7 +16,7 @@ Workspace Group Migration
 <!-- TOC -->
 
 This feature introduces the ability to migrate groups from workspace level to account level in
-the [group migration workflow](../README.md#group-migration-workflow). It helps you to upgrade all Databricks workspace assets:
+the [group migration workflow](../../reference/workflows/group_migration.md). It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
 Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
@@ -134,7 +134,7 @@ appropriate warning messages.
 
 ### Dashboard Permissions
 
-Reflected in [RedashPermissionsSupport](../src/databricks/labs/ucx/workspace_access/redash.py). See [examples](../tests/integration/workspace_access/test_redash.py) for more details on how to use it as a library.
+Reflected in [RedashPermissionsSupport](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/workspace_access/redash.py). See [examples](https://github.com/databrickslabs/ucx/blob/main/tests/integration/workspace_access/test_redash.py) for more details on how to use it as a library.
 
 
 
@@ -144,7 +144,7 @@ The `ScimSupport` is [`AclSupport`](#acl-support) that creates a snapshot of all
 The `_is_item_relevant` method checks if a permission item is relevant to the current migration state. The `get_crawler_tasks` method returns an iterator of partial functions
 for crawling the permissions of each group in the snapshot. It checks if the group has any roles or entitlements and returns a partial function to crawl the corresponding property.
 
-See [examples](../tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
+See [examples](https://github.com/databrickslabs/ucx/blob/main/tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
 
 
 

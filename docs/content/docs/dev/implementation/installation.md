@@ -13,7 +13,7 @@ It guides the user through a series of prompts to gather necessary information, 
   
 
 
-The [`WorkspaceInstallation`](src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. 
+The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. 
 
 It handles the configuration and exception management during the installation process. 
 The installation process creates dashboards, databases, and jobs.

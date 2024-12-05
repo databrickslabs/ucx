@@ -41,7 +41,7 @@ more central in [Unity Catalog](https://docs.databricks.com/en/data-governance/u
 
 ## Tracking
 
-The [(experimental) migration progress workflow](../README.md#experimental-migration-progress-workflow) tracks the
+The [(experimental) migration progress workflow](./workflows/progress.md) tracks the
 migration progress and populates [migration progress tables](#persistence).
 
 ### Roll-up to business resources
@@ -73,7 +73,7 @@ to be _dangling_ objects. For now, these objects are tracked separately, thus no
 
 ## Persistence
 
-The progress is persisted in the [UCX UC catalog](../README.md#create-ucx-catalog-command) so that migration progress can be
+The progress is persisted in the [UCX UC catalog](../reference/table_persistence.md) so that migration progress can be
 tracked cross-workspace. The catalog contains the tables below.
 
 ### Historical
@@ -100,7 +100,7 @@ Example historical record:
 
 ### Workflow run
 
-The auxiliary [`workflow_runs` table](../src/databricks/labs/ucx/progress/install.py) tracks UCX workflow runs.
+The auxiliary [`workflow_runs` table](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/progress/install.py) tracks UCX workflow runs.
 
 | Column               | Data type   | Description                                |
 |----------------------|-------------|--------------------------------------------|
