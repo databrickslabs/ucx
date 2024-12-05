@@ -35,6 +35,6 @@ docs:
 	cd docs && hugo server
 
 docs-test:
-	cd docs && hugo --minify && yarn linkinator 'content/**/*.md' --markdown
+	cd docs && hugo --minify && yarn linkinator 'content/**/*.md' --markdown --url-rewrite-search /images/ --url-rewrite-replace /static/images/
 
 .PHONY: all clean dev lint fmt test integration coverage known solacc docs docs-test
