@@ -1,4 +1,7 @@
-## Joining a collection
+---
+title: Collection
+weight: 4
+---
 
 At the end of the installation, the user will be prompted if the current installation needs to join an existing collection (or create new collection if none present).
 

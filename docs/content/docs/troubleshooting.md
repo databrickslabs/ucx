@@ -1,4 +1,5 @@
-# UCX Troubleshooting guide
+# Troubleshooting
+
 This guide will help you troubleshoot potential issues running the UCX toolkit.
 
 ## Common errors

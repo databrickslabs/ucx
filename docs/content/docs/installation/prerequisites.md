@@ -1,4 +1,8 @@
-## Prerequisites
+---
+linkTitle: Prerequisites
+title: Prerequisites
+weight: 1
+---
 
 {{< callout type="info" >}}
 To install UCX, user must have Databricks Workspace Administrator privileges.

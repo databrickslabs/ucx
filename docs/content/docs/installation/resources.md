@@ -4,7 +4,7 @@ The following resources are installed by UCX:
 
 | Installed UCX resources                           | Description                                                                                      |
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| [Inventory database](./docs/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Inventory database](../../reference/table_persistence) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
 | [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
 | [Dashboards](#dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
 | [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
@@ -12,7 +12,7 @@ The following resources are installed by UCX:
 ## Installation folder
 
 UCX is in installed in the workspace folder `/Applications/ucx/`. This folder contains UCX's code resources, like the
-[source code](./src) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
+[source code](https://github.com/databrickslabs/ucx/tree/main/src/databricks) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
 *directly* used by UCX users. Resources that can be of importance to users are detailed in the subsections below.
 
 ### Readme notebook

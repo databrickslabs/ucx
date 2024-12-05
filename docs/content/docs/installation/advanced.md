@@ -1,13 +1,18 @@
-## Advanced installation options
+---
+title: Advanced setup steps
+linkTitle: Advanced setup steps
+weight: 5
+---
 
-Advanced installation options are detailed below.
+Advanced installation options and other actions are detailed below.
 
-### Force install over existing UCX
+## Force install over existing UCX
 Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
-The values for the environment variable are 'global' and 'user'.
 
-Global Install: When UCX is installed at '/Applications/ucx'
-User Install: When UCX is installed at '/Users/<user>/.ucx'
+The values for the environment variable are `global` and `user`.
+
+- Global Install: When UCX is installed at `/Applications/ucx`
+- User Install: When UCX is installed at `/Users/<user>/.ucx`
 
 If there is an existing global installation of UCX, you can force a user installation of UCX over the existing installation by setting the environment variable `UCX_FORCE_INSTALL` to 'global'.
 
@@ -30,7 +35,7 @@ At this moment there is no global override over a user installation of UCX. As t
 
 
 
-### Installing UCX on all workspaces within a Databricks account
+## Installing UCX on all workspaces within a Databricks account
 Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
 
 * `UCX_FORCE_INSTALL=account databricks labs install ucx`
@@ -43,9 +48,9 @@ This installation mode will automatically select the following options:
 
 
 
-### Installing UCX with company hosted pypi mirror
+## Installing UCX with company hosted pypi mirror
 {{< callout type="info" >}}
-If you're using custom Pypi, during installation, please reply *yes* to the question "Does the given workspace block Internet access"?
+If you're using custom Pypi, please reply *yes* to the question "Does the given workspace block Internet access"?
 {{< /callout >}}
 
 Some enterprise block the public pypi index and host a company controlled pypi mirror. 

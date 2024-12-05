@@ -1,4 +1,9 @@
-## Install and authenticate Databricks CLI
+---
+linkTitle: "Install and authenticate Databricks CLI"
+title: "Install and authenticate Databricks CLI"
+weight: 2
+---
+
 
 {{< callout type="info" >}}
 We only support installations and upgrades through [Databricks CLI](https://docs.databricks.com/en/dev-tools/cli/index.html), as UCX requires an installation script run to make sure all the necessary and correct configurations are in place. 

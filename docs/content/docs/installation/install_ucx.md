@@ -1,5 +1,9 @@
+---
+linkTitle: "Install UCX"
+title: Install UCX
+weight: 3
+---
 
-## Install UCX
 
 Install UCX via Databricks CLI:
 

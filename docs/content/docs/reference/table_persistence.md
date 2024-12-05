@@ -1,4 +1,8 @@
-# UCX objects
+---
+title: Table Persistence
+linkTitle: Table Persistence
+---
+
 
 List of all UCX objects and their respective metadata.
 
