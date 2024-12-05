@@ -1,6 +1,8 @@
 # Table migration process
 
-> You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
+{{<callout type="warning">}}
+You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
+{{</callout>}}
 
 This section explains how to migrate Hive metastore data objects to Unity Catalog. The table migration process consists
 of more steps than only a [workflow](#table-migration-workflow), these steps are:

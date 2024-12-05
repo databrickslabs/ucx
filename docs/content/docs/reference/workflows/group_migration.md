@@ -1,6 +1,8 @@
 ## Group migration workflow
 
-> You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
+{{<callout type="warning">}}
+You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
+{{</callout>}}
 
 **The group migration workflow does NOT CREATE account groups.** In contrast to account groups, [the (legacy)
 workspace-local groups cannot be assigned to additional workspaces or granted access to data in a Unity Catalog
