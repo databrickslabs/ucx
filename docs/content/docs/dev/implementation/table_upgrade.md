@@ -1,27 +1,6 @@
 Table Upgrade
 ===
 
-<!-- TOC -->
-- [Table Upgrade](#table-upgrade)
-- [Migration dashboard](#migration-dashboard)
-- [Common considerations](#common-considerations)
-  - [Tables (Parquet/Delta) on DBFS root](#tables-parquetdelta-on-dbfs-root)
-  - [Tables (Parquet/Delta) on Cloud Storage](#tables-parquetdelta-on-cloud-storage)
-  - [Tables (None Parquet/Delta)](#tables-none-parquetdelta)
-  - [Views](#views)
-  - [Functions](#functions)
-  - [Account Consideration](#account-consideration)
-  - [Open Questions](#open-questions)
-- [Design](#design)
-  - [Data Access Permissions](#data-access-permissions)
-  - [External Storage](#external-storage)
-  - [Table Mapping](#table-mapping)
-  - [Migrating Tables](#migrating-tables)
-  - [Moving tables](#moving-tables)
-  - [Table Size Estimation](#table-size-estimation)
-  - [Table Crawler](#table-crawler)
-  - [Table](#table)
-<!-- TOC -->
 
 The Hive Metastore migration process will upgrade the following Assets:
 

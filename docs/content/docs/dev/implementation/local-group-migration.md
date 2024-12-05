@@ -1,20 +1,6 @@
 Workspace Group Migration
 ===
 
-<!-- TOC -->
-- [Workspace Group Migration](#workspace-group-migration)
-- [Design](#design)
-  - [Group Manager](#group-manager)
-  - [Permission Manager](#permission-manager)
-  - [ACL Support](#acl-support)
-    - [Generic Permissions](#generic-permissions)
-    - [Dashboard Permissions](#dashboard-permissions)
-    - [Entitlements and Roles](#entitlements-and-roles)
-    - [Secret Scope Permissions](#secret-scope-permissions)
-    - [Legacy Table Access Controls](#legacy-table-access-controls)
-- [Troubleshooting](#troubleshooting)
-<!-- TOC -->
-
 This feature introduces the ability to migrate groups from workspace level to account level in
 the [group migration workflow](../../reference/workflows/group_migration.md). It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
