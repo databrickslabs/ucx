@@ -58,7 +58,7 @@ of `MigratedGroup` objects based on a mapping between workspace and account grou
 The `MatchingNamesStrategy`, `MatchByExternalIdStrategy`, `RegexSubStrategy`, and `RegexMatchStrategy` classes are
 concrete implementations of this interface. See [group name conflicts](group_name_conflict.md) for more details.
 
-The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../README.md#installation).
+The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../../installation/_index.md).
 It prompts the user to enter information about the group migration strategy, such as the renamed group prefix, regular expressions
 for matching and substitution, and a list of groups to migrate. The class also provides methods for validating user input
 and setting class variables based on the user's responses.
@@ -171,7 +171,7 @@ object ID, and `Grant` object from the `Permissions` object.
 
 # Troubleshooting
 
-Use [`DEBUG` notebook](../../installation/resources.md/#debug-notebook) to troubleshoot anything.
+Use [`DEBUG` notebook](../../installation/resources.md#debug-notebook) to troubleshoot anything.
 
 Below are some useful code snippets that can be useful for troubleshooting.
 Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run
