@@ -31,7 +31,7 @@ or specialized functionality unavailable in standard libraries.
 
 ## Adding entries to `known.json` file
 
-When adding a new entry to the [`known.json` file](src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
+When adding a new entry to the [`known.json` file](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
 stores information about known (in)compatibilities with Unity Catalog. The file speeds up static code analysis and prevents false positives.
 
 1. load into virtual environment
@@ -131,7 +131,7 @@ for the latest reference of environment variables related to authentication.
   indicate the cloud provider being used, such as "aws" for Amazon Web Services and "azure" for Microsoft Azure.
 - `DATABRICKS_ACCOUNT_ID`: This variable stores the unique identifier for your Databricks account.
 - `DATABRICKS_HOST`: This variable contains the URL of your Databricks workspace. It is the web address you use to access
-  your Databricks environment and typically looks like "https://dbc-....cloud.databricks.com."
+  your Databricks environment and typically looks like `https://dbc-....cloud.databricks.com`.
 - `TEST_DEFAULT_CLUSTER_ID`: This variable holds the identifier for the default cluster used in testing. The value
   resembles a unique cluster ID, like "0824-163015-tdtagl1h."
 - `TEST_DEFAULT_WAREHOUSE_DATASOURCE_ID`: This environment variable stores the identifier for the default warehouse data

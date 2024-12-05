@@ -28,7 +28,7 @@ Running UCX as a Service Principal is not supported.
 
 ### Workspace-level settings
 - Workspace should have Premium or Enterprise tier.
-- A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
+- A PRO or Serverless SQL Warehouse to render the [report](../reference/assessment.md) for the [assessment workflow](#assessment-workflow).
 
 {{< callout type="info" >}}
 If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](../reference/external_hms_glue.md)

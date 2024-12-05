@@ -40,7 +40,7 @@ Each time it will upgrade tables it can and report the ones it can't.
 We keep track of the migration and provide the user continuous feedback of the progress and status of the
 upgrade. This feedback is presented in the migration dashboard:
 
-![report](migration-report.png)
+![report](/images/migration-report.png)
 
 
 

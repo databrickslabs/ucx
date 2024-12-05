@@ -56,7 +56,7 @@ If you're using custom Pypi, please reply *yes* to the question "Does the given 
 Some enterprise block the public pypi index and host a company controlled pypi mirror. 
 
 To install UCX while using a company hosted pypi mirror for finding its dependencies, add all UCX dependencies to the company hosted pypi mirror (see
-"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company hosted PYPI mirror URL while installing UCX:
+"dependencies" in [`pyproject.toml`](https://github.com/databrickslabs/ucx/blob/main/pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company hosted PYPI mirror URL while installing UCX:
 
 ```bash
 PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx

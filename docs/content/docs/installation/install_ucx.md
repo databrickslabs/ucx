@@ -15,7 +15,7 @@ You'll be prompted to select a [configuration profile](https://docs.databricks.c
 
 After running this command, UCX will be installed locally and a number of assets will be deployed in the selected workspace.
 
-Upon the first installation, you're prompted for a workspace local [group migration strategy](docs/group_name_conflict.md).
+Upon the first installation, you're prompted for a workspace local [group migration strategy](../dev/implementation/group_name_conflict.md).
 Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration, which is saved to the workspace and can be opened in a web browser.
 
 These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#advanced-force-install-over-existing-ucx) for more details.

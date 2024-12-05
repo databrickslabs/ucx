@@ -12,7 +12,7 @@ counterpart table:
 
 The output is processed and displayed in the migration dashboard using the in `reconciliation_results` view.
 
-![reconciliation results](docs/recon_results.png)
+![reconciliation results](/images/recon_results.png)
 
 ### [LEGACY] Scan tables in mounts Workflow
 #### <b>Always run this workflow AFTER the assessment has finished</b>
