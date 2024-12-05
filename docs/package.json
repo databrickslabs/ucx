@@ -5,6 +5,7 @@
   "license": "Databricks",
   "dependencies": {
     "@tailwindcss/cli": "^4.0.0-beta.5",
+    "linkinator": "^6.1.2",
     "tailwindcss": "^4.0.0-beta.5"
   },
   "devDependencies": {}

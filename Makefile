@@ -34,4 +34,7 @@ solacc:
 docs:
 	cd docs && hugo server
 
-.PHONY: all clean dev lint fmt test integration coverage known solacc docs
+docs-test:
+	cd docs && hugo --minify && yarn linkinator 'content/**/*.md' --markdown
+
+.PHONY: all clean dev lint fmt test integration coverage known solacc docs docs-test
