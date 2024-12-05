@@ -63,8 +63,9 @@ class HiveMetastoreFederation(SecretsMixin):
         self._enable_hms_federation = enable_hms_federation
         self._installation = installation
 
+    # Supported databases and version for HMS Federation
     supported_db_vers: ClassVar[dict[str, list[str]]] = {
-        "mysql": ["2.3.0", "0.13"],
+        "mysql": ["2.3", "0.13"],
     }
 
     def create_from_cli(self, prompts: Prompts):
@@ -76,7 +77,7 @@ class HiveMetastoreFederation(SecretsMixin):
         try:
             ext_hms = self._get_ext_hms()
         except ValueError:
-            logger.info('Failed to get external Hive Metastore connection information')
+            logger.info('Failed to retrieve external Hive Metastore connection information')
 
         if ext_hms and prompts.confirm(
             f'A supported external Hive Metastore connection was identified: {ext_hms.db_type}. Use this connection?'
@@ -96,8 +97,13 @@ class HiveMetastoreFederation(SecretsMixin):
         if not jdbc_url:
             raise ValueError('JDBC URL not found')
         version = self._get_value_from_config_key(spark_config, 'spark.sql.hive.metastore.version')
+        # extract major version from version using regex
         if not version:
             raise ValueError('Hive Metastore version not found')
+        major_version = re.match(r'(\d+\.\d+)', version)
+        if not major_version:
+            raise ValueError(f'Invalid Hive Metastore version: {version}')
+        version = major_version.group(1)
         ext_hms = replace(self._split_jdbc_url(jdbc_url), version=version)
         supported_versions = self.supported_db_vers.get(ext_hms.db_type)
         if not supported_versions:
@@ -167,7 +173,7 @@ class HiveMetastoreFederation(SecretsMixin):
 
     def _get_or_create_ext_connection(self, name: str, ext_hms: ExtHms) -> ConnectionInfo:
         options: dict[str, str] = {
-            "builtin": "false",
+            # TODO: Fix once the FEDERATION end point is fixed. Include "builtin": "false" in options
             "database": ext_hms.database,
             "db_type": ext_hms.db_type,
             "host": ext_hms.host,

@@ -132,7 +132,7 @@ def test_create_federated_catalog_ext(mock_installation):
             'password': 'bar',
             'port': '3306',
             'user': 'foo',
-            'version': '2.3.0',
+            'version': '2.3',
         },
     )
     workspace_client.catalogs.create.assert_called_with(
