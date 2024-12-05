@@ -58,3 +58,8 @@ menu:
       url: "https://github.com/databrickslabs/ucx"
       params:
         icon: github
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
