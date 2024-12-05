@@ -24,8 +24,8 @@ See the [resource index](#resource-index) for more details on the above objects.
 
 ## Usage
 
-Use the migration progress through the [migration progress dashboard](../README.md#dashboards) after running the
-[(experimental) migration progress workflow](../README.md#experimental-migration-progress-workflow).
+Use the migration progress through the [migration progress dashboard](./dashboards.md) after running the
+[(experimental) migration progress workflow](./workflows/progress.md).
 
 ### Failures
 
@@ -78,7 +78,7 @@ tracked cross-workspace. The catalog contains the tables below.
 
 ### Historical
 
-The [`historical` table](../src/databricks/labs/ucx/progress/install.py) contains historical records of inventory
+The [`historical` table](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/progress/install.py) contains historical records of inventory
 objects relevant to the migration progress
 
 | Column       | Data type               | Description                                                                        |

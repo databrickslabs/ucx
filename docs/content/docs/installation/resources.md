@@ -4,9 +4,9 @@ The following resources are installed by UCX:
 
 | Installed UCX resources                           | Description                                                                                      |
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| [Inventory database](../../reference/table_persistence) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
-| [Dashboards](#dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
+| [Inventory database](../reference/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](../reference/workflows/)                           | Workflows to execute UCX                                                                         |
+| [Dashboards](../reference/dashboards.md)                         | Dashboards to visualize UCX outcomes                                                             |
 | [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
 
 ## Installation folder

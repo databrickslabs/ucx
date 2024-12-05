@@ -82,7 +82,7 @@ install UCX with their authentication, or request a workspace
 administrator to grant you temporary administrator privileges to run the
 installation. More details on the issues that you can run into if
 you are not an admin (and some possible solutions) can be found
-[here](docs/troubleshooting.md#resolving-common-errors-on-ucx-install).
+[here](./troubleshooting.md#resolving-common-errors-on-ucx-install).
 
 **User is not a Cloud IAM Administrator:** Cloud CLI needs to be
 installed in the local machine for certain cloud related activities,
@@ -202,7 +202,7 @@ will not be able to assess the tables on HMS.
 required Spark config for connecting to the external HMS, or manually
 edit the cluster post-installation to have the correct configurations.
 Detailed steps can be found
-[<u>here</u>](docs/external_hms_glue.md).
+[here](./external_hms_glue.md).
 
 **External HMS connectivity from UCX SQL warehouse:** UCX requires a SQL
 warehouse to create tables, run queries, create and refresh dashboards.

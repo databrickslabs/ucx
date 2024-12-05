@@ -26,7 +26,7 @@ Please follow the [post-migration data reconciliation workflow](../reference/wor
 
 ### Code Migration
 
-Please follow the [code migration commands](../reference/commands/code_migration.md)
+Please follow the [code migration commands](../reference/commands/code.md)
 
 {{% /steps %}}
 
