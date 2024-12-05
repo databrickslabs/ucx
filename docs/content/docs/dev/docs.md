@@ -1,6 +1,7 @@
 ---
 linkTitle: "Writing documentation"
 title: "Writing documentation"
+weight: 2
 ---
 
 UCX documentation uses the following set of technologies:

@@ -1,6 +1,6 @@
 ---
-title: Implementation details
-linkTitle: Implementation details
+title: Installation process
+linkTitle: Installation process
 ---
 
 The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace.

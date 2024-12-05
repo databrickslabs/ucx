@@ -1,19 +1,13 @@
-External Hive Metastore Integration
-===
+---
+linkTitle: External Hive Metastore Integration
+title: External Hive Metastore Integration
+---
 
-<!-- TOC -->
-* [External Hive Metastore Integration](#external-hive-metastore-integration)
-* [Installation](#installation)
-* [Manual Override](#manual-override)
-* [Assessment Workflow](#assessment-workflow)
-* [Table Migration Workflow](#table-migration-workflow)
-* [Additional Considerations](#additional-considerations)
-<!-- TOC -->
 
 UCX works with both the default workspace metastore, or an external Hive metastore. This document outlines the current
 integration and how to set up UCX to work with your existing external metastore.
 
-# Installation
+## Installation
 
 The setup process follows the following steps
 
@@ -39,7 +33,7 @@ the data access configuration. See [Enable data access configuration](https://le
 
 [[back to top](#external-hive-metastore-integration)]
 
-# Manual Override
+## Manual Override
 
 If the workspace does not have a cluster policy or SQL data access configuration for external Hive metastore, there are
 two options to manually enable this:
@@ -68,7 +62,7 @@ following the post-installation steps above.
 
 [[back to top](#external-hive-metastore-integration)]
 
-# Assessment Workflow
+## Assessment Workflow
 
 Once UCX is set up with external Hive metastore the assessment workflow will scan tables & views from the external
 Hive metastore instead of the default workspace metastore.
@@ -81,7 +75,7 @@ with external Hive metastore configuration. The assessment dashboard will also f
 
 [[back to top](#external-hive-metastore-integration)]
 
-# Table Migration Workflow
+## Table Migration Workflow
 
 Table migration workflow will upgrade tables & views from the external Hive metastore the Unity Catalog. This workflow
 only needs to be executed once per external Hive metastore. Running the workflow on other workspaces sharing the same
@@ -89,7 +83,7 @@ metastore is redundant and will be a no-op.
 
 [[back to top](#external-hive-metastore-integration)]
 
-# Additional Considerations
+## Additional Considerations
 
 If a workspace is set up with multiple external Hive metastores, you will need to plan the approach carefully. Below are
 a few considerations to keep in mind:

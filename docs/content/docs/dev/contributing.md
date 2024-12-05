@@ -1,6 +1,7 @@
 ---
-linkTitle: "Contributing"
+linkTitle: "Contributing to UCX"
 title: "Contributing to UCX"
+weight: 1
 ---
 
 ## First Principles

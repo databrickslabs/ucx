@@ -3,12 +3,33 @@ title: "Process"
 linkTitle: "Process"
 weight: 2
 ---
+
 On a high level, the steps in migration process are:
-1. [assessment](#assessment-workflow)
-2. [group migration](#group-migration-workflow)
-3. [table migration](#table-migration-process)
-4. [data reconciliation](#post-migration-data-reconciliation-workflow)
-5. [code migration](#code-migration-commands)
+
+{{% steps %}}
+
+### Assessment
+
+Please follow the [assessment workflow](../reference/workflows/assessment.md) 
+
+### Group Migration
+
+Please follow the [group migration workflow](../reference/workflows/group_migration.md)
+
+### Table Migration
+
+Please follow the [table migration process](../process/table_migration.md)
+
+### Post Migration Data Reconciliation
+
+Please follow the [post-migration data reconciliation workflow](../reference/workflows/reconciliation.md)
+
+### Code Migration
+
+Please follow the [code migration commands](../reference/commands/code_migration.md)
+
+{{% /steps %}}
+
 
 The migration process can be schematic visualized as:
 
