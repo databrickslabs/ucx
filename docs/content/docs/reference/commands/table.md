@@ -276,20 +276,6 @@ to the bucket. It then maps the bucket to the tables which has external location
 the schema and catalog if at least one such table is migrated to it.
 [[back to top](#databricks-labs-ucx)]
 
-## `assign-owner-group` command
-
-```text
-databricks labs ucx assign-owner-group
-```
-
-This command assigns the owner group to the UCX catalog and all migrated tables.
-The owner group is an account group that will be designated as an owner to all migrated objects (catalogs, schemas, tables, views).
-The principal running the command and later, the migration workflows, is required to be a member of this group.
-The command will list all the groups the principal is a member of and allow the selection of the owner group.
-It sets the default_owner_group property in the config.yml file.
-
-[[back to top](#databricks-labs-ucx)]
-
 ## `migrate-tables` command
 
 ```text

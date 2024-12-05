@@ -1,5 +1,8 @@
-# Migration process
-
+---
+title: "Process"
+linkTitle: "Process"
+weight: 2
+---
 On a high level, the steps in migration process are:
 1. [assessment](#assessment-workflow)
 2. [group migration](#group-migration-workflow)

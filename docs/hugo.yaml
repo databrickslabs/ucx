@@ -48,8 +48,8 @@ menu:
     - name: Installation
       pageRef: /docs/installation
       weight: 2
-    - name: Tutorial
-      pageRef: /docs/tutorial
+    - name: Process
+      pageRef: /docs/process
       weight: 2
     - name: Reference
       pageRef: /docs/reference

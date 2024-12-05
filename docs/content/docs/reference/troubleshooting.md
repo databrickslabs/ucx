@@ -1,4 +1,8 @@
-# Troubleshooting
+---
+title: Troubleshooting
+linkTitle: Troubleshooting
+weight: 4
+---
 
 This guide will help you troubleshoot potential issues running the UCX toolkit.
 

@@ -118,7 +118,6 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`skip` command](#skip-command)
   * [`unskip` command](#unskip-command)
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
-  * [`assign-owner-group` command](#assign-owner-group-command)
   * [`migrate-tables` command](#migrate-tables-command)
   * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`move` command](#move-command)
@@ -764,10 +763,6 @@ See [this guide](docs/assessment.md) for more details.
 Proceed to the [group migration workflow](#group-migration-workflow) below or go back to the
 [migration process diagram](#migration-process).
 
-The UCX assessment workflow is designed to only run once, re-running will **not** update the existing results. If the
-inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](#uninstall-ucx)
-and [installing](#install-ucx) it again.
-
 [[back to top](#databricks-labs-ucx)]
 
 ## Group migration workflow
@@ -919,14 +914,14 @@ The output is processed and displayed in the migration dashboard using the in `r
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
-The manually triggered `migration-progress-experimental` workflow populates the tables visualized in the
-[migration progress dashboard](#dashboards) by updating a **subset** of the [inventory tables](#assessment-workflow)
-to [track Unity Catalog compatability](docs/migration-progress.md) of Hive and workspace objects that need to be migrated.
+The `migration-progress-experimental` workflow updates a subset of the inventory tables to track migration status of
+workspace resources that need to be migrated. Besides updating the inventory tables, this workflow tracks the migration
+progress by updating the following [UCX catalog](#create-ucx-catalog-command) tables:
 
-The following pre-requisites need to be fulfilled before running the workflow:
-- [UC metastore attached to workspace](../README.md#assign-metastore-command)
-- [UCX catalog exists](../README.md#create-ucx-catalog-command)
-- [Assessment job ran successfully](../README.md#ensure-assessment-run-command)
+- `workflow_runs`: Tracks the status of the workflow runs.
+
+_Note: A subset of the inventory is updated, *not* the complete inventory that is initially gathered by
+the [assessment workflow](#assessment-workflow)._
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -943,7 +938,7 @@ overview with a short description is given.
 | [Assessment \[Azure\]](./src/databricks/labs/ucx/queries/assessment/azure/00_0_azure_service_principals.md)     | Assessment outcomes specific to Azure              |
 | [Migration \[Main\]](./src/databricks/labs/ucx/queries/migration/main/00_0_migration_overview.md)               | Migration overview                                 |
 | [Migration \[Groups\]](./src/databricks/labs/ucx/queries/migration/groups/00_0_migration_overview.md)           | Group migration outcomes                           |
-| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | [Migration progress](./docs/migration-progress.md) |
+| [Progress \[Main\]](./src/databricks/labs/ucx/queries/progress/main/00_0_migration_progress.md)                 | Migration progress                                 |
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1317,8 +1312,6 @@ access the configuration file from the command line. Here's the description of c
   * `num_threads`: An optional integer representing the number of threads to use for migration.
   * `database_to_catalog_mapping`: An optional dictionary mapping source database names to target catalog names.
   * `default_catalog`: An optional string representing the default catalog name.
-  * `skip_tacl_migration`: Optional flag, allow skipping TACL migration when migrating tables or creating catalogs and schemas.
-  * `default_owner_group`: Assigns this group to all migrated objects (catalogs, databases, tables, views, etc.). The group has to be an account group and the user running the migration has to be a member of this group.
   * `log_level`: An optional string representing the log level.
   * `workspace_start_path`: A string representing the starting path for notebooks and directories crawler in the workspace.
   * `instance_profile`: An optional string representing the name of the instance profile.
@@ -1713,20 +1706,6 @@ the schema and catalog if at least one such table is migrated to it.
 For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
 the schema and catalog if at least one such table is migrated to it.
-[[back to top](#databricks-labs-ucx)]
-
-## `assign-owner-group` command
-
-```text
-databricks labs ucx assign-owner-group
-```
-
-This command assigns the owner group to the UCX catalog and all migrated tables.
-The owner group is an account group that will be designated as an owner to all migrated objects (catalogs, schemas, tables, views).
-The principal running the command and later, the migration workflows, is required to be a member of this group.
-The command will list all the groups the principal is a member of and allow the selection of the owner group.
-It sets the default_owner_group property in the config.yml file.
-
 [[back to top](#databricks-labs-ucx)]
 
 ## `migrate-tables` command
