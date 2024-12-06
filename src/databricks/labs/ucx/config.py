@@ -74,6 +74,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # [INTERNAL ONLY] Limit the dashboards to the given list
     include_dashboard_ids: list[str] | None = None
 
+    # [INTERNAL ONLY] Limit the queries to the given list
+    include_query_ids: list[str] | None = None
+
     enable_hms_federation: bool = False
 
     managed_table_external_storage: str = 'CLONE'
