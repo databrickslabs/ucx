@@ -1,7 +1,5 @@
-from datetime import timedelta
-
 from databricks.sdk.service.jobs import Task, PipelineTask
-from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary, PipelineCluster, PipelineState
+from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary, PipelineCluster
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
@@ -140,4 +138,3 @@ def test_pipeline_migrate(
             results[0].pipeline_id,
             results[1].pipeline_id,
         ]
-
