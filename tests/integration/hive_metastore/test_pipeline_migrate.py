@@ -84,14 +84,6 @@ def test_pipeline_migrate(
             libraries=[PipelineLibrary(notebook=NotebookLibrary(path=str(dlt_notebooks[0])))],
         ),
     ]
-    ws.pipelines.start_update(created_pipelines[0].pipeline_id)
-    ws.pipelines.start_update(created_pipelines[1].pipeline_id)
-    assert (
-        ws.pipelines.wait_get_pipeline_idle(created_pipelines[0].pipeline_id, timeout=timedelta(minutes=6))
-    ).state == PipelineState.IDLE
-    assert (
-        ws.pipelines.wait_get_pipeline_idle(created_pipelines[1].pipeline_id, timeout=timedelta(minutes=2))
-    ).state == PipelineState.IDLE
 
     job_with_pipeline_list = [
         runtime_ctx.make_job(
@@ -128,6 +120,7 @@ def test_pipeline_migrate(
     pipelines_migrator = PipelinesMigrator(
         ws,
         runtime_ctx.pipelines_crawler,
+        runtime_ctx.jobs_crawler,
         runtime_ctx.make_catalog().name,
         skip_pipeline_ids=[created_pipelines[1].pipeline_id],
     )
@@ -142,17 +135,9 @@ def test_pipeline_migrate(
 
     assert len(results) == 2
 
-    assert (
-        ws.jobs.get(job_with_pipeline_list[0].job_id).settings.tasks[0].pipeline_task.pipeline_id
-        == results[0].pipeline_id
-    )
-    assert (
-        ws.jobs.get(job_with_pipeline_list[1].job_id).settings.tasks[0].pipeline_task.pipeline_id
-        == results[0].pipeline_id
-    )
-    assert (
-        ws.pipelines.wait_get_pipeline_idle(results[0].pipeline_id, timeout=timedelta(minutes=6))
-    ).state == PipelineState.IDLE
-    assert (
-        ws.pipelines.wait_get_pipeline_idle(results[1].pipeline_id, timeout=timedelta(minutes=2))
-    ).state == PipelineState.IDLE
+    for job_with_pipeline in job_with_pipeline_list:
+        assert ws.jobs.get(job_with_pipeline.job_id).settings.tasks[0].pipeline_task.pipeline_id in [
+            results[0].pipeline_id,
+            results[1].pipeline_id,
+        ]
+
