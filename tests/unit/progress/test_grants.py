@@ -44,8 +44,8 @@ def test_grant_progress_encoder_no_failures(mock_backend, grant: Grant) -> None:
             "Action 'DENY' on DATABASE 'hive_metastore.schema' unmappable to Unity Catalog",
         ),
         (
-            Grant("principal", "READ_METADATA", "hive_metastore", "schema", "table"),
-            "Action 'READ_METADATA' on TABLE 'hive_metastore.schema.table' unmappable to Unity Catalog",
+            Grant("principal", "READ_METADATA", "hive_metastore", "schema", udf="function"),
+            "Action 'READ_METADATA' on FUNCTION 'hive_metastore.schema.function' unmappable to Unity Catalog",
         ),
     ],
 )
