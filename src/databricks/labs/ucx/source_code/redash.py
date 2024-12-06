@@ -52,7 +52,7 @@ class Redash:
     @cached_property
     def _dashboards(self) -> list[Dashboard]:
         """Refresh the dashboards to get the latest tags."""
-        return list(self._crawler.snapshot(force_refresh=True))  # TODO: Can we avoid the refresh?
+        return list(self._crawler.snapshot())
 
     def _list_dashboards(self, *dashboard_ids: str) -> list[Dashboard]:
         """List the Redash dashboards."""
