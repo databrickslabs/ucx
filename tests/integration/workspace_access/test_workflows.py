@@ -15,6 +15,26 @@ def test_running_real_migrate_groups_job(
     make_secret_scope,
     make_secret_scope_acl,
 ) -> None:
+    """Test the migrate groups workflow.
+
+    We have many asserts in a single integration tests as we minimize the number of integration tests that run workflows
+    to minimize the number of long-running integration tests.
+
+    For testing, we require:
+    - UCX installation (as always)
+    - A workspace group as the source for migration
+    - A account group as the target for migration
+    - Permissions to migrate:
+      - Cluster policy
+      - Schema and table access permissions
+      - Secret scope permissions
+    - Inventory tables used by the migrate groups workflow
+
+    We test:
+    - The workflow to complete successfully
+    - The workspace group to be renamed
+    - The permissions to be transferred to the account group
+    """
     ws_group, acc_group = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
     # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
@@ -36,6 +56,7 @@ def test_running_real_migrate_groups_job(
     make_secret_scope_acl(scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
 
     # TODO: Move `include_object_permissions` to context like other `include_` attributes
+    # Limit the considered permissions to the following objects:
     installation_ctx.__dict__['include_object_permissions'] = [
         f"cluster-policies:{cluster_policy.policy_id}",
         f"TABLE:{table.full_name}",
