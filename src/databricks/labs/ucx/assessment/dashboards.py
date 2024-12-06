@@ -254,6 +254,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             return self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
         except DatabricksError as e:
             logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
+            return None
 
 
 def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> LsqlLakeviewDashboard:
