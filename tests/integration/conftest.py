@@ -739,7 +739,8 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
     def created_queries(self) -> list[str]:
         query_ids = []
         for query in self._queries:
-            query_ids.append(query.id)
+            if query.id:
+                query_ids.append(query.id)
         if self._lakeview_query_id:
             query_ids.append(self._lakeview_query_id)
         return query_ids
