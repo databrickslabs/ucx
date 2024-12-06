@@ -630,6 +630,7 @@ class MockRuntimeContext(
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
+            include_query_ids=self.created_queries,
         )
 
     @cached_property
