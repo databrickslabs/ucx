@@ -238,7 +238,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         if self._include_query_ids:
             query_ids = set(dashboard.query_ids) & set(self._include_query_ids)
         else:
-            query_ids = dashboard.query_ids
+            query_ids = set(dashboard.query_ids)
         yield from self._get_legacy_queries(*query_ids)
 
     def _get_legacy_queries(self, *query_ids: str) -> Iterator[LegacyQuery]:
