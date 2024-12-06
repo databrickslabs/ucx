@@ -2,21 +2,21 @@ import collections
 import logging
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import AlreadyExists, NotFound, BadRequest
+from databricks.sdk.errors import AlreadyExists, NotFound
 from databricks.sdk.service.catalog import (
     ConnectionType,
     ConnectionInfo,
     SecurableType,
     Privilege,
     PermissionsChange,
-    CatalogInfo,
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-
+from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 
 logger = logging.getLogger(__name__)
 
@@ -37,32 +37,37 @@ class HiveMetastoreFederation:
         workspace_client: WorkspaceClient,
         external_locations: ExternalLocations,
         workspace_info: WorkspaceInfo,
+        catalog_schema: CatalogSchema,
         enable_hms_federation: bool = False,
     ):
         self._workspace_client = workspace_client
         self._external_locations = external_locations
         self._workspace_info = workspace_info
         self._enable_hms_federation = enable_hms_federation
+        self._catalog_schema = catalog_schema
 
-    def register_internal_hms_as_federated_catalog(self) -> CatalogInfo:
+    def register_internal_hms_as_federated_catalog(self, prompts: Prompts) -> None:
         if not self._enable_hms_federation:
             raise RuntimeWarning('Run `databricks labs ucx enable-hms-federation` to enable HMS Federation')
         name = self._workspace_info.current()
         connection_info = self._get_or_create_connection(name)
         assert connection_info.name is not None
-        try:
-            return self._workspace_client.catalogs.create(
-                name=connection_info.name,
-                connection_name=connection_info.name,
-                options={"authorized_paths": self._get_authorized_paths()},
-            )
-        except BadRequest as err:
-            if err.error_code == 'CATALOG_ALREADY_EXISTS':
-                logger.info(f'Catalog {connection_info.name} already exists')
-                for catalog_info in self._workspace_client.catalogs.list():
-                    if catalog_info.name == connection_info.name:
-                        return catalog_info
-            raise err
+        return self._catalog_schema.create_federated_catalog(
+            prompts, connection_info.name, connection_info.name, self._get_authorized_paths()
+        )
+        # try:
+        #     return self._workspace_client.catalogs.create(
+        #         name=connection_info.name,
+        #         connection_name=connection_info.name,
+        #         options={"authorized_paths": self._get_authorized_paths()},
+        #     )
+        # except BadRequest as err:
+        #     if err.error_code == 'CATALOG_ALREADY_EXISTS':
+        #         logger.info(f'Catalog {connection_info.name} already exists')
+        #         for catalog_info in self._workspace_client.catalogs.list():
+        #             if catalog_info.name == connection_info.name:
+        #                 return catalog_info
+        #     raise err
 
     def _get_or_create_connection(self, name: str) -> ConnectionInfo:
         try:
