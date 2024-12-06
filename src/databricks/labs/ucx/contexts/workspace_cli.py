@@ -197,6 +197,7 @@ class WorkspaceContext(CliContext):
     @cached_property
     def federation(self):
         return HiveMetastoreFederation(
+            self.installation,
             self.workspace_client,
             self.external_locations,
             self.workspace_info,
