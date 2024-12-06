@@ -191,7 +191,7 @@ def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_bac
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     assert "Cannot get Redash dashboard: did2" in caplog.messages
-    ws.dashboards.get.has_calls([call("did1"), call("did2")])
+    ws.dashboards.get.assert_has_calls([call("did1"), call("did2")])
     ws.dashboards.list.assert_not_called()
 
 
@@ -381,7 +381,7 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
     assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
     assert "Cannot get Lakeview dashboard: did2" in caplog.messages
-    ws.lakeview.get.has_calls([call("did1"), call("did2")])
+    ws.lakeview.get.assert_has_calls([call("did1"), call("did2")])
     ws.lakeview.list.assert_not_called()
 
 
