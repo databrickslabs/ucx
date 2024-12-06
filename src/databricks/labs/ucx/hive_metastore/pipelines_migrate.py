@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
 logger = logging.getLogger(__name__)
@@ -28,11 +29,13 @@ class PipelinesMigrator:
         self,
         ws: WorkspaceClient,
         pipelines_crawler: PipelinesCrawler,
+        jobs_crawler: JobsCrawler,
         catalog_name: str,
         skip_pipeline_ids: list[str] | None = None,
     ):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
+        self._jobs_crawler = jobs_crawler
         self._catalog_name = catalog_name
         self._skip_pipeline_ids = skip_pipeline_ids or []
         self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
@@ -41,13 +44,13 @@ class PipelinesMigrator:
         """
         Populates the pipeline_job_tasks_mapping dictionary with the pipeline_id as key and the list of jobs associated with the pipeline
         """
-        jobs = self._ws.jobs.list()
+        jobs = self._jobs_crawler.snapshot()
 
         for job in jobs:
             if not job.job_id:
                 continue
 
-            job_details = self._ws.jobs.get(job.job_id)
+            job_details = self._ws.jobs.get(int(job.job_id))
             if not job_details.settings or not job_details.settings.tasks:
                 continue
 

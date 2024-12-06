@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
@@ -269,6 +270,10 @@ class GlobalContext(abc.ABC):
         return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
+    def jobs_crawler(self) -> JobsCrawler:
+        return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
     def table_ownership(self) -> TableOwnership:
         return TableOwnership(
             self.administrator_locator,
@@ -341,7 +346,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pipelines_migrator(self) -> PipelinesMigrator:
-        return PipelinesMigrator(self.workspace_client, self.pipelines_crawler, self.config.ucx_catalog)
+        return PipelinesMigrator(
+            self.workspace_client, self.pipelines_crawler, self.jobs_crawler, self.config.ucx_catalog
+        )
 
     @cached_property
     def migrate_grants(self) -> MigrateGrants:
