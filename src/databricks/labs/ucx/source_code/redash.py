@@ -8,7 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import LegacyQuery, UpdateQueryRequestQuery
 from databricks.sdk.errors.platform import DatabricksError
 
-from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
+from databricks.labs.ucx.assessment.dashboards import Dashboard, RedashDashboardCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
@@ -50,15 +50,15 @@ class Redash:
             self._ws.dashboards.update(dashboard.id, tags=self._get_original_tags(dashboard.tags))
 
     @cached_property
-    def _dashboards(self) -> list[RedashDashboard]:
+    def _dashboards(self) -> list[Dashboard]:
         """Refresh the dashboards to get the latest tags."""
         return list(self._crawler.snapshot(force_refresh=True))  # TODO: Can we avoid the refresh?
 
-    def _list_dashboards(self, *dashboard_ids: str) -> list[RedashDashboard]:
+    def _list_dashboards(self, *dashboard_ids: str) -> list[Dashboard]:
         """List the Redash dashboards."""
         if not dashboard_ids:
             return self._dashboards
-        dashboards: list[RedashDashboard] = []
+        dashboards: list[Dashboard] = []
         seen_dashboard_ids = set[str]()
         for dashboard in self._dashboards:
             for dashboard_id in set(dashboard_ids) - seen_dashboard_ids:

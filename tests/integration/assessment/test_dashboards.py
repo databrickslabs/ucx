@@ -2,9 +2,8 @@ from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 
 from databricks.labs.ucx.assessment.dashboards import (
-    LakeviewDashboard,
     LakeviewDashboardCrawler,
-    RedashDashboard,
+    Dashboard,
     RedashDashboardCrawler,
 )
 
@@ -28,7 +27,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
     dashboards = list(crawler.snapshot())
 
     assert len(dashboards) == 1
-    assert dashboards[0] == RedashDashboard(id=dashboard.id)
+    assert dashboards[0] == Dashboard(id=dashboard.id)
 
 
 def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_limit(
@@ -68,4 +67,4 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
     dashboards = list(crawler.snapshot())
 
     assert len(dashboards) == 1
-    assert dashboards[0] == LakeviewDashboard(id=dashboard.dashboard_id)
+    assert dashboards[0] == Dashboard(id=dashboard.dashboard_id)

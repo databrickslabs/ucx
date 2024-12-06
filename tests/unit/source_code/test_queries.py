@@ -5,7 +5,7 @@ import pytest
 from databricks.labs.lsql.backends import Row
 from databricks.sdk.service.sql import LegacyQuery
 
-from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler, Query
+from databricks.labs.ucx.assessment.dashboards import Dashboard, RedashDashboardCrawler, Query
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -62,7 +62,7 @@ def test_lints_queries(migration_index, mock_backend) -> None:
     dfsa_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     dashboard_crawler = create_autospec(RedashDashboardCrawler)
-    dashboard_crawler.snapshot.return_value = [RedashDashboard("did", "dname", "dparent", query_ids=["qid"])]
+    dashboard_crawler.snapshot.return_value = [Dashboard("did", "dname", "dparent", query_ids=["qid"])]
     dashboard_crawler.list_queries.return_value = [
         Query(
             id="qid",
