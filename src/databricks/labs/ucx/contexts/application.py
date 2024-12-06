@@ -291,6 +291,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.inventory_database,
             include_dashboard_ids=self.config.include_dashboard_ids,
+            include_query_ids=self.config.include_query_ids,
             debug_listing_upper_limit=self.config.debug_listing_upper_limit,
         )
 
@@ -301,6 +302,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.inventory_database,
             include_dashboard_ids=self.config.include_dashboard_ids,
+            include_query_ids=self.config.include_query_ids,
         )
 
     @cached_property
