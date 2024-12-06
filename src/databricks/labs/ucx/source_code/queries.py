@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.assessment.dashboards import Dashboard, DashboardCrawlerType, Query
+from databricks.labs.ucx.assessment.dashboards import Dashboard, LakeviewDashboardCrawler, RedashDashboardCrawler, Query
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
@@ -48,7 +48,7 @@ class QueryLinter:
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
-        dashboard_crawlers: list[DashboardCrawlerType],
+        dashboard_crawlers: list[LakeviewDashboardCrawler | RedashDashboardCrawler],
         debug_listing_upper_limit: int | None = None,
     ):
         self._sql_backend = sql_backend
