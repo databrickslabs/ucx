@@ -282,10 +282,12 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         schema: str,
         *,
         include_dashboard_ids: list[str] | None = None,
+        include_query_ids: list[str] | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
+        self._include_query_ids = include_query_ids or []
 
     def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
@@ -349,4 +351,6 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         for sdk_dashboard in sdk_dashboards:
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
+                if self._include_query_ids and dataset.name not in self._include_query_ids:
+                    continue
                 yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
