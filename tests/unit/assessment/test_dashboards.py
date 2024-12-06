@@ -439,6 +439,46 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
     ws.lakeview.list.assert_not_called()
 
 
+def test_lakeview_dashboard_crawler_list_queries_includes_query_ids(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    datasets = [
+        Dataset("qid1", "SELECT 42 AS count", "First query"),
+        Dataset("qid2", "SELECT 21 AS count", "Second query"),
+    ]
+    dashboard = SdkLakeviewDashboard(
+        dashboard_id="did",
+        serialized_dashboard=json.dumps(LsqlLakeviewDashboard(datasets=datasets, pages=[]).as_dict()),
+    )
+    ws.lakeview.list.return_value = [dashboard]
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test", include_query_ids=["qid1"])
+
+    queries = list(crawler.list_queries())
+
+    assert queries == [Query(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count")]
+    ws.lakeview.list.assert_called_once()
+    ws.lakeview.get.assert_not_called()
+
+
+def test_lakeview_dashboard_crawler_list_queries_includes_query_ids_from_dashboard(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    datasets = [
+        Dataset("qid1", "SELECT 42 AS count", "First query"),
+        Dataset("qid2", "SELECT 21 AS count", "Second query"),
+    ]
+    dashboard = SdkLakeviewDashboard(
+        dashboard_id="parent",
+        serialized_dashboard=json.dumps(LsqlLakeviewDashboard(datasets=datasets, pages=[]).as_dict()),
+    )
+    ws.lakeview.get.return_value = dashboard
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test", include_query_ids=["qid1"])
+
+    queries = list(crawler.list_queries(Dashboard("parent")))
+
+    assert queries == [Query(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count")]
+    ws.lakeview.list.assert_not_called()
+    ws.lakeview.get.assert_called_once_with("parent")
+
+
 def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboards = [SdkLakeviewDashboard(dashboard_id="did1"), SdkLakeviewDashboard()]  # Second misses dashboard id
