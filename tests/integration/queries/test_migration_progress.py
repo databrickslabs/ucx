@@ -16,7 +16,10 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
+from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
+from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.used_table import UsedTable
 
 from ..conftest import MockRuntimeContext
 
@@ -189,6 +192,110 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
+def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
+    dashboard, query = make_dashboard(), make_query()
+    records = [
+        QueryProblem(
+            dashboard.id,
+            dashboard.parent,
+            dashboard.name,
+            query.id,
+            query.parent,
+            query.name,
+            "sql-parse-error",
+            "Could not parse SQL",
+        )
+    ]
+    return records
+
+
+@pytest.fixture
+def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
+    workspace_file = make_workspace_file(content='df = spark.read.csv("dbfs://folder/file.csv")')
+    query = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
+    records = [
+        DirectFsAccess(
+            path="dbfs://folder/file.csv",
+            is_read=False,
+            # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
+            is_write=True,
+            source_id=str(workspace_file),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id=str(workspace_file)),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+        DirectFsAccess(
+            path="dbfs://folder/file.csv",
+            is_read=False,
+            # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
+            is_write=True,
+            source_id=query.id,
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
+                LineageAtom(object_type="QUERY", object_id=f"my_dashboard_id/{query.id}", other={"name": "my_query"}),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+    ]
+    return records
+
+
+@pytest.fixture
+def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
+    table = make_table(catalog_name="hive_metastore")
+    workspace_file = make_workspace_file(content=f'df = spark.read.table("{table.full_name}")\ndisplay(df)')
+    records = [
+        UsedTable(
+            catalog_name=table.catalog_name,  # This table is pending migration
+            schema_name=table.schema_name,
+            table_name=table.name,
+            is_read=False,
+            # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
+            is_write=True,
+            source_id=str(workspace_file),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id=str(workspace_file)),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+        UsedTable(
+            catalog_name="catalog",  # This table is migrated
+            schema_name="staff_db",
+            table_name="employees",
+            is_read=False,
+            is_write=True,
+            source_id=str(make_workspace_file()),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+    ]
+    return records
+
+
+@pytest.fixture
 def catalog_populated(  # pylint: disable=too-many-arguments
     runtime_ctx: MockRuntimeContext,
     workflow_runs: list[WorkflowRun],
@@ -201,6 +308,9 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     clusters: list[ClusterInfo],
     pipelines: list[PipelineInfo],
     policies: list[PolicyInfo],
+    query_problems: list[QueryProblem],
+    dfsas: list[DirectFsAccess],
+    used_tables: list[UsedTable],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
@@ -235,6 +345,13 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         Grant,
         mode='overwrite',
     )
+    # Persist UsedTable to match when looking for UsedTable ownership to tables
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.used_tables_in_paths',
+        used_tables,
+        UsedTable,
+        mode='overwrite',
+    )
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
         runtime_ctx = runtime_ctx.replace(parent_run_id=parent_run_id)
         runtime_ctx.tables_progress.append_inventory_snapshot(tables)
@@ -252,6 +369,12 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         del runtime_ctx.pipelines_progress
         runtime_ctx.policies_progress.append_inventory_snapshot(policies)
         del runtime_ctx.policies_progress
+        runtime_ctx.query_problem_progress.append_inventory_snapshot(query_problems)
+        del runtime_ctx.query_problem_progress
+        runtime_ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsas)
+        del runtime_ctx.direct_filesystem_access_progress
+        runtime_ctx.used_table_progress.append_inventory_snapshot(used_tables)
+        del runtime_ctx.used_table_progress
     return runtime_ctx.ucx_catalog
 
 
@@ -290,21 +413,29 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_0_percentage_migration_progress", [Row(percentage=round(100 * 22 / 34, 2))]),
-        ("01_1_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_2_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
-        ("01_3_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
-        ("01_4_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_5_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
-        ("01_6_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
-        ("01_7_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 39, 2))]),
+        ("01_01_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_02_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
+        ("01_03_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
+        ("01_04_percentage_cluster_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_05_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
+        ("01_06_percentage_used_table_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_07_count_direct_filesystem_access", [Row(counter=2)]),
+        ("01_08_count_query_problem", [Row(counter=1)]),
+        ("01_09_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_10_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
-            "01_8_distinct_failures_per_object_type",
+            "01_11_distinct_failures_per_object_type",
             [
                 Row(
                     object_type="ClusterInfo",
                     count=1,
                     failure="Uses azure service principal credentials config in cluster",
+                ),
+                Row(
+                    object_type="DirectFsAccess",
+                    count=2,
+                    failure="Direct filesystem access is not supported in Unity Catalog",
                 ),
                 Row(
                     object_type="Grant",
@@ -327,8 +458,10 @@ def test_migration_progress_dashboard(
                     count=1,
                     failure="Uses azure service principal credentials config in policy",
                 ),
+                Row(object_type="QueryProblem", count=1, failure="[sql-parse-error] Could not parse SQL"),
                 Row(object_type="Table", count=5, failure="Pending migration"),
                 Row(object_type="Udf", count=1, failure="UDF not supported by UC"),
+                Row(object_type="UsedTable", count=1, failure="Pending migration"),
             ],
         ),
         (
@@ -351,14 +484,144 @@ def test_migration_progress_dashboard(
                 Row(owner="Eric", percentage=round(100 * 1 / 1, 2), total=1, total_migrated=1, total_not_migrated=0),
             ],
         ),
+        (
+            "03_01_pending_migration_data_asset_references",
+            [
+                Row(count=3),
+            ],
+        ),
+        (
+            "03_03_migrated_data_asset_references",
+            [
+                Row(count=1),
+            ],
+        ),
     ],
 )
-def test_percentage_migration_progress(
+def test_migration_progress_query(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
     query_name,
     rows,
 ) -> None:
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == rows
+
+
+def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
+    ws: WorkspaceClient,
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+) -> None:
+    """Separate test is required to set the owner of the used table at runtime"""
+    query_name = "03_02_data_asset_references_by_owner_bar_graph"
+    rows = [Row(owner=ws.current_user.me().user_name, count=1)]
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == rows
+
+
+def test_migration_progress_query_data_asset_references_pending_migration_overview(
+    ws: WorkspaceClient,
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+) -> None:
+    """Separate test is required to set the owner of the used table at runtime"""
+    query_name = "03_04_data_asset_references_pending_migration_overview"
+    current_user = ws.current_user.me().user_name
+    rows = [
+        Row(
+            owner=current_user,
+            object_type="Direct filesystem access",
+            percentage=0,
+            total=2,
+            total_migrated=0,
+            total_not_migrated=2,
+        ),
+        Row(
+            owner=current_user,
+            object_type="Table or view reference",
+            percentage=50,
+            total=2,
+            total_migrated=1,
+            total_not_migrated=1,
+        ),
+    ]
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == rows
+
+
+def test_migration_progress_query_data_asset_references_pending_migration(
+    ws: WorkspaceClient,
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+    dfsas: list[DirectFsAccess],
+    used_tables: list[UsedTable],
+) -> None:
+    """Separate test is required to set the dfsas and used table dynamically"""
+    query_name = "03_05_data_asset_references_pending_migration"
+    workspace_id = ws.get_workspace_id()
+    current_user = ws.current_user.me().user_name
+    rows = []
+    for dfsa in dfsas:
+        link_prefix = "/sql/editor/" if dfsa.source_type == "QUERY" else "/#workspace"
+        row = Row(
+            workspace_id=workspace_id,
+            owner=current_user,
+            object_type="Direct filesystem access",
+            object_id=dfsas[0].path,
+            failure="Direct filesystem access is not supported in Unity Catalog",
+            is_read=False,
+            is_write=True,
+            link=f"{link_prefix}{dfsa.source_id}",
+        )
+        rows.append(row)
+    for used_table in used_tables:
+        if used_table.catalog_name != "hive_metastore":
+            continue
+        row = Row(
+            workspace_id=workspace_id,
+            owner=current_user,
+            object_type="Table or view reference",
+            object_id=f"{used_table.catalog_name}.{used_table.schema_name}.{used_table.table_name}",
+            failure="Pending migration",
+            is_read=False,
+            is_write=True,
+            link=f"/#workspace{used_table.source_id}",
+        )
+        rows.append(row)
+    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
+    assert len(datasets) == 1, f"Missing query: {query_name}"
+    query_results = list(sql_backend.fetch(datasets[0].query))
+    assert query_results == rows
+
+
+def test_migration_progress_code_compatibility_issues(
+    ws: WorkspaceClient,
+    dashboard_metadata: DashboardMetadata,
+    sql_backend: SqlBackend,
+    query_problems: list[QueryProblem],
+) -> None:
+    """Separate test is required to set the dashboard and query id dynamically"""
+    query_name = "03_06_code_compatibility_issues"
+    workspace_id = ws.get_workspace_id()
+    rows = []
+    for query_problem in query_problems:
+        row = Row(
+            workspace_id=workspace_id,
+            code="sql-parse-error",
+            message="Could not parse SQL",
+            dashboard_name=query_problem.dashboard_name,
+            query_name=query_problem.query_name,
+            dashboard_id=query_problem.dashboard_id,
+            query_id=query_problem.query_id,
+        )
+        rows.append(row)
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
