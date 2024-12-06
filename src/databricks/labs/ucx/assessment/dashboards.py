@@ -328,6 +328,3 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
                 yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
-
-
-DashboardCrawlerType = LakeviewDashboardCrawler | RedashDashboardCrawler
