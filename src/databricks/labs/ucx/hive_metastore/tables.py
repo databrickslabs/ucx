@@ -48,7 +48,7 @@ class AclMigrationWhat(Enum):
 
 
 @dataclass
-class Table:
+class Table:  # pylint: disable=too-many-public-methods
     catalog: str
     database: str
     name: str
