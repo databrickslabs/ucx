@@ -28,7 +28,6 @@ using the [`skip` command](#skip-command).
 Once you're done with the table migration, proceed to the [code migration](#code-migration-commands).
 
 
-
 ## `principal-prefix-access` command
 
 ```text
@@ -42,7 +41,7 @@ Once you're done running this command, proceed to the [`migrate-credentials` com
 
 The "prefix" refers to the start - i.e. prefix - of table locations that point to the cloud storage location.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ### Access for AWS S3 Buckets
 
@@ -64,7 +63,7 @@ It has the following format:
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ### Access for Azure Storage Accounts
 
@@ -82,7 +81,7 @@ will be skipped.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `create-missing-principals` command (AWS Only)
 ```bash
@@ -97,7 +96,7 @@ Two optional parameter are available for this command:
 `--role-name` - This parameter is used to set the prefix for the role name. The default value is `UCX-ROLE`.
 `--role-policy` - This parameter is used to set the prefix for the role policy name. The default value is `UCX-POLICY`.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `delete-missing-principals` command (AWS Only)
 ```bash
@@ -107,7 +106,7 @@ This command helps to delete the IAM role created by UCX. It lists all the IAM R
 command and allows user to select multiple roles to delete. It also checks if selected roles are mapped to any storage credentials
 and asks for confirmation from user. Once confirmed, it deletes the role and its associated inline policy.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `create-uber-principal` command
 
@@ -127,7 +126,7 @@ Azure Resource Manager APIs.
 
 This command is one of prerequisites for the [table migration process](#table-migration).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `migrate-credentials` command
 
@@ -157,7 +156,7 @@ Please review the file and delete the Instance Profiles you do not want to be mi
 
 Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `validate-external-locations` command
 
@@ -172,7 +171,7 @@ This command validates and provides mapping to external tables to external locat
 
 Once you're done with this command, proceed to the [`migrate-locations` command](#migrate-locations-command).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `migrate-locations` command
 
@@ -195,7 +194,7 @@ or SQL warehouse
 
 Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `create-table-mapping` command
 
@@ -230,7 +229,7 @@ This command is one of prerequisites for the [table migration process](#Table-Mi
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `skip` command
 
@@ -247,7 +246,7 @@ only be used exclusively. This command is useful to temporarily disable migratio
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `unskip` command
 
@@ -257,7 +256,7 @@ databricks labs ucx unskip --schema X [--table Y] [--view Z]
 
 This command removes the mark set by the [`skip` command](#skip-command) on the given schema, table or view.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `create-catalogs-schemas` command
 
@@ -274,7 +273,7 @@ the schema and catalog if at least one such table is migrated to it.
 For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
 the schema and catalog if at least one such table is migrated to it.
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `migrate-tables` command
 
@@ -296,7 +295,7 @@ For AWS, it checks any instance profiles mapped to the interactive cluster or sq
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants either `SELECT` permission if
 the instance profile only has read access on the bucket and `ALL_PRIVILEGES` if the instance profile has write access on the bucket.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `revert-migrated-tables` command
 
@@ -312,7 +311,7 @@ to debug issues related to table migration.
 
 Go back to the [`create-table-mapping` command](#create-table-mapping-command) after you're done with this command.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `move` command
 
@@ -334,7 +333,7 @@ This is due to Unity Catalog not supporting multiple tables with overlapping pat
 
 This command supports moving multiple tables at once, by specifying `*` as the table name.
 
-
+[[back to top](#databricks-labs-ucx)]
 
 ## `alias` command
 
@@ -347,4 +346,4 @@ It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters
 the `TableMove` class. This command is useful for developers and administrators who want to create an alias for a table.
 It can also be used to debug issues related to table aliasing.
 
-
+[[back to top](#databricks-labs-ucx)]

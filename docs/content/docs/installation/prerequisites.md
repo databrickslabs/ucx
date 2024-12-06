@@ -13,12 +13,12 @@ Running UCX as a Service Principal is not supported.
 {{< /callout >}}
 
 ### Local machine
-- Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli).
+- Databricks CLI v0.213 or later. See [instructions](./databricks_cli.md).
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
 
 
 ### Network access from local machine
-- Network access to your Databricks Workspace used for the [installation process](#install-ucx).
+- Network access to your Databricks Workspace used for the [installation process](./install_ucx.md).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
 
 ### Account-level settings
@@ -28,7 +28,7 @@ Running UCX as a Service Principal is not supported.
 
 ### Workspace-level settings
 - Workspace should have Premium or Enterprise tier.
-- A PRO or Serverless SQL Warehouse to render the [report](../reference/assessment.md) for the [assessment workflow](#assessment-workflow).
+- A PRO or Serverless SQL Warehouse to render the [report](../reference/assessment.md) for the [assessment workflow](../reference/workflows/assessment.md).
 
 {{< callout type="info" >}}
 If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](../reference/external_hms_glue.md)
