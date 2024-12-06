@@ -32,6 +32,7 @@ from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
+# pylint: disable=too-many-public-methods
 
 
 class RuntimeContext(GlobalContext):
