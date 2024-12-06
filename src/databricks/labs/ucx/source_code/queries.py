@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.assessment.dashboards import DashboardType, DashboardCrawlerType, Query
+from databricks.labs.ucx.assessment.dashboards import Dashboard, DashboardCrawlerType, Query
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom, UsedTable
@@ -136,7 +136,7 @@ class QueryLinter:
             context.all_dfsas.extend(dfsas)
             context.all_tables.extend(tables)
 
-    def _list_dashboards_with_queries(self) -> Iterable[tuple[DashboardType, list[Query]]]:
+    def _list_dashboards_with_queries(self) -> Iterable[tuple[Dashboard, list[Query]]]:
         for crawler in self._dashboard_crawlers:
             for dashboard in crawler.snapshot():
                 yield dashboard, list(crawler.list_queries(dashboard))
@@ -159,7 +159,7 @@ class QueryLinter:
             yield from crawler.list_queries()
 
     def _lint_dashboard_with_queries(
-        self, dashboard: DashboardType, queries: list[Query]
+        self, dashboard: Dashboard, queries: list[Query]
     ) -> tuple[Iterable[QueryProblem], Iterable[DirectFsAccess], Iterable[UsedTable]]:
         query_problems: list[QueryProblem] = []
         query_dfsas: list[DirectFsAccess] = []

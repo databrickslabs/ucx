@@ -5,7 +5,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.sql import LegacyQuery, QueryOptions, UpdateQueryRequestQuery
 
-from databricks.labs.ucx.assessment.dashboards import RedashDashboard, RedashDashboardCrawler
+from databricks.labs.ucx.assessment.dashboards import Dashboard, RedashDashboardCrawler
 from databricks.labs.ucx.source_code.redash import Redash
 
 
@@ -20,7 +20,7 @@ def redash_installation():
     return installation
 
 
-def list_legacy_queries(dashboard: RedashDashboard) -> list[LegacyQuery]:
+def list_legacy_queries(dashboard: Dashboard) -> list[LegacyQuery]:
     queries = [
         LegacyQuery(
             id="1",
@@ -57,9 +57,9 @@ def list_legacy_queries(dashboard: RedashDashboard) -> list[LegacyQuery]:
 def redash_dashboard_crawler():
     crawler = create_autospec(RedashDashboardCrawler)
     crawler.snapshot.return_value = [
-        RedashDashboard(id="1", query_ids=["1"]),
-        RedashDashboard(id="2", query_ids=["1", "2", "3"], tags=[Redash.MIGRATED_TAG]),
-        RedashDashboard(id="3", tags=[]),
+        Dashboard(id="1", query_ids=["1"]),
+        Dashboard(id="2", query_ids=["1", "2", "3"], tags=[Redash.MIGRATED_TAG]),
+        Dashboard(id="3", tags=[]),
     ]
     crawler.list_legacy_queries.side_effect = list_legacy_queries
     return crawler
@@ -118,7 +118,7 @@ def test_revert_dashboards(ws, empty_index, redash_installation, redash_dashboar
 def test_migrate_dashboard_gets_no_queries_when_dashboard_is_empty(
     ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
-    empty_dashboard = RedashDashboard(id="1")
+    empty_dashboard = Dashboard(id="1")
     redash_dashboard_crawler.snapshot.return_value = [empty_dashboard]
     redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
@@ -131,7 +131,7 @@ def test_migrate_dashboard_gets_no_queries_when_dashboard_is_empty(
 def test_migrate_dashboard_lists_legacy_queries_from_dashboard(
     ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
-    dashboard = RedashDashboard(id="1", query_ids=["1"])
+    dashboard = Dashboard(id="1", query_ids=["1"])
     redash_dashboard_crawler.snapshot.return_value = [dashboard]
     redash = Redash(empty_index, ws, redash_installation, redash_dashboard_crawler)
 
