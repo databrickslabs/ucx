@@ -12,9 +12,8 @@ from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
 
 from databricks.labs.ucx.assessment.dashboards import (
-    LakeviewDashboard,
     LakeviewDashboardCrawler,
-    RedashDashboard,
+    Dashboard,
     RedashDashboardCrawler,
     Query,
 )
@@ -54,7 +53,7 @@ def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expec
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
-        (SdkRedashDashboard(id="id"), RedashDashboard("id")),
+        (SdkRedashDashboard(id="id"), Dashboard("id")),
         (
             SdkRedashDashboard(
                 id="did",
@@ -66,7 +65,7 @@ def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expec
                     Widget(visualization=LegacyVisualization(query=LegacyQuery(id="qid2"))),
                 ],
             ),
-            RedashDashboard("did", "name", "parent", ["qid1", "qid2"], ["tag1", "tag2"]),
+            Dashboard("did", "name", "parent", ["qid1", "qid2"], ["tag1", "tag2"]),
         ),
         (
             SdkRedashDashboard(
@@ -80,12 +79,12 @@ def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expec
                     Widget(visualization=LegacyVisualization(query=LegacyQuery(id="qid1"))),
                 ],
             ),
-            RedashDashboard("did", "name", "parent", ["qid1"], ["tag1", "tag2"]),
+            Dashboard("did", "name", "parent", ["qid1"], ["tag1", "tag2"]),
         ),
     ],
 )
-def test_redash_dashboard_from_sdk_dashboard(sdk_dashboard: SdkRedashDashboard, expected: RedashDashboard) -> None:
-    dashboard = RedashDashboard.from_sdk_dashboard(sdk_dashboard)
+def test_redash_dashboard_from_sdk_dashboard(sdk_dashboard: SdkRedashDashboard, expected: Dashboard) -> None:
+    dashboard = Dashboard.from_sdk_redash_dashboard(sdk_dashboard)
     assert dashboard == expected
 
 
@@ -245,7 +244,7 @@ def test_redash_dashboard_crawler_list_queries_from_dashboard(mock_backend) -> N
     )
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
-    queries = list(crawler.list_queries(dashboard=RedashDashboard("did", query_ids=["qid"])))
+    queries = list(crawler.list_queries(dashboard=Dashboard("did", query_ids=["qid"])))
 
     assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
     ws.queries_legacy.get.assert_called_once_with("qid")
@@ -257,7 +256,7 @@ def test_redash_dashboard_crawler_list_queries_handles_not_found(caplog, mock_ba
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.list_queries(dashboard=RedashDashboard("did", query_ids=["qid"])))
+        queries = list(crawler.list_queries(dashboard=Dashboard("did", query_ids=["qid"])))
 
     assert len(queries) == 0
     assert "Cannot get Redash query: qid" in caplog.messages
@@ -279,7 +278,7 @@ def test_redash_dashboard_crawler_list_queries_stops_when_debug_listing_upper_li
 @pytest.mark.parametrize(
     "sdk_dashboard, expected",
     [
-        (SdkLakeviewDashboard(dashboard_id="id"), LakeviewDashboard("id")),
+        (SdkLakeviewDashboard(dashboard_id="id"), Dashboard("id")),
         (
             SdkLakeviewDashboard(
                 dashboard_id="did",
@@ -292,7 +291,7 @@ def test_redash_dashboard_crawler_list_queries_stops_when_debug_listing_upper_li
                     ).as_dict()
                 ),
             ),
-            LakeviewDashboard("did", "name", "parent", ["qid1", "qid2"]),
+            Dashboard("did", "name", "parent", ["qid1", "qid2"]),
         ),
         (
             SdkLakeviewDashboard(
@@ -301,14 +300,12 @@ def test_redash_dashboard_crawler_list_queries_stops_when_debug_listing_upper_li
                 parent_path="parent",
                 serialized_dashboard=json.dumps(LsqlLakeviewDashboard(datasets=[], pages=[]).as_dict()),
             ),
-            LakeviewDashboard("did", "name", "parent", []),
+            Dashboard("did", "name", "parent", []),
         ),
     ],
 )
-def test_lakeview_dashboard_from_sdk_dashboard(
-    sdk_dashboard: SdkLakeviewDashboard, expected: LakeviewDashboard
-) -> None:
-    dashboard = LakeviewDashboard.from_sdk_dashboard(sdk_dashboard)
+def test_lakeview_dashboard_from_sdk_dashboard(sdk_dashboard: SdkLakeviewDashboard, expected: Dashboard) -> None:
+    dashboard = Dashboard.from_sdk_lakeview_dashboard(sdk_dashboard)
     assert dashboard == expected
 
 
@@ -333,7 +330,7 @@ def test_lakeview_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"])]
+    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=[])]
     ws.lakeview.list.assert_called_once()
 
 
@@ -359,7 +356,7 @@ def test_lakeview_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     ws.lakeview.get.assert_called_once_with("did1")
     ws.lakeview.list.assert_not_called()
 
@@ -379,7 +376,7 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     assert "Cannot get Lakeview dashboard: did2" in caplog.messages
     ws.lakeview.get.assert_has_calls([call("did1"), call("did2")])
     ws.lakeview.list.assert_not_called()
@@ -394,7 +391,7 @@ def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_bac
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[])]
+    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
     ws.lakeview.list.assert_called_once()
 
 
@@ -455,7 +452,7 @@ def test_lakeview_dashboard_crawler_list_queries_calls_query_api_get(mock_backen
     ws.lakeview.get.return_value = dashboard
     crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
 
-    queries = list(crawler.list_queries(LakeviewDashboard("did")))
+    queries = list(crawler.list_queries(Dashboard("did")))
 
     assert queries == [Query("qid", "Query", "parent", "SELECT 42 AS count")]
     ws.lakeview.get.assert_called_once_with("did")
@@ -467,7 +464,7 @@ def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_
     crawler = LakeviewDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
-        queries = list(crawler.list_queries(LakeviewDashboard("did")))
+        queries = list(crawler.list_queries(Dashboard("did")))
 
     assert len(queries) == 0
     assert "Cannot get Lakeview dashboard: did" in caplog.messages
