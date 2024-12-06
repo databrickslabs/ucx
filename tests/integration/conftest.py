@@ -741,7 +741,7 @@ class MockRuntimeContext(
     def created_queries(self) -> list[str]:
         query_ids = []
         for query in self._queries:
-            if query.id:
+            if query.id and query.id not in query_ids:
                 query_ids.append(query.id)
         if self._lakeview_query_id:
             query_ids.append(self._lakeview_query_id)
