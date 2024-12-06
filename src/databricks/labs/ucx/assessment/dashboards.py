@@ -64,11 +64,8 @@ class Query:
 
 
 @dataclass
-class RedashDashboard:
-    """UCX representation of a Redash dashboard.
-
-    Note: We prefer to keep this class similar to the :class:LakeviewDashboard.
-    """
+class Dashboard:
+    """UCX representation of a dashboard."""
 
     id: str
     """The ID for this dashboard."""
@@ -86,7 +83,7 @@ class RedashDashboard:
     """The tags set on this dashboard."""
 
     @classmethod
-    def from_sdk_dashboard(cls, dashboard: SdkRedashDashboard) -> RedashDashboard:
+    def from_sdk_redash_dashboard(cls, dashboard: SdkRedashDashboard) -> Dashboard:
         query_ids = []
         for widget in dashboard.widgets or []:
             if widget.visualization is None:
@@ -104,28 +101,8 @@ class RedashDashboard:
             tags=dashboard.tags or [],
         )
 
-
-@dataclass
-class LakeviewDashboard:
-    """UCX representation of a Lakeview dashboard.
-
-    Note: We prefer to keep this class similar to the :class:RedashDashboard.
-    """
-
-    id: str
-    """The ID for this dashboard."""
-
-    name: str = "UNKNOWN"
-    """The title of the dashboard that appears in list views and at the top of the dashboard page."""
-
-    parent: str = "ORPHAN"
-    """The identifier of the workspace folder containing the object."""
-
-    query_ids: list[str] = field(default_factory=list)
-    """The IDs of the queries referenced by this dashboard."""
-
     @classmethod
-    def from_sdk_dashboard(cls, dashboard: SdkLakeviewDashboard) -> LakeviewDashboard:
+    def from_sdk_lakeview_dashboard(cls, dashboard: SdkLakeviewDashboard) -> Dashboard:
         assert dashboard.dashboard_id
         lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
         query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
@@ -137,10 +114,7 @@ class LakeviewDashboard:
         )
 
 
-DashboardType = LakeviewDashboard | RedashDashboard
-
-
-class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
+class RedashDashboardCrawler(CrawlerBase[Dashboard]):
     """Crawler for Redash dashboards."""
 
     def __init__(
@@ -152,17 +126,17 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         include_dashboard_ids: list[str] | None = None,
         debug_listing_upper_limit: int | None = None,
     ):
-        super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", RedashDashboard)
+        super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
         self._debug_listing_upper_limit = debug_listing_upper_limit
 
-    def _crawl(self) -> Iterable[RedashDashboard]:
+    def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
         for sdk_dashboard in self._list_dashboards():
             if sdk_dashboard.id is None:
                 continue
-            dashboard = RedashDashboard.from_sdk_dashboard(sdk_dashboard)
+            dashboard = Dashboard.from_sdk_redash_dashboard(sdk_dashboard)
             dashboards.append(dashboard)
         return dashboards
 
@@ -202,11 +176,11 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             logger.warning(f"Cannot get Redash dashboard: {dashboard_id}", exc_info=e)
             return None
 
-    def _try_fetch(self) -> Iterable[RedashDashboard]:
+    def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
-            yield RedashDashboard(*row)
+            yield Dashboard(*row)
 
-    def list_legacy_queries(self, dashboard: DashboardType | None = None) -> Iterator[LegacyQuery]:
+    def list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
         """List legacy queries.
 
         Args:
@@ -230,7 +204,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
             except StopIteration:
                 break
 
-    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
+    def list_queries(self, dashboard: Dashboard | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:
@@ -251,7 +225,7 @@ class RedashDashboardCrawler(CrawlerBase[RedashDashboard]):
         except DatabricksError as e:
             logger.warning("Cannot list Redash queries", exc_info=e)
 
-    def _list_queries_from_dashboard(self, dashboard: DashboardType) -> Iterator[LegacyQuery]:
+    def _list_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
         """List queries from dashboard."""
         for query_id in dashboard.query_ids:
             try:
@@ -276,7 +250,7 @@ def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> 
     return lsql_dashboard
 
 
-class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
+class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
     """Crawler for Lakeview dashboards."""
 
     def __init__(
@@ -287,16 +261,16 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
         *,
         include_dashboard_ids: list[str] | None = None,
     ):
-        super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", LakeviewDashboard)
+        super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
 
-    def _crawl(self) -> Iterable[LakeviewDashboard]:
+    def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
         for sdk_dashboard in self._list_dashboards():
             if sdk_dashboard.dashboard_id is None:
                 continue
-            dashboard = LakeviewDashboard.from_sdk_dashboard(sdk_dashboard)
+            dashboard = Dashboard.from_sdk_lakeview_dashboard(sdk_dashboard)
             dashboards.append(dashboard)
         return dashboards
 
@@ -326,11 +300,11 @@ class LakeviewDashboardCrawler(CrawlerBase[LakeviewDashboard]):
             logger.warning(f"Cannot get Lakeview dashboard: {dashboard_id}", exc_info=e)
             return None
 
-    def _try_fetch(self) -> Iterable[LakeviewDashboard]:
+    def _try_fetch(self) -> Iterable[Dashboard]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
-            yield LakeviewDashboard(*row)
+            yield Dashboard(*row)
 
-    def list_queries(self, dashboard: DashboardType | None = None) -> Iterator[Query]:
+    def list_queries(self, dashboard: Dashboard | None = None) -> Iterator[Query]:
         """List queries.
 
         Args:

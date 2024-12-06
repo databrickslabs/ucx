@@ -51,7 +51,7 @@ from databricks.sdk.useragent import with_extra
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
-from databricks.labs.ucx.assessment.dashboards import LakeviewDashboard, RedashDashboard
+from databricks.labs.ucx.assessment.dashboards import Dashboard
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
@@ -125,8 +125,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "used_tables_in_paths", UsedTable),
             functools.partial(table, "used_tables_in_queries", UsedTable),
             functools.partial(table, "inferred_grants", Grant),
-            functools.partial(table, "redash_dashboards", RedashDashboard),
-            functools.partial(table, "lakeview_dashboards", LakeviewDashboard),
+            functools.partial(table, "redash_dashboards", Dashboard),
+            functools.partial(table, "lakeview_dashboards", Dashboard),
         ],
     )
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
