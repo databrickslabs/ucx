@@ -446,7 +446,7 @@ def test_lakeview_dashboard_crawler_list_queries_includes_query_ids(mock_backend
         Dataset("qid2", "SELECT 21 AS count", "Second query"),
     ]
     dashboard = SdkLakeviewDashboard(
-        dashboard_id="did",
+        dashboard_id="parent",
         serialized_dashboard=json.dumps(LsqlLakeviewDashboard(datasets=datasets, pages=[]).as_dict()),
     )
     ws.lakeview.list.return_value = [dashboard]
