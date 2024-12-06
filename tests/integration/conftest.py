@@ -498,6 +498,8 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
         self._jobs: list[Job] = []
+        self._queries: list[LegacyQuery] = []
+        self._lakeview_query_id: str | None = None
         self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
@@ -576,13 +578,21 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self._jobs.append(job)
         return job
 
-    def make_dashboard(self, **kwargs) -> SdkRedashDashboard:
-        dashboard = self._make_dashboard(**kwargs)
+    def make_query(self, **kwargs) -> LegacyQuery:
+        query = self._make_query(**kwargs)
+        self._queries.append(query)
+        return query
+
+    def make_dashboard(self, *, query: LegacyQuery | None = None, **kwargs) -> SdkRedashDashboard:
+        dashboard = self._make_dashboard(query=query, **kwargs)
+        if query:
+            self._queries.append(query)
         self._dashboards.append(dashboard)
         return dashboard
 
     def make_lakeview_dashboard(self, **kwargs) -> SdkLakeviewDashboard:
         dashboard = self._make_lakeview_dashboard(**kwargs)
+        self._lakeview_query_id = "query"  # Hardcoded query name in the `make_lakeview_dashboard` fixture
         self._dashboards.append(dashboard)
         return dashboard
 
@@ -598,9 +608,9 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
         self.make_job(content="spark.table('old.stuff')")
         self.make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
         self.make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
-        query_1 = self._make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
+        query_1 = self.make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
         self._make_dashboard(query=query_1)
-        query_2 = self._make_query(sql_query='SELECT * from my_schema.my_table')
+        query_2 = self.make_query(sql_query='SELECT * from my_schema.my_table')
         self._make_dashboard(query=query_2)
 
     def add_table(self, table: TableInfo):
@@ -724,6 +734,15 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):  # pylint: disable=too-ma
     @property
     def created_jobs(self) -> list[int]:
         return [job.job_id for job in self._jobs if job.job_id is not None]
+
+    @property
+    def created_queries(self) -> list[str]:
+        query_ids = []
+        for query in self._queries:
+            query_ids.append(query.id)
+        if self._lakeview_query_id:
+            query_ids.append(self._lakeview_query_id)
+        return query_ids
 
     @property
     def created_dashboards(self) -> list[str]:
@@ -1054,6 +1073,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
+            include_query_ids=self.created_queries,
             include_object_permissions=self.include_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             ucx_catalog=self.ucx_catalog,
