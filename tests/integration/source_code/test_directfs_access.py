@@ -1,3 +1,5 @@
+import pytest
+
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
@@ -36,6 +38,7 @@ def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
+@pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3411")
 def test_lakeview_query_dfsa_ownership(runtime_ctx) -> None:
     """Verify the ownership of a direct-fs record for a Lakeview query."""
     # `make_lakeview_dashboard` fixture expects query as string
