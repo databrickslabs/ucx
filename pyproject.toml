@@ -600,8 +600,7 @@ disable = [
     "consider-using-any-or-all",
     "too-many-positional-arguments",
     "unnecessary-default-type-args",
-    "logging-not-lazy",
-    "too-many-public-methods",  # TODO: Remove by someone who can bypass CI cheat linter check
+    "logging-not-lazy"
 ]
 
 # Enable the message, report, category or checker with the given id(s). You can

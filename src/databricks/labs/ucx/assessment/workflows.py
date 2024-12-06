@@ -7,7 +7,7 @@ from databricks.labs.ucx.framework.tasks import Workflow, job_task
 logger = logging.getLogger(__name__)
 
 
-class Assessment(Workflow):
+class Assessment(Workflow):  # pylint: disable=too-many-public-methods
     def __init__(self):
         super().__init__('assessment')
 
