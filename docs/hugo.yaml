@@ -1,0 +1,70 @@
+baseURL: https://databrickslabs.github.io/ucx
+languageCode: en-us
+title: UCX
+
+module:
+  imports:
+    - path: github.com/imfing/hextra
+
+# https://gohugo.io/functions/css/tailwindcss/
+build:
+  cachebusters:
+    - source: layouts/.*
+      target: css
+
+params:
+  theme:
+    default: dark
+    displayToggle: true
+
+  footer:
+    enable: true
+    displayCopyright: true
+    displayPoweredBy: false
+
+  search:
+    enable: true
+    type: flexsearch
+
+    flexsearch:
+      # index page by: content | summary | heading | title
+      index: content
+
+  navbar:
+    displayTitle: true
+    displayLogo: true
+    logo:
+      path: logo.svg
+      dark: logo.svg
+      link: /ucx
+      width: 40
+      height: 20
+
+menu:
+  main:
+    - name: Overview
+      pageRef: /docs
+      weight: 1
+    - name: Installation
+      pageRef: /docs/installation
+      weight: 2
+    - name: Process
+      pageRef: /docs/process
+      weight: 2
+    - name: Reference
+      pageRef: /docs/reference
+      weight: 3
+    - name: Search
+      weight: 4
+      params:
+        type: search
+    - name: GitHub
+      weight: 5
+      url: "https://github.com/databrickslabs/ucx"
+      params:
+        icon: github
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true

@@ -1,4 +1,8 @@
-# Contributing
+---
+linkTitle: "Contributing to UCX"
+title: "Contributing to UCX"
+weight: 1
+---
 
 ## First Principles
 
@@ -27,7 +31,7 @@ or specialized functionality unavailable in standard libraries.
 
 ## Adding entries to `known.json` file
 
-When adding a new entry to the [`known.json` file](src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
+When adding a new entry to the [`known.json` file](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
 stores information about known (in)compatibilities with Unity Catalog. The file speeds up static code analysis and prevents false positives.
 
 1. load into virtual environment
@@ -127,7 +131,7 @@ for the latest reference of environment variables related to authentication.
   indicate the cloud provider being used, such as "aws" for Amazon Web Services and "azure" for Microsoft Azure.
 - `DATABRICKS_ACCOUNT_ID`: This variable stores the unique identifier for your Databricks account.
 - `DATABRICKS_HOST`: This variable contains the URL of your Databricks workspace. It is the web address you use to access
-  your Databricks environment and typically looks like "https://dbc-....cloud.databricks.com."
+  your Databricks environment and typically looks like `https://dbc-....cloud.databricks.com`.
 - `TEST_DEFAULT_CLUSTER_ID`: This variable holds the identifier for the default cluster used in testing. The value
   resembles a unique cluster ID, like "0824-163015-tdtagl1h."
 - `TEST_DEFAULT_WAREHOUSE_DATASOURCE_ID`: This environment variable stores the identifier for the default warehouse data
@@ -214,7 +218,7 @@ with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugi
 IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during
 development. Please make sure that your test setup allows for easy debugging by following best practices.
 
-![debugging tests](docs/debugging-tests.gif)
+![debugging tests](/images/debugging-tests.gif)
 
 Adhering to these guidelines ensures that our integration tests are robust, efficient, and easily maintainable. This,
 in turn, contributes to the overall reliability and quality of our software.
@@ -263,7 +267,7 @@ HATCH_PYTHON="$(which python3.10)" make clean dev test
 ```
 
 Configure your IDE to use `.venv/bin/python` from the virtual environment when developing the project:
-![IDE Setup](docs/hatch-intellij.gif)
+![IDE Setup](/images/hatch-intellij.gif)
 
 
 Verify installation with

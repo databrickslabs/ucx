@@ -1,0 +1,22 @@
+<a
+    {{- $u := urls.Parse .Destination }}
+    {{- if $u.IsAbs }}
+        href="{{ .Destination | safeURL }}"
+    {{- else }}
+        {{ if strings.HasSuffix $u.Path ".md" -}}
+            {{ with .Page.GetPage $u.Path }}
+                href="{{ .RelPermalink | safeURL }}{{ with $u.Fragment }}#{{ . }}{{ end }}"
+            {{ else }}
+                {{- errorf "Page does not exist: %s on page content/%s.md" $u.Path .Page.Path }}
+            {{ end }}
+        {{- else -}}
+            {{ warnf "Please use a path to a .md file to check link exists (%s on page content%s.md)" .Destination .Page.Path }}
+        {{- end -}}
+    {{- end }}
+    {{- with .Title }}
+        title="{{ . }}"
+    {{ end -}}
+>
+    {{- with .Text | safeHTML }}{{ . }}{{ end -}}
+</a>
+{{- /* chomp trailing newline */ -}}

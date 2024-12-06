@@ -26,7 +26,7 @@ The user then input the Prefix/Suffix/Regular Expression.
 The installation process will validate the regular expression.
 The installation process will register the selection as regular expression in the configuration YAML file.
 
-We introduce 3 more parameters to the [configuration](../README.md#open-remote-config-command) and the group manager:
+We introduce 3 more parameters to the [configuration](../../reference/commands/utility.md#open-remote-config-command) and the group manager:
 
 - workspace_group_regex
 - workspace_group_replace
