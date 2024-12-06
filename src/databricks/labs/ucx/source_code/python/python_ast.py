@@ -68,7 +68,7 @@ class MaybeTree:
         return self.tree.first_statement()
 
 
-class Tree:
+class Tree:  # pylint: disable=too-many-public-methods
 
     @classmethod
     def maybe_parse(cls, code: str) -> MaybeTree:

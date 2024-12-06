@@ -29,6 +29,8 @@ from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
 
+# pylint: disable=too-many-public-methods
+
 
 class WorkspaceContext(CliContext):
     def __init__(self, ws: WorkspaceClient, named_parameters: dict[str, str] | None = None):
