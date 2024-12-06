@@ -194,6 +194,63 @@ def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_bac
     ws.dashboards.list.assert_not_called()
 
 
+def list_legacy_queries() -> list[LegacyQuery]:
+    queries = [
+        LegacyQuery(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count"),
+        LegacyQuery(id="qid2", name="Second query", parent="parent", query="SELECT 21 AS count"),
+    ]
+    return queries
+
+
+def get_legacy_query(query_id: str) -> LegacyQuery:
+    for query in list_legacy_queries():
+        if query.id == query_id:
+            return query
+    raise NotFound(f"Legacy query: {query_id}")
+
+
+def test_redash_dashboard_crawler_list_queries_includes_query_ids(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.queries_legacy.list.side_effect = list_legacy_queries
+    ws.queries_legacy.get.side_effect = get_legacy_query
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", include_query_ids=["qid1"])
+
+    queries = list(crawler.list_queries())
+
+    assert queries == [Query(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count")]
+    ws.queries_legacy.list.assert_not_called()
+    ws.queries_legacy.get.assert_called_once()
+
+
+def test_redash_dashboard_crawler_list_queries_includes_query_ids_from_dashboard(mock_backend) -> None:
+    dashboard = Dashboard("did", query_ids=["qid1", "qid2"])
+    ws = create_autospec(WorkspaceClient)
+    ws.queries_legacy.list.side_effect = list_legacy_queries
+    ws.queries_legacy.get.side_effect = get_legacy_query
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", include_query_ids=["qid1"])
+
+    queries = list(crawler.list_queries(dashboard))
+
+    assert queries == [Query(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count")]
+    ws.queries_legacy.list.assert_not_called()
+    ws.queries_legacy.get.assert_called_once()
+
+
+def test_redash_dashboard_crawler_skips_not_found_query_ids(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.queries_legacy.list.side_effect = list_legacy_queries
+    ws.queries_legacy.get.side_effect = get_legacy_query
+    crawler = RedashDashboardCrawler(ws, mock_backend, "test", include_query_ids=["qid1", "non-existing-id"])
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
+        queries = list(crawler.list_queries())
+
+    assert queries == [Query(id="qid1", name="First query", parent="parent", query="SELECT 42 AS count")]
+    assert "Cannot get Redash query: non-existing-id" in caplog.messages
+    ws.queries_legacy.list.assert_not_called()
+    ws.queries_legacy.get.assert_has_calls([call("qid1"), call("non-existing-id")])
+
+
 def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard()]  # Second misses dashboard id

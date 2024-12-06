@@ -124,11 +124,13 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         schema: str,
         *,
         include_dashboard_ids: list[str] | None = None,
+        include_query_ids: list[str] | None = None,
         debug_listing_upper_limit: int | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids or []
+        self._include_query_ids = include_query_ids or []
         self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def _crawl(self) -> Iterable[Dashboard]:
@@ -180,30 +182,6 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Dashboard(*row)
 
-    def list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
-        """List legacy queries.
-
-        Args:
-            dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
-                Defaults to None.
-
-        Note:
-            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
-            another crawler for the queries by retrieving the queries every time they are requested.
-        """
-        if dashboard:
-            queries_iterator = self._list_queries_from_dashboard(dashboard)
-        else:
-            queries_iterator = self._list_all_queries()
-        # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
-        # to a small number of items in debug mode for the assessment workflow just to complete.
-        counter = itertools.count()
-        while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit > next(counter):
-            try:
-                yield next(queries_iterator)
-            except StopIteration:
-                break
-
     def list_queries(self, dashboard: Dashboard | None = None) -> Iterator[Query]:
         """List queries.
 
@@ -218,20 +196,64 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         for query in self.list_legacy_queries(dashboard):
             yield Query.from_legacy_query(query)
 
-    def _list_all_queries(self) -> Iterator[LegacyQuery]:
-        """List all queries."""
-        try:
-            yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
-        except DatabricksError as e:
-            logger.warning("Cannot list Redash queries", exc_info=e)
+    def list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
+        """List legacy queries.
 
-    def _list_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
-        """List queries from dashboard."""
-        for query_id in dashboard.query_ids:
+        Args:
+            dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
+                Defaults to None.
+
+        Note:
+            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
+            another crawler for the queries by retrieving the queries every time they are requested.
+        """
+        queries_iterator = self._list_legacy_queries(dashboard)
+        # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
+        # to a small number of items in debug mode for the assessment workflow just to complete.
+        counter = itertools.count()
+        while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit > next(counter):
             try:
-                yield self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+                yield next(queries_iterator)
+            except StopIteration:
+                break
+
+    def _list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
+        """List legacy queries."""
+        if dashboard:
+            return self._list_legacy_queries_from_dashboard(dashboard)
+        return self._list_all_legacy_queries()
+
+    def _list_all_legacy_queries(self) -> Iterator[LegacyQuery]:
+        """List all queries."""
+        if self._include_query_ids:
+            yield from self._get_legacy_queries(*self._include_query_ids)
+        else:
+            try:
+                yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
             except DatabricksError as e:
-                logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
+                logger.warning("Cannot list Redash queries", exc_info=e)
+
+    def _list_legacy_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
+        """List queries from dashboard."""
+        if self._include_query_ids:
+            query_ids = set(dashboard.query_ids) & set(self._include_query_ids)
+        else:
+            query_ids = dashboard.query_ids
+        yield from self._get_legacy_queries(*query_ids)
+
+    def _get_legacy_queries(self, *query_ids: str) -> Iterator[LegacyQuery]:
+        """Get a legacy queries."""
+        for query_id in query_ids:
+            query = self._get_legacy_query(query_id)
+            if query:
+                yield query
+
+    def _get_legacy_query(self, query_id: str) -> LegacyQuery | None:
+        """Get a legacy query."""
+        try:
+            return self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+        except DatabricksError as e:
+            logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
 
 
 def _convert_sdk_to_lsql_lakeview_dashboard(dashboard: SdkLakeviewDashboard) -> LsqlLakeviewDashboard:
