@@ -539,10 +539,10 @@ class FasterTableScanCrawler(TablesCrawler):
         return scala_option.get() if scala_option.isDefined() else None
 
     def _all_databases(self) -> list[str]:
-        try:
-            if not self._include_database:
-                return list(self._iterator(self._external_catalog.listDatabases()))
+        if self._include_database:
             return self._include_database
+        try:
+            return list(self._iterator(self._external_catalog.listDatabases()))
         except Exception as err:  # pylint: disable=broad-exception-caught
             if "py4j.security.Py4JSecurityException" in str(err):
                 logger.error(

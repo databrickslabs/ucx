@@ -39,7 +39,12 @@ class LegacyGroupMigration(Workflow):
             return
         ctx.group_manager.reflect_account_groups_on_workspace()
 
-    @job_task(depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
+    @job_task(job_cluster="tacl")
+    def setup_tacl(self, ctx: RuntimeContext):
+        """(Optimization) Allow the TACL job cluster to be started while we're verifying the prerequisites for
+        refreshing everything."""
+
+    @job_task(depends_on=[reflect_account_groups_on_workspace, setup_tacl], job_cluster="tacl")
     def apply_permissions_to_account_groups(self, ctx: RuntimeContext):
         """Fourth phase of the workspace-local group migration process. It does the following:
           - Assigns the full set of permissions of the original group to the account-level one
@@ -65,7 +70,12 @@ class LegacyGroupMigration(Workflow):
         if not ctx.config.use_legacy_permission_migration:
             logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
-        ctx.permission_manager.verify_group_permissions()
+        if not ctx.permission_manager.verify_group_permissions():
+            raise ValueError(
+                "Some group permissions were not migrated successfully. Wait for an hour then use the "
+                "`validate-group-permissions` workflow to validate the permissions after the API caught up. "
+                f"Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
+            )
 
 
 class PermissionsMigrationAPI(Workflow):
@@ -142,7 +152,10 @@ class ValidateGroupPermissions(Workflow):
         if not ctx.config.use_legacy_permission_migration:
             logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
-        ctx.permission_manager.verify_group_permissions()
+        if not ctx.permission_manager.verify_group_permissions():
+            raise ValueError(
+                f"Some group permissions were not migrated successfully. Run `databricks labs ucx logs --workflow '{self._name}' --debug` for more details."
+            )
 
 
 class RemoveWorkspaceLocalGroups(Workflow):
