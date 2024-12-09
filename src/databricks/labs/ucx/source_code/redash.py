@@ -51,11 +51,9 @@ class Redash:
     def _list_dashboards(self, *dashboard_ids: str, force_refresh: bool = False) -> list[Dashboard]:
         """List the Redash dashboards."""
         # Cached property is not used as this class in used from the CLI, thus called once per Python process
-        dashboards = self._crawler.snapshot(force_refresh=force_refresh)
-        if not dashboard_ids:
-            return list(dashboards)
-        dashboards_filtered = [d for d in dashboards if d.id in dashboard_ids]
-        return dashboards_filtered
+        dashboards_snapshot = self._crawler.snapshot(force_refresh=force_refresh)
+        dashboards = [d for d in dashboards_snapshot if not dashboard_ids or d.id in dashboard_ids]
+        return dashboards
 
     def _fix_query(self, query: Query) -> None:
         assert query.id is not None
