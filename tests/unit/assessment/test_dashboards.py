@@ -24,8 +24,8 @@ from databricks.labs.ucx.assessment.dashboards import (
     [
         (LegacyQuery(id="qid"), Query("qid")),
         (
-            LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count", parent="parent"),
-            Query("qid", "Query", "parent", "SELECT 42 AS count"),
+            LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count", parent="parent", tags=["tag1", "tag2"]),
+            Query("qid", "Query", "parent", "SELECT 42 AS count", ["tag1", "tag2"]),
         ),
     ],
 )

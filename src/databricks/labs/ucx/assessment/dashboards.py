@@ -41,6 +41,9 @@ class Query:
     query: str = ""
     """The text of the query to be run."""
 
+    tags: list[str] = field(default_factory=list)
+    """The tags set on this dashboard."""
+
     @classmethod
     def from_legacy_query(cls, query: LegacyQuery) -> Query:
         """Create query from a :class:LegacyQuery"""
@@ -50,6 +53,7 @@ class Query:
             name=query.name or cls.name,
             parent=query.parent or cls.parent,
             query=query.query or cls.query,
+            tags=query.tags or [],
         )
 
     @classmethod
