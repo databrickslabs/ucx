@@ -41,6 +41,12 @@ class Query:
     query: str = ""
     """The text of the query to be run."""
 
+    catalog: str = ""
+    """The name of the catalog to execute this query in."""
+
+    schema: str = ""
+    """The name of the schema to execute this query in."""
+
     tags: list[str] = field(default_factory=list)
     """The tags set on this dashboard."""
 
@@ -48,11 +54,17 @@ class Query:
     def from_legacy_query(cls, query: LegacyQuery) -> Query:
         """Create query from a :class:LegacyQuery"""
         assert query.id
+        catalog = schema = None
+        if query.options:
+            catalog = query.options.catalog
+            schema = query.options.schema
         return cls(
             id=query.id,
             name=query.name or cls.name,
             parent=query.parent or cls.parent,
             query=query.query or cls.query,
+            catalog=catalog or cls.catalog,
+            schema=schema or cls.schema,
             tags=query.tags or [],
         )
 

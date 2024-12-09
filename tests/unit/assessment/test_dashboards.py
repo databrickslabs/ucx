@@ -9,7 +9,13 @@ from databricks.labs.lsql.backends import Row
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyVisualization, LegacyQuery, Widget
+from databricks.sdk.service.sql import (
+    Dashboard as SdkRedashDashboard,
+    LegacyVisualization,
+    LegacyQuery,
+    Widget,
+    QueryOptions,
+)
 
 from databricks.labs.ucx.assessment.dashboards import (
     LakeviewDashboardCrawler,
@@ -24,8 +30,15 @@ from databricks.labs.ucx.assessment.dashboards import (
     [
         (LegacyQuery(id="qid"), Query("qid")),
         (
-            LegacyQuery(id="qid", name="Query", query="SELECT 42 AS count", parent="parent", tags=["tag1", "tag2"]),
-            Query("qid", "Query", "parent", "SELECT 42 AS count", ["tag1", "tag2"]),
+            LegacyQuery(
+                id="qid",
+                name="Query",
+                query="SELECT 42 AS count",
+                parent="parent",
+                tags=["tag1", "tag2"],
+                options=QueryOptions(catalog="catalog", schema="schema"),
+            ),
+            Query("qid", "Query", "parent", "SELECT 42 AS count", "catalog", "schema", ["tag1", "tag2"]),
         ),
     ],
 )
