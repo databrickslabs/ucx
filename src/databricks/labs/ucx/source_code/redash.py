@@ -107,16 +107,12 @@ class Redash:
         assert query.query is not None
         if query.tags is None:
             return
-        # find the backup query
-        is_migrated = False
         for tag in query.tags:
             if tag == self.MIGRATED_TAG:
-                is_migrated = True
-
-        if not is_migrated:
+                break  # If loop is broken, the else below is NOT reached
+        else:
             logger.debug(f"Query {query.name} was not migrated by UCX")
             return
-
         backup_query = self._installation.load(LegacyQuery, filename=f'backup/queries/{query.id}.json')
         update_query = UpdateQueryRequestQuery(
             query_text=backup_query.query, tags=self._get_original_tags(backup_query.tags)
