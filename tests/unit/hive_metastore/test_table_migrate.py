@@ -1429,7 +1429,7 @@ def test_refresh_migration_status_check_remaining_tables(ws, mock_backend, caplo
     )
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore"):
-        table_migrate.check_remaining_tables(migration_status_snapshot)
+        table_migrate.warn_about_remaining_non_migrated_tables(migration_status_snapshot)
         assert 'remained-hive-metastore-table: hive_metastore.schema1.table3' in caplog.messages
 
     table_crawler.snapshot.assert_called_once()

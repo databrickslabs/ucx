@@ -60,7 +60,7 @@ class TablesMigrator:
         self._migrate_grants = migrate_grants
         self._external_locations = external_locations
 
-    def check_remaining_tables(self, migration_status: Iterable[TableMigrationStatus]) -> None:
+    def warn_about_remaining_non_migrated_tables(self, migration_status: Iterable[TableMigrationStatus]) -> None:
         migration_index = TableMigrationIndex(migration_status)
         for crawled_table in self._tables_crawler.snapshot():
             if not migration_index.is_migrated(crawled_table.database, crawled_table.name):

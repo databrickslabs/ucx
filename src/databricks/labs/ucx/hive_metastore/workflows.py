@@ -86,7 +86,7 @@ class TableMigration(Workflow):
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
         # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
         updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        ctx.tables_migrator.check_remaining_tables(updated_migration_progress)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
 
     @job_task(
         depends_on=[verify_progress_tracking_prerequisites, update_migration_status], job_cluster="user_isolation"
@@ -150,7 +150,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
         # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
         updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        ctx.tables_migrator.check_remaining_tables(updated_migration_progress)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
@@ -226,7 +226,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
         # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
         updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        ctx.tables_migrator.check_remaining_tables(updated_migration_progress)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
@@ -272,7 +272,7 @@ class ScanTablesInMounts(Workflow):
     def update_migration_status(self, ctx: RuntimeContext) -> None:
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
         updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        ctx.tables_migrator.check_remaining_tables(updated_migration_progress)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
@@ -320,7 +320,7 @@ class MigrateTablesInMounts(Workflow):
         """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
         # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
         updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
-        ctx.tables_migrator.check_remaining_tables(updated_migration_progress)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
