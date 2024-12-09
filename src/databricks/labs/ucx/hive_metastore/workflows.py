@@ -96,10 +96,9 @@ class TableMigration(Workflow):
         # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
         # history log.
         # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
-        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         # Note: encoding the Table records will trigger loading of the migration-status data.
-        history_log.append_inventory_snapshot(tables_snapshot)
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
@@ -160,10 +159,9 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
         # history log.
         # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
-        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         # Note: encoding the Table records will trigger loading of the migration-status data.
-        history_log.append_inventory_snapshot(tables_snapshot)
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
@@ -236,10 +234,9 @@ class MigrateExternalTablesCTAS(Workflow):
         # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
         # history log.
         # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
-        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         # Note: encoding the Table records will trigger loading of the migration-status data.
-        history_log.append_inventory_snapshot(tables_snapshot)
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
@@ -280,10 +277,9 @@ class ScanTablesInMounts(Workflow):
     def update_tables_history_log(self, ctx: RuntimeContext) -> None:
         """Update the history log with the latest tables inventory and migration status."""
         # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
-        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         # Note: encoding the Table records will trigger loading of the migration-status data.
-        history_log.append_inventory_snapshot(tables_snapshot)
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
@@ -330,10 +326,9 @@ class MigrateTablesInMounts(Workflow):
         # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
         # history log.
         # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
-        history_log = ctx.tables_progress
         tables_snapshot = ctx.tables_crawler.snapshot()
         # Note: encoding the Table records will trigger loading of the migration-status data.
-        history_log.append_inventory_snapshot(tables_snapshot)
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
 
     @job_task(
         job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
