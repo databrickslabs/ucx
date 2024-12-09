@@ -11,6 +11,9 @@ def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
 
     installation_ctx.redash.migrate_dashboards(dashboard.id)
 
+    dashboard_migrated = installation_ctx.workspace_client.dashboards.get(dashboard.id)
+    assert Redash.MIGRATED_TAG in (dashboard_migrated.tags or [])
+
     query_migrated = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
     assert Redash.MIGRATED_TAG in (query_migrated.tags or [])
 
@@ -18,6 +21,9 @@ def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
     assert Redash.MIGRATED_TAG not in (query_not_migrated.tags or [])
 
     installation_ctx.redash.revert_dashboards(dashboard.id)  # Revert removes migrated tag
+
+    dashboard_reverted = installation_ctx.workspace_client.dashboards.get(dashboard.id)
+    assert Redash.MIGRATED_TAG not in (dashboard_reverted.tags or [])
 
     query_reverted = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
     assert Redash.MIGRATED_TAG not in (query_reverted.tags or [])
