@@ -54,14 +54,14 @@ class Redash:
         dashboards = self._crawler.snapshot()
         if not dashboard_ids:
             return list(dashboards)
-        seen_dashboard_ids = set[str]()
+        dashboards_filtered, seen_dashboard_ids = list[Dashboard](), set[str]()
         for dashboard in dashboards:
             for dashboard_id in set(dashboard_ids) - seen_dashboard_ids:
                 if dashboard.id == dashboard_id:
-                    dashboards.append(dashboard)
+                    dashboards_filtered.append(dashboard)
                     seen_dashboard_ids.add(dashboard.id)
                     break
-        return dashboards
+        return dashboards_filtered
 
     def _fix_query(self, query: LegacyQuery) -> None:
         assert query.id is not None
