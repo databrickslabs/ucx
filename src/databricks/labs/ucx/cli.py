@@ -886,5 +886,22 @@ def enable_hms_federation(w: WorkspaceClient, _: Prompts, ctx: WorkspaceContext 
     ctx.federation_enabler.enable()
 
 
+@ucx.command
+def migrate_dlt_pipelines(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+) -> None:
+    """Migrate DLT pipelines to UC"""
+    if ctx:
+        workspace_contexts = [ctx]
+    else:
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+
+    for workspace_context in workspace_contexts:
+        workspace_context.pipelines_migrator.migrate_pipelines()
+
+
 if __name__ == "__main__":
     ucx()
