@@ -129,7 +129,7 @@ def test_hive_deny_sql() -> None:
     [
         (
             Grant("user", "READ_METADATA", catalog="hive_metastore", database="mydb", table="mytable"),
-            None,
+            "GRANT BROWSE ON TABLE `hive_metastore`.`mydb`.`mytable` TO `user`",
         ),
         (
             Grant("me", "OWN", catalog="hive_metastore", database="mydb", table="mytable"),
@@ -138,6 +138,10 @@ def test_hive_deny_sql() -> None:
         (
             Grant("me", "USAGE", catalog="hive_metastore", database="mydb"),
             "GRANT USE SCHEMA ON DATABASE `hive_metastore`.`mydb` TO `me`",
+        ),
+        (
+            Grant("me", "READ_METADATA", catalog="hive_metastore", database="mydb"),
+            "GRANT BROWSE ON DATABASE `hive_metastore`.`mydb` TO `me`",
         ),
         (
             Grant("me", "INVALID", catalog="hive_metastore", database="mydb"),
@@ -718,7 +722,7 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
         return [
             Grant(
                 principal="user",
-                action_type="READ_METADATA",
+                action_type="EXECUTE",
                 catalog=table.catalog,
                 database=table.database,
                 table=table.name,
@@ -737,7 +741,7 @@ def test_migrate_grants_logs_unmapped_acl(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.grants"):
         migrate_grants.apply(table, dataclasses.replace(table, catalog="catalog"))
     assert (
-        "failed-to-migrate: Hive metastore grant 'READ_METADATA' cannot be mapped to UC grant for TABLE 'catalog.database.table'"
+        "failed-to-migrate: Hive metastore grant 'EXECUTE' cannot be mapped to UC grant for TABLE 'catalog.database.table'"
         in caplog.text
     )
     group_manager.assert_not_called()

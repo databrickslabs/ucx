@@ -170,7 +170,7 @@ def create_account_groups(
     """
     if not ctx:
         ctx = AccountContext(a, named_parameters)
-    ctx.account_workspaces.create_account_level_groups(prompts, ctx.workspace_ids)
+    ctx.account_workspaces.create_account_level_groups(prompts)
 
 
 @ucx.command
