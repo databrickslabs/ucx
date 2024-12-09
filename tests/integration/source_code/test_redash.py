@@ -1,3 +1,7 @@
+import datetime as dt
+
+from databricks.sdk.retries import retried
+
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.sdk.service.sql import Dashboard
 
@@ -11,8 +15,13 @@ def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
 
     installation_ctx.redash.migrate_dashboards(dashboard.id)
 
-    dashboard_migrated = installation_ctx.workspace_client.dashboards.get(dashboard.id)
-    assert Redash.MIGRATED_TAG in (dashboard_migrated.tags or [])
+    @retried(on=[ValueError], timeout=dt.timedelta(seconds=90))
+    def wait_for_migrated_tag_in_dashboard(dashboard_id: str) -> None:
+        dashboard_latest = installation_ctx.workspace_client.dashboards.get(dashboard_id)
+        if Redash.MIGRATED_TAG not in (dashboard_latest.tags or []):
+            raise ValueError(f"Missing group migration tag in dashboard: {dashboard_id}")
+
+    wait_for_migrated_tag_in_dashboard(dashboard.id)
 
     query_migrated = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
     assert Redash.MIGRATED_TAG in (query_migrated.tags or [])
@@ -22,8 +31,13 @@ def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
 
     installation_ctx.redash.revert_dashboards(dashboard.id)  # Revert removes migrated tag
 
-    dashboard_reverted = installation_ctx.workspace_client.dashboards.get(dashboard.id)
-    assert Redash.MIGRATED_TAG not in (dashboard_reverted.tags or [])
+    @retried(on=[ValueError], timeout=dt.timedelta(seconds=90))
+    def wait_for_migrated_tag_not_in_dashboard(dashboard_id: str) -> None:
+        dashboard_latest = installation_ctx.workspace_client.dashboards.get(dashboard_id)
+        if Redash.MIGRATED_TAG in (dashboard_latest.tags or []):
+            raise ValueError(f"Group migration tag still in dashboard: {dashboard_id}")
+
+    wait_for_migrated_tag_not_in_dashboard(dashboard.id)
 
     query_reverted = installation_ctx.workspace_client.queries.get(query_in_dashboard.id)
     assert Redash.MIGRATED_TAG not in (query_reverted.tags or [])
