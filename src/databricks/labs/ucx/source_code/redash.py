@@ -100,12 +100,7 @@ class Redash:
     def _revert_query(self, query: LegacyQuery) -> None:
         assert query.id is not None
         assert query.query is not None
-        if query.tags is None:
-            return
-        for tag in query.tags:
-            if tag == self.MIGRATED_TAG:
-                break  # If loop is broken, the else below is NOT reached
-        else:
+        if self.MIGRATED_TAG not in (query.tags or []):
             logger.debug(f"Query {query.name} was not migrated by UCX")
             return
         backup_query = self._installation.load(LegacyQuery, filename=f'backup/queries/{query.id}.json')
