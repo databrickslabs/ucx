@@ -40,8 +40,9 @@ def test_running_real_assessment_job_ext_hms(
     ext_hms_ctx.workspace_installation.run()
 
     workflow = "assessment"
-    ext_hms_ctx.deployed_workflows.run_workflow(workflow)
-    assert ext_hms_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
+    ext_hms_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
+    workflow_completed_successfully = ext_hms_ctx.deployed_workflows.validate_step(workflow)
+    assert workflow_completed_successfully, f"Workflow failed: {workflow}"
 
     after = ext_hms_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert ws_group.display_name in after, f"Group {ws_group.display_name} not found in cluster policy"
