@@ -1,6 +1,5 @@
 import logging
 from dataclasses import replace
-from functools import cached_property
 
 from databricks.labs.blueprint.installation import Installation
 
@@ -49,18 +48,14 @@ class Redash:
                 self._revert_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_original_tags(dashboard.tags))
 
-    @cached_property
-    def _dashboards(self) -> list[Dashboard]:
-        """Refresh the dashboards to get the latest tags."""
-        return list(self._crawler.snapshot())
-
     def _list_dashboards(self, *dashboard_ids: str) -> list[Dashboard]:
         """List the Redash dashboards."""
+        # Cached property is not used as this class in used from the CLI, thus called once per Python process
+        dashboards = self._crawler.snapshot()
         if not dashboard_ids:
-            return self._dashboards
-        dashboards: list[Dashboard] = []
+            return list(dashboards)
         seen_dashboard_ids = set[str]()
-        for dashboard in self._dashboards:
+        for dashboard in dashboards:
             for dashboard_id in set(dashboard_ids) - seen_dashboard_ids:
                 if dashboard.id == dashboard_id:
                     dashboards.append(dashboard)
