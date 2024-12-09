@@ -31,4 +31,10 @@ known:
 solacc:
 	hatch run python tests/integration/source_code/solacc.py
 
-.PHONY: all clean dev lint fmt test integration coverage known solacc
+docs:
+	cd docs && hugo server --buildDrafts --disableFastRender
+
+docs-test-md:
+	cd docs && hugo --minify && yarn linkinator 'content/**/*.md' --markdown --url-rewrite-search /images/ --url-rewrite-replace /static/images/
+
+.PHONY: all clean dev lint fmt test integration coverage known solacc docs docs-test
