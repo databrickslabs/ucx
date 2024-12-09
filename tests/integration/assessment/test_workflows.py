@@ -31,6 +31,7 @@ def test_running_real_assessment_job(
     tmp_table = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 2+2 AS four")
     view = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 2+2 AS four", view=True)
     non_delta = installation_ctx.make_table(schema_name=source_schema.name, non_delta=True)
+
     installation_ctx.make_linting_resources()
     installation_ctx.workspace_installation.run()
 
