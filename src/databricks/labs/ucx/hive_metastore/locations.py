@@ -194,6 +194,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 external_locations.append(external_location)
                 continue
             queue.extend(curr.children.values())
+        root_dbfs = self._mounts_snapshot[-1]
+        if root_dbfs.name == '/':
+            external_locations.append(ExternalLocation(root_dbfs.source, 0))
         return sorted(external_locations, key=lambda _: _.location)
 
     def _resolve_location(self, table: Table) -> Table:
@@ -212,6 +215,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not location.startswith('dbfs:'):
             return location  # not a mount, save some cycles
         for mount in self._mounts_snapshot:
+            # Skip the root mount
+            if mount.name == '/':
+                continue
             prefix = mount.as_scheme_prefix()
             if not location.startswith(prefix):
                 continue
