@@ -3,9 +3,9 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors import PermissionDenied
-from databricks.sdk.service.sql import LegacyQuery, QueryOptions, UpdateQueryRequestQuery
+from databricks.sdk.service.sql import LegacyQuery, UpdateQueryRequestQuery
 
-from databricks.labs.ucx.assessment.dashboards import Dashboard, RedashDashboardCrawler
+from databricks.labs.ucx.assessment.dashboards import Dashboard, Query, RedashDashboardCrawler
 from databricks.labs.ucx.source_code.redash import Redash
 
 
@@ -20,27 +20,30 @@ def redash_installation():
     return installation
 
 
-def list_legacy_queries(dashboard: Dashboard) -> list[LegacyQuery]:
+def list_queries(dashboard: Dashboard) -> list[Query]:
     queries = [
-        LegacyQuery(
+        Query(
             id="1",
             name="test_query",
             query="SELECT * FROM old.things",
-            options=QueryOptions(catalog="hive_metastore", schema="default"),
+            catalog="hive_metastore",
+            schema="default",
             tags=["test_tag"],
         ),
-        LegacyQuery(
+        Query(
             id="2",
             name="test_query",
             query="SELECT * FROM old.things",
-            options=QueryOptions(catalog="hive_metastore", schema="default"),
+            catalog="hive_metastore",
+            schema="default",
             tags=["test_tag"],
         ),
-        LegacyQuery(
+        Query(
             id="3",
             name="test_query",
             query="SELECT * FROM old.things",
-            options=QueryOptions(catalog="hive_metastore", schema="default"),
+            catalog="hive_metastore",
+            schema="default",
             tags=["test_tag", Redash.MIGRATED_TAG],
         ),
     ]
@@ -61,7 +64,7 @@ def redash_dashboard_crawler():
         Dashboard(id="2", query_ids=["1", "2", "3"], tags=[Redash.MIGRATED_TAG]),
         Dashboard(id="3", tags=[]),
     ]
-    crawler.list_legacy_queries.side_effect = list_legacy_queries
+    crawler.list_queries.side_effect = list_queries
     return crawler
 
 
@@ -73,10 +76,12 @@ def test_migrate_all_dashboards(ws, empty_index, redash_installation, redash_das
     redash_installation.assert_file_written(
         "backup/queries/1.json",
         {
+            'catalog': 'hive_metastore',
             'id': '1',
             'name': 'test_query',
-            'options': {'catalog': 'hive_metastore', 'schema': 'default'},
+            'parent': 'ORPHAN',
             'query': 'SELECT * FROM old.things',
+            'schema': 'default',
             'tags': ['test_tag'],
         },
     )
@@ -128,7 +133,7 @@ def test_migrate_dashboard_gets_no_queries_when_dashboard_is_empty(
     redash_dashboard_crawler.snapshot.assert_called_once()
 
 
-def test_migrate_dashboard_lists_legacy_queries_from_dashboard(
+def test_migrate_dashboard_lists_queries_from_dashboard(
     ws, empty_index, redash_installation, redash_dashboard_crawler
 ) -> None:
     dashboard = Dashboard(id="1", query_ids=["1"])
@@ -137,5 +142,5 @@ def test_migrate_dashboard_lists_legacy_queries_from_dashboard(
 
     redash.migrate_dashboards()
 
-    redash_dashboard_crawler.list_legacy_queries.assert_called_with(dashboard)
+    redash_dashboard_crawler.list_queries.assert_called_with(dashboard)
     redash_dashboard_crawler.snapshot.assert_called_once()

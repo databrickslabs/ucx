@@ -209,10 +209,10 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
-        for query in self.list_legacy_queries(dashboard):
+        for query in self._list_legacy_queries(dashboard):
             yield Query.from_legacy_query(query)
 
-    def list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
+    def _list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
         """List legacy queries.
 
         Args:
@@ -223,7 +223,10 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
             another crawler for the queries by retrieving the queries every time they are requested.
         """
-        queries_iterator = self._list_legacy_queries(dashboard)
+        if dashboard:
+            queries_iterator = self._list_legacy_queries_from_dashboard(dashboard)
+        else:
+            queries_iterator = self._list_all_legacy_queries()
         # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
         # to a small number of items in debug mode for the assessment workflow just to complete.
         counter = itertools.count()
@@ -232,12 +235,6 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
                 yield next(queries_iterator)
             except StopIteration:
                 break
-
-    def _list_legacy_queries(self, dashboard: Dashboard | None = None) -> Iterator[LegacyQuery]:
-        """List legacy queries."""
-        if dashboard:
-            return self._list_legacy_queries_from_dashboard(dashboard)
-        return self._list_all_legacy_queries()
 
     def _list_all_legacy_queries(self) -> Iterator[LegacyQuery]:
         """List all queries."""
