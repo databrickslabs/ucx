@@ -72,7 +72,7 @@ _migration_workflows: Sequence[type[Workflow]] = (
 
 @pytest.mark.parametrize(
     "task",
-    [getattr(workflow, "verify_prerequisites") for workflow in _migration_workflows],
+    [getattr(workflow, "verify_progress_tracking_prerequisites") for workflow in _migration_workflows],
     ids=[workflow.__name__ for workflow in _migration_workflows],
 )
 def test_with_valid_prerequisites(ws, run_workflow, task) -> None:
@@ -85,7 +85,7 @@ def test_with_valid_prerequisites(ws, run_workflow, task) -> None:
 
 @pytest.mark.parametrize(
     "task",
-    [getattr(workflow, "verify_prerequisites") for workflow in _migration_workflows],
+    [getattr(workflow, "verify_progress_tracking_prerequisites") for workflow in _migration_workflows],
     ids=[workflow.__name__ for workflow in _migration_workflows],
 )
 def test_with_invalid_prerequisites(ws, run_workflow, task) -> None:
