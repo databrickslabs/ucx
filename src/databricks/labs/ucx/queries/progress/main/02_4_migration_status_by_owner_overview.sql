@@ -1,6 +1,6 @@
 /* --title 'Overview' --description 'Tables and views migration' --width 5 */
 WITH migration_statuses AS (
-    SELECT *
+    SELECT owner, failures
     FROM ucx_catalog.multiworkspace.objects_snapshot
     WHERE object_type = 'Table'
 )
