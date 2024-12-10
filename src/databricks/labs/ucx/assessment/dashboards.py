@@ -32,19 +32,19 @@ class Query:
     id: str
     """The ID for this query."""
 
-    name: str = "UNKNOWN"
+    name: str | None = None
     """The title of this query that appears in list views, widget headings, and on the query page."""
 
-    parent: str = "ORPHAN"
+    parent: str | None = None
     """The identifier of the workspace folder containing the object."""
 
-    query: str = ""
+    query: str | None = None
     """The text of the query to be run."""
 
-    catalog: str = ""
+    catalog: str | None = None
     """The name of the catalog to execute this query in."""
 
-    schema: str = ""
+    schema: str | None = None
     """The name of the schema to execute this query in."""
 
     tags: list[str] = field(default_factory=list)

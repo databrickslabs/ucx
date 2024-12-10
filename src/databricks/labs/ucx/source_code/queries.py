@@ -206,8 +206,8 @@ class QueryLinter:
                 dashboard_parent="",
                 dashboard_name="",
                 query_id=query.id,
-                query_parent=query.parent,
-                query_name=query.name,
+                query_parent=query.parent or "PARENT",
+                query_name=query.name or "UNKNOWN",
                 code=advice.code,
                 message=advice.message,
             )
@@ -218,7 +218,9 @@ class QueryLinter:
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         collector = ctx.dfsa_collector(Language.SQL)
         source_id = f"{dashboard_id}/{query.id}"
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name})]
+        source_lineage = [
+            LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name or "UNKNOWN"})
+        ]
         for dfsa in collector.collect_dfsas(query.query):
             yield dfsa.replace_source(source_id=source_id, source_lineage=source_lineage)
 
@@ -228,6 +230,8 @@ class QueryLinter:
         ctx = LinterContext(self._migration_index, CurrentSessionState())
         collector = ctx.tables_collector(Language.SQL)
         source_id = f"{dashboard_id}/{query.id}"
-        source_lineage = [LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name})]
+        source_lineage = [
+            LineageAtom(object_type="QUERY", object_id=source_id, other={"name": query.name or "UNKNOWN"})
+        ]
         for table in collector.collect_tables(query.query):
             yield table.replace_source(source_id=source_id, source_lineage=source_lineage)
