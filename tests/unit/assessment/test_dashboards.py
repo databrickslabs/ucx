@@ -594,3 +594,29 @@ def test_dashboard_ownership_owner_of_from_dashboard_creator() -> None:
     assert owner == "Cor"
     administrator_locator.get_workspace_administrator.assert_not_called()
     workspace_path_ownership.owner_of_path.assert_not_called()
+
+
+def test_dashboard_ownership_owner_of_from_workspace_path_owner() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    workspace_path_ownership.owner_of_path.return_value = "Cor"
+    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+
+    owner = ownership.owner_of(Dashboard("id", parent="path"))
+
+    assert owner == "Cor"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    workspace_path_ownership.owner_of_path.assert_called_with("path")
+
+
+def test_dashboard_ownership_owner_of_from_administrator_locator() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    administrator_locator.get_workspace_administrator.return_value = "Cor"
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+
+    owner = ownership.owner_of(Dashboard("id"))
+
+    assert owner == "Cor"
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    workspace_path_ownership.owner_of_path.assert_not_called()
