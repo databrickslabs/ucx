@@ -244,7 +244,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             yield from self._get_legacy_queries(*self._include_query_ids)
         else:
             try:
-                yield from self._ws.queries_legacy.list()  # TODO: Update this to non-legacy query
+                yield from self._ws.queries_legacy.list()
             except DatabricksError as e:
                 logger.warning("Cannot list Redash queries", exc_info=e)
 
@@ -266,7 +266,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
     def _get_legacy_query(self, query_id: str) -> LegacyQuery | None:
         """Get a legacy query."""
         try:
-            return self._ws.queries_legacy.get(query_id)  # TODO: Update this to non-legacy query
+            return self._ws.queries_legacy.get(query_id)
         except DatabricksError as e:
             logger.warning(f"Cannot get Redash query: {query_id}", exc_info=e)
             return None
