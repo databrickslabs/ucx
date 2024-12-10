@@ -12,7 +12,6 @@ from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
         ("regular", "migrate-tables"),
         ("hiveserde", "migrate-external-hiveserde-tables-in-place-experimental"),
         ("hiveserde", "migrate-external-tables-ctas"),
-        # TODO: Some workflows are missing here, and also need to be included in the tests.
     ],
     indirect=("prepare_tables_for_migration",),
 )
