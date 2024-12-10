@@ -1,7 +1,15 @@
 import dataclasses
 
-from databricks.labs.lsql.backends import CommandExecutionBackend
+import pytest
+
+from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
 from databricks.sdk.service.iam import PermissionLevel
+
+
+@pytest.fixture
+def sql_backend(ws, env_or_skip) -> SqlBackend:
+    cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
+    return CommandExecutionBackend(ws, cluster_id)
 
 
 def test_running_real_assessment_job_ext_hms(
@@ -21,7 +29,6 @@ def test_running_real_assessment_job_ext_hms(
         group_name=ws_group.display_name,
     )
     ext_hms_ctx = installation_ctx.replace(
-        sql_backend=CommandExecutionBackend(ws, cluster_id),
         config_transform=lambda wc: dataclasses.replace(
             wc,
             override_clusters={
