@@ -9,6 +9,7 @@ from databricks.labs.lsql.backends import Row
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, PermissionDenied, TooManyRequests
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
+from databricks.sdk.service.iam import User
 from databricks.sdk.service.sql import (
     Dashboard as SdkRedashDashboard,
     LegacyVisualization,
@@ -81,7 +82,7 @@ def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expec
                 ],
                 user_id=123456789,
             ),
-            Dashboard("did", "name", "parent", ["qid1", "qid2"], ["tag1", "tag2"], "Cor"),
+            Dashboard("did", "name", "parent", ["qid1", "qid2"], ["tag1", "tag2"], "123456789"),
         ),
         (
             SdkRedashDashboard(
@@ -125,7 +126,7 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
     assert rows == [
-        Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"], creator=None)
+        Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"], creator_id=None)
     ]
     ws.dashboards.list.assert_called_once()
 
@@ -160,7 +161,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mo
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     assert "Cannot list next Redash dashboards page" in caplog.messages
     ws.dashboards.list.assert_called_once()
 
@@ -174,7 +175,7 @@ def test_redash_dashboard_crawler_stops_when_debug_listing_upper_limit_reached(m
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     ws.dashboards.list.assert_called_once()
 
 
@@ -186,7 +187,7 @@ def test_redash_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None:
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     ws.dashboards.get.assert_called_once_with("did1")
     ws.dashboards.list.assert_not_called()
 
@@ -206,7 +207,7 @@ def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_bac
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     assert "Cannot get Redash dashboard: did2" in caplog.messages
     ws.dashboards.get.assert_has_calls([call("did1"), call("did2")])
     ws.dashboards.list.assert_not_called()
@@ -278,7 +279,7 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     ws.dashboards.list.assert_called_once()
 
 
@@ -405,7 +406,7 @@ def test_lakeview_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=[], creator=None)]
+    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=[], creator_id=None)]
     ws.lakeview.list.assert_called_once()
 
 
@@ -431,7 +432,7 @@ def test_lakeview_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     ws.lakeview.get.assert_called_once_with("did1")
     ws.lakeview.list.assert_not_called()
 
@@ -451,7 +452,7 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     assert "Cannot get Lakeview dashboard: did2" in caplog.messages
     ws.lakeview.get.assert_has_calls([call("did1"), call("did2")])
     ws.lakeview.list.assert_not_called()
@@ -506,7 +507,7 @@ def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_bac
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator=None)]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
     ws.lakeview.list.assert_called_once()
 
 
@@ -586,39 +587,61 @@ def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_
     ws.lakeview.get.assert_called_once_with("did")
 
 
-def test_dashboard_ownership_owner_of_from_dashboard_creator() -> None:
+def test_dashboard_ownership_owner_of_from_user_display_name() -> None:
     administrator_locator = create_autospec(AdministratorLocator)
+    ws = create_autospec(WorkspaceClient)
+    ws.users.get.return_value = User(display_name="Cor")
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
-    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+    ownership = DashboardOwnership(administrator_locator, ws, workspace_path_ownership)
 
-    owner = ownership.owner_of(Dashboard("id", creator="Cor"))
+    owner = ownership.owner_of(Dashboard("id", creator_id="123456789"))
 
     assert owner == "Cor"
     administrator_locator.get_workspace_administrator.assert_not_called()
+    ws.users.get.assert_called_with("123456789")
+    workspace_path_ownership.owner_of_path.assert_not_called()
+
+
+def test_dashboard_ownership_owner_of_from_user_email() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    ws = create_autospec(WorkspaceClient)
+    ws.users.get.return_value = User(user_name="cor.zuurmond@databricks.com")
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    ownership = DashboardOwnership(administrator_locator, ws, workspace_path_ownership)
+
+    owner = ownership.owner_of(Dashboard("id", creator_id="123456789"))
+
+    assert owner == "cor.zuurmond@databricks.com"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    ws.users.get.assert_called_with("123456789")
     workspace_path_ownership.owner_of_path.assert_not_called()
 
 
 def test_dashboard_ownership_owner_of_from_workspace_path_owner() -> None:
     administrator_locator = create_autospec(AdministratorLocator)
+    ws = create_autospec(WorkspaceClient)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
     workspace_path_ownership.owner_of_path.return_value = "Cor"
-    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+    ownership = DashboardOwnership(administrator_locator, ws, workspace_path_ownership)
 
     owner = ownership.owner_of(Dashboard("id", parent="path"))
 
     assert owner == "Cor"
     administrator_locator.get_workspace_administrator.assert_not_called()
+    ws.users.get.assert_not_called()
     workspace_path_ownership.owner_of_path.assert_called_with("path")
 
 
 def test_dashboard_ownership_owner_of_from_administrator_locator() -> None:
     administrator_locator = create_autospec(AdministratorLocator)
     administrator_locator.get_workspace_administrator.return_value = "Cor"
+    ws = create_autospec(WorkspaceClient)
     workspace_path_ownership = create_autospec(WorkspacePathOwnership)
-    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+    ownership = DashboardOwnership(administrator_locator, ws, workspace_path_ownership)
 
     owner = ownership.owner_of(Dashboard("id"))
 
     assert owner == "Cor"
     administrator_locator.get_workspace_administrator.assert_called_once()
+    ws.users.get.assert_not_called()
     workspace_path_ownership.owner_of_path.assert_not_called()

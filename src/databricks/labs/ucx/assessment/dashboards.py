@@ -99,7 +99,7 @@ class Dashboard:
     tags: list[str] = field(default_factory=list)
     """The tags set on this dashboard."""
 
-    creator: str | None = None
+    creator_id: str | None = None
     """The ID of the user who owns the dashboard."""
 
     @classmethod
@@ -113,7 +113,7 @@ class Dashboard:
         if dashboard.tags:
             kwargs["tags"] = dashboard.tags
         if dashboard.user_id:
-            kwargs["creator"] = str(dashboard.user_id)
+            kwargs["creator_id"] = str(dashboard.user_id)
         query_ids = []
         for widget in dashboard.widgets or []:
             if widget.visualization is None:
@@ -383,14 +383,28 @@ class DashboardOwnership(Ownership[Dashboard]):
     """
 
     def __init__(
-        self, administrator_locator: AdministratorLocator, workspace_path_ownership: WorkspacePathOwnership
+        self,
+        administrator_locator: AdministratorLocator,
+        ws: WorkspaceClient,
+        workspace_path_ownership: WorkspacePathOwnership,
     ) -> None:
         super().__init__(administrator_locator)
+        self._ws = ws
         self._workspace_path_ownership = workspace_path_ownership
 
     def _maybe_direct_owner(self, record: Dashboard) -> str | None:
-        if record.creator:
-            return record.creator
+        if record.creator_id:
+            creator_name = self._get_user_name(record.creator_id)
+            if creator_name:
+                return creator_name
         if record.parent:
             return self._workspace_path_ownership.owner_of_path(record.parent)
         return None
+
+    def _get_user_name(self, user_id: str) -> str | None:
+        try:
+            user = self._ws.users.get(user_id)
+            return user.display_name or user.user_name
+        except DatabricksError as e:
+            logger.warning(f"Could not retrieve user: {user_id}", exc_info=e)
+            return None
