@@ -11,7 +11,7 @@ def test_running_real_assessment_job_ext_hms(
     make_cluster_policy,
     make_cluster_policy_permissions,
 ) -> None:
-    cluster_id = env_or_skip('TEST_EXT_HMS_CLUSTER_ID')
+    main_cluster_id = env_or_skip("TEST_EXT_HMS_NOUC_CLUSTER_ID")
     ws_group, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
     # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
     cluster_policy = make_cluster_policy()
@@ -24,7 +24,9 @@ def test_running_real_assessment_job_ext_hms(
         sql_backend=CommandExecutionBackend(ws, cluster_id),
         config_transform=lambda wc: dataclasses.replace(
             wc,
-            override_clusters=None,
+            override_clusters={
+                "main": main_cluster_id,
+            },
             include_object_permissions=[f"cluster-policies:{cluster_policy.policy_id}"],
         ),
         extend_prompts={
