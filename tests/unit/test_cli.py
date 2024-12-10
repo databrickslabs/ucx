@@ -22,6 +22,7 @@ from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
+from databricks.labs.ucx.assessment.dashboards import RedashDashboardCrawler
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
@@ -1151,16 +1152,24 @@ def test_migrate_dbsql_dashboards_calls_migrate_dashboards_on_redash_with_dashbo
 
 def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash(ws):
     redash = create_autospec(Redash)
-    ctx = WorkspaceContext(ws).replace(redash=redash)
+    redash_crawler = create_autospec(RedashDashboardCrawler)
+    ctx = WorkspaceContext(ws).replace(redash=redash, redash_crawler=redash_crawler)
+
     revert_dbsql_dashboards(ws, ctx=ctx)
+
     redash.revert_dashboards.assert_called_once_with()
+    redash_crawler.snapshot.assert_called_once_with(force_refresh=True)
 
 
 def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash_with_dashboard_id(ws):
     redash = create_autospec(Redash)
-    ctx = WorkspaceContext(ws).replace(redash=redash)
+    redash_crawler = create_autospec(RedashDashboardCrawler)
+    ctx = WorkspaceContext(ws).replace(redash=redash, redash_crawler=redash_crawler)
+
     revert_dbsql_dashboards(ws, dashboard_id="id", ctx=ctx)
+
     redash.revert_dashboards.assert_called_once_with("id")
+    redash_crawler.snapshot.assert_called_once_with(force_refresh=True)
 
 
 def test_cli_missing_awscli(ws, mocker, caplog):
