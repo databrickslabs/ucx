@@ -98,6 +98,9 @@ class Dashboard:
     tags: list[str] = field(default_factory=list)
     """The tags set on this dashboard."""
 
+    creator: str | None = None
+    """The ID of the user who owns the dashboard."""
+
     @classmethod
     def from_sdk_redash_dashboard(cls, dashboard: SdkRedashDashboard) -> Dashboard:
         assert dashboard.id
@@ -108,6 +111,8 @@ class Dashboard:
             kwargs["parent"] = dashboard.parent
         if dashboard.tags:
             kwargs["tags"] = dashboard.tags
+        if dashboard.user_id:
+            kwargs["creator"] = str(dashboard.user_id)
         query_ids = []
         for widget in dashboard.widgets or []:
             if widget.visualization is None:
