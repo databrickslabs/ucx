@@ -101,6 +101,13 @@ class Dashboard:
     @classmethod
     def from_sdk_redash_dashboard(cls, dashboard: SdkRedashDashboard) -> Dashboard:
         assert dashboard.id
+        kwargs: dict[str, str | list[str] | None] = {"id": dashboard.id}
+        if dashboard.name:
+            kwargs["name"] = dashboard.name
+        if dashboard.parent:
+            kwargs["parent"] = dashboard.parent
+        if dashboard.tags:
+            kwargs["tags"] = dashboard.tags
         query_ids = []
         for widget in dashboard.widgets or []:
             if widget.visualization is None:
@@ -110,25 +117,23 @@ class Dashboard:
             if widget.visualization.query.id is None:
                 continue
             query_ids.append(widget.visualization.query.id)
-        return cls(
-            id=dashboard.id,
-            name=dashboard.name or cls.name,
-            parent=dashboard.parent or cls.parent,
-            query_ids=query_ids,
-            tags=dashboard.tags or [],
-        )
+        if query_ids:
+            kwargs["query_ids"] = query_ids
+        return cls(**kwargs)  # type: ignore
 
     @classmethod
     def from_sdk_lakeview_dashboard(cls, dashboard: SdkLakeviewDashboard) -> Dashboard:
         assert dashboard.dashboard_id
+        kwargs: dict[str, str | list[str] | None] = {"id": dashboard.dashboard_id}
+        if dashboard.display_name:
+            kwargs["name"] = dashboard.display_name
+        if dashboard.parent_path:
+            kwargs["parent"] = dashboard.parent_path
         lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(dashboard)
         query_ids = [dataset.name for dataset in lsql_dashboard.datasets]
-        return cls(
-            id=dashboard.dashboard_id,
-            name=dashboard.display_name or cls.name,
-            parent=dashboard.parent_path or cls.parent,
-            query_ids=query_ids,
-        )
+        if query_ids:
+            kwargs["query_ids"] = query_ids
+        return cls(**kwargs)  # type: ignore
 
 
 class RedashDashboardCrawler(CrawlerBase[Dashboard]):
