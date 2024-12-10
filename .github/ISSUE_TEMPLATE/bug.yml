@@ -4,7 +4,7 @@ name: Bug Report
 description: Something is not working with UCX
 title: "[BUG]: "
 labels: ["bug", "needs-triage"]
-projects: ["databrickslabs/12"]
+projects: ["databrickslabs/13"]
 # assignees:
 #   - ucx-write
 body:
