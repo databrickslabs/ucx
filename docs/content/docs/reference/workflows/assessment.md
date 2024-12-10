@@ -10,7 +10,7 @@ and [securable objects in the Hive metastore](https://docs.databricks.com/en/dat
 relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` tasks retrieve assess and objects. The
 `assess_` tasks assess the compatibility with UC. The output of each task is stored in the
 [inventory database](#installation-resources) so that it can be used for further analysis and decision-making through
-the [assessment report](../assessment.md).
+the [assessment report](docs/reference/assessment.md).
 
 1. `crawl_tables`: This task retrieves table definitions from the Hive metastore and persists the definitions in
    the `tables` table. The definitions include information such as:
@@ -75,7 +75,7 @@ the [assessment report](../assessment.md).
     [migration problems](#linter-message-codes).
 
 After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
-See [this guide](../assessment.md) for more details.
+See [this guide](docs/reference/assessment.md) for more details.
 
 ![report](/images/assessment-report.png)
 

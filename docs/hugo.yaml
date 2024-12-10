@@ -16,7 +16,7 @@ params:
 
   editURL:
     enable: true
-    base: "https://databrickslabs.github.io/ucx/edit/main"
+    base: "https://github.com/renardeinside/ucx/edit/main/docs/content"
   
   theme:
     default: dark

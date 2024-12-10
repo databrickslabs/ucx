@@ -30,7 +30,7 @@ databricks --profile ACCOUNTS labs ucx sync-workspace-info
 > or "https://accounts.azuredatabricks.net").
 
 This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
-necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
+necessary to create an immutable default catalog mapping for [table migration](docs/process/table_migration) process and is the prerequisite
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
@@ -98,10 +98,10 @@ Workspace Group Name  Members Count  Account Group Name  Members Count  Differen
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership.
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership. See [group migration](../dev/implementation/local-group-migration.md) and
-[group migration](#group-migration-workflow) for more details.
+used to debug issues related to group membership. See [group migration](docs/dev/implementation/local-group-migration.md) and
+[group migration](docs/reference/workflows/group_migration.md) for more details.
 
-Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
+Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](docs/process/table_migration)
 
 
 

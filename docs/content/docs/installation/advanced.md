@@ -83,7 +83,7 @@ Upgrade UCX via Databricks CLI:
 databricks labs upgrade ucx
 ```
 
-The prompts will be similar to [Installation](#install-ucx)
+The prompts will be similar to [Installation](docs/installation/install_ucx)
 
 ![macos_upgrade_ucx](/images/macos_3_databrickslabsmac_upgradeucx.gif)
 

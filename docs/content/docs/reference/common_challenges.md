@@ -82,12 +82,11 @@ install UCX with their authentication, or request a workspace
 administrator to grant you temporary administrator privileges to run the
 installation. More details on the issues that you can run into if
 you are not an admin (and some possible solutions) can be found
-[here](./troubleshooting.md#resolving-common-errors-on-ucx-install).
+[here](/docs/reference/troubleshooting.md#resolving-common-errors-on-ucx-install).
 
 **User is not a Cloud IAM Administrator:** Cloud CLI needs to be
 installed in the local machine for certain cloud related activities,
-like creating an [<u>uber
-principal</u>](#create-uber-principal-command).
+like creating an [uber principal](/docs/reference/commands/table.md#create-uber-principal-command).
 For this, the user needs Cloud IAM Administrator privileges.
 
 **Solution:** Work with a cloud administrator in your organization to
@@ -146,7 +145,7 @@ specific version of UCX, you can do it using the command
 
 **Workspace Level:** If you are facing authentication issues while
 setting up Databricks CLI, please refer to the
-[Cryptic errors on authentication](./troubleshooting.md#cryptic-errors-on-authentication)
+[Cryptic errors on authentication](docs/reference/troubleshooting.md#cryptic-errors-on-authentication)
 section to resolve the common errors related to authentication,
 profiles, and tokens.
 

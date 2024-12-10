@@ -4,15 +4,15 @@ The following resources are installed by UCX:
 
 | Installed UCX resources                           | Description                                                                                      |
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| [Inventory database](../reference/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| [Workflows](../reference/workflows/_index.md)                           | Workflows to execute UCX                                                                         |
-| [Dashboards](../reference/dashboards.md)                         | Dashboards to visualize UCX outcomes                                                             |
+| [Inventory database](docs/reference/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](docs/reference/workflows/)                           | Workflows to execute UCX                                                                         |
+| [Dashboards](docs/reference/dashboards.md)                         | Dashboards to visualize UCX outcomes                                                             |
 | [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
 
 ## Installation folder
 
 UCX is in installed in the workspace folder `/Applications/ucx/`. This folder contains UCX's code resources, like the
-[source code](https://github.com/databrickslabs/ucx/tree/main/src/databricks) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
+[source code](https://github.com/databrickslabs/ucx/tree/main/src/databricks) from UCX GitHub repository and the [dashboard](docs/reference/dashboards). Generally, these resources are not
 *directly* used by UCX users. Resources that can be of importance to users are detailed in the subsections below.
 
 ### Readme notebook

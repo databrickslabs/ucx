@@ -1,7 +1,7 @@
 # Table migration process
 
 {{<callout type="warning">}}
-You are required to complete the [assessment workflow](../reference/workflows/assessment.md) before starting the table migration workflow.
+You are required to complete the [assessment workflow](docs/reference/workflows/assessment.md) before starting the table migration workflow.
 {{</callout>}}
 
 This section explains how to migrate Hive metastore data objects to Unity Catalog. The table migration process consists
@@ -98,7 +98,7 @@ following [these instructions](https://docs.databricks.com/en/data-governance/un
 #### Step 1: Create external Locations
 
 Create UC external locations by running the [`migration-locations` command](#migrate-locations-command). The command
-creates a location for each location found during the [assessment](../reference/workflows/assessment.md). It uses the credentials
+creates a location for each location found during the [assessment](docs/reference/workflows/assessment.md). It uses the credentials
 created in the previous steps.
 
 Alternatively, manually create the external locations

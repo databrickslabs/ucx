@@ -1,7 +1,7 @@
 ## Group migration workflow
 
 {{<callout type="warning">}}
-You are required to complete the [assessment workflow](../workflows/assessment.md) before starting the table migration workflow.
+You are required to complete the [assessment workflow](docs/reference/workflows/assessment.md) before starting the table migration workflow.
 {{</callout>}}
 
 **The group migration workflow does NOT CREATE account groups.** In contrast to account groups, [the (legacy)
@@ -61,7 +61,7 @@ After successfully running the group migration workflow:
 3. Proceed to the [table migration process](#Table-Migration).
 
 For additional information see:
-- The [detailed design](../../dev/implementation/local-group-migration.md) of thie group migration workflow.
+- The [detailed design](docs/dev/implementation/local-group-migration.md) of thie group migration workflow.
 - The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
   migration process.
 

@@ -14,20 +14,20 @@ Briefly, the process involves the following steps:
 
 ### Setting up the environment
 
-Please fullfill the [prerequisites](#prerequisites) before installing UCX.
+Please fullfill the [prerequisites](docs/installation/prerequisites/) before installing UCX.
 
 ### Install and authenticate Databricks CLI
 
-Please [install and authenticate Databricks CLI](#install-and-authenticate-databricks-cli) on your local machine.
+Please [install and authenticate Databricks CLI](docs/installation/databricks_cli/) on your local machine.
 
 ### Install the toolkit 
 
-Install UCX via Databricks CLI. Please follow the instructions to [install UCX](#install-ucx).
+Install UCX via Databricks CLI. Please follow the instructions to [install UCX](docs/installation/install_ucx).
 
 ### [Optional] Joining a collection
 
 Workspaces can be grouped into collections to manage UCX migration at collection level.
-Please follow the instructions to [join a collection](#joining-a-collection) if you want to join an existing collection or create a new one.
+Please follow the instructions to [join a collection](docs/installation/collection) if you want to join an existing collection or create a new one.
 
 {{% /steps %}}
 

@@ -25,8 +25,7 @@
           {{- /* Global resource; drop query and fragment */}}
           {{- $attrs = dict "href" .RelPermalink }}
         {{- else }}
-          {{- warnf "[output] %s" $attrs -}}
-          {{- warnf "Unable to resolve reference to %s from %s" $u.Path ($.Page.File.Path | absURL) }}
+          {{- warnf "Unable to resolve reference to %s" $u.Path }}
         {{- end }}
       {{- end }}
     {{- end }}
@@ -49,3 +48,4 @@
   {{- printf " %s=%q" $k $v | safeHTMLAttr }}
 {{- end -}}
 >{{ .Text | safe.HTML }}</a>
+{{- /**/ -}}

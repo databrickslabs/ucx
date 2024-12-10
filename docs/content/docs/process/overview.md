@@ -9,23 +9,23 @@ On a high level, the steps in migration process are:
 
 ### Assessment
 
-Please follow the [assessment workflow](../reference/workflows/assessment.md) 
+Please follow the [assessment workflow](docs/reference/workflows/assessment.md) 
 
 ### Group Migration
 
-Please follow the [group migration workflow](../reference/workflows/group_migration.md)
+Please follow the [group migration workflow](docs/reference/workflows/group_migration.md)
 
 ### Table Migration
 
-Please follow the [table migration process](../process/table_migration.md)
+Please follow the [table migration process](docs/process/table_migration.md)
 
 ### Post Migration Data Reconciliation
 
-Please follow the [post-migration data reconciliation workflow](../reference/workflows/reconciliation.md)
+Please follow the [post-migration data reconciliation workflow](docs/reference/workflows/reconciliation.md)
 
 ### Code Migration
 
-Please follow the [code migration commands](../reference/commands/code.md)
+Please follow the [code migration commands](docs/reference/commands/code.md)
 
 {{% /steps %}}
 

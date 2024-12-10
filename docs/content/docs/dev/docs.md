@@ -58,6 +58,11 @@ You can reference them in your markdown files using the following syntax:
 ![Alt text](/images/image.png)
 ```
 
+{{< callout type="info" >}}
+Please note that image paths should start with `/images/` and be relative to the `docs/static` directory.
+
+{{< /callout >}}
+
 ## Using shortcodes
 
 Shortcodes are used to add reusable components to the documentation. You can find the list of available shortcodes in the [Hextra documentation](https://imfing.github.io/hextra/docs/guide/shortcodes/).
@@ -67,6 +72,40 @@ We mainly use the following shortcodes:
 - [tabs](https://imfing.github.io/hextra/docs/guide/shortcodes/tabs/)
 - [steps](https://imfing.github.io/hextra/docs/guide/shortcodes/steps/)
 
+
+## Using links
+
+When linking to other pages in the documentation, use the following syntax:
+
+```markdown
+[Link text](docs/reference/workflows/group_migration.md)
+```
+
+Please note that paths should be relative to the `docs/content` directory.
+
+{{< callout type="info" >}}
+Please make sure to use relative paths when linking to other pages in the documentation. This way, the links will work correctly when the documentation is deployed.
+{{< /callout >}}
+
+To reference the index for a folder (e.g. `_index.md` file), use the following syntax:
+
+```markdown
+[Link text](docs/reference/workflows/)
+```
+
+This will link to the `_index.md` file in the `docs/content/docs/reference/workflows` directory.
+
+Links to specific anchors in other files should be formatted as follows:
+
+```markdown
+[Link text](docs/reference/workflows/group_migration.md#group-migration-workflow)
+```
+
+Links to local anchors should be formatted as follows:
+
+```markdown
+[Link text](#using-links)
+```
 
 
 

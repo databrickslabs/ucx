@@ -73,7 +73,7 @@ to be _dangling_ objects. For now, these objects are tracked separately, thus no
 
 ## Persistence
 
-The progress is persisted in the [UCX UC catalog](../reference/table_persistence.md) so that migration progress can be
+The progress is persisted in the [UCX UC catalog](docs/reference/table_persistence.md) so that migration progress can be
 tracked cross-workspace. The catalog contains the tables below.
 
 ### Historical
