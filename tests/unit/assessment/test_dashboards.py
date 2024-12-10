@@ -79,7 +79,7 @@ def test_query_from_lakeview_dataset(dataset: Dataset, parent: str | None, expec
                     Widget(visualization=LegacyVisualization(query=LegacyQuery(id="qid1"))),
                     Widget(visualization=LegacyVisualization(query=LegacyQuery(id="qid2"))),
                 ],
-                user_id="Cor",
+                user_id=123456789,
             ),
             Dashboard("did", "name", "parent", ["qid1", "qid2"], ["tag1", "tag2"], "Cor"),
         ),
