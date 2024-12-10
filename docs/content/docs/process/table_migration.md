@@ -7,11 +7,26 @@ You are required to complete the [assessment workflow](docs/reference/workflows/
 This section explains how to migrate Hive metastore data objects to Unity Catalog. The table migration process consists
 of more steps than only a [workflow](#table-migration-workflow), these steps are:
 
-1. [Table mapping](#table-mapping) : Create a file that maps Hive metastore data objects to Unity Catalog locations.
-2. [Data access](#data-access) : Setup identities to access table data.
-3. [New Unity Catalog resources](#new-unity-catalog-resources) : Create **new** Unity Catalog resources that do not
-   require touching existing Hive metastore resources.
-4. [Migrate Hive metastore data objects](#migrate-hive-metastore-data-objects) : Migrate Hive metastore data objects to UC.
+{{% steps %}}
+
+### Step 1 - table mapping
+
+Create a file that maps Hive metastore data objects to Unity Catalog locations. For details, check [table mapping](#table-mapping) section. 
+
+### Step 2 - data access
+
+Setup cloud principals to access data in Unity Catalog and during the table migration. For details, check [data access](#data-access) section.
+
+### Step 3 - Create new Unity Catalog resources
+
+Create new Unity Catalog resources that do not require touching existing Hive metastore resources. For details, check [new Unity Catalog resources](#new-unity-catalog-resources) section.
+
+### Step 4 - Migrate Hive metastore data objects
+
+Migrate Hive metastore data objects to Unity Catalog. For details, check [migrate Hive metastore data objects](#migrate-hive-metastore-data-objects) section.
+
+{{% /steps %}}
+
 
 ### Table mapping
 

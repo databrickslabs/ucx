@@ -84,7 +84,7 @@ When linking to other pages in the documentation, use the following syntax:
 Please note that paths should be relative to the `docs/content` directory.
 
 {{< callout type="info" >}}
-Please make sure to use relative paths when linking to other pages in the documentation. This way, the links will work correctly when the documentation is deployed.
+Please make sure to use correct paths when linking to other pages in the documentation. This way, the links will work correctly when the documentation is deployed.
 {{< /callout >}}
 
 To reference the index for a folder (e.g. `_index.md` file), use the following syntax:

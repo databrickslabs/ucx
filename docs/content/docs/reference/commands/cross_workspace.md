@@ -15,6 +15,14 @@ workspace information with the UCX installations. Once the workspace information
 
 ## `sync-workspace-info` command
 
+{{< callout type="warning" >}}
+This command requires Databricks Account Administrator privileges. 
+
+Use `--profile` to select the Databricks cli profile configured
+with access to the Databricks account console (with account-level endpoint "https://accounts.cloud.databricks.com/"
+or "https://accounts.azuredatabricks.net").
+{{< /callout >}}
+
 ```text
 databricks --profile ACCOUNTS labs ucx sync-workspace-info
 14:07:07  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
@@ -25,9 +33,7 @@ databricks --profile ACCOUNTS labs ucx sync-workspace-info
 ...
 ```
 
-> Requires Databricks Account Administrator privileges. Use `--profile` to select the Databricks cli profile configured
-> with access to the Databricks account console (with endpoint "https://accounts.cloud.databricks.com/"
-> or "https://accounts.azuredatabricks.net").
+
 
 This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
 necessary to create an immutable default catalog mapping for [table migration](docs/process/table_migration) process and is the prerequisite
@@ -65,11 +71,16 @@ Databricks Account Administrators. It can also be used to manually create the wo
 
 ## `create-account-groups` command
 
+{{< callout type="warning" >}}
+This command requires Databricks Account Administrator privileges.
+{{< /callout >}}
+
 ```text
 $ databricks labs ucx create-account-groups [--workspace-ids 123,456,789]
 ```
 
-**Requires Databricks Account Administrator privileges.** This command creates account-level groups if a workspace local
+
+This command creates account-level groups if a workspace local
 group is not present in the account. It crawls all workspaces configured in `--workspace-ids` flag, then creates
 account level groups if a WS local group is not present in the account. If `--workspace-ids` flag is not specified, UCX
 will create account groups for all workspaces configured in the account.
