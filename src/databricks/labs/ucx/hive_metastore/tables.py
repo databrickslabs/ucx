@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import re
 import typing
@@ -85,6 +87,27 @@ class Table:  # pylint: disable=too-many-public-methods
     def __post_init__(self) -> None:
         if isinstance(self.table_format, str):  # Should not happen according to type hint, still safer
             self.table_format = self.table_format.upper()
+
+    @classmethod
+    def from_historical_data(cls, data: dict[str, str]) -> Table:
+        kwargs: dict[str, str | bool] = {
+            "catalog": data["catalog"],
+            "database": data["database"],
+            "name": data["name"],
+            "table_format": data["table_format"],
+            "location": data["table_format"],
+        }
+        if "location" in data:
+            kwargs["location"] = data["location"]
+        if "view_text" in data:
+            kwargs["view_text"] = data["view_text"]
+        if "upgraded_to" in data:
+            kwargs["upgraded_to"] = data["upgraded_to"]
+        if "storage_properties" in data:
+            kwargs["storage_properties"] = data["storage_properties"]
+        if "is_partitioned" in data:
+            kwargs["is_partitioned"] = bool(data["is_partitioned"])
+        return cls(**kwargs)  # type: ignore
 
     @property
     def is_delta(self) -> bool:
