@@ -53,6 +53,15 @@ def mock_installation() -> MockInstallation:
                 },
             ],
             'state.json': {'resources': {'jobs': {'test': '123', 'assessment': '456'}}},
+            'pipeline_mapping.csv': [
+                {
+                    'src_pipeline_id': '123',
+                    'target_catalog_name': 'catalog',
+                    'target_schema_name': 'schema',
+                    'target_pipeline_name': 'pipeline',
+                    'workspace_name': 'workspace',
+                }
+            ],
         }
     )
 
