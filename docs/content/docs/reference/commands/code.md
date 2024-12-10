@@ -1,11 +1,10 @@
 # Code migration commands
 
-See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
+See the [migration process diagram](docs/process/overview.md#diagram) to understand the role of the code migration commands in the migration process.
 
-After you're done with the [table migration](#Table-Migration), you can proceed to the code migration.
+After you're done with the [table migration](docs/reference/workflows/table_migration.md), you can proceed to the code migration.
 
-Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
-clusters to be UC compatible.
+Once you're done with the code migration, you can run the [`cluster-remap` command](docs/reference/commands/cross_workspace/#cluster-remap-command) to remap the clusters to be UC compatible.
 
 
 
@@ -43,13 +42,15 @@ the automated transformation process.
 
 ## `migrate-dbsql-dashboards` command
 
+{{< callout type="warning">}}
+**Experimental**: once [table migration](docs/reference/workflows/table_migration.md) is complete, you can run this command to
+migrate all Databricks SQL dashboards in the workspace. At this moment, this command is highly experimental and discards
+formatting during the automated transformation process.
+{{< /callout >}}
+
 ```text
 databricks labs ucx migrate-dbsql-dashboards [--dashboard-id <dashboard-id>]
 ```
-
-**(Experimental)** Once [table migration](#Table-Migration) is complete, you can run this command to
-migrate all Databricks SQL dashboards in the workspace. At this moment, this command is highly experimental and discards
-formatting during the automated transformation process.
 
 This command tags dashboards & queries that have been migrated with `migrated by UCX` tag. The original queries are
 also backed up in the ucx installation folder, to allow for easy rollback (see [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)).
@@ -62,12 +63,16 @@ This command is incremental and can be run multiple times to migrate new dashboa
 
 ## `revert-dbsql-dashboards` command
 
+{{< callout type="warning">}}
+**Experimental**: this command reverts the migration of Databricks SQL dashboards in the workspace, after
+`migrate-dbsql-dashboards` command is executed.
+{{< /callout >}}
+
 ```text
 databricks labs ucx revert-dbsql-dashboards [--dashboard-id <dashboard-id>]
 ```
 
-**(Experimental)** This command reverts the migration of Databricks SQL dashboards in the workspace, after
-`migrate-dbsql-dashboards` command is executed.
+
 
 This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
 

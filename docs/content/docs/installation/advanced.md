@@ -1,6 +1,6 @@
 ---
-title: Advanced setup steps
-linkTitle: Advanced setup steps
+title: Advanced
+linkTitle: Advanced
 weight: 5
 ---
 

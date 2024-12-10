@@ -3,6 +3,9 @@ title: Overview
 linkTitle: Overview
 weight: 1
 ---
+
+## Steps
+
 On a high level, the steps in migration process are:
 
 {{% steps %}}
@@ -29,6 +32,7 @@ Please follow the [code migration commands](docs/reference/commands/code.md)
 
 {{% /steps %}}
 
+## Diagram
 
 The migration process can be schematic visualized as:
 

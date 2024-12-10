@@ -30,14 +30,3 @@ Workspaces can be grouped into collections to manage UCX migration at collection
 Please follow the instructions to [join a collection](docs/installation/collection) if you want to join an existing collection or create a new one.
 
 {{% /steps %}}
-
-
-
-
-## Next
-
-Use the assessment workflow as described here:
-
-{{< cards >}}
-  {{< card link="../tutorial" title="Tutorial" icon="document-text" subtitle="Learn how to use UCX" >}}
-{{< /cards >}}

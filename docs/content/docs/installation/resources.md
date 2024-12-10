@@ -36,14 +36,12 @@ Every installation creates a `DEBUG` notebook, that initializes UCX as a library
 
 ![debug](/images/debug-logs.png)
 
-The [workflow](#workflows) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed
-every minute in a separate file. Debug logs for [the command-line interface](#authenticate-databricks-cli) are shown
-by adding the `--debug` flag:
+The [workflow](docs/reference/workflows.md) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed every minute in a separate file. Debug logs for [the command-line interface](docs/installation/databricks_cli.md) are shown by adding the `--debug` flag:
 
 ```bash
 databricks --debug labs ucx <command>
 ```
 
-## Installation configuration
+## Installation configuration persistence
 
-In the installation folder, the UCX configuration is kept.
+The UCX configuration is stored in the installation folder.
