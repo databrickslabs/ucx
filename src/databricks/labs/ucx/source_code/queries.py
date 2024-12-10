@@ -171,8 +171,8 @@ class QueryLinter:
                     dataclasses.replace(
                         problem,
                         dashboard_id=dashboard.id,
-                        dashboard_parent=dashboard.parent,
-                        dashboard_name=dashboard.name,
+                        dashboard_parent=dashboard.parent or "PARENT",
+                        dashboard_name=dashboard.name or "UNKNOWN",
                     )
                 )
             dfsas = self.collect_dfsas_from_query(dashboard.id, query)
@@ -180,7 +180,7 @@ class QueryLinter:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
                     object_id=dashboard.id,
-                    other={"parent": dashboard.parent, "name": dashboard.name},
+                    other={"parent": dashboard.parent or "PARENT", "name": dashboard.name or "UNKNOWN"},
                 )
                 source_lineage = [atom] + dfsa.source_lineage
                 query_dfsas.append(dataclasses.replace(dfsa, source_lineage=source_lineage))
@@ -189,7 +189,7 @@ class QueryLinter:
                 atom = LineageAtom(
                     object_type="DASHBOARD",
                     object_id=dashboard.id,
-                    other={"parent": dashboard.parent, "name": dashboard.name},
+                    other={"parent": dashboard.parent or "PARENT", "name": dashboard.name or "UNKNOWN"},
                 )
                 source_lineage = [atom] + table.source_lineage
                 query_tables.append(dataclasses.replace(table, source_lineage=source_lineage))
