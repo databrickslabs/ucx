@@ -457,6 +457,10 @@ class GlobalContext(abc.ABC):
         return TableMapping(self.installation, self.workspace_client, self.sql_backend)
 
     @cached_property
+    def directfs_mapping(self) -> DirectFsMapping:
+        return DirectFsMapping(self.installation, self.workspace_client, self.sql_backend)
+
+    @cached_property
     def catalog_schema(self) -> CatalogSchema:
         return CatalogSchema(self.workspace_client, self.table_mapping, self.migrate_grants, self.config.ucx_catalog)
 

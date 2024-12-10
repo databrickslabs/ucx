@@ -197,6 +197,20 @@ def create_table_mapping(
         if len(workspace_contexts) == 1:
             webbrowser.open(f"{w.config.host}/#workspace{path}")
 
+@ucx.command
+def create_directfs_mapping(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
+    """Create DirectFS mapping for all the direcfs references in the workspace"""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+
+    if ctx:
+        workspace_contexts = [ctx]
+    for workspace_context in workspace_contexts:
+        workspace_context.directfs_mapping.create_directfs_mapping()
 
 @ucx.command
 def validate_external_locations(
