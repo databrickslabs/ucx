@@ -86,10 +86,10 @@ class Dashboard:
     id: str
     """The ID for this dashboard."""
 
-    name: str = "UNKNOWN"
+    name: str | None = None
     """The title of the dashboard that appears in list views and at the top of the dashboard page."""
 
-    parent: str = "ORPHAN"
+    parent: str | None = None
     """The identifier of the workspace folder containing the object."""
 
     query_ids: list[str] = field(default_factory=list)

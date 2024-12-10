@@ -155,7 +155,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mo
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     assert "Cannot list next Redash dashboards page" in caplog.messages
     ws.dashboards.list.assert_called_once()
 
@@ -169,7 +169,7 @@ def test_redash_dashboard_crawler_stops_when_debug_listing_upper_limit_reached(m
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     ws.dashboards.list.assert_called_once()
 
 
@@ -181,7 +181,7 @@ def test_redash_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None:
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     ws.dashboards.get.assert_called_once_with("did1")
     ws.dashboards.list.assert_not_called()
 
@@ -201,7 +201,7 @@ def test_redash_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_bac
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     assert "Cannot get Redash dashboard: did2" in caplog.messages
     ws.dashboards.get.assert_has_calls([call("did1"), call("did2")])
     ws.dashboards.list.assert_not_called()
@@ -273,7 +273,7 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     ws.dashboards.list.assert_called_once()
 
 
@@ -426,7 +426,7 @@ def test_lakeview_dashboard_crawler_includes_dashboard_ids(mock_backend) -> None
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     ws.lakeview.get.assert_called_once_with("did1")
     ws.lakeview.list.assert_not_called()
 
@@ -446,7 +446,7 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
         crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     assert "Cannot get Lakeview dashboard: did2" in caplog.messages
     ws.lakeview.get.assert_has_calls([call("did1"), call("did2")])
     ws.lakeview.list.assert_not_called()
@@ -501,7 +501,7 @@ def test_lakeview_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_bac
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
-    assert rows == [Row(id="did1", name="UNKNOWN", parent="ORPHAN", query_ids=[], tags=[])]
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[])]
     ws.lakeview.list.assert_called_once()
 
 
