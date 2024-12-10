@@ -20,9 +20,11 @@ from databricks.sdk.service.sql import (
 from databricks.labs.ucx.assessment.dashboards import (
     LakeviewDashboardCrawler,
     Dashboard,
+    DashboardOwnership,
     RedashDashboardCrawler,
     Query,
 )
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership
 
 
 @pytest.mark.parametrize(
@@ -580,3 +582,15 @@ def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_
     assert len(queries) == 0
     assert "Cannot get Lakeview dashboard: did" in caplog.messages
     ws.lakeview.get.assert_called_once_with("did")
+
+
+def test_dashboard_ownership_owner_of_from_dashboard_creator() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
+    ownership = DashboardOwnership(administrator_locator, workspace_path_ownership)
+
+    owner = ownership.owner_of(Dashboard("id", creator="Cor"))
+
+    assert owner == "Cor"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    workspace_path_ownership.owner_of_path.assert_not_called()

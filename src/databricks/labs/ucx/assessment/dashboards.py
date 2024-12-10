@@ -14,6 +14,7 @@ from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyQuery
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, WorkspacePathOwnership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 
@@ -373,3 +374,21 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
                 if self._include_query_ids is not None and dataset.name not in self._include_query_ids:
                     continue
                 yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
+
+
+class DashboardOwnership(Ownership[Dashboard]):
+    """Determine ownership of dashboard in the inventory.
+
+    This is the dashboard creator (if known) otherwise the parent (path) owner (if known).
+    """
+
+    def __init__(self, administrator_locator: AdministratorLocator, workspace_path_ownership: WorkspacePathOwnership) -> None:
+        super().__init__(administrator_locator)
+        self._workspace_path_ownership = workspace_path_ownership
+
+    def _maybe_direct_owner(self, record: Dashboard) -> str | None:
+        if record.creator:
+            return record.creator
+        if record.parent:
+            return self._workspace_path_ownership.owner_of_path(record.parent)
+        return None
