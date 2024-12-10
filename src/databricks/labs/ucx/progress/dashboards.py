@@ -71,7 +71,9 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
                     continue
                 dashboard_id = direct_fs_access.source_lineage[0].object_id
                 query_id = direct_fs_access.source_lineage[1].object_id  # <dashboard id>/<query id>
-                query_name = direct_fs_access.source_lineage[1].other.get("name", "UNKNOWN")
+                query_name = "UNKNOWN"
+                if direct_fs_access.source_lineage[1].other and "name" in direct_fs_access.source_lineage[1].other:
+                    query_name = direct_fs_access.source_lineage[1].other["name"]
                 # Follow same failure message structure as the QueryProblem above and DirectFsAccessPyLinter deprecation
                 code = "direct-filesystem-access"
                 message = f"The use of direct filesystem references is deprecated: {direct_fs_access.path}"
