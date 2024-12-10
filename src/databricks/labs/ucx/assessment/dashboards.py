@@ -100,6 +100,7 @@ class Dashboard:
 
     @classmethod
     def from_sdk_redash_dashboard(cls, dashboard: SdkRedashDashboard) -> Dashboard:
+        assert dashboard.id
         query_ids = []
         for widget in dashboard.widgets or []:
             if widget.visualization is None:
@@ -110,7 +111,7 @@ class Dashboard:
                 continue
             query_ids.append(widget.visualization.query.id)
         return cls(
-            id=dashboard.id or cls.id,
+            id=dashboard.id,
             name=dashboard.name or cls.name,
             parent=dashboard.parent or cls.parent,
             query_ids=query_ids,
