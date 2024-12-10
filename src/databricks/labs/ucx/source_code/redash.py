@@ -40,7 +40,7 @@ class Redash:
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
 
     def revert_dashboards(self, *dashboard_ids: str) -> None:
-        for dashboard in self._list_dashboards(*dashboard_ids, force_refresh=True):  # Refresh for up-to-date tags
+        for dashboard in self._list_dashboards(*dashboard_ids):  # Refresh for up-to-date tags
             if self.MIGRATED_TAG not in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} was not migrated by UCX")
                 continue
@@ -48,11 +48,10 @@ class Redash:
                 self._revert_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_original_tags(dashboard.tags))
 
-    def _list_dashboards(self, *dashboard_ids: str, force_refresh: bool = False) -> list[Dashboard]:
+    def _list_dashboards(self, *dashboard_ids: str) -> list[Dashboard]:
         """List the Redash dashboards."""
         # Cached property is not used as this class in used from the CLI, thus called once per Python process
-        dashboards_snapshot = self._crawler.snapshot(force_refresh=force_refresh)
-        dashboards = [d for d in dashboards_snapshot if not dashboard_ids or d.id in dashboard_ids]
+        dashboards = [d for d in self._crawler.snapshot() if not dashboard_ids or d.id in dashboard_ids]
         return dashboards
 
     def _fix_query(self, query: Query) -> None:

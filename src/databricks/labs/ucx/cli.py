@@ -776,6 +776,7 @@ def migrate_dbsql_dashboards(
 def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None, ctx: WorkspaceContext | None = None):
     """Revert migrated DBSQL Dashboard queries back to their original state"""
     ctx = ctx or WorkspaceContext(w)
+    ctx.redash_crawler.snapshot(force_refresh=True)  # Need the latest tags before reverting dashboards
     if dashboard_id:
         ctx.redash.revert_dashboards(dashboard_id)
     else:
