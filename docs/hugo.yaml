@@ -13,6 +13,11 @@ build:
       target: css
 
 params:
+
+  editURL:
+    enable: true
+    base: "https://databrickslabs.github.io/ucx/edit/main"
+  
   theme:
     default: dark
     displayToggle: true

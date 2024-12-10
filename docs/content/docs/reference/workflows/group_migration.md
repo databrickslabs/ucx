@@ -1,7 +1,7 @@
 ## Group migration workflow
 
 {{<callout type="warning">}}
-You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
+You are required to complete the [assessment workflow](../workflows/assessment.md) before starting the table migration workflow.
 {{</callout>}}
 
 **The group migration workflow does NOT CREATE account groups.** In contrast to account groups, [the (legacy)

@@ -1,22 +1,51 @@
-<a
-    {{- $u := urls.Parse .Destination }}
-    {{- if $u.IsAbs }}
-        href="{{ .Destination | safeURL }}"
+{{- $attrs := dict }}
+{{- $u := urls.Parse .Destination }}
+
+{{- if $u.IsAbs }}
+  {{- /* Remote */}}
+  {{- $attrs = dict "href" $u.String "rel" "external" }}
+{{- else }}
+  {{- with $u.Path }}
+    {{- with $.Page.GetPage . }}
+      {{- /* Page */}}
+      {{- $href := .RelPermalink }}
+      {{- with $u.RawQuery }}
+        {{- $href = printf "%s?%s" $href $u.RawQuery }}
+      {{- end }}
+      {{- with $u.Fragment }}
+        {{- $href = printf "%s#%s" $href $u.Fragment }}
+      {{- end }}
+      {{- $attrs = dict "href" $href }}
     {{- else }}
-        {{ if strings.HasSuffix $u.Path ".md" -}}
-            {{ with .Page.GetPage $u.Path }}
-                href="{{ .RelPermalink | safeURL }}{{ with $u.Fragment }}#{{ . }}{{ end }}"
-            {{ else }}
-                {{- errorf "Page does not exist: %s on page content/%s.md" $u.Path .Page.Path }}
-            {{ end }}
-        {{- else -}}
-            {{ warnf "Please use a path to a .md file to check link exists (%s on page content%s.md)" .Destination .Page.Path }}
-        {{- end -}}
+      {{- with $.Page.Resources.GetMatch $u.Path }}
+        {{- /* Page resource; drop query and fragment */}}
+        {{- $attrs = dict "href" .RelPermalink }}
+      {{- else }}
+        {{- with resources.Get $u.Path }}
+          {{- /* Global resource; drop query and fragment */}}
+          {{- $attrs = dict "href" .RelPermalink }}
+        {{- else }}
+          {{- warnf "[output] %s" $attrs -}}
+          {{- warnf "Unable to resolve reference to %s from %s" $u.Path ($.Page.File.Path | absURL) }}
+        {{- end }}
+      {{- end }}
     {{- end }}
-    {{- with .Title }}
-        title="{{ . }}"
-    {{ end -}}
->
-    {{- with .Text | safeHTML }}{{ . }}{{ end -}}
-</a>
-{{- /* chomp trailing newline */ -}}
+  {{- else }}
+    {{- with $u.Fragment }}
+      {{- /* Fragment only; prepend page's relative permalink */}}
+      {{- $attrs = dict "href" (printf "%s#%s" $.Page.RelPermalink .) }}
+    {{- else }}
+      {{- errorf "Unable to resolve reference to %s from %s" $u.Path $.Page.File.Path }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- with .Title }}
+  {{- $attrs = merge $attrs (dict "title" .) }}
+{{- end -}}
+
+<a
+{{- range $k, $v := $attrs }}
+  {{- printf " %s=%q" $k $v | safeHTMLAttr }}
+{{- end -}}
+>{{ .Text | safe.HTML }}</a>
