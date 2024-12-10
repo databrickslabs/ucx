@@ -13,7 +13,6 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 
 def test_running_real_assessment_job_ext_hms(
-    ws,
     installation_ctx,
     env_or_skip,
     make_cluster_policy,
