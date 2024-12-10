@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def sql_backend(ws, env_or_skip) -> SqlBackend:
+    """Ensure the SQL backend used during fixture setup is attached to the external HMS.
+
+    Various resources are created during setup of the installation context: this ensures that
+    they are created in the external HMS where the assessment workflow will be run. (Otherwise they will not be found.)
+    """
     cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
     return CommandExecutionBackend(ws, cluster_id)
 
