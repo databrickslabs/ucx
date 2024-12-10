@@ -357,11 +357,9 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
 
             Different to the Redash crawler, Lakeview queries are part of the (serialized) dashboard definition.
         """
-        sdk_dashboards = []
         if dashboard:
             sdk_dashboard = self._get_dashboard(dashboard_id=dashboard.id)
-            if sdk_dashboard:
-                sdk_dashboards.append(sdk_dashboard)
+            sdk_dashboards = [sdk_dashboard] if sdk_dashboard else []
         else:
             sdk_dashboards = self._list_dashboards()
         for sdk_dashboard in sdk_dashboards:
