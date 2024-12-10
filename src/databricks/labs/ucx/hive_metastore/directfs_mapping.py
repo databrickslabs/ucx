@@ -1,3 +1,3 @@
-class TableMapping:
+class DirectFsMapping:
     FILENAME = 'directfs_mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
