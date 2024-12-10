@@ -17,21 +17,8 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
     return CommandExecutionBackend(ws, cluster_id)
 
 
-def test_running_real_assessment_job_ext_hms(
-    installation_ctx,
-    env_or_skip,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
-) -> None:
+def test_running_real_assessment_job_ext_hms(installation_ctx, env_or_skip) -> None:
     main_cluster_id = env_or_skip("TEST_EXT_HMS_NOUC_CLUSTER_ID")
-    ws_group, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
-    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=PermissionLevel.CAN_USE,
-        group_name=ws_group.display_name,
-    )
     ext_hms_ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
@@ -46,6 +33,14 @@ def test_running_real_assessment_job_ext_hms(
             r".*connect to the external metastore?.*": "yes",
             r"Choose a cluster policy": "0",
         },
+    )
+    del installation_ctx  # Use ext_hms_ctx from now on instead of installation_ctx to ensure the external HMS is used.
+    ws_group, _ = ext_hms_ctx.make_ucx_group(wait_for_provisioning=True)
+    cluster_policy = ext_hms_ctx.make_cluster_policy()
+    ext_hms_ctx.make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=ws_group.display_name,
     )
     ext_hms_ctx.make_linting_resources()
     source_schema = ext_hms_ctx.make_schema(catalog_name="hive_metastore")
