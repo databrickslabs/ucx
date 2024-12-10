@@ -224,10 +224,6 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         Args:
             dashboard (DashboardType | None) : List queries for dashboard. If None, list all queries.
                 Defaults to None.
-
-        Note:
-            This public method does not adhere to the common crawler layout, still, it is implemented to avoid/postpone
-            another crawler for the queries by retrieving the queries every time they are requested.
         """
         if dashboard:
             queries_iterator = self._list_legacy_queries_from_dashboard(dashboard)
