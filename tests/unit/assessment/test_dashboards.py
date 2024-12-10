@@ -124,7 +124,9 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
     crawler.snapshot()
 
     rows = mock_backend.rows_written_for("hive_metastore.test.redash_dashboards", "overwrite")
-    assert rows == [Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"], creator=None)]
+    assert rows == [
+        Row(id="did", name="name", parent="parent", query_ids=["qid1", "qid2"], tags=["tag1", "tag2"], creator=None)
+    ]
     ws.dashboards.list.assert_called_once()
 
 

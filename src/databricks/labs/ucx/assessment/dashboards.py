@@ -382,7 +382,9 @@ class DashboardOwnership(Ownership[Dashboard]):
     This is the dashboard creator (if known) otherwise the parent (path) owner (if known).
     """
 
-    def __init__(self, administrator_locator: AdministratorLocator, workspace_path_ownership: WorkspacePathOwnership) -> None:
+    def __init__(
+        self, administrator_locator: AdministratorLocator, workspace_path_ownership: WorkspacePathOwnership
+    ) -> None:
         super().__init__(administrator_locator)
         self._workspace_path_ownership = workspace_path_ownership
 
