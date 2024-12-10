@@ -178,7 +178,7 @@ class LineageAtom:
 
     object_type: str
     object_id: str
-    other: dict[str, str] = field(default_factory=dict)
+    other: dict[str, str] | None = None
 
 
 @dataclass
