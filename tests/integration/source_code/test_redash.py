@@ -29,6 +29,7 @@ def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
     query_not_migrated = installation_ctx.workspace_client.queries.get(query_outside_dashboard.id)
     assert Redash.MIGRATED_TAG not in (query_not_migrated.tags or [])
 
+    installation_ctx.redash_crawler.snapshot(force_refresh=True)  # Update the dashboard tags
     installation_ctx.redash.revert_dashboards(dashboard.id)  # Revert removes migrated tag
 
     @retried(on=[ValueError], timeout=dt.timedelta(seconds=90))
