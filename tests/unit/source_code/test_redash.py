@@ -79,7 +79,6 @@ def test_migrate_all_dashboards(ws, empty_index, redash_installation, redash_das
             'catalog': 'hive_metastore',
             'id': '1',
             'name': 'test_query',
-            'parent': 'ORPHAN',
             'query': 'SELECT * FROM old.things',
             'schema': 'default',
             'tags': ['test_tag'],
