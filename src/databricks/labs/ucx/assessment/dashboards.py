@@ -151,8 +151,8 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "redash_dashboards", Dashboard)
         self._ws = ws
-        self._include_dashboard_ids = include_dashboard_ids or []
-        self._include_query_ids = include_query_ids or []
+        self._include_dashboard_ids = include_dashboard_ids
+        self._include_query_ids = include_query_ids
         self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def _crawl(self) -> Iterable[Dashboard]:
@@ -165,7 +165,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         return dashboards
 
     def _list_dashboards(self) -> list[SdkRedashDashboard]:
-        if self._include_dashboard_ids:
+        if self._include_dashboard_ids is not None:
             return self._get_dashboards(*self._include_dashboard_ids)
         try:
             dashboards_iterator = self._ws.dashboards.list()
@@ -244,7 +244,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
 
     def _list_all_legacy_queries(self) -> Iterator[LegacyQuery]:
         """List all queries."""
-        if self._include_query_ids:
+        if self._include_query_ids is not None:
             yield from self._get_legacy_queries(*self._include_query_ids)
         else:
             try:
@@ -254,7 +254,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
 
     def _list_legacy_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
         """List queries from dashboard."""
-        if self._include_query_ids:
+        if self._include_query_ids is not None:
             query_ids = set(dashboard.query_ids) & set(self._include_query_ids)
         else:
             query_ids = set(dashboard.query_ids)
@@ -306,8 +306,8 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", Dashboard)
         self._ws = ws
-        self._include_dashboard_ids = include_dashboard_ids or []
-        self._include_query_ids = include_query_ids or []
+        self._include_dashboard_ids = include_dashboard_ids
+        self._include_query_ids = include_query_ids
 
     def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
@@ -319,7 +319,7 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         return dashboards
 
     def _list_dashboards(self) -> list[SdkLakeviewDashboard]:
-        if self._include_dashboard_ids:
+        if self._include_dashboard_ids is not None:
             return self._get_dashboards(*self._include_dashboard_ids)
         try:
             # If the API listing limit becomes an issue in testing, please see the `:class:RedashDashboardCrawler`
@@ -371,6 +371,6 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         for sdk_dashboard in sdk_dashboards:
             lsql_dashboard = _convert_sdk_to_lsql_lakeview_dashboard(sdk_dashboard)
             for dataset in lsql_dashboard.datasets:
-                if self._include_query_ids and dataset.name not in self._include_query_ids:
+                if self._include_query_ids is not None and dataset.name not in self._include_query_ids:
                     continue
                 yield Query.from_lakeview_dataset(dataset, parent=sdk_dashboard.dashboard_id)
