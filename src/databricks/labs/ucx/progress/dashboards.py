@@ -5,10 +5,13 @@ from functools import cached_property
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.assessment.dashboards import Dashboard, DashboardOwnership
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
+from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
 class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
@@ -19,6 +22,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         sql_backend: SqlBackend,
         ownership: DashboardOwnership,
         direct_fs_access_crawlers: list[DirectFsAccessCrawler],
+        used_tables_crawlers: list[UsedTablesCrawler],
         inventory_database: str,
         run_id: int,
         workspace_id: int,
@@ -36,6 +40,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         )
         self._inventory_database = inventory_database
         self._direct_fs_access_crawlers = direct_fs_access_crawlers
+        self._used_tables_crawlers = used_tables_crawlers
 
     @cached_property
     def _query_problems(self) -> dict[str, list[str]]:
@@ -74,6 +79,37 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
                 index[dashboard_id].append(failure)
         return index
 
+    @cached_property
+    def _used_tables(self) -> dict[str, list[UsedTable]]:
+        index = collections.defaultdict(list)
+        for crawler in self._used_tables_crawlers:
+            for used_table in crawler.snapshot():
+                # The dashboard and query source lineage are added by the QueryLinter
+                if len(used_table.source_lineage) < 2:
+                    continue
+                if used_table.source_lineage[0].object_type != "DASHBOARD":  # Note: this skips dangling queries
+                    continue
+                if used_table.source_lineage[1].object_type != "QUERY":
+                    continue
+                dashboard_id = used_table.source_lineage[0].object_id
+                index[dashboard_id].append(used_table)
+        return index
+
+    @cached_property
+    def _tables_failures(self) -> dict[str, list[str]]:
+        table_failures = {}
+        for row in self._sql_backend.fetch(
+            f"SELECT * FROM `{self._catalog}`.`{self._schema}`.`objects_snapshot` WHERE object_type = 'Table'"
+        ):
+            historical = Historical(**row.asDict())
+            table = Table.from_historical_data(historical.data)
+            table_failures[table.full_name] = historical.failures
+        index = collections.defaultdict(list)
+        for dashboard_id, used_tables in self._used_tables.items():
+            for used_table in used_tables:
+                index[dashboard_id].extend(table_failures.get(used_table.full_name, []))
+        return index
+
     def _encode_record_as_historical(self, record: Dashboard) -> Historical:
         """Encode a dashboard as a historical records.
 
@@ -85,5 +121,5 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         failures = []
         failures.extend(self._query_problems.get(record.id, []))
         failures.extend(self._direct_fs_accesses.get(record.id, []))
-        # TODO: Add UsedTable
+        failures.extend(self._tables_failures.get(record.id, []))
         return replace(historical, failures=historical.failures + failures)
