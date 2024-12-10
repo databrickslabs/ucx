@@ -3,6 +3,7 @@ import dataclasses
 import pytest
 
 from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
+from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.iam import PermissionLevel
 
 
@@ -36,7 +37,7 @@ def test_running_real_assessment_job_ext_hms(installation_ctx, env_or_skip) -> N
     )
     del installation_ctx  # Use ext_hms_ctx from now on instead of installation_ctx to ensure the external HMS is used.
     ws_group, _ = ext_hms_ctx.make_ucx_group(wait_for_provisioning=True)
-    cluster_policy = ext_hms_ctx.make_cluster_policy()
+    cluster_policy: CreatePolicyResponse = ext_hms_ctx.make_cluster_policy()
     ext_hms_ctx.make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
