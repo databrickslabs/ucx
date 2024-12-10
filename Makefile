@@ -38,7 +38,5 @@ docs-test:
 	@echo 'Make sure to run `make docs` in another terminal'
 	cd docs && yarn linkinator http://localhost:1313/ucx/
 
-docs-test-md:
-	cd docs && hugo --minify && yarn linkinator 'content/**/*.md'
 
 .PHONY: all clean dev lint fmt test integration coverage known solacc docs docs-test
