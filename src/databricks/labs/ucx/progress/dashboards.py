@@ -32,7 +32,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         direct_fs_access_crawlers: list[DirectFsAccessCrawler],
         used_tables_crawlers: list[UsedTablesCrawler],
         inventory_database: str,
-        run_id: int,
+        job_run_id: int,
         workspace_id: int,
         catalog: str,
     ) -> None:
@@ -40,7 +40,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
             sql_backend,
             ownership,
             Dashboard,
-            run_id,
+            job_run_id,
             workspace_id,
             catalog,
             "multiworkspace",
