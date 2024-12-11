@@ -820,6 +820,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
     make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
     env_or_skip,
     make_random,
 ) -> MockRuntimeContext:
@@ -836,6 +838,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
         make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope,
+        make_secret_scope_acl,
         env_or_skip,
         ws,
         make_random,
@@ -959,7 +963,7 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
 class MockInstallationContext(MockRuntimeContext):
     __test__ = False
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments, too-many-locals
         self,
         make_catalog_fixture,
         make_schema_fixture,
