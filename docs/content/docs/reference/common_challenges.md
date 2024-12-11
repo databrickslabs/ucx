@@ -26,7 +26,7 @@ not, make necessary changes to the network/firewall settings.
 
 **From Databricks workspace to PyPi:** There are some dependent
 libraries which need to be installed from
-[<u>pypi.org</u>](https://pypi.org/) to run the UCX workflows from the
+[pypi.org](https://pypi.org/) to run the UCX workflows from the
 Databricks workspace. If the workspace doesn’t have network
 connectivity, then the job might fail with
 NO_MATCHING_DISTRIBUTION_ERROR.
@@ -86,7 +86,7 @@ you are not an admin (and some possible solutions) can be found
 
 **User is not a Cloud IAM Administrator:** Cloud CLI needs to be
 installed in the local machine for certain cloud related activities,
-like creating an [uber principal](/docs/reference/commands/table.md#create-uber-principal-command).
+like creating an [uber principal](docs/reference/commands.md#create-uber-principal).
 For this, the user needs Cloud IAM Administrator privileges.
 
 **Solution:** Work with a cloud administrator in your organization to
@@ -94,21 +94,21 @@ run the commands that need cloud administrator rights.
 
 Admin privileges required for commands:
 
-| **CLI command**                                                                                  | **Admin privileges** |
-|--------------------------------------------------------------------------------------------------|----|
-| [<u>install</u>](#install-ucx)                                                                   | Workspace Admin |
-| [<u>account install</u>](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account) | Account Admin |
-| [<u>create-account-groups</u>](#create-account-groups-command)                                   | Account Admin |
-| [<u>validate-groups-membership</u>](#validate-groups-membership-command)                         | Account Admin |
-| [<u>create-uber-principal</u>](#create-uber-principal-command)                                   | Cloud Admin |
-| [<u>principal-prefix-access</u>](#principal-prefix-access-command)                               | Cloud Admin |
-| [<u>create-missing-principals</u>](#create-missing-principals-command-aws-only)                  | Cloud Admin |
-| [<u>delete-missing-principals</u>](#delete-missing-principals-command-aws-only)                  | Cloud Admin |
-| [<u>migrate-credentials</u>](#migrate-credentials-command)                                       | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
-| [<u>migrate-location</u>](#migrate-locations-command)                                            | Metastore Admin / CREATE EXTERNAL LOCATION privilege |
-| [<u>create-catalogs-schemas</u>](#create-catalogs-schemas-command)                               | Metastore Admin / CREATE CATALOG privilege |
-| [<u>sync-workspace-info</u>](#sync-workspace-info-command)                                       | Account Admin |
-| [<u>manual-workspace-info</u>](#manual-workspace-info-command)                                   | Workspace Admin |
+| **CLI command**                                                                            | **Admin privileges**                                                               |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [install](docs/installation/install_ucx.md)                                         | Workspace Admin                                                                    |
+| [account install](docs/installation/collection.md)                                  | Account Admin                                                                      |
+| [create-account-groups](docs/reference/commands.md#create-account-groups)           | Account Admin                                                                      |
+| [validate-groups-membership](docs/reference/commands.md#validate-groups-membership) | Account Admin                                                                      |
+| [create-uber-principal](docs/reference/commands.md#create-uber-principal)           | Cloud Admin                                                                        |
+| [principal-prefix-access](docs/reference/commands.md#principal-prefix-access)       | Cloud Admin                                                                        |
+| [create-missing-principals](docs/reference/commands.md#create-missing-principals)   | Cloud Admin                                                                        |
+| [delete-missing-principals](docs/reference/commands.md#delete-missing-principals)   | Cloud Admin                                                                        |
+| [migrate-credentials](docs/reference/commands.md#migrate-credentials)               | Cloud Admin, Account Admin / Metastore Admin / CREATE STORAGE CREDENTIAL privilege |
+| [migrate-location](docs/reference/commands.md#migrate-locations)                    | Metastore Admin / CREATE EXTERNAL LOCATION privilege                               |
+| [create-catalogs-schemas](docs/reference/commands.md#create-catalogs-schemas)       | Metastore Admin / CREATE CATALOG privilege                                         |
+| [sync-workspace-info](docs/reference/commands.md#sync-workspace-info)               | Account Admin                                                                      |
+| [manual-workspace-info](docs/reference/commands.md#manual-workspace-info)           | Workspace Admin                                                                    |
 
 
 
@@ -124,7 +124,7 @@ higher.
 
 **Solution:** Check the current version with `databricks --version`. For
 lower versions of CLI,
-[<u>update</u>](https://docs.databricks.com/en/dev-tools/cli/install.html#update)
+[update](https://docs.databricks.com/en/dev-tools/cli/install.html#update)
 the Databricks CLI on the local machine.
 
 **UCX:** When you install UCX, you get the latest version. But since UCX
@@ -156,13 +156,10 @@ configured in .databrickscfg, you will get an error message
 first".
 
 **Solution:** To authenticate with a Databricks account, consider using
-one of the following authentication types: [<u>OAuth machine-to-machine
-(M2M)
-authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#m2m-auth),
-[<u>OAuth user-to-machine (U2M)
-authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#u2m-auth),
-[<u>Basic authentication
-(legacy)</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#basic-auth).
+one of the following authentication types: 
+- [OAuth machine-to-machine (M2M) authentication](https://docs.databricks.com/en/dev-tools/cli/authentication.html#m2m-auth)
+- [OAuth user-to-machine (U2M) authentication](https://docs.databricks.com/en/dev-tools/cli/authentication.html#u2m-auth)
+- [Basic authentication (legacy)](https://docs.databricks.com/en/dev-tools/cli/authentication.html#basic-auth)
 
 
 
@@ -174,7 +171,7 @@ Dev and Prod workspaces. You want to install UCX only for the Prod
 workspace.
 
 **Solution:** The Databricks CLI provides an option to select the
-[<u>profile</u>](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
+[profile](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
 using `--profile \<profile_name\>` or `-p \<profile_name\>`. You can
 test that the correct workspace is getting selected by running any
 Databricks CLI command. For example, you can run `databricks clusters

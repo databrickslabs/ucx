@@ -13,5 +13,5 @@ User should be an account admin to be able to join a collection.
 
 
 {{<callout type="info">}}
-You can read more about cross-workspace installation [here](docs/reference/commands/cross_workspace).
+You can read more about cross-workspace installation [here](docs/reference/commands.md#cross-workspace-installations).
 {{< /callout >}}

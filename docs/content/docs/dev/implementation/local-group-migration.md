@@ -68,7 +68,7 @@ is created, you can call the `inventorize_permissions` method to crawl and save 
 the inventory database in the `permissions` table.
 
 The `apply_group_permissions` method allows you to apply the permissions to a list of account groups, while
-the [`verify_group_permissions` method](docs/reference/commands/cross_workspace.md#validate-groups-membership-command) verifies that the permissions are valid.
+the [`verify_group_permissions` method](docs/reference/commands.md#validate-groups-membership) verifies that the permissions are valid.
 
 
 
