@@ -6,7 +6,8 @@ from databricks.labs.ucx.assessment.dashboards import Dashboard
 from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.progress.dashboards import DashboardProgressEncoder
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.base import LineageAtom
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
@@ -29,7 +30,22 @@ def test_dashboard_progress_encoder_no_failures() -> None:
     )
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "user"
+    dfsa = DirectFsAccess(
+        source_id="/path/to/write_dfsa.py",
+        source_lineage=[
+            LineageAtom(
+                object_type="DASHBOARD",
+                object_id="12345",  # Not a match with dashboard below, hence no failure
+                other={"parent": "parent", "name": "dashboard"},
+            ),
+            LineageAtom(object_type="QUERY", object_id="did/qid", other={"name": "query"}),
+        ],
+        path="dfsa:/path/to/data/",
+        is_read=False,
+        is_write=True,
+    )
     direct_fs_access_crawler = create_autospec(DirectFsAccessCrawler)
+    direct_fs_access_crawler.snapshot.return_value = [dfsa]
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     encoder = DashboardProgressEncoder(
         mock_backend,
@@ -88,6 +104,53 @@ def test_dashboard_progress_encoder_query_problem_as_failure() -> None:
         catalog="test",
     )
     dashboard = Dashboard("12345")
+
+    encoder.append_inventory_snapshot([dashboard])
+
+    rows = mock_backend.rows_written_for(escape_sql_identifier(encoder.full_name), "append")
+    assert rows, f"No rows written for: {encoder.full_name}"
+    assert rows[0].failures == failures
+    ownership.owner_of.assert_called_once()
+    direct_fs_access_crawler.snapshot.assert_called_once()
+    used_tables_crawler.snapshot.assert_called_once()
+
+
+def test_dashboard_progress_encoder_direct_filesystem_access(mock_backend) -> None:
+    failures = [
+        "[direct-filesystem-access] query (did/qid) : "
+        "The use of direct filesystem references is deprecated: dfsa:/path/to/data/",
+    ]
+
+    ownership = create_autospec(Ownership)
+    ownership.owner_of.return_value = "user"
+    dfsa = DirectFsAccess(
+        source_id="/path/to/write_dfsa.py",
+        source_lineage=[
+            LineageAtom(
+                object_type="DASHBOARD",
+                object_id="did",
+                other={"parent": "parent", "name": "dashboard"},
+            ),
+            LineageAtom(object_type="QUERY", object_id="did/qid", other={"name": "query"}),
+        ],
+        path="dfsa:/path/to/data/",
+        is_read=False,
+        is_write=True,
+    )
+    direct_fs_access_crawler = create_autospec(DirectFsAccessCrawler)
+    direct_fs_access_crawler.snapshot.return_value = [dfsa]
+    used_tables_crawler = create_autospec(UsedTablesCrawler)
+    encoder = DashboardProgressEncoder(
+        mock_backend,
+        ownership,
+        [direct_fs_access_crawler],
+        [used_tables_crawler],
+        inventory_database="inventory",
+        run_id=1,
+        workspace_id=123456789,
+        catalog="test",
+    )
+    dashboard = Dashboard("did")
 
     encoder.append_inventory_snapshot([dashboard])
 
