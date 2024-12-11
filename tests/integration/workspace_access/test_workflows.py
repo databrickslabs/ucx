@@ -1,5 +1,6 @@
 import datetime as dt
 from dataclasses import replace
+from gettext import install
 
 import pytest
 from databricks.sdk.retries import retried
@@ -7,11 +8,11 @@ from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
+from integration.conftest import installation_ctx
+
 
 def test_running_real_migrate_groups_job(
     installation_ctx,
-    make_secret_scope,
-    make_secret_scope_acl,
 ) -> None:
     """Test the migrate groups workflow.
 
@@ -49,8 +50,8 @@ def test_running_real_migrate_groups_job(
     installation_ctx.make_grant(ws_group.display_name, 'SELECT', table_info=table)
 
     # TODO: Move `make_secret_scope` and `make_secret_scope_acl` to context like other `make_` methods
-    secret_scope = make_secret_scope()
-    make_secret_scope_acl(scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
+    secret_scope = installation_ctx.make_secret_scope()
+    installation_ctx.make_secret_scope_acl(scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
 
     # TODO: Move `include_object_permissions` to context like other `include_` attributes
     # Limit the considered permissions to the following objects:
