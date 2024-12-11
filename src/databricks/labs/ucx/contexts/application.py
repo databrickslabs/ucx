@@ -14,6 +14,7 @@ from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.hive_metastore.directfs_mapping import DirectFsMapping
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler

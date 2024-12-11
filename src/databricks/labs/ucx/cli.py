@@ -197,6 +197,7 @@ def create_table_mapping(
         if len(workspace_contexts) == 1:
             webbrowser.open(f"{w.config.host}/#workspace{path}")
 
+
 @ucx.command
 def create_directfs_mapping(
     w: WorkspaceClient,
@@ -209,8 +210,11 @@ def create_directfs_mapping(
 
     if ctx:
         workspace_contexts = [ctx]
-    for workspace_context in workspace_contexts:
-        workspace_context.directfs_mapping.create_directfs_mapping()
+    for workspace_ctx in workspace_contexts:
+        workspace_ctx.directfs_mapping.save(
+            workspace_ctx.directfs_crawler, workspace_ctx.tables_crawler, workspace_ctx.workspace_info
+        )
+
 
 @ucx.command
 def validate_external_locations(
