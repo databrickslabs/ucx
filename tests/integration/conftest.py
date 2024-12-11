@@ -471,6 +471,8 @@ class MockRuntimeContext(
         make_lakeview_dashboard_fixture,
         make_cluster_policy_fixture,
         make_cluster_policy_permissions_fixture,
+        make_secret_scope_fixture,
+        make_secret_scope_acl_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
@@ -494,6 +496,8 @@ class MockRuntimeContext(
         self._make_lakeview_dashboard = make_lakeview_dashboard_fixture
         self._make_cluster_policy = make_cluster_policy_fixture
         self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
+        self._make_secret_scope = make_secret_scope_fixture
+        self._make_secret_scope_acl = make_secret_scope_acl_fixture
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
@@ -575,6 +579,12 @@ class MockRuntimeContext(
 
     def make_cluster_policy_permissions(self, **kwargs):
         return self._make_cluster_policy_permissions(**kwargs)
+
+    def make_secret_scope(self, **kwargs):
+        return self._make_secret_scope(**kwargs)
+
+    def make_secret_scope_acl(self, **kwargs):
+        return self._make_secret_scope_acl(**kwargs)
 
     def make_job(self, **kwargs) -> Job:
         job = self._make_job(**kwargs)
@@ -967,6 +977,8 @@ class MockInstallationContext(MockRuntimeContext):
         make_lakeview_dashboard_fixture,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope_fixture,
+        make_secret_scope_acl_fixture,
         ws_fixture,
         watchdog_purge_suffix,
     ):
@@ -983,6 +995,8 @@ class MockInstallationContext(MockRuntimeContext):
             make_lakeview_dashboard_fixture,
             make_cluster_policy,
             make_cluster_policy_permissions,
+            make_secret_scope_fixture,
+            make_secret_scope_acl_fixture,
             env_or_skip_fixture,
             ws_fixture,
             make_random_fixture,
@@ -1167,6 +1181,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
     make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
@@ -1186,6 +1202,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
         make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope,
+        make_secret_scope_acl,
         ws,
         watchdog_purge_suffix,
     )
