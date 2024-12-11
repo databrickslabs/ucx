@@ -117,7 +117,9 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
     def _get_tables_failures(self) -> DashboardIdToFailuresType:
         table_failures = {}
         for row in self._sql_backend.fetch(
-            f"SELECT * FROM `{self._catalog}`.`{self._schema}`.`objects_snapshot` WHERE object_type = 'Table'"
+            f"SELECT * FROM objects_snapshot WHERE object_type = 'Table'",
+            catalog=self._catalog,
+            schema=self._schema,
         ):
             historical = Historical(**row.asDict())
             table = Table.from_historical_data(historical.data)
