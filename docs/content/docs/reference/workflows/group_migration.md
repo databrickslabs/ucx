@@ -12,7 +12,7 @@ using [identity federation](https://docs.databricks.com/en/admin/users-groups/in
 to manage groups from a single place: your Databricks account. We expect UCX users to create account groups
 centrally while most other Databricks resources that UCX touches are scoped to a single workspace.
 If you do not have account groups matching the workspace in which UCX is installed, please
-run [`create-account-groups` command](#create-account-groups-command) before running the group migration workflow.
+run [`create-account-groups` command](docs/reference/commands.md#create-account-groups) before running the group migration workflow.
 
 The group migration workflow is designed to migrate workspace-local groups to account-level groups. It verifies if
 the necessary groups are available to the workspace with the correct permissions, and removes unnecessary groups and
@@ -20,7 +20,7 @@ permissions. The group migration workflow depends on the output of the assessmen
 executed after a successful run of the assessment workflow. The group migration workflow may be executed multiple times.
 
 1. `verify_metastore_attached`: Verifies if a metastore is attached. Account level groups are only available when
-    a metastore is attached. [See `assign-metastore` command.](#assign-metastore-command)
+    a metastore is attached. [See `assign-metastore` command.](docs/reference/commands.md#assign-metastore)
 2. `rename_workspace_local_groups`: This task renames workspace-local groups by adding a `ucx-renamed-` prefix. This
    step is taken to avoid conflicts with account groups that may have the same name as workspace-local groups.
 3. `reflect_account_groups_on_workspace`: This task adds matching account groups to this workspace. The matching account
@@ -52,13 +52,13 @@ executed after a successful run of the assessment workflow. The group migration 
    destination groups.
 
 After successfully running the group migration workflow:
-1. Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence the newly created
+1. Use [`validate-groups-membership` command](docs/reference/commands.md#validate-groups-membership) for extra confidence the newly created
    account level groups are considered to be valid.
-2. Run the [`remove-workspace-local-backup-grups`](#validate-groups-membership-command) to remove workspace-level backup
+2. Run the [`remove-workspace-local-backup-grups`](docs/reference/commands.md#validate-groups-membership) to remove workspace-level backup
    groups, along with their permissions. This should only be executed after confirming that the workspace-local
    migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and
    remove any unnecessary groups and permissions.
-3. Proceed to the [table migration process](#Table-Migration).
+3. Proceed to the [table migration process](docs/process/table_migration.md).
 
 For additional information see:
 - The [detailed design](docs/dev/implementation/local-group-migration.md) of thie group migration workflow.

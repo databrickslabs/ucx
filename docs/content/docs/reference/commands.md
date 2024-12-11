@@ -40,7 +40,7 @@ With modern IDEs, clicking on the file link opens the file at the problematic li
 databricks labs ucx migrate-local-code
 ```
 
-**(Experimental)** Once [table migration](#Table-Migration) is complete, you can run this command to
+**(Experimental)** Once [table migration](docs/process/table_migration.md) is complete, you can run this command to
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during
 the automated transformation process.
@@ -374,9 +374,9 @@ across workspaces.
 
 ## Table migration commands
 
-These commands are vital part of [table migration process](#Table-Migration) process and require
-the [assessment workflow](#assessment-workflow) and
-[group migration workflow](#group-migration-workflow) to be completed.
+These commands are vital part of [table migration process](docs/process/table_migration.md) process and require
+the [assessment workflow](docs/reference/workflows/assessment.md) and
+[group migration workflow](docs/reference/workflows/group_migration.md) to be completed.
 See the [migration process diagram](docs/process/overview.md#diagram) to understand the role of the table migration commands in
 the migration process.
 
@@ -512,15 +512,15 @@ databricks labs ucx create-uber-principal [--subscription-ids X]
 
 
 
-Once the [`assessment` workflow](#assessment-workflow) complete, you should run this command to create a service principal with the
+Once the [`assessment` workflow](docs/reference/workflows/assessment.md) complete, you should run this command to create a service principal with the
 _**read-only access to all storage**_ used by tables in this workspace. It will also configure the
-[UCX Cluster Policy](#installation) & SQL Warehouse data access configuration to use this service principal for migration
+[UCX Cluster Policy](docs/installation) & SQL Warehouse data access configuration to use this service principal for migration
 workflows. Once migration is complete, this service principal should be unprovisioned.
 
 On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using
 Azure Resource Manager APIs.
 
-This command is one of prerequisites for the [table migration process](#table-migration).
+This command is one of prerequisites for the [table migration process](docs/process/table_migration.md).
 
 
 
@@ -634,7 +634,7 @@ databricks labs ucx skip --schema X [--table Y] [--view Z]
 
 Anytime after [`create-table-mapping` command](#create-table-mapping) is executed, you can run this command.
 
-This command allows users to skip certain schemas, tables or views during the [table migration](#table-migration) process.
+This command allows users to skip certain schemas, tables or views during the [table migration](docs/process/table_migration.md) process.
 The command takes `--schema` and, optionally, `--table` and `--view` flags to specify the schema, table or view to skip.
 If no `--table` flag is provided, all tables in the specified HMS database are skipped. The `--table` and `--view` can
 only be used exclusively. This command is useful to temporarily disable migration of a particular schema, table or view.
@@ -715,7 +715,7 @@ databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-ca
 ```
 
 This command moves a UC table/tables from one schema to another schema after
-the [table migration](#Table-Migration) process. This is useful for developers and administrators who want
+the [table migration](docs/process/table_migration.md) process. This is useful for developers and administrators who want
 to adjust their catalog structure after tables upgrade.
 
 Users will be prompted whether tables/view are dropped after moving to new schema. This only applies to `MANAGED` tables and views.
@@ -873,7 +873,7 @@ Path                                      Database  Warehouse
 /Users/serge.smertin@databricks.com/.ucx  ucx       675eaf1ff976aa98
 ```
 
-This command displays the [installations](#installation) by different users on the same workspace. It fetches all
+This command displays the [installations](docs/installation/advanced.md) by different users on the same workspace. It fetches all
 the installations where the `ucx` package is installed and prints their details in JSON format. This command is useful
 for administrators who want to see which users have installed `ucx` and where. It can also be used to debug issues
 related to multiple installations of `ucx` on the same workspace.

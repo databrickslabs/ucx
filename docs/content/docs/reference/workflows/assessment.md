@@ -3,13 +3,13 @@
 ![ucx_assessment_workflow](/images/ucx_assessment_workflow.png)
 
 The assessment workflow can be triggered using the Databricks UI or via the
-[`ensure-assessment-run` command](#ensure-assessment-run-command).
+[`ensure-assessment-run` command](docs/reference/commands.md#ensure-assessment-run).
 
 The assessment workflow retrieves - or *crawls* - details of [workspace assets](https://docs.databricks.com/en/workspace/workspace-assets.html)
 and [securable objects in the Hive metastore](https://docs.databricks.com/en/data-governance/table-acls/object-privileges.html#securable-objects-in-the-hive-metastore)
 relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` tasks retrieve assess and objects. The
 `assess_` tasks assess the compatibility with UC. The output of each task is stored in the
-[inventory database](#installation-resources) so that it can be used for further analysis and decision-making through
+[inventory database](docs/installation/resources.md) so that it can be used for further analysis and decision-making through
 the [assessment report](docs/reference/assessment.md).
 
 1. `crawl_tables`: This task retrieves table definitions from the Hive metastore and persists the definitions in
