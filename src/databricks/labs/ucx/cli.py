@@ -212,7 +212,9 @@ def create_directfs_mapping(
         workspace_contexts = [ctx]
     for workspace_ctx in workspace_contexts:
         workspace_ctx.directfs_mapping.save(
-            workspace_ctx.directfs_crawler, workspace_ctx.tables_crawler, workspace_ctx.workspace_info
+            [workspace_ctx.directfs_access_crawler_for_paths, workspace_ctx.directfs_access_crawler_for_queries],
+            workspace_ctx.tables_crawler,
+            workspace_ctx.workspace_info,
         )
 
 

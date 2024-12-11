@@ -66,7 +66,7 @@ class DirectFsMapping:
 
     def directfs_list(
         self,
-        directfs_crawler: DirectFsAccessCrawler,
+        directfs_crawlers: list[DirectFsAccessCrawler],
         tables_crawler: TablesCrawler,
         workspace_name: str,
         catalog_name: str,
@@ -75,7 +75,9 @@ class DirectFsMapping:
         List all direct filesystem access records.
         """
         directfs_snapshot = []
-        directfs_crawler.dump_all(directfs_snapshot)
+        for crawler in directfs_crawlers:
+            for directfs_access in crawler.snapshot():
+                directfs_snapshot.append(directfs_access)
         tables_snapshot = list(tables_crawler.snapshot())
         if not tables_snapshot:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
@@ -85,6 +87,7 @@ class DirectFsMapping:
             raise ValueError(msg)
 
         # TODO: very inefficient search, just for initial testing
+        #
         for table in tables_snapshot:
             for directfs_record in directfs_snapshot:
                 if table.location:
@@ -100,15 +103,15 @@ class DirectFsMapping:
                         )
 
     def save(
-        self, directfs_crawler: DirectFsAccessCrawler, tables_crawler: TablesCrawler, workspace_info: WorkspaceInfo
+        self,
+        directfs_crawlers: list[DirectFsAccessCrawler],
+        tables_crawler: TablesCrawler,
+        workspace_info: WorkspaceInfo,
     ) -> str:
         """
         Save direct filesystem access records to a CSV file.
         """
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
-        directfs_records = []
-
-
-        directfs_records = self.directfs_list(directfs_crawler,  tables_crawler, workspace_name, default_catalog_name)
+        directfs_records = self.directfs_list(directfs_crawlers, tables_crawler, workspace_name, default_catalog_name)
         return self._installation.save(list(directfs_records), filename=self.FILENAME)
