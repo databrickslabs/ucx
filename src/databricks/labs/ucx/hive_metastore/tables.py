@@ -94,8 +94,8 @@ class Table:  # pylint: disable=too-many-public-methods
             "catalog": data["catalog"],
             "database": data["database"],
             "name": data["name"],
+            "object_type": data["object_type"],
             "table_format": data["table_format"],
-            "location": data["table_format"],
         }
         if "location" in data:
             kwargs["location"] = data["location"]
