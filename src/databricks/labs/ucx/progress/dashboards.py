@@ -1,10 +1,12 @@
 import collections
+import logging
+from collections.abc import Iterable
 from dataclasses import replace
-from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.assessment.dashboards import Dashboard, DashboardOwnership
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
@@ -12,6 +14,12 @@ from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+
+
+logger = logging.getLogger(__name__)
+
+
+DashboardIdToFailuresType = dict[str, list[str]]  # dict[<dashboard id>, list[<failure message>]]
 
 
 class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
@@ -42,8 +50,19 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         self._direct_fs_access_crawlers = direct_fs_access_crawlers
         self._used_tables_crawlers = used_tables_crawlers
 
-    @cached_property
-    def _query_problems(self) -> dict[str, list[str]]:
+    def append_inventory_snapshot(self, snapshot: Iterable[Dashboard]) -> None:
+        query_problems = self._get_query_problems()
+        dfsas = self._get_direct_filesystem_accesses()
+        table_failures = self._get_tables_failures()
+        history_records = []
+        for record in snapshot:
+            history_record = self._encode_dashboard_as_historical(record, query_problems, dfsas, table_failures)
+            history_records.append(history_record)
+        logger.debug(f"Appending {len(history_records)} {self._klass} table record(s) to history.")
+        # The mode is 'append'. This is documented as conflict-free.
+        self._sql_backend.save_table(escape_sql_identifier(self.full_name), history_records, Historical, mode="append")
+
+    def _get_query_problems(self) -> DashboardIdToFailuresType:
         index = collections.defaultdict(list)
         for row in self._sql_backend.fetch(
             'SELECT * FROM query_problems',
@@ -57,8 +76,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
             index[problem.dashboard_id].append(failure)
         return index
 
-    @cached_property
-    def _direct_fs_accesses(self) -> dict[str, list[str]]:
+    def _get_direct_filesystem_accesses(self) -> DashboardIdToFailuresType:
         index = collections.defaultdict(list)
         for crawler in self._direct_fs_access_crawlers:
             for direct_fs_access in crawler.snapshot():
@@ -81,8 +99,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
                 index[dashboard_id].append(failure)
         return index
 
-    @cached_property
-    def _used_tables(self) -> dict[str, list[UsedTable]]:
+    def _get_used_tables(self) -> dict[str, list[UsedTable]]:
         index = collections.defaultdict(list)
         for crawler in self._used_tables_crawlers:
             for used_table in crawler.snapshot():
@@ -97,8 +114,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
                 index[dashboard_id].append(used_table)
         return index
 
-    @cached_property
-    def _tables_failures(self) -> dict[str, list[str]]:
+    def _get_tables_failures(self) -> DashboardIdToFailuresType:
         table_failures = {}
         for row in self._sql_backend.fetch(
             f"SELECT * FROM `{self._catalog}`.`{self._schema}`.`objects_snapshot` WHERE object_type = 'Table'"
@@ -107,21 +123,29 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
             table = Table.from_historical_data(historical.data)
             table_failures[table.full_name] = historical.failures
         index = collections.defaultdict(list)
-        for dashboard_id, used_tables in self._used_tables.items():
-            for used_table in used_tables:
+        used_tables = self._get_used_tables()
+        for dashboard_id, used_tables_in_dashboard in used_tables.items():
+            for used_table in used_tables_in_dashboard:
                 index[dashboard_id].extend(table_failures.get(used_table.full_name, []))
         return index
 
-    def _encode_record_as_historical(self, record: Dashboard) -> Historical:
+    def _encode_dashboard_as_historical(
+        self,
+        record: Dashboard,
+        query_problems: DashboardIdToFailuresType,
+        dfsas: DashboardIdToFailuresType,
+        tables_failures: DashboardIdToFailuresType,
+    ) -> Historical:
         """Encode a dashboard as a historical records.
 
         Failures are detected by the QueryLinter:
         - Query problems
         - Direct filesystem access by code used in query
+        - Hive metastore tables
         """
         historical = super()._encode_record_as_historical(record)
         failures = []
-        failures.extend(self._query_problems.get(record.id, []))
-        failures.extend(self._direct_fs_accesses.get(record.id, []))
-        failures.extend(self._tables_failures.get(record.id, []))
+        failures.extend(query_problems.get(record.id, []))
+        failures.extend(dfsas.get(record.id, []))
+        failures.extend(tables_failures.get(record.id, []))
         return replace(historical, failures=historical.failures + failures)
