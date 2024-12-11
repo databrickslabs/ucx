@@ -74,7 +74,8 @@ class DirectFsMapping:
         """
         List all direct filesystem access records.
         """
-        directfs_snapshot = list(directfs_crawler.snapshot())
+        directfs_snapshot = []
+        directfs_crawler.dump_all(directfs_snapshot)
         tables_snapshot = list(tables_crawler.snapshot())
         if not tables_snapshot:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
@@ -106,7 +107,8 @@ class DirectFsMapping:
         """
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
+        directfs_records = []
 
-        directfs_records = self.directfs_list(directfs_crawler, tables_crawler, workspace_name, default_catalog_name)
 
+        directfs_records = self.directfs_list(directfs_crawler,  tables_crawler, workspace_name, default_catalog_name)
         return self._installation.save(list(directfs_records), filename=self.FILENAME)
