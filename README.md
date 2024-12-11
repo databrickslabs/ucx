@@ -26,7 +26,7 @@ Please refer to the [developer documentation](https://databrickslabs.github.io/u
 
 # Troubleshooting
 
-For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) 
+For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](https://databrickslabs.github.io/ucx/docs/reference/troubleshooting/). 
 
 # Feedback
 
