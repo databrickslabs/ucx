@@ -1,14 +1,14 @@
 # UCX by Databricks Labs
 
-<div style="text-align: center;">
+<p align="center">
     <a href="https://github.com/databrickslabs/ucx">
-        <img src="./docs/static/logo.svg" width="200" height="200" alt="logo" />
+        <img src="./docs/static/logo.svg" class="align-center" width="200" height="200" alt="logo" />
     </a>
-</div>
+</p>
 
-<div style="text-align: center;">
+<p align="center">
     <b>🚀 UCX - Unity Catalog Migration Assistant</b>
-</div>
+</p>
 
 UCX is a command line tool that helps you migrate your Databricks workspace to Unity Catalog. UCX provides a set of commands to help you migrate your tables, dashboards, and notebooks to be UC compatible.
 
