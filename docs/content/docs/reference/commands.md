@@ -377,7 +377,7 @@ across workspaces.
 These commands are vital part of [table migration process](#Table-Migration) process and require
 the [assessment workflow](#assessment-workflow) and
 [group migration workflow](#group-migration-workflow) to be completed.
-See the [migration process diagram](#migration-process) to understand the role of the table migration commands in
+See the [migration process diagram](docs/process/overview.md#diagram) to understand the role of the table migration commands in
 the migration process.
 
 The first step is to run the [`principal-prefix-access` command](#principal-prefix-access) to identify all
@@ -803,7 +803,7 @@ status can be listed with the [`workflows` command](#workflows).
 
 ### `workflows`
 
-See the [migration process diagram](#migration-process) to understand the role of each workflow in the migration process.
+See the [migration process diagram](docs/process/overview.md#diagram) to understand the role of each workflow in the migration process.
 
 ```text
 $ databricks labs ucx workflows

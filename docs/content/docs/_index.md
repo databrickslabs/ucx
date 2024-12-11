@@ -39,6 +39,5 @@ Dive right into the following section to get started:
 
 {{< cards >}}
   {{< card link="installation" title="Installation" icon="document-text" subtitle="Learn how to install UCX" >}}
-  {{< card link="tutorial" title="Tutorial" icon="document-text" subtitle="Learn how to use UCX" >}}
-  {{< card link="reference" title="Reference" icon="document-text" subtitle="Explore the UCX CLI reference" >}}
+  {{< card link="process/overview" title="Overview" icon="document-text" subtitle="Check out the migration process overview" >}}
 {{< /cards >}}

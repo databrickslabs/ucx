@@ -62,7 +62,7 @@ After successfully running the group migration workflow:
 
 For additional information see:
 - The [detailed design](docs/dev/implementation/local-group-migration.md) of thie group migration workflow.
-- The [migration process diagram](#migration-process) showing the group migration workflow in context of the whole
+- The [migration process diagram](docs/process/overview.md#diagram) showing the group migration workflow in context of the whole
   migration process.
 
 
