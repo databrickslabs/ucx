@@ -59,7 +59,7 @@ from databricks.labs.ucx.source_code.used_table import UsedTable, UsedTablesCraw
             owner="cor",
             ucx_version=ucx_version,
         ),
-    ]
+    ],
 )
 def test_dashboard_progress_encoder(expected: Row) -> None:
     # The Mockbackend.fetch ignores the catalog and schema keyword arguments
