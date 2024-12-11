@@ -15,7 +15,11 @@ The output is processed and displayed in the migration dashboard using the in `r
 ![reconciliation results](/images/recon_results.png)
 
 ### [LEGACY] Scan tables in mounts Workflow
-#### <b>Always run this workflow AFTER the assessment has finished</b>
+
+{{< callout type="warning" >}}
+Always run this workflow AFTER the assessment has finished.
+{{< /callout >}}
+
 - This experimental workflow attempts to find all Tables inside mount points that are present on your workspace.
 - If you do not run this workflow, then `migrate-tables-in-mounts-experimental` won't do anything.
 - It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
@@ -31,7 +35,7 @@ The output is processed and displayed in the migration dashboard using the in `r
 ### [LEGACY] Migrate tables in mounts Workflow
 - An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter.
 - You must do the following in order to make this work:
-  - run the Assessment [workflow](#assessment-workflow)
-  - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
-  - run the [`create-table-mapping` command](#create-table-mapping-command)
+  - run the Assessment [workflow](docs/reference/workflows/assessment.md)
+  - run the scan tables in mounts [workflow](#legacy-scan-tables-in-mounts-workflow)
+  - run the [`create-table-mapping` command](docs/reference/commands.md#create-table-mapping)
     - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
