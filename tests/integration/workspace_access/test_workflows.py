@@ -10,8 +10,6 @@ from databricks.sdk.service.workspace import AclPermission
 
 def test_running_real_migrate_groups_job(
     installation_ctx,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
     make_secret_scope,
     make_secret_scope_acl,
 ) -> None:
@@ -37,9 +35,8 @@ def test_running_real_migrate_groups_job(
     """
     ws_group, acc_group = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
-    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
+    cluster_policy = installation_ctx.make_cluster_policy()
+    installation_ctx.make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
