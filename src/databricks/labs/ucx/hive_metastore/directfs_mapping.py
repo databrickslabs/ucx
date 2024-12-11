@@ -2,6 +2,8 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.marketplace import Installation
 
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+
 
 class DirectFsMapping:
     FILENAME = 'directfs_mapping.csv'
@@ -17,3 +19,10 @@ class DirectFsMapping:
         self.installation = installation
         self.workspace_client = workspace_client
         self.sql_backend = sql_backend
+
+
+    def directfs_list(self, directfs_crawler: DirectFsAccessCrawler):
+        """
+        List all direct filesystem access records.
+        """
+        return directfs_crawler.snapshot()
