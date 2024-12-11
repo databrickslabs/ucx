@@ -14,7 +14,7 @@ Each time it will upgrade tables it can and report the ones it can't.
 
 
 
-# Migration dashboard
+## Migration dashboard
 
 We keep track of the migration and provide the user continuous feedback of the progress and status of the
 upgrade. This feedback is presented in the migration dashboard:
@@ -23,7 +23,7 @@ upgrade. This feedback is presented in the migration dashboard:
 
 
 
-# Common considerations
+## Common considerations
 
 1. One view per workspace summarizing all the table inventory and various counters
 1. By default, we create a single catalog per HMS (<prefix (optional)>_<workspace_name>), happens at the account level.
@@ -61,9 +61,9 @@ upgrade. This feedback is presented in the migration dashboard:
 1. We should consider automating ACLs based on Instance Profiles / Service Principals and other legacy security
     mechanisms
 
+## Tables overview
 
-
-## Tables (Parquet/Delta) on DBFS root
+### Tables (Parquet/Delta) on DBFS root
 
 1. By default, we copy the table content (CTAS)
 1. Allow skipping individual tables/databases
@@ -74,7 +74,7 @@ upgrade. This feedback is presented in the migration dashboard:
 
 
 
-## Tables (Parquet/Delta) on Cloud Storage
+### Tables (Parquet/Delta) on Cloud Storage
 
 1. Verify that we have the external locations for these tables
 1. Automate creation of External Locations (Future)
@@ -83,7 +83,7 @@ upgrade. This feedback is presented in the migration dashboard:
 
 
 
-## Tables (None Parquet/Delta)
+### Tables (None Parquet/Delta)
 
 1. Copy this table using CTAS or Deep Clone. (Consider bringing history)
 1. Copy the Metadata

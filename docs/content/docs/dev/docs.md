@@ -138,3 +138,11 @@ Please make sure (especially in Process and Reference sections) to correctly ord
 
 Please don't use nesting when not necessary. 3 levels of nesting are maximum. If you need more, please consider restructuring the content.
 
+
+## File naming
+
+Please follow the `snake_case.md` naming convention for markdown files. This makes it easier to find and reference files in the documentation. For example:
+
+- `group_migration.md`
+- `table.md`
+

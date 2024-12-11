@@ -1,7 +1,7 @@
 Group Name Conflict Resolution
 ===
 
-See [this document](docs/dev/implementation/group_name_conflict) for workspace group migration.
+See [this document](docs/dev/implementation/local_group_migration.md) for workspace group migration.
 
 When migrating multiple workspaces we can run into conflicts.
 These conflicts occur when groups with the same name in different workspaces have different membership and different

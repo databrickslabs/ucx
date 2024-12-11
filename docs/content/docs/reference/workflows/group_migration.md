@@ -61,7 +61,7 @@ After successfully running the group migration workflow:
 3. Proceed to the [table migration process](docs/process/table_migration.md).
 
 For additional information see:
-- The [detailed design](docs/dev/implementation/local-group-migration.md) of thie group migration workflow.
+- The [detailed design](docs/dev/implementation/local_group_migration.md) of thie group migration workflow.
 - The [migration process diagram](docs/process/overview.md#diagram) showing the group migration workflow in context of the whole
   migration process.
 
