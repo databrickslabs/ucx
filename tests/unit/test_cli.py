@@ -1028,28 +1028,15 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-@pytest.mark.parametrize("run_as_collection", [False, True])
-def test_migrate_tables_errors_out_before_assessment(
-    run_as_collection,
-    workspace_clients,
-    acc_client,
-) -> None:
-    if not run_as_collection:
-        workspace_clients = [workspace_clients[0]]
-    run = Run(
-        state=RunState(result_state=RunResultState.SUCCESS),
-        start_time=0,
-        end_time=1000,
-        run_duration=1000,
-    )
-    for workspace_client in workspace_clients:
-        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
-        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.FAILED))]
+def test_migrate_tables_errors_out_before_assessment(ws, acc_client) -> None:
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.side_effect = RuntimeWarning("Verification failed")
+    ctx = WorkspaceContext(ws).replace(verify_progress_tracking=verify_progress_tracking)
 
-    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
+    with pytest.raises(RuntimeWarning, match="Verification failed"):
+        migrate_tables(ws, MockPrompts({}), ctx=ctx, a=acc_client)
 
-    for workspace_client in workspace_clients:
-        workspace_client.jobs.run_now.assert_not_called()
+    ws.jobs.run_now.assert_not_called()
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
