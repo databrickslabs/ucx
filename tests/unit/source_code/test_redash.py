@@ -48,12 +48,7 @@ def list_queries(dashboard: Dashboard) -> list[Query]:
         ),
     ]
     query_mapping = {query.id: query for query in queries}
-    queries_matched = []
-    for query_id in dashboard.query_ids:
-        query = query_mapping.get(query_id)
-        if query:
-            queries_matched.append(query)
-    return queries_matched
+    return [query_mapping[query_id] for query_id in dashboard.query_ids if query_id in query_mapping]
 
 
 @pytest.fixture
