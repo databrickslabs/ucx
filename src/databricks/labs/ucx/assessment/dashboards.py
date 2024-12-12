@@ -54,30 +54,36 @@ class Query:
     @classmethod
     def from_legacy_query(cls, query: LegacyQuery) -> Query:
         """Create query from a :class:LegacyQuery"""
-        assert query.id
-        catalog = schema = None
-        if query.options:
-            catalog = query.options.catalog
-            schema = query.options.schema
-        return cls(
-            id=query.id,
-            name=query.name or cls.name,
-            parent=query.parent or cls.parent,
-            query=query.query or cls.query,
-            catalog=catalog or cls.catalog,
-            schema=schema or cls.schema,
-            tags=query.tags or [],
-        )
+        if not query.id:
+            raise ValueError(f"Query id is required: {query}")
+        kwargs: dict[str, str | list[str]] = {"id": query.id}
+        if query.name:
+            kwargs["name"] = query.name
+        if query.parent:
+            kwargs["parent"] = query.parent
+        if query.query:
+            kwargs["query"] = query.query
+        if query.options and query.options.catalog:
+            kwargs["catalog"] = query.options.catalog
+        if query.options and query.options.schema:
+            kwargs["schema"] = query.options.schema
+        if query.tags:
+            kwargs["tags"] = query.tags
+        return cls(**kwargs)  # type: ignore
 
     @classmethod
     def from_lakeview_dataset(cls, dataset: Dataset, *, parent: str | None = None) -> Query:
         """Create query from a :class:Dataset"""
-        return cls(
-            id=dataset.name,
-            name=dataset.display_name or cls.name,
-            parent=parent or cls.parent,
-            query=dataset.query,
-        )
+        if not dataset.name:
+            raise ValueError(f"Dataset name is required: {dataset}")
+        kwargs = {"id": dataset.name}
+        if dataset.display_name:
+            kwargs["name"] = dataset.display_name
+        if parent:
+            kwargs["parent"] = parent
+        if dataset.query:
+            kwargs["query"] = dataset.query
+        return cls(**kwargs)  # type: ignore
 
 
 @dataclass
