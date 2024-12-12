@@ -27,7 +27,7 @@ def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx) -> N
 
     dfsas = list(simple_ctx.directfs_access_crawler_for_queries.snapshot())
     # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
-    assert dfsas[0] == [
+    assert dfsas == [
         DirectFsAccess(
             source_id=f"{dashboard_with_dfsa.id}/{query_with_dfsa.id}",
             source_lineage=[
