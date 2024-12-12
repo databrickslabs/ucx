@@ -193,7 +193,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             except StopIteration:
                 break
             except DatabricksError as e:
-                logger.warning("Cannot list next Redash dashboards page", exc_info=e)
+                logger.error("Cannot list next Redash dashboards page", exc_info=e)
                 break
         return dashboards
 
