@@ -18,7 +18,7 @@ class LegacyGroupMigration(Workflow):
         Account level groups are only available when a metastore is attached to the workspace.
         """
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         ctx.verify_has_metastore.verify_metastore()
 
@@ -26,7 +26,7 @@ class LegacyGroupMigration(Workflow):
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
         """Renames workspace local groups by adding `db-temp-` prefix."""
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         ctx.group_manager.rename_groups()
 
@@ -35,7 +35,7 @@ class LegacyGroupMigration(Workflow):
         """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
         step to be successful. This process does not create the account level group(s)."""
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         ctx.group_manager.reflect_account_groups_on_workspace()
 
@@ -56,7 +56,7 @@ class LegacyGroupMigration(Workflow):
 
         See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         migration_state = ctx.group_manager.get_migration_state()
         if len(migration_state.groups) == 0:
@@ -68,7 +68,7 @@ class LegacyGroupMigration(Workflow):
     def validate_groups_permissions(self, ctx: RuntimeContext):
         """Validate that all the crawled permissions are applied correctly to the destination groups."""
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         if not ctx.permission_manager.verify_group_permissions():
             raise ValueError(
@@ -89,7 +89,7 @@ class PermissionsMigrationAPI(Workflow):
         Account level groups are only available when a metastore is attached to the workspace.
         """
         if ctx.config.use_legacy_permission_migration:
-            logger.info("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
+            logger.error("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
             return
         ctx.verify_has_metastore.verify_metastore()
 
@@ -97,7 +97,7 @@ class PermissionsMigrationAPI(Workflow):
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
         """Renames workspace local groups by adding `db-temp-` prefix."""
         if ctx.config.use_legacy_permission_migration:
-            logger.info("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
+            logger.error("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
             return
         ctx.group_manager.rename_groups()
 
@@ -106,7 +106,7 @@ class PermissionsMigrationAPI(Workflow):
         """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
         step to be successful. This process does not create the account level group(s)."""
         if ctx.config.use_legacy_permission_migration:
-            logger.info("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
+            logger.error("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
             return
         ctx.group_manager.reflect_account_groups_on_workspace()
 
@@ -130,7 +130,7 @@ class PermissionsMigrationAPI(Workflow):
 
         It covers local workspace-local permissions for all entities."""
         if ctx.config.use_legacy_permission_migration:
-            logger.info("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
+            logger.error("Remove `use_legacy_permission_migration: true` from config.yml to run this workflow.")
             return
         migration_state = ctx.group_manager.get_migration_state()
         if len(migration_state.groups) == 0:
@@ -150,7 +150,7 @@ class ValidateGroupPermissions(Workflow):
     def validate_groups_permissions(self, ctx: RuntimeContext):
         """Validate that all the crawled permissions are applied correctly to the destination groups."""
         if not ctx.config.use_legacy_permission_migration:
-            logger.info("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
+            logger.error("Use `migrate-groups` job, or set `use_legacy_permission_migration: true` in config.yml.")
             return
         if not ctx.permission_manager.verify_group_permissions():
             raise ValueError(
