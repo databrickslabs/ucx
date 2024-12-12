@@ -258,7 +258,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
             try:
                 yield from self._ws.queries_legacy.list()
             except DatabricksError as e:
-                logger.warning("Cannot list Redash queries", exc_info=e)
+                logger.error("Cannot list Redash queries", exc_info=e)
 
     def _list_legacy_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[LegacyQuery]:
         """List queries from dashboard."""
