@@ -14,25 +14,26 @@ def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
 
     dfsas = list(runtime_ctx.directfs_access_crawler_for_queries.snapshot())
     # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
-    assert len(dfsas) == 1, "Expected one DFSA"
-    assert dfsas[0] == DirectFsAccess(
-        source_id=f"{dashboard.id}/{query.id}",
-        source_lineage=[
-            LineageAtom(
-                object_type="DASHBOARD",
-                object_id=dashboard.id,
-                other={"parent": dashboard.parent, "name": dashboard.name},
-            ),
-            LineageAtom(
-                object_type="QUERY",
-                object_id=f"{dashboard.id}/{query.id}",
-                other={"name": query.name},
-            ),
-        ],
-        path="dbfs://some_folder/some_file.csv",
-        is_read=True,
-        is_write=False,
-    )
+    assert dfsas == [
+        DirectFsAccess(
+            source_id=f"{dashboard.id}/{query.id}",
+            source_lineage=[
+                LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard.id,
+                    other={"parent": dashboard.parent, "name": dashboard.name},
+                ),
+                LineageAtom(
+                    object_type="QUERY",
+                    object_id=f"{dashboard.id}/{query.id}",
+                    other={"name": query.name},
+                ),
+            ],
+            path="dbfs://some_folder/some_file.csv",
+            is_read=True,
+            is_write=False,
+        )
+    ]
 
     owner = runtime_ctx.directfs_access_ownership.owner_of(dfsas[0])
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
@@ -50,25 +51,26 @@ def test_lakeview_query_dfsa_ownership(runtime_ctx) -> None:
     # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
     # The "query" in the source and object id, and "count" in the name are hardcoded in the
     # `make_lakeview_dashboard` fixture
-    assert len(dfsas) == 1, "Expected one DFSA"
-    assert dfsas[0] == DirectFsAccess(
-        source_id=f"{dashboard.dashboard_id}/query",
-        source_lineage=[
-            LineageAtom(
-                object_type="DASHBOARD",
-                object_id=dashboard.dashboard_id,
-                other={"parent": dashboard.parent_path, "name": dashboard.display_name},
-            ),
-            LineageAtom(
-                object_type="QUERY",
-                object_id=f"{dashboard.dashboard_id}/query",
-                other={"name": "count"},
-            ),
-        ],
-        path="dbfs://some_folder/some_file.csv",
-        is_read=True,
-        is_write=False,
-    )
+    assert dfsas == [
+        DirectFsAccess(
+            source_id=f"{dashboard.dashboard_id}/query",
+            source_lineage=[
+                LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard.dashboard_id,
+                    other={"parent": dashboard.parent_path, "name": dashboard.display_name},
+                ),
+                LineageAtom(
+                    object_type="QUERY",
+                    object_id=f"{dashboard.dashboard_id}/query",
+                    other={"name": "count"},
+                ),
+            ],
+            path="dbfs://some_folder/some_file.csv",
+            is_read=True,
+            is_write=False,
+        )
+    ]
 
     owner = runtime_ctx.directfs_access_ownership.owner_of(dfsas[0])
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
