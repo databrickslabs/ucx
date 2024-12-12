@@ -32,13 +32,13 @@ def test_table_migration_job_refreshes_migration_status(
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test these workflows.
-    installation_ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
-    assessment_completed_correctly = installation_ctx.deployed_workflows.validate_step("assessment")
+    ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
+    assessment_completed_correctly = ctx.deployed_workflows.validate_step("assessment")
     assert assessment_completed_correctly, "Workflow failed: assessment"
 
     # The workflow under test.
     run_id = ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
-    workflow_completed_correctly = installation_ctx.deployed_workflows.validate_step(workflow)
+    workflow_completed_correctly = ctx.deployed_workflows.validate_step(workflow)
     assert workflow_completed_correctly, f"Workflow failed: {workflow}"
 
     # Avoiding MigrationStatusRefresh as it will refresh the status before fetching.
@@ -73,22 +73,22 @@ def test_table_migration_job_refreshes_migration_status(
 
     # Ensure that the workflow populated the `workflow_runs` table.
     query = f"""
-        SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs
-        WHERE workspace_id = {installation_ctx.workspace_id}
+        SELECT 1 FROM {ctx.ucx_catalog}.multiworkspace.workflow_runs
+        WHERE workspace_id = {ctx.workspace_id}
           AND workflow_run_id = {run_id}
         LIMIT 1
     """
-    assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
+    assert any(ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
 
     # Ensure that the history file has table records written to it that correspond to this run.
     query = f"""
-        SELECT 1 from {installation_ctx.ucx_catalog}.multiworkspace.historical
-        WHERE workspace_id = {installation_ctx.workspace_id}
+        SELECT 1 from {ctx.ucx_catalog}.multiworkspace.historical
+        WHERE workspace_id = {ctx.workspace_id}
           AND job_run_id = {run_id}
           AND object_type = 'Table'
         LIMIT 1
     """
-    assert any(installation_ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
+    assert any(ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
 
 
 @pytest.mark.parametrize(
