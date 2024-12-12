@@ -740,13 +740,10 @@ class MockRuntimeContext(
 
     @property
     def created_queries(self) -> list[str]:
-        query_ids = []
-        for query in self._queries:
-            if query.id and query.id not in query_ids:
-                query_ids.append(query.id)
+        query_ids = {query.id for query in self._queries if query.id}
         if self._lakeview_query_id:
-            query_ids.append(self._lakeview_query_id)
-        return query_ids
+            query_ids.add(self._lakeview_query_id)
+        return list(query_ids)
 
     @property
     def created_dashboards(self) -> list[str]:
