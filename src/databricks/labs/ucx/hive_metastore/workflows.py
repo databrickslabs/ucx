@@ -1,3 +1,5 @@
+import datetime as dt
+
 from databricks.labs.ucx.assessment.workflows import Assessment
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
@@ -57,10 +59,53 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
-    @job_task(job_cluster="user_isolation", depends_on=[migrate_views])
-    def update_migration_status(self, ctx: RuntimeContext):
-        """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.get_remaining_tables()
+    @job_task(job_cluster="user_isolation")
+    def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
+
+    @job_task(
+        depends_on=[
+            convert_managed_table,
+            migrate_external_tables_sync,
+            migrate_dbfs_root_delta_tables,
+            migrate_dbfs_root_non_delta_tables,
+            migrate_views,
+            verify_progress_tracking_prerequisites,
+        ],
+    )
+    def update_table_inventory(self, ctx: RuntimeContext) -> None:
+        """Refresh the tables inventory, prior to updating the migration status of all the tables."""
+        # The table inventory cannot be (quickly) crawled from the table_migration cluster, and the main cluster is not
+        # UC-enabled, so we cannot both snapshot and update the history log from the same location.
+        # Step 1 of 3: Just refresh the tables inventory.
+        ctx.tables_crawler.snapshot(force_refresh=True)
+
+    @job_task(depends_on=[verify_progress_tracking_prerequisites, update_table_inventory], job_cluster="user_isolation")
+    def update_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
+        updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
+
+    @job_task(
+        depends_on=[verify_progress_tracking_prerequisites, update_migration_status], job_cluster="user_isolation"
+    )
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory and migration status."""
+        # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
+        # history log.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
+        tables_snapshot = ctx.tables_crawler.snapshot()
+        # Note: encoding the Table records will trigger loading of the migration-status data.
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run of this workflow."""
+        ctx.workflow_run_recorder.record()
 
 
 class MigrateHiveSerdeTablesInPlace(Workflow):
@@ -86,10 +131,44 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
-    @job_task(job_cluster="user_isolation", depends_on=[migrate_views])
-    def update_migration_status(self, ctx: RuntimeContext):
-        """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.get_remaining_tables()
+    @job_task(job_cluster="user_isolation")
+    def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
+
+    @job_task(depends_on=[verify_progress_tracking_prerequisites, migrate_views])
+    def update_table_inventory(self, ctx: RuntimeContext) -> None:
+        """Refresh the tables inventory, prior to updating the migration status of all the tables."""
+        # The table inventory cannot be (quickly) crawled from the table_migration cluster, and the main cluster is not
+        # UC-enabled, so we cannot both snapshot and update the history log from the same location.
+        # Step 1 of 3: Just refresh the tables inventory.
+        ctx.tables_crawler.snapshot(force_refresh=True)
+
+    @job_task(job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_table_inventory])
+    def update_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
+        updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
+    )
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory and migration status."""
+        # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
+        # history log.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
+        tables_snapshot = ctx.tables_crawler.snapshot()
+        # Note: encoding the Table records will trigger loading of the migration-status data.
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run of this workflow."""
+        ctx.workflow_run_recorder.record()
 
 
 class MigrateExternalTablesCTAS(Workflow):
@@ -120,10 +199,51 @@ class MigrateExternalTablesCTAS(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW)
 
-    @job_task(job_cluster="user_isolation", depends_on=[migrate_views])
-    def update_migration_status(self, ctx: RuntimeContext):
-        """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.get_remaining_tables()
+    @job_task(job_cluster="user_isolation")
+    def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
+
+    @job_task(
+        depends_on=[
+            verify_progress_tracking_prerequisites,
+            migrate_views,
+            migrate_hive_serde_ctas,
+            migrate_other_external_ctas,
+        ]
+    )
+    def update_table_inventory(self, ctx: RuntimeContext) -> None:
+        """Refresh the tables inventory, prior to updating the migration status of all the tables."""
+        # The table inventory cannot be (quickly) crawled from the table_migration cluster, and the main cluster is not
+        # UC-enabled, so cannot both snapshot and update the history log from the same location.
+        # Step 1 of 3: Just refresh the tables inventory.
+        ctx.tables_crawler.snapshot(force_refresh=True)
+
+    @job_task(job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_table_inventory])
+    def update_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
+        updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
+    )
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory and migration status."""
+        # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
+        # history log.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
+        tables_snapshot = ctx.tables_crawler.snapshot()
+        # Note: encoding the Table records will trigger loading of the migration-status data.
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run of this workflow."""
+        ctx.workflow_run_recorder.record()
 
 
 class ScanTablesInMounts(Workflow):
@@ -137,10 +257,36 @@ class ScanTablesInMounts(Workflow):
         replacing any existing content that might be present."""
         ctx.tables_in_mounts.snapshot(force_refresh=True)
 
-    @job_task(job_cluster="user_isolation", depends_on=[scan_tables_in_mounts_experimental])
-    def update_migration_status(self, ctx: RuntimeContext):
-        """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.get_remaining_tables()
+    @job_task(job_cluster="user_isolation")
+    def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
+
+    @job_task(
+        job_cluster="user_isolation",
+        depends_on=[verify_progress_tracking_prerequisites, scan_tables_in_mounts_experimental],
+    )
+    def update_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
+    )
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory and migration status."""
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
+        tables_snapshot = ctx.tables_crawler.snapshot()
+        # Note: encoding the Table records will trigger loading of the migration-status data.
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run of this workflow."""
+        ctx.workflow_run_recorder.record()
 
 
 class MigrateTablesInMounts(Workflow):
@@ -152,7 +298,41 @@ class MigrateTablesInMounts(Workflow):
         """[EXPERIMENTAL] This workflow migrates `delta tables stored in mount points` to Unity Catalog using a Create Table statement."""
         ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
 
-    @job_task(job_cluster="user_isolation", depends_on=[migrate_tables_in_mounts_experimental])
-    def update_migration_status(self, ctx: RuntimeContext):
-        """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.get_remaining_tables()
+    @job_task(job_cluster="user_isolation")
+    def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
+        """Verify the prerequisites for running this job on the table migration cluster are fulfilled."""
+        ctx.verify_progress_tracking.verify(timeout=dt.timedelta(hours=1))
+
+    @job_task(depends_on=[verify_progress_tracking_prerequisites, migrate_tables_in_mounts_experimental])
+    def update_table_inventory(self, ctx: RuntimeContext) -> None:
+        """Refresh the tables inventory, prior to updating the migration status of all the tables."""
+        # The table inventory cannot be (quickly) crawled from the table_migration cluster, and the main cluster is not
+        # UC-enabled, so we cannot both snapshot and update the history log from the same location.
+        # Step 1 of 3: Just refresh the tables inventory.
+        ctx.tables_crawler.snapshot(force_refresh=True)
+
+    @job_task(job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_table_inventory])
+    def update_migration_status(self, ctx: RuntimeContext) -> None:
+        """Scan the tables (and views) in the inventory and record whether each has been migrated or not."""
+        # Step 2 of 3: Refresh the migration status of all the tables (updated in the previous step on the main cluster.)
+        updated_migration_progress = ctx.migration_status_refresher.snapshot(force_refresh=True)
+        ctx.tables_migrator.warn_about_remaining_non_migrated_tables(updated_migration_progress)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_migration_status]
+    )
+    def update_tables_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest tables inventory and migration status."""
+        # Step 3 of 3: Assuming (due to depends-on) the inventory and migration status were refreshed, capture into the
+        # history log.
+        # TODO: Avoid triggering implicit refresh here if either the table or migration-status inventory is empty.
+        tables_snapshot = ctx.tables_crawler.snapshot()
+        # Note: encoding the Table records will trigger loading of the migration-status data.
+        ctx.tables_progress.append_inventory_snapshot(tables_snapshot)
+
+    @job_task(
+        job_cluster="user_isolation", depends_on=[verify_progress_tracking_prerequisites, update_tables_history_log]
+    )
+    def record_workflow_run(self, ctx: RuntimeContext) -> None:
+        """Record the workflow run of this workflow."""
+        ctx.workflow_run_recorder.record()
