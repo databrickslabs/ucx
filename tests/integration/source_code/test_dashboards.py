@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+import datetime as dt
 
 import pytest
 
@@ -61,15 +61,15 @@ def _populate_directfs_problems(installation_ctx):
             is_read=False,
             is_write=True,
             source_id="xyz.py",
-            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
     ]
     installation_ctx.directfs_access_crawler_for_paths.dump_all(dfsas)
@@ -79,13 +79,13 @@ def _populate_directfs_problems(installation_ctx):
             is_read=False,
             is_write=True,
             source_id="xyz.py",
-            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
     ]
     installation_ctx.directfs_access_crawler_for_queries.dump_all(dfsas)
@@ -100,15 +100,15 @@ def _populate_used_tables(installation_ctx):
             is_read=False,
             is_write=True,
             source_id="xyz.py",
-            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
     ]
     installation_ctx.used_tables_crawler_for_paths.dump_all(tables)
@@ -120,13 +120,13 @@ def _populate_used_tables(installation_ctx):
             is_read=False,
             is_write=True,
             source_id="xyz.py",
-            source_timestamp=datetime.now(timezone.utc) - timedelta(hours=2.0),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
                 LineageAtom(object_type="QUERY", object_id="my_dashboard_id/my_query_id", other={"name": "my_query"}),
             ],
-            assessment_start_timestamp=datetime.now(timezone.utc) - timedelta(minutes=5.0),
-            assessment_end_timestamp=datetime.now(timezone.utc) - timedelta(minutes=2.0),
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
     ]
     installation_ctx.used_tables_crawler_for_queries.dump_all(tables)
