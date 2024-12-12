@@ -46,7 +46,6 @@ def test_running_real_migrate_groups_job(
     installation_ctx.make_grant(ws_group.display_name, 'OWN', schema_info=schema)
     installation_ctx.make_grant(ws_group.display_name, 'SELECT', table_info=table)
 
-    # TODO: Move `make_secret_scope` and `make_secret_scope_acl` to context like other `make_` methods
     secret_scope = installation_ctx.make_secret_scope()
     installation_ctx.make_secret_scope_acl(
         scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE
