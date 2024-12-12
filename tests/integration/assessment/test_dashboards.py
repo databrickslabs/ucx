@@ -26,8 +26,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
 
     dashboards = list(crawler.snapshot())
 
-    assert len(dashboards) == 1
-    assert dashboards[0] == Dashboard.from_sdk_redash_dashboard(dashboard)
+    assert dashboards == [Dashboard.from_sdk_redash_dashboard(dashboard)]
 
 
 def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_limit(
@@ -66,5 +65,4 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
 
     dashboards = list(crawler.snapshot())
 
-    assert len(dashboards) == 1
-    assert dashboards[0] == Dashboard.from_sdk_lakeview_dashboard(dashboard)
+    assert dashboards == [Dashboard.from_sdk_lakeview_dashboard(dashboard)]
