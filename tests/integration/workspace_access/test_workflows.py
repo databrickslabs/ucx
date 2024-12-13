@@ -51,7 +51,7 @@ def test_running_real_migrate_groups_job(
         scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE
     )
 
-    installation_ctx.configure_object_permissions()
+    installation_ctx.configure_include_object_permissions()
     installation_ctx.workspace_installation.run()
     # The crawlers should run as part of the assessment. To minimize the crawling here, we only crawl what is necessary
     # Tables crawler fails on `tacl` cluster used by the apply and validate permission tasks
@@ -125,7 +125,7 @@ def test_running_legacy_validate_groups_permissions_job(
     make_secret_scope_acl(scope=secret_scope, principal=ws_group_a.display_name, permission=AclPermission.WRITE)
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
-    installation_ctx.configure_object_permissions()
+    installation_ctx.configure_include_object_permissions()
     installation_ctx.__dict__['config_transform'] = lambda c: replace(c, use_legacy_permission_migration=True)
     installation_ctx.workspace_installation.run()
     installation_ctx.permission_manager.snapshot()

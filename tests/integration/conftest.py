@@ -45,6 +45,7 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -501,6 +502,7 @@ class MockRuntimeContext(
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
+        self._catalogs: list[Catalog] = []
         self._groups: list[Group] = []
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
@@ -620,7 +622,9 @@ class MockRuntimeContext(
         return self._make_notebook(**kwargs)
 
     def make_catalog(self, **kwargs):
-        return self._make_catalog(**kwargs)
+        catalog = self._make_catalog(**kwargs)
+        self._catalogs.append(catalog)
+        return catalog
 
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
@@ -1083,13 +1087,29 @@ class MockInstallationContext(MockRuntimeContext):
     def include_object_permissions(self) -> list[str] | None:
         return None
 
-    def configure_object_permissions(self) -> None:
+    def configure_include_object_permissions(self) -> None:
+        # Initialize include_object_permissions for the created fixtures
+        # Currently only supports the object types for which the fixtures exist
+
         if not self.config.include_object_permissions:
             self.config.include_object_permissions = []
-        for table in self._tables:
-            self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
+
+        # GenericPermissionsSupport
         for cluster_policy in self._cluster_policies:
             self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
+        for job in self._jobs:
+            self.config.include_object_permissions.append(f"jobs:{job.job_id}")
+
+        # TableAclSupport
+        for table in self._tables:
+            self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
+        for schema in self._schemas:
+            self.config.include_object_permissions.append(f"DATABASE:{schema.full_name}")
+        for catalog in self._catalogs:
+            self.config.include_object_permissions.append(f"CATALOG:{catalog.name}")
+        for udf in self._udfs:
+            self.config.include_object_permissions.append(f"FUNCTION:{udf.name}")
+
         for secret_scope in self._secret_scopes:
             self.config.include_object_permissions.append(f"secrets:{secret_scope}")
         for query in self._queries:
