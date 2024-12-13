@@ -437,8 +437,37 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._account_groups_lookup = AccountGroupLookup(ws)
 
         # The include group names is kept for legacy support. We prefer the group ids as it limits the API calls.
-        self._include_group_names = include_group_names
-        self._include_group_ids = include_group_ids
+        if include_group_names is not None and include_group_ids is not None:
+            raise ValueError("`include_group_names` and `include_group_ids` function exclusively")
+        # WARNING: Only the cached `_include_` properties should access the `_init` includes
+        self._include_group_names_initial = include_group_names
+        self._include_group_ids_initial = include_group_ids
+
+    @functools.cached_property
+    def _include_group_names(self) -> list[str]:
+        """The group names to include.
+
+        Note:
+            The `_include_group_ids` is preferred.
+        """
+        if self._include_group_ids_initial is None:
+            return self._include_group_names_initial
+        group_names = self._include_group_names_initial.copy()
+        for group in self._get_groups(*self._include_group_ids_initial):
+            if group.display_name:
+                group_names.append(group.display_name)
+        return group_names
+
+    @functools.cached_property
+    def _include_group_ids(self) -> list[str]:
+        """The group ids to include."""
+        if self._include_group_names is None:
+            return self._include_group_ids_initial
+        groups = self._list_groups(self._resource_type_workspace_group, "id,displayName")
+        group_ids = self._include_group_ids_initial.copy()
+        for group in groups:
+            group_ids.append(group.id)
+        return group_ids
 
     def rename_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
@@ -755,7 +784,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             list_attributes = ",".join(set(",".split(scim_attributes)) & {"id", "displayName", "meta"})
         else:
             list_attributes = scim_attributes
-        groups, groups_iterator = [], self._get_groups_iterator(list_attributes)
+        if self._group_ids is not None:
+            groups_iterator = self._get_groups(*self._include_group_names, scim_attributes)
+        else:
+            groups_iterator = self._get_groups_iterator(list_attributes)
+        groups = []
         while True:
             try:
                 group = next(groups_iterator)
@@ -775,12 +808,19 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return groups
 
     def _get_groups_iterator(self, attributes: str) -> Iterator[Group]:
+        # TODO: Use include group ids
         try:
             # TODO: Test raising Permission error for list
             yield from self._ws.groups.list(attributes=attributes)
         except DatabricksError as e:
             logger.error("Cannot list groups", exc_info=e)
             yield from []
+
+    def _get_groups(self, *group_ids: str) -> Iterator[iam.Group]:
+        for group_id in group_ids:
+            group = self._get_group(group_id)
+            if group:
+                yield group
 
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group(self, group_id: str) -> iam.Group | None:
