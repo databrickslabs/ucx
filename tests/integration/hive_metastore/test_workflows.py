@@ -1,3 +1,6 @@
+import dataclasses
+from typing import Literal
+
 import pytest
 from databricks.sdk.errors import NotFound
 
@@ -6,22 +9,21 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.mark.parametrize(
-    "prepare_tables_for_migration,workflow",
+    "scenario, workflow",
     [
         ("regular", "migrate-tables"),
         ("hiveserde", "migrate-external-hiveserde-tables-in-place-experimental"),
         ("hiveserde", "migrate-external-tables-ctas"),
     ],
-    indirect=("prepare_tables_for_migration",),
 )
 def test_table_migration_job_refreshes_migration_status(
-    ws,
     installation_ctx,
-    prepare_tables_for_migration,
-    workflow,
-):
+    scenario: Literal["regular", "hiveserde"],
+    workflow: str,
+    make_table_migration_context,
+) -> None:
     """The migration status should be refreshed after the migration job."""
-    tables, _ = prepare_tables_for_migration
+    tables, _ = make_table_migration_context(scenario, installation_ctx)
     ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
@@ -62,16 +64,9 @@ def test_table_migration_job_refreshes_migration_status(
     assert len(asserts) == 0, assert_message
 
 
-@pytest.mark.parametrize(
-    "prepare_tables_for_migration,workflow",
-    [
-        ("managed", "migrate-tables"),
-    ],
-    indirect=("prepare_tables_for_migration",),
-)
-def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_for_migration, workflow, sql_backend):
+def test_table_migration_for_managed_table(installation_ctx, make_table_migration_context) -> None:
     # This test cases test the CONVERT_TO_EXTERNAL scenario.
-    tables, dst_schema = prepare_tables_for_migration
+    tables, dst_schema = make_table_migration_context("managed", installation_ctx)
     ctx = installation_ctx.replace(
         extend_prompts={
             r"If hive_metastore contains managed table with external.*": "0",
@@ -80,24 +75,25 @@ def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_
     )
 
     ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow(workflow)
+    ctx.deployed_workflows.run_workflow("migrate-tables")
 
     for table in tables.values():
         try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
     managed_table = tables["src_managed_table"]
 
-    for key, value, _ in sql_backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"):
+    for key, value, _ in ctx.sql_backend.fetch(
+        f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"
+    ):
         if key == "Type":
             assert value == "EXTERNAL"
             break
 
 
-@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
-def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_tables_for_migration):
-    tables, dst_schema = prepare_tables_for_migration
+def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_migration_context) -> None:
+    tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
@@ -110,14 +106,13 @@ def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_ta
     # assert the tables are migrated
     for table in tables.values():
         try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
-def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables_for_migration):
-    tables, dst_schema = prepare_tables_for_migration
+def test_hiveserde_table_ctas_migration_job(installation_ctx, make_table_migration_context) -> None:
+    tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
@@ -130,16 +125,13 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
     # assert the tables are migrated
     for table in tables.values():
         try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-@pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_table_migration_job_publishes_remaining_tables(
-    ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog
-):
-    tables, dst_schema = prepare_tables_for_migration
+def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_table_migration_context) -> None:
+    tables, dst_schema = make_table_migration_context("regular", installation_ctx)
     installation_ctx.workspace_installation.run()
     second_table = list(tables.values())[1]
     table = Table(
@@ -154,7 +146,7 @@ def test_table_migration_job_publishes_remaining_tables(
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
     remaining_tables = list(
-        sql_backend.fetch(
+        installation_ctx.sql_backend.fetch(
             f"""
                 SELECT
                 SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)

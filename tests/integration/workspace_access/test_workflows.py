@@ -57,7 +57,7 @@ def test_running_real_migrate_groups_job(
 
     # TODO: Move `include_object_permissions` to context like other `include_` attributes
     # Limit the considered permissions to the following objects:
-    installation_ctx.__dict__['include_object_permissions'] = [
+    installation_ctx.config.include_object_permissions = [
         f"cluster-policies:{cluster_policy.policy_id}",
         f"TABLE:{table.full_name}",
         f"secrets:{secret_scope}",

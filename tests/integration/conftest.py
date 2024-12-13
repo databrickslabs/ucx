@@ -1,14 +1,15 @@
 import json
-from collections.abc import Callable, Generator
 import functools
 import collections
 import os
 import logging
+import shutil
+import subprocess
+from collections.abc import Callable, Generator
 from dataclasses import replace
 from datetime import timedelta
 from functools import cached_property
-import shutil
-import subprocess
+from typing import Literal
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.commands import CommandExecutor
@@ -1222,42 +1223,49 @@ def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo
 
 
 @pytest.fixture
-def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
-) -> tuple[dict[str, TableInfo], SchemaInfo]:
-    # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
-    # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
-    # tables, otherwise we will prepare regular tables.
-    # see documents here for details https://docs.pytest.org/en/8.1.x/example/parametrize.html#indirect-parametrization
-    scenario = request.param
-    is_hiveserde = scenario == "hiveserde"
-    random = make_random(5).lower()
-    # create external and managed tables to be migrated
-    if scenario == "hiveserde":
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
-        table_base_dir = make_storage_dir(
-            path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
-        )
-        tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
-    elif scenario == "managed":
-        schema_name = f"managed_{random}"
-        schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
-        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
-    elif scenario == "regular":
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
-        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+def make_table_migration_context(
+    env_or_skip,
+    make_random,
+    make_mounted_location,
+    make_storage_dir,
+) -> Callable[
+    [Literal["hiveserde", "managed", "regular"], MockInstallationContext], tuple[dict[str, TableInfo], SchemaInfo]
+]:
 
-    # create destination catalog and schema
-    dst_catalog = make_catalog()
-    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
-    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
-    installation_ctx.with_table_mapping_rules(migrate_rules)
-    installation_ctx.with_dummy_resource_permission()
-    installation_ctx.save_tables(is_hiveserde=is_hiveserde)
-    installation_ctx.save_mounts()
-    installation_ctx.with_dummy_grants_and_tacls()
-    return tables, dst_schema
+    def prepare(
+        scenario: Literal["hiveserde", "managed", "regular"], ctx: MockInstallationContext
+    ) -> tuple[dict[str, TableInfo], SchemaInfo]:
+        random = make_random(5).lower()
+        # create external and managed tables to be migrated
+        if scenario == "hiveserde":
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+            table_base_dir = make_storage_dir(
+                path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
+            )
+            tables = prepare_hiveserde_tables(ctx, random, schema, table_base_dir)
+        elif scenario == "managed":
+            schema_name = f"managed_{random}"
+            schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
+            tables = prepare_regular_tables(ctx, make_mounted_location, schema)
+        elif scenario == "regular":
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
+            tables = prepare_regular_tables(ctx, make_mounted_location, schema)
+        else:
+            raise ValueError(f"Unsupported scenario {scenario}")
+
+        # create destination catalog and schema
+        dst_catalog = ctx.make_catalog()
+        dst_schema = ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+        migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
+        ctx.with_table_mapping_rules(migrate_rules)
+        ctx.with_dummy_resource_permission()
+        ctx.save_tables(is_hiveserde=scenario == "hiveserde")
+        ctx.save_mounts()
+        ctx.with_dummy_grants_and_tacls()
+        return tables, dst_schema
+
+    return prepare
 
 
 @pytest.fixture

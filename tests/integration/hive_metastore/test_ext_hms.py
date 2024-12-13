@@ -23,10 +23,9 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-@pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
+def test_migration_job_ext_hms(ws, installation_ctx, make_table_migration_context, env_or_skip) -> None:
+    tables, dst_schema = make_table_migration_context('regular', installation_ctx)
     ext_hms_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
-    tables, dst_schema = prepare_tables_for_migration
     ext_hms_ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
