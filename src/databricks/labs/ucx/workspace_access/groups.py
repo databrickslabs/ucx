@@ -676,14 +676,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         for row in self._sql_backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             migrated_groups.append(MigratedGroup(*row))
 
-        if self._include_group_ids is None and self._include_group_names is None:
+        if self._include_group_ids is None:
             return migrated_groups
 
         migrated_groups_filtered = []
         for migrated_group in migrated_groups:
             if migrated_group.id_in_workspace in self._include_group_ids:
-                migrated_groups_filtered.append(migrated_group)
-            elif migrated_group.name_in_workspace in self._include_group_names:
                 migrated_groups_filtered.append(migrated_group)
             else:
                 logger.warning(
@@ -951,6 +949,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]
     ) -> GroupMigrationStrategy:
         if self._workspace_group_regex is not None and self._workspace_group_replace is not None:
+            # TODO: Refactor strategies to expect include group ids
             return RegexSubStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
