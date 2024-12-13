@@ -1084,14 +1084,17 @@ class MockInstallationContext(MockRuntimeContext):
         return self.config.include_object_permissions
 
     def configure_object_permissions(self) -> None:
-        if not self.config.include_object_permissions:
-            self.config.include_object_permissions = []
-        for table in self._tables:
-            self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
-        for cluster_policy in self._cluster_policies:
-            self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
-        for secret_scope in self._secret_scopes:
-            self.config.include_object_permissions.append(f"secrets:{secret_scope}")
+        pass
+        # if not self.config.include_object_permissions:
+        #     self.config.include_object_permissions = []
+        # for table in self._tables:
+        #     self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
+        # for cluster_policy in self._cluster_policies:
+        #     self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
+        # for secret_scope in self._secret_scopes:
+        #     self.config.include_object_permissions.append(f"secrets:{secret_scope}")
+        # for query in self._queries:
+        #     self.config.include_object_permissions.append(f"queries:{query.id}")
 
     @cached_property
     def config(self) -> WorkspaceConfig:
