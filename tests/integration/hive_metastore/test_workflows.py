@@ -99,7 +99,8 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
             break
 
 
-def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_migration_context) -> None:
+@pytest.mark.parametrize("workflow", ["migrate-external-hiveserde-tables-in-place-experimental", "migrate-external-tables-ctas"])
+def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_migration_context, workflow) -> None:
     tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
@@ -112,32 +113,9 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
     )
     ctx.workspace_installation.run()
 
-    ctx.deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+    ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
 
-    assert ctx.deployed_workflows.validate_step("migrate-external-hiveserde-tables-in-place-experimental")
-    for table in tables.values():
-        try:
-            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-
-
-def test_hiveserde_table_ctas_migration_job(installation_ctx, make_table_migration_context) -> None:
-    tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
-    ctx = installation_ctx.replace(
-        config_transform=lambda wc: dataclasses.replace(
-            wc,
-            skip_tacl_migration=True,
-        ),
-        extend_prompts={
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    ctx.workspace_installation.run()
-
-    ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
-
-    assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
+    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
     for table in tables.values():
         try:
             assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
