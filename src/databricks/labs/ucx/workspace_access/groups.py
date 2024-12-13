@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from abc import abstractmethod
-from collections.abc import Iterable, Collection
+from collections.abc import Iterable, Iterator, Collection
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -14,6 +14,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import (
     BadRequest,
+    DatabricksError,
     DeadlineExceeded,
     InternalError,
     NotFound,
@@ -750,9 +751,17 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             list_attributes = ",".join(set(",".split(scim_attributes)) & {"id", "displayName", "meta"})
         else:
             list_attributes = scim_attributes
-        groups = []
-        for group in self._ws.groups.list(attributes=list_attributes):  # TODO: Wrap list around try-except
-            if self._is_group_out_of_scope(group, resource_type):
+        groups, groups_iterator = [], self._get_groups_iterator(list_attributes)
+        while True:
+            try:
+                group = next(groups_iterator)
+            except StopIteration:
+                break
+            except DatabricksError as e:
+                # TODO: Test raising Permission error for list second page
+                logger.error("Cannot list next groups page", exc_info=e)
+                break
+            if not group or self._is_group_out_of_scope(group, resource_type):
                 continue
             group_with_all_attributes = self._get_group(group.id) if is_limit_list_attributes else group
             if not group_with_all_attributes:
@@ -760,6 +769,14 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             groups.append(group_with_all_attributes)
         logger.info(f"Found {len(groups)} {resource_type}")
         return groups
+
+    def _get_groups_iterator(self, attributes: str) -> Iterator[Group]:
+        try:
+            # TODO: Test raising Permission error for list
+            yield from self._ws.groups.list(attributes=attributes)
+        except DatabricksError as e:
+            logger.error("Cannot list groups", exc_info=e)
+            yield from []
 
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group(self, group_id: str) -> iam.Group | None:
