@@ -589,7 +589,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             elif group.display_name != expected_name:
                 logger.log(
                     pending_log_level,
-                    f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {found_name})",
+                    f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {group.display_name})",
                 )
                 pending_renames.append(GroupRenameIncompleteError(group_id, group.display_name, expected_name))
             else:
