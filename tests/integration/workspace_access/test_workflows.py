@@ -51,14 +51,7 @@ def test_running_real_migrate_groups_job(
         scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE
     )
 
-    # TODO: Move `include_object_permissions` to context like other `include_` attributes
-    # Limit the considered permissions to the following objects:
-    installation_ctx.__dict__['include_object_permissions'] = [
-        f"cluster-policies:{cluster_policy.policy_id}",
-        f"TABLE:{table.full_name}",
-        f"secrets:{secret_scope}",
-    ]
-
+    installation_ctx.configure_object_permissions()
     installation_ctx.workspace_installation.run()
     # The crawlers should run as part of the assessment. To minimize the crawling here, we only crawl what is necessary
     # Tables crawler fails on `tacl` cluster used by the apply and validate permission tasks
