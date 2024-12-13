@@ -579,19 +579,19 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         logger.debug(f"Group enumeration showed all {len(expected_groups)} renamed groups; assuming complete.")
 
     def _check_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]], pending_log_level: int) -> None:
-        found_groups = self._workspace_groups_in_workspace()
+        groups = {group.id: group for group in self._workspace_groups_in_workspace().values() if group.id}
         pending_renames: list[RuntimeError] = []
         for group_id, expected_name in expected_groups:
-            found_name = found_groups.get(group_id, None)
-            if found_name is None:
+            group = groups.get(group_id, None)
+            if group is None or group.display_name is None:
                 logger.warning(f"Group enumeration omits renamed group: {group_id} (renamed to {expected_name})")
                 pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name})"))
-            elif found_name != expected_name:
+            elif group.display_name != expected_name:
                 logger.log(
                     pending_log_level,
                     f"Group enumeration does not yet reflect rename: {group_id} (renamed to {expected_name} but currently {found_name})",
                 )
-                pending_renames.append(GroupRenameIncompleteError(group_id, found_name, expected_name))
+                pending_renames.append(GroupRenameIncompleteError(group_id, group.display_name, expected_name))
             else:
                 logger.debug(f"Group enumeration reflects renamed group: {group_id} (renamed to {expected_name})")
         if pending_renames:
