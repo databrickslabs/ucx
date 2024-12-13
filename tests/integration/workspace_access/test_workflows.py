@@ -125,12 +125,7 @@ def test_running_legacy_validate_groups_permissions_job(
     make_secret_scope_acl(scope=secret_scope, principal=ws_group_a.display_name, permission=AclPermission.WRITE)
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
-    installation_ctx.__dict__['include_object_permissions'] = [
-        f"cluster-policies:{cluster_policy.policy_id}",
-        f"queries:{query.id}",
-        f"TABLE:{table.full_name}",
-        f"secrets:{secret_scope}",
-    ]
+    installation_ctx.configure_object_permissions()
     installation_ctx.__dict__['config_transform'] = lambda c: replace(c, use_legacy_permission_migration=True)
     installation_ctx.workspace_installation.run()
     installation_ctx.permission_manager.snapshot()
