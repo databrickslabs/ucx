@@ -666,24 +666,25 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._wait_for_deleted_workspace_groups(deleted_groups)
 
     def _try_fetch(self) -> Iterable[MigratedGroup]:
-        state = []
+        migrated_groups = []
         for row in self._sql_backend.fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
-            state.append(MigratedGroup(*row))
+            migrated_groups.append(MigratedGroup(*row))
 
-        if self._include_group_names is None:
-            return state
+        if self._include_group_ids is None and self._include_group_names is None:
+            return migrated_groups
 
-        new_state = []
-        group_name_with_state = {migrated_group.name_in_workspace: migrated_group for migrated_group in state}
-        for group_name in self._include_group_names:
-            if group_name in group_name_with_state:
-                new_state.append(group_name_with_state[group_name])
+        migrated_groups_filtered = []
+        for migrated_group in migrated_groups:
+            if migrated_group.id_in_workspace in self._include_group_ids:
+                migrated_groups_filtered.append(migrated_group)
+            elif migrated_group.name_in_workspace in self._include_group_names:
+                migrated_groups_filtered.append(migrated_group)
             else:
                 logger.warning(
-                    f"Group {group_name} defined in configuration does not exist on the groups table. "
-                    "Consider checking if the group exist in the workspace or re-running the assessment."
+                    f"Group {migrated_group.name_in_workspace} defined in configuration does not exist in the groups "
+                    f"table. Consider checking if the group exist in the workspace or re-running the assessment."
                 )
-        return new_state
+        return migrated_groups_filtered
 
     def _crawl(self) -> Iterable[MigratedGroup]:
         workspace_groups_in_workspace = self._workspace_groups_in_workspace()
