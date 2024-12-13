@@ -776,12 +776,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     @staticmethod
     def _is_workspace_group(group: iam.Group) -> bool:
         """Is the group a workspace group, or not."""
-        return group.meta and group.meta.resource_type == "WorkspaceGroup"
+        return group.meta is not None and group.meta.resource_type == "WorkspaceGroup"
 
     @staticmethod
     def _is_account_group(group: iam.Group) -> bool:
         """Is the group an account group, or not."""
-        return group.meta and group.meta.resource_type == "Group"
+        return group.meta is not None and group.meta.resource_type == "Group"
 
     @functools.cached_property
     def _groups_with_members(self) -> list[iam.Group]:
