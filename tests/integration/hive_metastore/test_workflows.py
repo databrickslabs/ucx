@@ -35,7 +35,9 @@ def test_table_migration_job_refreshes_migration_status(
     )
 
     ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow(workflow)
+    ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
+
+    assert ctx.deployed_workflows.validate_step(workflow)
 
     # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
     migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
@@ -82,7 +84,7 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
     )
 
     ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow("migrate-tables")
+    ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
 
     missing_tables = set[str]()
     for table in tables.values():
@@ -146,7 +148,7 @@ def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_t
     )
     ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
 
-    ctx.deployed_workflows.run_workflow("migrate-tables")
+    ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
 
     assert ctx.deployed_workflows.validate_step("migrate-tables")
     remaining_tables = list(
