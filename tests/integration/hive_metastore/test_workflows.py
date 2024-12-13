@@ -2,6 +2,7 @@ import dataclasses
 from typing import Literal
 
 import pytest
+from databricks.labs.lsql.core import Row
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -84,13 +85,14 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("migrate-tables")
 
+    missing_tables = set[str]()
     for table in tables.values():
-        try:
-            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-    managed_table = tables["src_managed_table"]
+        migrated_table_name = f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}"
+        if not ctx.workspace_client.tables.exists(migrated_table_name):
+            missing_tables.add(migrated_table_name)
+    assert not missing_tables, f"Missing migrated tables: {missing_tables}"
 
+    managed_table = tables["src_managed_table"]
     for key, value, _ in ctx.sql_backend.fetch(
         f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(managed_table.full_name)}"
     ):
@@ -116,11 +118,12 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
     ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
 
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
+    missing_tables = set[str]()
     for table in tables.values():
-        try:
-            assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+        migrated_table_name = f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}"
+        if not ctx.workspace_client.tables.exists(migrated_table_name):
+           missing_tables.add(migrated_table_name)
+    assert not missing_tables, f"Missing migrated tables: {missing_tables}"
 
 
 def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_table_migration_context) -> None:
@@ -156,4 +159,4 @@ def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_t
             """
         )
     )
-    assert remaining_tables[0].message == f'hive_metastore.{dst_schema.name}.{second_table.name}'
+    assert remaining_tables == [Row(message=f"hive_metastore.{dst_schema.name}.{second_table.name}")]
