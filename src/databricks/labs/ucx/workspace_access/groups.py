@@ -362,11 +362,20 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         *,
         external_id_match: bool = False,
     ):
+        # The include group names is kept for legacy support. We prefer the group ids as it limits the API calls.
+        if include_group_names is not None and include_group_ids is not None:
+            raise ValueError(
+                "`include_group_names` and `include_group_ids` function exclusively. We recommend to use `include_group_ids`."
+            )
+
         super().__init__(sql_backend, "hive_metastore", inventory_database, "groups", MigratedGroup)
         if not renamed_group_prefix:
             renamed_group_prefix = "db-temp-"
 
         self._ws = ws
+        self._include_group_names = include_group_names
+        # WARNING: Use `_include_group_ids` below not `_include_group_ids_initial
+        self._include_group_ids_initial = include_group_ids
         self._renamed_group_prefix = renamed_group_prefix
         self._workspace_group_regex = workspace_group_regex
         self._workspace_group_replace = workspace_group_replace
@@ -374,35 +383,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
         self._account_groups_lookup = AccountGroupLookup(ws)
-
-        # The include group names is kept for legacy support. We prefer the group ids as it limits the API calls.
-        if include_group_names is not None and include_group_ids is not None:
-            raise ValueError(
-                "`include_group_names` and `include_group_ids` function exclusively. We recommend to use `include_group_ids`."
-            )
-        # WARNING: Only the cached `_include_` properties should access the `_initial` includes
-        self._include_group_names_initial = include_group_names
-        self._include_group_ids_initial = include_group_ids
-
-    @functools.cached_property
-    def _include_group_names(self) -> list[str] | None:
-        """The group names to include.
-
-        TODO: Remove this property
-
-        Note:
-            The `_include_group_ids` is preferred.
-        """
-        if self._include_group_ids_initial is None:
-            return self._include_group_names_initial
-        if self._include_group_names_initial is not None:
-            group_names = self._include_group_names_initial.copy()
-        else:
-            group_names = []
-        for group in self._get_groups(*self._include_group_ids_initial):
-            if group.display_name:
-                group_names.append(group.display_name)
-        return group_names
 
     @functools.cached_property
     def _include_group_ids(self) -> list[str] | None:
