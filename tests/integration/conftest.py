@@ -508,7 +508,10 @@ class MockRuntimeContext(
         self._queries: list[LegacyQuery] = []
         self._lakeview_query_id: str | None = None
         self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
-        # TODO: add methods to pre-populate the following:
+        self._cluster_policies: list[CreatePolicyResponse] = []
+        self._secret_scopes = []
+
+    # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
     def with_table_mapping_rules(self, rules):
@@ -575,13 +578,17 @@ class MockRuntimeContext(
         return grant
 
     def make_cluster_policy(self, **kwargs) -> CreatePolicyResponse:
-        return self._make_cluster_policy(**kwargs)
+        cluster_policy = self._make_cluster_policy(**kwargs)
+        self._cluster_policies.append(cluster_policy)
+        return cluster_policy
 
     def make_cluster_policy_permissions(self, **kwargs):
         return self._make_cluster_policy_permissions(**kwargs)
 
     def make_secret_scope(self, **kwargs):
-        return self._make_secret_scope(**kwargs)
+        secret_scope = self._make_secret_scope(**kwargs)
+        self._secret_scopes.append(secret_scope)
+        return secret_scope
 
     def make_secret_scope_acl(self, **kwargs):
         return self._make_secret_scope_acl(**kwargs)
@@ -1073,8 +1080,19 @@ class MockInstallationContext(MockRuntimeContext):
         return lambda wc: wc
 
     @cached_property
-    def include_object_permissions(self) -> None:
-        return None
+    def include_object_permissions(self) -> list[str] | None:
+        return self.config.include_object_permissions
+
+    def configure_object_permissions(self) -> None:
+        if not self.include_object_permissions:
+            self.config.include_object_permissions = []
+        for table in self._tables:
+            self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
+        for cluster_policy in self._cluster_policies:
+            self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
+        for secret_scope in self._secret_scopes:
+            self.config.include_object_permissions.append(f"secrets:{secret_scope}")
+
 
     @cached_property
     def config(self) -> WorkspaceConfig:
