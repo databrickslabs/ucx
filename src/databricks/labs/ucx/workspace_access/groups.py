@@ -472,7 +472,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         else:
             group_ids = []
         groups = self._workspace_groups_in_workspace()
-        for _, group in groups:
+        for group in groups.values():
             group_ids.append(group.id)
         return group_ids
 
