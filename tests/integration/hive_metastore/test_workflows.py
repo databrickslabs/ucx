@@ -86,6 +86,8 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
 
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
+
     missing_tables = set[str]()
     for table in tables.values():
         migrated_table_name = f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}"
