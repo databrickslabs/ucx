@@ -242,6 +242,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.inventory_database,
             self.config.include_group_names,
+            self.config.include_group_ids,
             self.config.renamed_group_prefix,
             workspace_group_regex=self.config.workspace_group_regex,
             workspace_group_replace=self.config.workspace_group_replace,

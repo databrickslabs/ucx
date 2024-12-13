@@ -26,8 +26,10 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     workspace_group_replace: str | None = None
     account_group_regex: str | None = None
     group_match_by_external_id: bool = False
-    # Includes group names for migration. If not specified, all matching groups will be picked up
+    # Includes group for migration. If not specified, all matching groups will be picked up
+    # The include_group_names is kept for legacy support. We prefer the group ids as it limits the API calls.
     include_group_names: list[str] | None = None
+    include_group_ids: list[str] | None = None
     renamed_group_prefix: str | None = "db-temp-"
     instance_pool_id: str | None = None
     # in v3, warehouse_id should be part of connect
