@@ -7,6 +7,12 @@ __all__ = ["WorkspaceConfig"]
 
 @dataclass
 class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
+    """The workspace config
+
+    Notes:
+        The `include_` attributes scopes UCX to the given objects per object kind. We differentiate between `None`
+        being "include all objects" and `[]` (empty list) to "exclude all objects" (or include NO objects).
+    """
     __file__ = "config.yml"
     __version__ = 2
 
