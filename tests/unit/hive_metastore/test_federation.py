@@ -125,7 +125,6 @@ def test_create_federated_catalog_ext(mock_installation):
         name='a',
         connection_type=ConnectionType.HIVE_METASTORE,
         options={
-            'builtin': 'false',
             'database': 'metastore',
             'db_type': 'mysql',
             'host': 'hostname.us-east-2.rds.amazonaws.com',
@@ -145,7 +144,7 @@ def test_create_federated_catalog_ext(mock_installation):
         call.update(
             SecurableType.EXTERNAL_LOCATION,
             'b',
-            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_CATALOG])],
+            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
     ]
     assert calls == workspace_client.grants.method_calls
