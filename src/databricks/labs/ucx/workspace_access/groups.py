@@ -444,7 +444,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._include_group_ids_initial = include_group_ids
 
     @functools.cached_property
-    def _include_group_names(self) -> list[str]:
+    def _include_group_names(self) -> list[str] | None:
         """The group names to include.
 
         Note:
@@ -452,19 +452,25 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         """
         if self._include_group_ids_initial is None:
             return self._include_group_names_initial
-        group_names = self._include_group_names_initial.copy()
+        if self._include_group_names_initial is not None:
+            group_names = self._include_group_names_initial.copy()
+        else:
+            group_names = []
         for group in self._get_groups(*self._include_group_ids_initial):
             if group.display_name:
                 group_names.append(group.display_name)
         return group_names
 
     @functools.cached_property
-    def _include_group_ids(self) -> list[str]:
+    def _include_group_ids(self) -> list[str] | None:
         """The group ids to include."""
         if self._include_group_names is None:
             return self._include_group_ids_initial
+        if self._include_group_ids_initial is not None:
+            group_ids = self._include_group_ids_initial.copy()
+        else:
+            group_ids = []
         groups = self._list_groups(self._resource_type_workspace_group, "id,displayName")
-        group_ids = self._include_group_ids_initial.copy()
         for group in groups:
             group_ids.append(group.id)
         return group_ids
