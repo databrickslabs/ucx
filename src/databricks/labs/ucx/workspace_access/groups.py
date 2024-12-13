@@ -446,7 +446,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _include_group_names(self) -> list[str] | None:
         """The group names to include.
 
-        TODO: Add deprecation warning.
+        TODO: Remove this property
 
         Note:
             The `_include_group_ids` is preferred.
