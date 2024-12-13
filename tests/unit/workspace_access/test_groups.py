@@ -1380,6 +1380,37 @@ def test_migration_state_with_filtered_group():
     ]
 
 
+def _list_dummy_workspace_groups(*args, **kwargs) -> list[Group]:
+    """List a dummy DE, DS and admins workspace group"""
+    _ = args, kwargs
+    groups = [
+        Group(id="0", display_name="admins", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+        Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+        Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup")),
+    ]
+    return groups
+
+
+def _get_dummy_workspace_groups(group_id: id) -> Group:
+    for group in _list_dummy_workspace_groups():
+        if group.id == group_id:
+            return group
+    raise NotFound(f"Group not found: {group_id}")
+
+
+def test_group_manager_has_de_workspace_group(mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.groups.list.side_effect = _list_dummy_workspace_groups
+    ws.groups.get.side_effect = _get_dummy_workspace_groups
+    group_manager = GroupManager(mock_backend, ws, inventory_database="inv")
+
+    has_workspace_group = group_manager.has_workspace_group("de")
+
+    assert has_workspace_group, "Expected workspace group to exist: de"
+    ws.groups.list.assert_called_once()
+    ws.groups.get.assert_called_once_with("1")
+
+
 def test_regex_sub_strategy_replaces_with_empty_replace():
     workspace_groups = {"group_old": Group("group_old")}
     account_groups = {"group": Group("group")}
