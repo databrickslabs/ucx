@@ -740,14 +740,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # a strategy of enumerating the bare minimum and request full attributes for each group individually.
         attributes = scim_attributes.split(",")
         if "members" in attributes:
-            retry_on_internal_error = retried(on=[InternalError], timeout=self._verify_timeout)
-            get_group = retry_on_internal_error(self._get_group)
             # Limit to the attributes we need for determining if the group is out of scope; the rest are fetched later.
             scan_attributes = [attribute for attribute in attributes if attribute in {"id", "displayName", "meta"}]
             for group in self._ws.groups.list(attributes=",".join(scan_attributes)):
                 if self._is_group_out_of_scope(group, resource_type):
                     continue
-                group_with_all_attributes = get_group(group.id)
+                group_with_all_attributes = self._get_group(group.id)
                 if not group_with_all_attributes:
                     continue
                 results.append(group_with_all_attributes)
@@ -761,12 +759,15 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     @rate_limited(max_requests=255, burst_period_seconds=60)
     def _get_group(self, group_id: str) -> iam.Group | None:
-        try:
-            return self._ws.groups.get(group_id)
-        except NotFound:
-            # during integration tests, we may get certain groups removed,
-            # which will cause timeout errors because of groups no longer there.
-            return None
+        @retried(on=[InternalError], timeout=self._verify_timeout)
+        def _get_group() -> iam.Group | None:
+            try:
+                return self._ws.groups.get(group_id)
+            except NotFound:
+                # during integration tests, we may get certain groups removed,
+                # which will cause timeout errors because of groups no longer there.
+                return None
+        return _get_group()
 
     @rate_limited(max_requests=20)
     def _get_account_group(self, group_id: str) -> Group | None:
