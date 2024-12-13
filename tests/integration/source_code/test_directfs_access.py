@@ -1,33 +1,78 @@
+import pytest
+
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
-from databricks.labs.ucx.source_code.queries import QueryLinter
 
 
-def test_query_dfsa_ownership(runtime_ctx, make_query, make_dashboard, inventory_schema, sql_backend) -> None:
-    """Verify the ownership of a direct-fs record for a query."""
+def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
+    """Verify the ownership of a direct-fs record for a legacy query."""
+    query = runtime_ctx.make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
+    dashboard = runtime_ctx.make_dashboard(query=query)
 
-    # A dashboard with a query that contains a direct filesystem reference.
-    query = make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
-    dashboard = make_dashboard(query=query)
+    runtime_ctx.query_linter.refresh_report()
 
-    # Produce a DFSA record for the query.
-    linter = QueryLinter(
-        runtime_ctx.workspace_client,
-        sql_backend,
-        inventory_schema,
-        TableMigrationIndex([]),
-        runtime_ctx.directfs_access_crawler_for_queries,
-        runtime_ctx.used_tables_crawler_for_queries,
-        include_dashboard_ids=[dashboard.id],
-    )
-    linter.refresh_report()
+    dfsas = list(runtime_ctx.directfs_access_crawler_for_queries.snapshot())
+    # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
+    assert dfsas == [
+        DirectFsAccess(
+            source_id=f"{dashboard.id}/{query.id}",
+            source_lineage=[
+                LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard.id,
+                    other={"parent": dashboard.parent, "name": dashboard.name},
+                ),
+                LineageAtom(
+                    object_type="QUERY",
+                    object_id=f"{dashboard.id}/{query.id}",
+                    other={"name": query.name},
+                ),
+            ],
+            path="dbfs://some_folder/some_file.csv",
+            is_read=True,
+            is_write=False,
+        )
+    ]
 
-    # Find a record for the query.
-    records = runtime_ctx.directfs_access_crawler_for_queries.snapshot()
-    query_record = next(record for record in records if record.source_id == f"{dashboard.id}/{query.id}")
+    owner = runtime_ctx.directfs_access_ownership.owner_of(dfsas[0])
+    assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
-    # Verify ownership can be made.
-    owner = runtime_ctx.directfs_access_ownership.owner_of(query_record)
+
+@pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3411")
+def test_lakeview_query_dfsa_ownership(runtime_ctx) -> None:
+    """Verify the ownership of a direct-fs record for a Lakeview query."""
+    # `make_lakeview_dashboard` fixture expects query as string
+    dashboard = runtime_ctx.make_lakeview_dashboard(query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
+
+    runtime_ctx.query_linter.refresh_report()
+
+    dfsas = list(runtime_ctx.directfs_access_crawler_for_queries.snapshot())
+    # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
+    # The "query" in the source and object id, and "count" in the name are hardcoded in the
+    # `make_lakeview_dashboard` fixture
+    assert dfsas == [
+        DirectFsAccess(
+            source_id=f"{dashboard.dashboard_id}/query",
+            source_lineage=[
+                LineageAtom(
+                    object_type="DASHBOARD",
+                    object_id=dashboard.dashboard_id,
+                    other={"parent": dashboard.parent_path, "name": dashboard.display_name},
+                ),
+                LineageAtom(
+                    object_type="QUERY",
+                    object_id=f"{dashboard.dashboard_id}/query",
+                    other={"name": "count"},
+                ),
+            ],
+            path="dbfs://some_folder/some_file.csv",
+            is_read=True,
+            is_write=False,
+        )
+    ]
+
+    owner = runtime_ctx.directfs_access_ownership.owner_of(dfsas[0])
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
 
 
