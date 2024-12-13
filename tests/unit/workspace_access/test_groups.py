@@ -1391,7 +1391,7 @@ def _list_dummy_workspace_groups(*args, **kwargs) -> list[Group]:
     return groups
 
 
-def _get_dummy_workspace_groups(group_id: id) -> Group:
+def _get_dummy_workspace_groups(group_id: str) -> Group:
     for group in _list_dummy_workspace_groups():
         if group.id == group_id:
             return group
