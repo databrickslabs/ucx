@@ -436,9 +436,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # The include group names is kept for legacy support. We prefer the group ids as it limits the API calls.
         if include_group_names is not None and include_group_ids is not None:
             raise ValueError(
-                "`include_group_names` and `include_group_ids` function exclusively. We recommend to only use `include_group_ids`."
+                "`include_group_names` and `include_group_ids` function exclusively. We recommend to use `include_group_ids`."
             )
-        # WARNING: Only the cached `_include_` properties should access the `_init` includes
+        # WARNING: Only the cached `_include_` properties should access the `_initial` includes
         self._include_group_names_initial = include_group_names
         self._include_group_ids_initial = include_group_ids
 
