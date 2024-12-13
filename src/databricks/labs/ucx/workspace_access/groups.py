@@ -473,7 +473,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             group_ids = []
         groups = self._workspace_groups_in_workspace()
         for group in groups.values():
-            group_ids.append(group.id)
+            if group.id:
+                group_ids.append(group.id)
         return group_ids
 
     def rename_groups(self):
