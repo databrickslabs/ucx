@@ -25,6 +25,10 @@ def test_table_migration_job_refreshes_migration_status(
     """The migration status should be refreshed after the migration job."""
     tables, _ = make_table_migration_context(scenario, installation_ctx)
     ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            skip_tacl_migration=True,
+        ),
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
@@ -68,6 +72,10 @@ def test_table_migration_for_managed_table(installation_ctx, make_table_migratio
     # This test cases test the CONVERT_TO_EXTERNAL scenario.
     tables, dst_schema = make_table_migration_context("managed", installation_ctx)
     ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            skip_tacl_migration=True,
+        ),
         extend_prompts={
             r"If hive_metastore contains managed table with external.*": "0",
             r".*Do you want to update the existing installation?.*": 'yes',
@@ -95,6 +103,10 @@ def test_table_migration_for_managed_table(installation_ctx, make_table_migratio
 def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_migration_context) -> None:
     tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            skip_tacl_migration=True,
+        ),
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
@@ -114,6 +126,10 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
 def test_hiveserde_table_ctas_migration_job(installation_ctx, make_table_migration_context) -> None:
     tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            skip_tacl_migration=True,
+        ),
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
@@ -132,7 +148,13 @@ def test_hiveserde_table_ctas_migration_job(installation_ctx, make_table_migrati
 
 def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_table_migration_context) -> None:
     tables, dst_schema = make_table_migration_context("regular", installation_ctx)
-    installation_ctx.workspace_installation.run()
+    ctx = installation_ctx.replace(
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            skip_tacl_migration=True,
+        ),
+    )
+    ctx.workspace_installation.run()
     second_table = list(tables.values())[1]
     table = Table(
         "hive_metastore",
@@ -141,17 +163,17 @@ def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_t
         object_type="UNKNOWN",
         table_format="UNKNOWN",
     )
-    installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
-    installation_ctx.deployed_workflows.run_workflow("migrate-tables")
-    assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
+    ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
+    ctx.deployed_workflows.run_workflow("migrate-tables")
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
 
     remaining_tables = list(
-        installation_ctx.sql_backend.fetch(
+        ctx.sql_backend.fetch(
             f"""
                 SELECT
                 SUBSTRING(message, LENGTH('remained-hive-metastore-table: ') + 1)
                 AS message
-                FROM {installation_ctx.inventory_database}.logs
+                FROM {ctx.inventory_database}.logs
                 WHERE message LIKE 'remained-hive-metastore-table: %'
             """
         )
