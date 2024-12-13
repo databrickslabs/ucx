@@ -608,7 +608,7 @@ class MockRuntimeContext(
             ucx_catalog=self.ucx_catalog,
             connect=self.workspace_client.config,
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
-            include_group_names=self.created_groups,
+            include_group_ids=self.created_group_ids,
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
@@ -712,8 +712,8 @@ class MockRuntimeContext(
         return list(created_databases)
 
     @property
-    def created_groups(self) -> list[str]:
-        return [group.display_name for group in self._groups if group.display_name is not None]
+    def created_group_ids(self) -> list[str]:
+        return [group.id for group in self._groups if group.id is not None]
 
     @property
     def created_jobs(self) -> list[int]:
@@ -750,8 +750,8 @@ class MockRuntimeContext(
             self.sql_backend,
             self.workspace_client,
             self.inventory_database,
-            self.created_groups,
-            self.config.renamed_group_prefix,
+            include_group_ids=self.created_group_ids,
+            renamed_group_prefix=self.config.renamed_group_prefix,
             workspace_group_regex=self.config.workspace_group_regex,
             workspace_group_replace=self.config.workspace_group_replace,
             account_group_regex=self.config.account_group_regex,
@@ -1032,7 +1032,7 @@ class MockInstallationContext(MockRuntimeContext):
             },
             workspace_start_path=self.installation.install_folder(),
             renamed_group_prefix=self.renamed_group_prefix,
-            include_group_names=self.created_groups,
+            include_group_ids=self.created_group_ids,
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
