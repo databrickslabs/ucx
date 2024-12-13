@@ -3,6 +3,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 
 
 @pytest.mark.parametrize(
@@ -15,7 +16,6 @@ from databricks.labs.ucx.hive_metastore.tables import Table
     indirect=("prepare_tables_for_migration",),
 )
 def test_table_migration_job_refreshes_migration_status(
-    ws,
     installation_ctx,
     prepare_tables_for_migration,
     workflow,
@@ -27,39 +27,68 @@ def test_table_migration_job_refreshes_migration_status(
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-
     ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow(workflow)
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
 
-    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
-    migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test these workflows.
+    ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
+    assessment_completed_correctly = ctx.deployed_workflows.validate_step("assessment")
+    assert assessment_completed_correctly, "Workflow failed: assessment"
+
+    # The workflow under test.
+    run_id = ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
+    workflow_completed_correctly = ctx.deployed_workflows.validate_step(workflow)
+    assert workflow_completed_correctly, f"Workflow failed: {workflow}"
+
+    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching.
+    migration_status_query = f"SELECT * FROM {ctx.migration_status_refresher.full_name}"
     migration_statuses = list(ctx.sql_backend.fetch(migration_status_query))
 
-    if len(migration_statuses) == 0:
+    if not migration_statuses:
         ctx.deployed_workflows.relay_logs(workflow)
-        assert False, "No migration statuses found"
+        pytest.fail("No migration statuses found")
 
-    asserts = []
+    problems = []
     for table in tables.values():
         migration_status = []
         for status in migration_statuses:
             if status.src_schema == table.schema_name and status.src_table == table.name:
                 migration_status.append(status)
 
-        assert_message_postfix = f" found for {table.table_type} {table.full_name}"
-        if len(migration_status) == 0:
-            asserts.append("No migration status" + assert_message_postfix)
-        elif len(migration_status) > 1:
-            asserts.append("Multiple migration statuses" + assert_message_postfix)
-        elif migration_status[0].dst_schema is None:
-            asserts.append("No destination schema" + assert_message_postfix)
-        elif migration_status[0].dst_table is None:
-            asserts.append("No destination table" + assert_message_postfix)
+        match migration_status:
+            case []:
+                problems.append(f"No migration status found for {table.table_type} {table.full_name}")
+            case [_, _, *_]:
+                problems.append(f"Multiple migration statuses found for {table.table_type} {table.full_name}")
+            case [status] if status.dst_schema is None:
+                problems.append(f"No destination schema found for {table.table_type} {table.full_name}")
+            case [status] if status.dst_table is None:
+                problems.append(f"No destination table found for {table.table_type} {table.full_name}")
 
-    assert_message = (
-        "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
+    failure_message = (
+        "\n".join(problems) + " given migration statuses:\n" + "\n".join([str(status) for status in migration_statuses])
     )
-    assert len(asserts) == 0, assert_message
+    assert not problems, failure_message
+
+    # Ensure that the workflow populated the `workflow_runs` table.
+    query = f"""
+        SELECT 1 FROM {ctx.ucx_catalog}.multiworkspace.workflow_runs
+        WHERE workspace_id = {ctx.workspace_id}
+          AND workflow_run_id = {run_id}
+        LIMIT 1
+    """
+    assert any(ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
+
+    # Ensure that the history file has table records written to it that correspond to this run.
+    query = f"""
+        SELECT 1 from {ctx.ucx_catalog}.multiworkspace.historical
+        WHERE workspace_id = {ctx.workspace_id}
+          AND job_run_id = {run_id}
+          AND object_type = 'Table'
+        LIMIT 1
+    """
+    assert any(ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
 
 
 @pytest.mark.parametrize(
@@ -78,8 +107,15 @@ def test_table_migration_for_managed_table(ws, installation_ctx, prepare_tables_
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow(workflow)
 
     for table in tables.values():
@@ -104,6 +140,14 @@ def test_hiveserde_table_in_place_migration_job(ws, installation_ctx, prepare_ta
         },
     )
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
     # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-external-hiveserde-tables-in-place-experimental")
@@ -124,6 +168,14 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
         },
     )
     ctx.workspace_installation.run()
+    ProgressTrackingInstallation(ctx.sql_backend, ctx.ucx_catalog).run()
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
     # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
@@ -137,10 +189,11 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, prepare_tables
 
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
 def test_table_migration_job_publishes_remaining_tables(
-    ws, installation_ctx, sql_backend, prepare_tables_for_migration, caplog
+    installation_ctx, sql_backend, prepare_tables_for_migration, caplog
 ):
     tables, dst_schema = prepare_tables_for_migration
     installation_ctx.workspace_installation.run()
+    ProgressTrackingInstallation(installation_ctx.sql_backend, installation_ctx.ucx_catalog).run()
     second_table = list(tables.values())[1]
     table = Table(
         "hive_metastore",
@@ -150,6 +203,13 @@ def test_table_migration_job_publishes_remaining_tables(
         table_format="UNKNOWN",
     )
     installation_ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
+
+    # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
+    # before we can test the migration workflow.
+    installation_ctx.deployed_workflows.run_workflow("assessment")
+    assert installation_ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
+
+    # The workflow under test.
     installation_ctx.deployed_workflows.run_workflow("migrate-tables")
     assert installation_ctx.deployed_workflows.validate_step("migrate-tables")
 
