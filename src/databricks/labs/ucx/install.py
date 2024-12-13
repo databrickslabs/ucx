@@ -45,6 +45,7 @@ from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     EndpointInfoWarehouseType,
     SpotInstancePolicy,
+    Disposition,
 )
 from databricks.sdk.useragent import with_extra
 
@@ -259,6 +260,12 @@ class WorkspaceInstaller(WorkspaceContext):
         recon_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
         )
+
+        query_statement_disposition = self.prompts.confirm(
+            "Do you want to use the EXTERNAL_LINKS disposition value for query statements? (Only needed with large workspaces)"
+        )
+        query_statement_disposition = Disposition.EXTERNAL_LINKS if query_statement_disposition else None
+
         return WorkspaceConfig(
             inventory_database=inventory_database,
             ucx_catalog=ucx_catalog,
@@ -276,6 +283,7 @@ class WorkspaceInstaller(WorkspaceContext):
             recon_tolerance_percent=recon_tolerance_percent,
             upload_dependencies=upload_dependencies,
             default_owner_group=default_owner_group,
+            query_statement_disposition=query_statement_disposition,
         )
 
     def _compare_remote_local_versions(self):

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from databricks.sdk.core import Config
+from databricks.sdk.service.sql import Disposition
 
 __all__ = ["WorkspaceConfig"]
 
@@ -91,6 +92,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # Skip TACL migration during table migration
     skip_tacl_migration: bool = False
+
+    query_statement_disposition: Disposition | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
