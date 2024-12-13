@@ -182,7 +182,7 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         try:
             dashboards_iterator = self._ws.dashboards.list()
         except DatabricksError as e:
-            logger.warning("Cannot list Redash dashboards", exc_info=e)
+            logger.error("Cannot list Redash dashboards", exc_info=e)
             return []
         dashboards: list[SdkRedashDashboard] = []
         # Redash APIs are very slow to paginate, especially for large number of dashboards, so we limit the listing
@@ -334,7 +334,7 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
             # for an example on how to implement a (debug) rate limit
             return list(self._ws.lakeview.list())  # TODO: Add dashboard summary view?
         except DatabricksError as e:
-            logger.warning("Cannot list Lakeview dashboards", exc_info=e)
+            logger.error("Cannot list Lakeview dashboards", exc_info=e)
             return []
 
     def _get_dashboards(self, *dashboard_ids: str) -> list[SdkLakeviewDashboard]:
