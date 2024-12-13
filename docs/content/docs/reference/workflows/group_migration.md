@@ -83,6 +83,8 @@ This task validates that all the crawled permissions are applied correctly to th
 
 {{% /steps %}}
 
+You can trigger the workflow from the Workspace UI. 
+
 ## Post-migration steps
 
 After successfully running the group migration workflow:
