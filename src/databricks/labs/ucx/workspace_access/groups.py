@@ -540,7 +540,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         attributes = "id,displayName"
         found_groups = {
             group.id: group.display_name
-            for group in self._list_workspace_groups(self._resource_type_workspace_group, attributes)
+            for group in self._list_groups(self._resource_type_workspace_group, attributes)
             if group.display_name
         }
         pending_renames: list[RuntimeError] = []
@@ -709,7 +709,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
         attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}
-        for group in self._list_workspace_groups(self._resource_type_workspace_group, attributes):
+        for group in self._list_groups(self._resource_type_workspace_group, attributes):
             if not group.display_name:
                 logger.debug(f"Ignoring workspace group without name: {group.id}")
                 continue
@@ -718,7 +718,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
         groups = {}
-        for group in self._list_workspace_groups(self._resource_type_account_group, "id,displayName,externalId,meta"):
+        for group in self._list_groups(self._resource_type_account_group, "id,displayName,externalId,meta"):
             if not group.display_name:
                 logger.debug(f"Ignoring account group in workspace without name: {group.id}")
                 continue
@@ -736,7 +736,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             return True
         return False
 
-    def _list_workspace_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
+    def _list_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
         results = []
         logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes} ...")
         # If members are requested during enumeration the API can time out. In this case we fall back on
@@ -843,7 +843,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         attributes = "id,displayName"
         expected_deletions = {group.id_in_workspace for group in deleted_workspace_groups}
         pending_deletions = []
-        for group in self._list_workspace_groups(self._resource_type_workspace_group, attributes):
+        for group in self._list_groups(self._resource_type_workspace_group, attributes):
             if group.id in expected_deletions:
                 pending_deletions.append(GroupDeletionIncompleteError(group.id, group.display_name))
         if pending_deletions:
