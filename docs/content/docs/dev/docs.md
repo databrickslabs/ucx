@@ -18,8 +18,15 @@ To build the documentation, you need to have the following tools installed:
 - [Node.js](https://nodejs.org/en/download/)
 - [Yarn](https://classic.yarnpkg.com/en/docs/install/)
 
+On MacOS, you can install the prerequisites using [Homebrew](https://brew.sh/):
+
+```bash
+brew install hugo node
+npm install -g yarn
+```
+
 {{<callout type="info">}}
-The documentation is built using Hugo, a static site generator. The content is written in Markdown and the site is styled using TailwindCSS. We only need node.js and yarn to make tailwindcss work.
+The documentation is built using Hugo, a static site generator. The content is written in Markdown and the site is styled using TailwindCSS. We only need Node.JS and `yarn` to make TailwindCSS work locally during development.
 {{</callout>}}
 
 ## Installing tailwindcss
