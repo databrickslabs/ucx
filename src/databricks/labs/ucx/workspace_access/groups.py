@@ -405,9 +405,6 @@ class GroupRenameIncompleteError(RuntimeError):
 
 class GroupManager(CrawlerBase[MigratedGroup]):
 
-    _resource_type_workspace_group = "WorkspaceGroup"
-    _resource_type_account_group = "Group"
-
     def __init__(  # pylint: disable=too-many-arguments
         self,
         sql_backend: SqlBackend,
@@ -474,8 +471,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             group_ids = self._include_group_ids_initial.copy()
         else:
             group_ids = []
-        groups = self._list_groups(self._resource_type_workspace_group, "id,displayName")
-        for group in groups:
+        groups = self._workspace_groups_in_workspace()
+        for _, group in groups:
             group_ids.append(group.id)
         return group_ids
 
@@ -582,11 +579,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _check_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]], pending_log_level: int) -> None:
         attributes = "id,displayName"
-        found_groups = {
-            group.id: group.display_name
-            for group in self._list_groups(self._resource_type_workspace_group, attributes)
-            if group.display_name
-        }
+        found_groups = self._workspace_groups_in_workspace()
         pending_renames: list[RuntimeError] = []
         for group_id, expected_name in expected_groups:
             found_name = found_groups.get(group_id, None)
@@ -750,9 +743,12 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return name in groups
 
     def _workspace_groups_in_workspace(self) -> dict[str, Group]:
-        attributes = "id,displayName,meta,externalId,members,roles,entitlements"
         groups = {}
-        for group in self._list_groups(self._resource_type_workspace_group, attributes):
+        for group in self._groups_with_members:
+            if self._is_system_group(group):
+                continue
+            if not self._is_workspace_group(group):
+                continue
             if not group.display_name:
                 logger.debug(f"Ignoring workspace group without name: {group.id}")
                 continue
@@ -761,7 +757,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
     def _account_groups_in_workspace(self) -> dict[str, Group]:
         groups = {}
-        for group in self._list_groups(self._resource_type_account_group, "id,displayName,externalId,meta"):
+        for group in self._groups_without_members:
+            if self._is_system_group(group):
+                continue
+            if not self._is_account_group(group):
+                continue
             if not group.display_name:
                 logger.debug(f"Ignoring account group in workspace without name: {group.id}")
                 continue
@@ -769,34 +769,31 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return groups
 
     @staticmethod
-    def _is_group_out_of_scope(group: iam.Group, resource_type: str) -> bool:
-        if group.display_name in SYSTEM_GROUPS:
-            return True
-        meta = group.meta
-        if not meta:
-            return False
-        if meta.resource_type != resource_type:
-            return True
-        return False
+    def _is_system_group(group: iam.Group) -> bool:
+        """Is the group a system group, or not."""
+        return group.display_name in SYSTEM_GROUPS
 
-    def _list_groups(self, resource_type: str, scim_attributes: str) -> list[iam.Group]:
-        """List the groups using the workspace client.
+    @staticmethod
+    def _is_workspace_group(group: iam.Group) -> bool:
+        """Is the group a workspace group, or not."""
+        return group.meta and group.meta.resource_type == "WorkspaceGroup"
+
+    @staticmethod
+    def _is_account_group(group: iam.Group) -> bool:
+        """Is the group an account group, or not."""
+        return group.meta and group.meta.resource_type == "Group"
+
+    @functools.cached_property
+    def _groups_with_members(self) -> list[iam.Group]:
+        """List the workspace groups with members.
 
         Note:
-            If the "members" attribute is requested, the API can time out during enumeration. In this case, enumerating
-            the minimum number of attributes during listing and request all attributes for each (filtered) group
-            individually.
+            Prefer :meth:`_groups_without_members` when possible, see docstring of that property.
         """
-        logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes} ...")
-        groups = []
-        for group in self._groups_without_members:
-            if self._is_group_out_of_scope(group, resource_type):
-                continue
-            groups.append(group)
-        if "members" not in scim_attributes:
-            return groups
+        if self._include_group_ids is not None:
+            return list(self._get_groups(*self._include_group_ids))
         groups_with_members = []
-        for group in groups:
+        for group in self._groups_without_members:
             group_with_members = self._get_group(group.id)
             if group_with_members:
                 groups_with_members.append(group_with_members)
@@ -810,8 +807,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             Excluding the members attribute is an optimization step as requesting the members increases an API timeout
             significantly.
         """
-        groups_iterator = self._get_groups_iterator("id,displayName,externalId,meta")
-        groups = []
+        if self._include_group_ids is not None:
+            return list(self._get_groups(*self._include_group_ids))
+        groups, groups_iterator = [], self._list_groups(attributes="id,displayName,externalId,meta")
         while True:
             try:
                 groups.append(next(groups_iterator))
@@ -823,16 +821,13 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 break
         return groups
 
-    def _get_groups_iterator(self, attributes: str) -> Iterator[Group]:
-        if self._include_group_ids is not None:
-            yield from self._get_groups(*self._include_group_ids)
-        else:
-            try:
-                # TODO: Test raising Permission error for list
-                yield from self._ws.groups.list(attributes=attributes)
-            except DatabricksError as e:
-                logger.error("Cannot list groups", exc_info=e)
-                yield from []
+    def _list_groups(self, *, attributes: str) -> Iterator[Group]:
+        try:
+            # TODO: Test raising Permission error for list
+            yield from self._ws.groups.list(attributes=attributes)
+        except DatabricksError as e:
+            logger.error("Cannot list groups", exc_info=e)
+            yield from []
 
     def _get_groups(self, *group_ids: str) -> Iterator[iam.Group]:
         for group_id in group_ids:
@@ -924,7 +919,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         attributes = "id,displayName"
         expected_deletions = {group.id_in_workspace for group in deleted_workspace_groups}
         pending_deletions = []
-        for group in self._list_groups(self._resource_type_workspace_group, attributes):
+        for _, group in self._workspace_groups_in_workspace():
             if group.id in expected_deletions:
                 pending_deletions.append(GroupDeletionIncompleteError(group.id, group.display_name))
         if pending_deletions:
