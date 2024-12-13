@@ -72,7 +72,7 @@ class LocationTrie:
         parse_result = cls._parse_url(location.rstrip("/"))
         if not parse_result:
             return []
-        parts = [parse_result.scheme, parse_result.netloc]
+        parts = [parse_result.scheme.replace("s3a", "s3"), parse_result.netloc]
         for part in parse_result.path.split("/"):
             if not part:
                 continue  # remove empty strings
@@ -154,16 +154,35 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         schema: str,
         tables_crawler: TablesCrawler,
         mounts_crawler: 'MountsCrawler',
+        enable_hms_federation: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
+        self._enable_hms_federation = enable_hms_federation
 
     @cached_property
     def _mounts_snapshot(self) -> list['Mount']:
         """Returns all mounts, sorted by longest prefixes first."""
         return sorted(self._mounts_crawler.snapshot(), key=lambda _: (len(_.name), _.name), reverse=True)
+
+    def get_dbfs_root(self) -> ExternalLocation | None:
+        """
+        Get the root location of the DBFS
+
+        Returns:
+            Cloud storage root location for dbfs
+
+        """
+        logger.debug("Retrieving DBFS root location")
+        response = self._ws.api_client.do("GET", "/api/2.0/dbfs/resolve-path", query={"path": "dbfs:/"})
+        if isinstance(response, dict):
+            resolved_path = response.get("resolved_path")
+            if resolved_path:
+                resolved_path = re.sub(r"^s3a:/", r"s3:/", resolved_path)
+                return ExternalLocation(resolved_path, 0)
+        return None
 
     def _external_locations(self) -> Iterable[ExternalLocation]:
         trie = LocationTrie()
@@ -194,10 +213,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 external_locations.append(external_location)
                 continue
             queue.extend(curr.children.values())
-        if self._mounts_snapshot:
-            root_dbfs = self._mounts_snapshot[-1]
-            if root_dbfs.name == '/':
-                external_locations.append(ExternalLocation(root_dbfs.source, 0))
         return sorted(external_locations, key=lambda _: _.location)
 
     def _resolve_location(self, table: Table) -> Table:
@@ -263,6 +278,14 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ExternalLocation(*row)
+
+    def snapshot(self, *, force_refresh: bool = False) -> list[ExternalLocation]:
+        external_locations = list(super().snapshot(force_refresh=force_refresh))
+        if self._enable_hms_federation:
+            dbfs_root = self.get_dbfs_root()
+            if dbfs_root:
+                external_locations.append(dbfs_root)
+        return external_locations
 
     @staticmethod
     def _get_ext_location_definitions(missing_locations: list[ExternalLocation]) -> list:
@@ -363,11 +386,9 @@ class MountsCrawler(CrawlerBase[Mount]):
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
         inventory_database: str,
-        enable_hms_federation: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", inventory_database, "mounts", Mount)
         self._dbutils = ws.dbutils
-        self._enable_hms_federation = enable_hms_federation
 
     @staticmethod
     def _deduplicate_mounts(mounts: list) -> list:
@@ -396,6 +417,7 @@ class MountsCrawler(CrawlerBase[Mount]):
             return None
 
     def _resolve_dbfs_root(self) -> Mount | None:
+        # TODO: Consider deprecating this method and rely on the new API call
         # pylint: disable=broad-exception-caught,too-many-try-statements
         try:
             jvm = self._jvm
@@ -419,12 +441,6 @@ class MountsCrawler(CrawlerBase[Mount]):
         try:
             for mount_point, source, _ in self._dbutils.fs.mounts():
                 mounts.append(Mount(mount_point, source))
-            if self._enable_hms_federation:
-                root_mount = self._resolve_dbfs_root()
-                if root_mount:
-                    # filter out DatabricksRoot, otherwise ExternalLocations.resolve_mount() won't work
-                    mounts = list(filter(lambda _: _.source != 'DatabricksRoot', mounts))
-                    mounts.append(root_mount)
         except Exception as error:  # pylint: disable=broad-except
             if "com.databricks.backend.daemon.dbutils.DBUtilsCore.mounts() is not whitelisted" in str(error):
                 logger.warning(

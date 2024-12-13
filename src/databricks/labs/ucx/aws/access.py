@@ -227,12 +227,17 @@ class AWSResourcePermissions:
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
         external_locations = self._locations.snapshot()
+        logger.info(f"Found {len(external_locations)} external locations")
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}
         for external_location in external_locations:
             path = PurePath(external_location.location)
             for role in compatible_roles:
-                if not (path.match(role.resource_path) or path.match(role.resource_path + "/*")):
+                if not (
+                    PurePath(role.resource_path) in path.parents
+                    or path.match(role.resource_path)
+                    or path.match(role.resource_path + "/*")
+                ):
                     continue
                 if role.role_arn not in roles:
                     roles[role.role_arn] = AWSCredentialCandidate(
@@ -374,11 +379,15 @@ class AWSResourcePermissions:
             logger.error(f"Failed to assign instance profile to cluster policy {iam_role_name}")
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
 
+    def _clean_location_name(self, location: str) -> str:
+        # Remove leading s3:// s3a:// and trailing /
+        return location.replace("s3://", "").replace("s3a://", "").replace("/", "_").replace(":", "_").replace(".", "_")
+
     def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
         if single_role:
             metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
             return f"{role_name}_{metastore_id}"
-        return f"{role_name}_{location[5:]}"
+        return f"{role_name}_{self._clean_location_name(location)}"
 
     def delete_uc_role(self, role_name: str):
         self._aws_resources.delete_role(role_name)
