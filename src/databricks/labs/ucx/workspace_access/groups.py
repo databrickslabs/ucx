@@ -414,6 +414,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         ws: WorkspaceClient,
         inventory_database: str,
         include_group_names: list[str] | None = None,
+        include_group_ids: list[str] | None = None,
         renamed_group_prefix: str | None = "db-temp-",
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
@@ -427,7 +428,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             renamed_group_prefix = "db-temp-"
 
         self._ws = ws
-        self._include_group_names = include_group_names
         self._renamed_group_prefix = renamed_group_prefix
         self._workspace_group_regex = workspace_group_regex
         self._workspace_group_replace = workspace_group_replace
@@ -435,6 +435,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self._external_id_match = external_id_match
         self._verify_timeout = verify_timeout
         self._account_groups_lookup = AccountGroupLookup(ws)
+
+        # The include group names is kept for legacy support. We prefer the group ids as it limits the API calls.
+        self._include_group_names = include_group_names
+        self._include_group_ids = include_group_ids
 
     def rename_groups(self):
         account_groups_in_workspace = self._account_groups_in_workspace()
