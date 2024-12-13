@@ -1095,8 +1095,6 @@ class MockInstallationContext(MockRuntimeContext):
         for query in self._queries:
             self.config.include_object_permissions.append(f"queries:{query.id}")
 
-        self.include_object_permissions = self.config.include_object_permissions
-
     @cached_property
     def config(self) -> WorkspaceConfig:
         workspace_config = self.workspace_installer.configure()
