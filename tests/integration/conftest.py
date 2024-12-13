@@ -509,9 +509,9 @@ class MockRuntimeContext(
         self._lakeview_query_id: str | None = None
         self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
         self._cluster_policies: list[CreatePolicyResponse] = []
-        self._secret_scopes = []
+        self._secret_scopes: list[str] = []
 
-    # TODO: add methods to pre-populate the following:
+        # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
     def with_table_mapping_rules(self, rules):
@@ -1084,7 +1084,7 @@ class MockInstallationContext(MockRuntimeContext):
         return self.config.include_object_permissions
 
     def configure_object_permissions(self) -> None:
-        if not self.include_object_permissions:
+        if not self.config.include_object_permissions:
             self.config.include_object_permissions = []
         for table in self._tables:
             self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
@@ -1092,7 +1092,6 @@ class MockInstallationContext(MockRuntimeContext):
             self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
         for secret_scope in self._secret_scopes:
             self.config.include_object_permissions.append(f"secrets:{secret_scope}")
-
 
     @cached_property
     def config(self) -> WorkspaceConfig:
