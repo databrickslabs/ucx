@@ -154,33 +154,14 @@ class MigrationState:
 
 
 class GroupMigrationStrategy:
-    def __init__(
-        self,
-        workspace_groups_in_workspace,
-        account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
-    ):
+    def __init__(self, workspace_groups_in_workspace, account_groups_in_account, /, renamed_groups_prefix):
         self.renamed_groups_prefix = renamed_groups_prefix
         self.workspace_groups_in_workspace = workspace_groups_in_workspace
         self.account_groups_in_account = account_groups_in_account
-        self.include_group_names = include_group_names
 
     @abstractmethod
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         raise NotImplementedError
-
-    def get_filtered_groups(self):
-        if not self.include_group_names:
-            logger.info("No group listing provided, all matching groups will be migrated")
-            return self.workspace_groups_in_workspace
-        logger.info("Group listing provided, a subset of all groups will be migrated")
-        return {
-            group_name: self.workspace_groups_in_workspace[group_name]
-            for group_name in self.workspace_groups_in_workspace.keys()
-            if group_name in self.include_group_names
-        }
 
     @staticmethod
     def _safe_match(group_name: str, pattern: re.Pattern) -> str:
@@ -205,24 +186,9 @@ class GroupMigrationStrategy:
 
 
 class MatchingNamesStrategy(GroupMigrationStrategy):
-    def __init__(
-        self,
-        workspace_groups_in_workspace,
-        account_groups_in_account,
-        *,
-        renamed_groups_prefix: str,
-        include_group_names: list[str] | None,
-    ):
-        super().__init__(
-            workspace_groups_in_workspace,
-            account_groups_in_account,
-            include_group_names=include_group_names,
-            renamed_groups_prefix=renamed_groups_prefix,
-        )
 
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
-        workspace_groups = self.get_filtered_groups()
-        for group in workspace_groups.values():
+        for group in self.workspace_groups_in_workspace.values():
             account_group = self.account_groups_in_account.get(group.display_name)
             if not account_group:
                 logger.info(
@@ -243,25 +209,10 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
 
 
 class MatchByExternalIdStrategy(GroupMigrationStrategy):
-    def __init__(
-        self,
-        workspace_groups_in_workspace,
-        account_groups_in_account,
-        *,
-        renamed_groups_prefix: str,
-        include_group_names: list[str] | None,
-    ):
-        super().__init__(
-            workspace_groups_in_workspace,
-            account_groups_in_account,
-            include_group_names=include_group_names,
-            renamed_groups_prefix=renamed_groups_prefix,
-        )
 
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
-        workspace_groups = self.get_filtered_groups()
         account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
-        for group in workspace_groups.values():
+        for group in self.workspace_groups_in_workspace.values():
             account_group = account_groups_by_id.get(group.external_id)
             if not account_group:
                 logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
@@ -286,15 +237,11 @@ class RegexSubStrategy(GroupMigrationStrategy):
         account_groups_in_account: dict[str, Group],
         *,
         renamed_groups_prefix: str,
-        include_group_names: list[str] | None,
         workspace_group_regex: str,
         workspace_group_replace: str,
     ):
         super().__init__(
-            workspace_groups_in_workspace,
-            account_groups_in_account,
-            include_group_names=include_group_names,
-            renamed_groups_prefix=renamed_groups_prefix,
+            workspace_groups_in_workspace, account_groups_in_account, renamed_groups_prefix=renamed_groups_prefix
         )
         self.workspace_group_regex = workspace_group_regex  # Keep to support legacy public API
         self.workspace_group_replace = workspace_group_replace
@@ -302,8 +249,7 @@ class RegexSubStrategy(GroupMigrationStrategy):
         self._workspace_group_pattern = re.compile(self.workspace_group_regex)
 
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
-        workspace_groups = self.get_filtered_groups()
-        for group in workspace_groups.values():
+        for group in self.workspace_groups_in_workspace.values():
             name_in_account = self._safe_sub(
                 group.display_name,
                 self._workspace_group_pattern,
@@ -335,15 +281,11 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         account_groups_in_account,
         *,
         renamed_groups_prefix: str,
-        include_group_names: list[str] | None,
         workspace_group_regex: str,
         account_group_regex: str,
     ):
         super().__init__(
-            workspace_groups_in_workspace,
-            account_groups_in_account,
-            include_group_names=include_group_names,
-            renamed_groups_prefix=renamed_groups_prefix,
+            workspace_groups_in_workspace, account_groups_in_account, renamed_groups_prefix=renamed_groups_prefix
         )
         # Keep to support legacy public API
         self.workspace_group_regex = workspace_group_regex
@@ -355,7 +297,7 @@ class RegexMatchStrategy(GroupMigrationStrategy):
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups_by_match = {
             self._safe_match(group_name, self._workspace_group_pattern): group
-            for group_name, group in self.get_filtered_groups().items()
+            for group_name, group in self.workspace_groups_in_workspace.items()
         }
         account_groups_by_match = {
             self._safe_match(group_name, self._account_group_pattern): group
@@ -957,12 +899,10 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]
     ) -> GroupMigrationStrategy:
         if self._workspace_group_regex is not None and self._workspace_group_replace is not None:
-            # TODO: Refactor strategies to expect include group ids
             return RegexSubStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
                 renamed_groups_prefix=self._renamed_group_prefix,
-                include_group_names=self._include_group_names,
                 workspace_group_regex=self._workspace_group_regex,
                 workspace_group_replace=self._workspace_group_replace,
             )
@@ -971,7 +911,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 workspace_groups_in_workspace,
                 account_groups_in_account,
                 renamed_groups_prefix=self._renamed_group_prefix,
-                include_group_names=self._include_group_names,
                 workspace_group_regex=self._workspace_group_regex,
                 account_group_regex=self._account_group_regex,
             )
@@ -980,13 +919,11 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 workspace_groups_in_workspace,
                 account_groups_in_account,
                 renamed_groups_prefix=self._renamed_group_prefix,
-                include_group_names=self._include_group_names,
             )
         return MatchingNamesStrategy(
             workspace_groups_in_workspace,
             account_groups_in_account,
             renamed_groups_prefix=self._renamed_group_prefix,
-            include_group_names=self._include_group_names,
         )
 
 

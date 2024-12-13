@@ -1418,7 +1418,6 @@ def test_regex_sub_strategy_replaces_with_empty_replace():
         workspace_groups,
         account_groups,
         renamed_groups_prefix="db-temp-",
-        include_group_names=["group_old"],
         workspace_group_regex="_old",
         workspace_group_replace="",
     )
