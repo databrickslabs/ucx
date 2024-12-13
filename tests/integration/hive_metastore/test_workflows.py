@@ -68,8 +68,7 @@ def test_table_migration_job_refreshes_migration_status(
     assert len(asserts) == 0, assert_message
 
 
-def test_table_migration_for_managed_table(installation_ctx, make_table_migration_context) -> None:
-    # This test cases test the CONVERT_TO_EXTERNAL scenario.
+def test_table_migration_convert_manged_to_external(installation_ctx, make_table_migration_context) -> None:
     tables, dst_schema = make_table_migration_context("managed", installation_ctx)
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
@@ -112,10 +111,10 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
         },
     )
     ctx.workspace_installation.run()
+
     ctx.deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
-    # assert the workflow is successful
+
     assert ctx.deployed_workflows.validate_step("migrate-external-hiveserde-tables-in-place-experimental")
-    # assert the tables are migrated
     for table in tables.values():
         try:
             assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
@@ -135,10 +134,10 @@ def test_hiveserde_table_ctas_migration_job(installation_ctx, make_table_migrati
         },
     )
     ctx.workspace_installation.run()
+
     ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
-    # assert the workflow is successful
+
     assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
-    # assert the tables are migrated
     for table in tables.values():
         try:
             assert ctx.workspace_client.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
@@ -164,9 +163,10 @@ def test_table_migration_job_publishes_remaining_tables(installation_ctx, make_t
         table_format="UNKNOWN",
     )
     ctx.table_mapping.skip_table_or_view(dst_schema.name, second_table.name, load_table=lambda *_: table)
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
 
+    ctx.deployed_workflows.run_workflow("migrate-tables")
+
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
     remaining_tables = list(
         ctx.sql_backend.fetch(
             f"""
