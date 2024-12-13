@@ -226,6 +226,65 @@ def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_account():
     assert not res
 
 
+def test_snapshot_should_filters_out_all_groups_with_include_group_names_as_empty_list(mock_backend) -> None:
+    """If the `include_group_names` is an empty list, no groups should be found."""
+    ws = create_autospec(WorkspaceClient)
+    group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    acc_group_1 = Group(id="11", display_name="de", external_id="1234")
+    acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (acc_group_1, acc_group_2)],
+    }
+    ws.groups.list.return_value = [group1, group2]
+    ws.groups.get.side_effect = [group1, group2]
+    manager = GroupManager(mock_backend, ws, inventory_database="inv", include_group_names=[])
+
+    migrated_groups = manager.snapshot()
+
+    assert not migrated_groups
+
+
+def test_snapshot_should_keep_all_groups_with_include_group_names_as_none(mock_backend) -> None:
+    """If the `include_group_names` is None, all groups should be found."""
+    ws = create_autospec(WorkspaceClient)
+    group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    acc_group_1 = Group(id="11", display_name="de", external_id="1234")
+    acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
+    ws.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (acc_group_1, acc_group_2)],
+    }
+    ws.groups.list.return_value = [group1, group2]
+    ws.groups.get.side_effect = [group1, group2]
+    manager = GroupManager(mock_backend, ws, inventory_database="inv", include_group_names=[])
+
+    migrated_groups = manager.snapshot()
+
+    assert migrated_groups == [
+        MigratedGroup(
+            id_in_workspace="1",
+            name_in_workspace="de",
+            name_in_account="de",
+            temporary_name="db-temp-de",
+            members=None,
+            external_id="1234",
+            roles=None,
+            entitlements=None,
+        ),
+        MigratedGroup(
+            id_in_workspace="2",
+            name_in_workspace="ds",
+            name_in_account="ds",
+            temporary_name="db-temp-ds",
+            members=None,
+            external_id="1235",
+            roles=None,
+            entitlements=None,
+        ),
+    ]
+
+
 def test_snapshot_should_rename_groups_defined_in_conf():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
