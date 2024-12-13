@@ -578,7 +578,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         logger.debug(f"Group enumeration showed all {len(expected_groups)} renamed groups; assuming complete.")
 
     def _check_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]], pending_log_level: int) -> None:
-        attributes = "id,displayName"
         found_groups = self._workspace_groups_in_workspace()
         pending_renames: list[RuntimeError] = []
         for group_id, expected_name in expected_groups:
@@ -916,7 +915,6 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _check_for_deleted_workspace_groups(
         self, deleted_workspace_groups: list[MigratedGroup], still_present_log_level: int
     ) -> None:
-        attributes = "id,displayName"
         expected_deletions = {group.id_in_workspace for group in deleted_workspace_groups}
         pending_deletions = []
         for _, group in self._workspace_groups_in_workspace():
