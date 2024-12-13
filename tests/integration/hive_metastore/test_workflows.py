@@ -3,7 +3,6 @@ from typing import Literal
 
 import pytest
 from databricks.labs.lsql.core import Row
-from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -101,7 +100,9 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
             break
 
 
-@pytest.mark.parametrize("workflow", ["migrate-external-hiveserde-tables-in-place-experimental", "migrate-external-tables-ctas"])
+@pytest.mark.parametrize(
+    "workflow", ["migrate-external-hiveserde-tables-in-place-experimental", "migrate-external-tables-ctas"]
+)
 def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_migration_context, workflow) -> None:
     tables, dst_schema = make_table_migration_context("hiveserde", installation_ctx)
     ctx = installation_ctx.replace(
@@ -122,7 +123,7 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
     for table in tables.values():
         migrated_table_name = f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}"
         if not ctx.workspace_client.tables.exists(migrated_table_name):
-           missing_tables.add(migrated_table_name)
+            missing_tables.add(migrated_table_name)
     assert not missing_tables, f"Missing migrated tables: {missing_tables}"
 
 
