@@ -791,10 +791,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             list_attributes = ",".join(set(",".split(scim_attributes)) & {"id", "displayName", "meta"})
         else:
             list_attributes = scim_attributes
-        if self._group_ids is not None:
-            groups_iterator = self._get_groups(*self._include_group_names, scim_attributes)
-        else:
-            groups_iterator = self._get_groups_iterator(list_attributes)
+        groups_iterator = self._get_groups_iterator(list_attributes)
         groups = []
         while True:
             try:
@@ -815,13 +812,15 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         return groups
 
     def _get_groups_iterator(self, attributes: str) -> Iterator[Group]:
-        # TODO: Use include group ids
-        try:
-            # TODO: Test raising Permission error for list
-            yield from self._ws.groups.list(attributes=attributes)
-        except DatabricksError as e:
-            logger.error("Cannot list groups", exc_info=e)
-            yield from []
+        if self._include_group_ids is not None:
+            yield from self._get_groups(*self._include_group_ids)
+        else:
+            try:
+                # TODO: Test raising Permission error for list
+                yield from self._ws.groups.list(attributes=attributes)
+            except DatabricksError as e:
+                logger.error("Cannot list groups", exc_info=e)
+                yield from []
 
     def _get_groups(self, *group_ids: str) -> Iterator[iam.Group]:
         for group_id in group_ids:
