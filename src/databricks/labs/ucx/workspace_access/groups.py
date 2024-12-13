@@ -788,29 +788,39 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             individually.
         """
         logger.info(f"Listing workspace groups (resource_type={resource_type}) with {scim_attributes} ...")
-        is_limit_list_attributes = "members" in scim_attributes
-        if is_limit_list_attributes:
-            list_attributes = ",".join(set(",".split(scim_attributes)) & {"id", "displayName", "meta"})
-        else:
-            list_attributes = scim_attributes
-        groups_iterator = self._get_groups_iterator(list_attributes)
+        groups = []
+        for group in self._groups_without_members:
+            if self._is_group_out_of_scope(group, resource_type):
+                continue
+            groups.append(group)
+        if "members" not in scim_attributes:
+            return groups
+        groups_with_members = []
+        for group in groups:
+            group_with_members = self._get_group(group.id)
+            if group_with_members:
+                groups_with_members.append(group_with_members)
+        return groups_with_members
+
+    @functools.cached_property
+    def _groups_without_members(self) -> list[iam.Group]:
+        """List groups without members.
+
+        Note:
+            Excluding the members attribute is an optimization step as requesting the members increases an API timeout
+            significantly.
+        """
+        groups_iterator = self._get_groups_iterator("id,displayName,externalId,meta")
         groups = []
         while True:
             try:
-                group = next(groups_iterator)
+                groups.append(next(groups_iterator))
             except StopIteration:
                 break
             except DatabricksError as e:
                 # TODO: Test raising Permission error for list second page
                 logger.error("Cannot list next groups page", exc_info=e)
                 break
-            if not group or self._is_group_out_of_scope(group, resource_type):
-                continue
-            group_with_all_attributes = self._get_group(group.id) if is_limit_list_attributes else group
-            if not group_with_all_attributes:
-                continue
-            groups.append(group_with_all_attributes)
-        logger.info(f"Found {len(groups)} {resource_type}")
         return groups
 
     def _get_groups_iterator(self, attributes: str) -> Iterator[Group]:
