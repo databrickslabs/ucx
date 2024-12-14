@@ -23,7 +23,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
     "location",
     [
         "s3://databricks-e2demofieldengwest/b169/b50",
-        "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
+        "s3://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
         "s3n://bucket-name/path-to-file-in-bucket",
         "s3n://bucket-name/path-to-another-file",
         "s3n://bucket-name",
