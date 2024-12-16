@@ -11,7 +11,6 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.source_code.base import UsedTable
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.queries import QueryProblem
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
@@ -30,7 +29,6 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         sql_backend: SqlBackend,
         ownership: DashboardOwnership,
         *,
-        direct_fs_access_crawlers: list[DirectFsAccessCrawler],
         used_tables_crawlers: list[UsedTablesCrawler],
         inventory_database: str,
         job_run_id: int,
@@ -48,16 +46,14 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
             "historical",
         )
         self._inventory_database = inventory_database
-        self._direct_fs_access_crawlers = direct_fs_access_crawlers
         self._used_tables_crawlers = used_tables_crawlers
 
     def append_inventory_snapshot(self, snapshot: Iterable[Dashboard]) -> None:
         query_problems = self._get_query_problems()
-        dfsas = self._get_direct_filesystem_accesses()
         table_failures = self._get_tables_failures()
         history_records = []
         for record in snapshot:
-            history_record = self._encode_dashboard_as_historical(record, query_problems, dfsas, table_failures)
+            history_record = self._encode_dashboard_as_historical(record, query_problems, table_failures)
             history_records.append(history_record)
         logger.debug(f"Appending {len(history_records)} {self._klass} table record(s) to history.")
         # The mode is 'append'. This is documented as conflict-free.
@@ -75,29 +71,6 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
                 f'[{problem.code}] {problem.query_name} ({problem.dashboard_id}/{problem.query_id}) : {problem.message}'
             )
             index[problem.dashboard_id].append(failure)
-        return index
-
-    def _get_direct_filesystem_accesses(self) -> DashboardIdToFailuresType:
-        index = collections.defaultdict(list)
-        for crawler in self._direct_fs_access_crawlers:
-            for direct_fs_access in crawler.snapshot():
-                # The dashboard and query source lineage are added by the QueryLinter
-                if len(direct_fs_access.source_lineage) < 2:
-                    continue
-                if direct_fs_access.source_lineage[0].object_type != "DASHBOARD":  # Note: this skips dangling queries
-                    continue
-                if direct_fs_access.source_lineage[1].object_type != "QUERY":
-                    continue
-                dashboard_id = direct_fs_access.source_lineage[0].object_id
-                query_id = direct_fs_access.source_lineage[1].object_id  # <dashboard id>/<query id>
-                query_name = "UNKNOWN"
-                if direct_fs_access.source_lineage[1].other and "name" in direct_fs_access.source_lineage[1].other:
-                    query_name = direct_fs_access.source_lineage[1].other["name"]
-                # Follow same failure message structure as the QueryProblem above and DirectFsAccessPyLinter deprecation
-                code = "direct-filesystem-access"
-                message = f"The use of direct filesystem references is deprecated: {direct_fs_access.path}"
-                failure = f"[{code}] {query_name} ({query_id}) : {message}"
-                index[dashboard_id].append(failure)
         return index
 
     def _get_used_tables(self) -> dict[str, list[UsedTable]]:
@@ -136,7 +109,6 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         self,
         record: Dashboard,
         query_problems: DashboardIdToFailuresType,
-        dfsas: DashboardIdToFailuresType,
         tables_failures: DashboardIdToFailuresType,
     ) -> Historical:
         """Encode a dashboard as a historical records.
@@ -149,6 +121,5 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         historical = super()._encode_record_as_historical(record)
         failures = []
         failures.extend(query_problems.get(record.id, []))
-        failures.extend(dfsas.get(record.id, []))
         failures.extend(tables_failures.get(record.id, []))
         return replace(historical, failures=historical.failures + failures)

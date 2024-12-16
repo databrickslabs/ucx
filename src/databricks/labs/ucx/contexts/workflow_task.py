@@ -251,7 +251,6 @@ class RuntimeContext(GlobalContext):
         return DashboardProgressEncoder(
             self.sql_backend,
             self.dashboard_ownership,
-            direct_fs_access_crawlers=[self.directfs_access_crawler_for_queries],
             used_tables_crawlers=[self.used_tables_crawler_for_queries],
             inventory_database=self.config.inventory_database,
             job_run_id=self.parent_run_id,
