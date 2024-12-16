@@ -253,14 +253,6 @@
     "audioread.rawread": [],
     "audioread.version": []
   },
-  "autocommand": {
-    "autocommand": [],
-    "autocommand.autoasync": [],
-    "autocommand.autocommand": [],
-    "autocommand.automain": [],
-    "autocommand.autoparse": [],
-    "autocommand.errors": []
-  },
   "azure": {
     "azure.digitaltwins": [],
     "azure.digitaltwins.core": []
@@ -998,12 +990,6 @@
     "backcall": [],
     "backcall._signatures": [],
     "backcall.backcall": []
-  },
-  "backports.tarfile": {
-    "backports": [],
-    "backports.tarfile": [],
-    "backports.tarfile.compat": [],
-    "backports.tarfile.compat.py38": []
   },
   "bcrypt": {
     "bcrypt": []
@@ -6639,11 +6625,6 @@
     "importlib_resources.readers": [],
     "importlib_resources.simple": []
   },
-  "inflect": {
-    "inflect": [],
-    "inflect.compat": [],
-    "inflect.compat.py38": []
-  },
   "iniconfig": {
     "iniconfig": []
   },
@@ -6838,22 +6819,11 @@
     "jaraco.classes.meta": [],
     "jaraco.classes.properties": []
   },
-  "jaraco.collections": {
-    "jaraco.collections": []
-  },
   "jaraco.context": {
     "jaraco.context": []
   },
   "jaraco.functools": {
     "jaraco.functools": []
-  },
-  "jaraco.text": {
-    "jaraco.text": [],
-    "jaraco.text.layouts": [],
-    "jaraco.text.show-newlines": [],
-    "jaraco.text.strip-prefix": [],
-    "jaraco.text.to-dvorak": [],
-    "jaraco.text.to-qwerty": []
   },
   "jax-jumpy": {
     "jumpy": [],
@@ -32844,21 +32814,6 @@
     "trl.trainer.sft_config": [],
     "trl.trainer.sft_trainer": [],
     "trl.trainer.utils": []
-  },
-  "typeguard": {
-    "typeguard": [],
-    "typeguard._checkers": [],
-    "typeguard._config": [],
-    "typeguard._decorators": [],
-    "typeguard._exceptions": [],
-    "typeguard._functions": [],
-    "typeguard._importhook": [],
-    "typeguard._memo": [],
-    "typeguard._pytest_plugin": [],
-    "typeguard._suppression": [],
-    "typeguard._transformer": [],
-    "typeguard._union_transformer": [],
-    "typeguard._utils": []
   },
   "types-python-dateutil": {},
   "types-pyyaml": {},
