@@ -324,6 +324,8 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         for sdk_dashboard in self._list_dashboards():
             if sdk_dashboard.dashboard_id is None:
                 continue
+            if sdk_dashboard.dashboard_id in (self._exclude_dashboard_ids or []):
+                continue
             dashboard = Dashboard.from_sdk_lakeview_dashboard(sdk_dashboard)
             dashboards.append(dashboard)
         return dashboards
