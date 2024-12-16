@@ -31,7 +31,7 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
     installation_ctx.deployed_workflows.run_workflow(workflow)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
-    # Ensure that the migration-progress workflow populated the `workflow_runs` table.
+    # Ensure that the `migration-progress` workflow populated the `workflow_runs` table.
     query = f"SELECT 1 FROM {installation_ctx.ucx_catalog}.multiworkspace.workflow_runs LIMIT 1"
     assert any(installation_ctx.sql_backend.fetch(query)), f"No workflow run captured: {query}"
 
