@@ -303,6 +303,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.inventory_database,
             include_dashboard_ids=self.config.include_dashboard_ids,
+            exclude_dashboard_ids=list(self.install_state.dashboards.values()),
             include_query_ids=self.config.include_query_ids,
         )
 
