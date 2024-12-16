@@ -102,7 +102,8 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         used_tables = self._get_used_tables()
         for dashboard_id, used_tables_in_dashboard in used_tables.items():
             for used_table in used_tables_in_dashboard:
-                index[dashboard_id].extend(table_failures.get(used_table.full_name, []))
+                for failure in table_failures.get(used_table.full_name, []):
+                    index[dashboard_id].append(f"{failure}: {used_table.full_name}")
         return index
 
     def _encode_dashboard_as_historical(
