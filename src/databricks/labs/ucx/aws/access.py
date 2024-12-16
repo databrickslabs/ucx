@@ -208,7 +208,7 @@ class AWSResourcePermissions:
         return policy_actions
 
     def _identify_missing_paths(self):
-        external_locations = self._locations.snapshot()
+        external_locations = self._locations.external_locations_with_root()
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
@@ -226,7 +226,7 @@ class AWSResourcePermissions:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
-        external_locations = self._locations.snapshot()
+        external_locations = self._locations.external_locations_with_root()
         logger.info(f"Found {len(external_locations)} external locations")
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}
@@ -328,7 +328,7 @@ class AWSResourcePermissions:
 
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
-        s3_paths = {loc.location for loc in self._locations.snapshot()}
+        s3_paths = {loc.location for loc in self._locations.external_locations_with_root()}
         if len(s3_paths) == 0:
             logger.info("No S3 paths to migrate found")
             return

@@ -377,7 +377,7 @@ def sp_migrations(installation, credential_manager):
         ExternalLocation("abfss://things@labsazurethings2.dfs.core.windows.net/folder1", 1),
     ]
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = external_location
+    external_locations.external_locations_with_root.return_value = external_location
 
     arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
 

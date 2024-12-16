@@ -69,7 +69,7 @@ class LocationTrie:
     def _parse_location(cls, location: str | None) -> list[str]:
         if not location:
             return []
-        parse_result = cls._parse_url(location.rstrip("/"))
+        parse_result = cls._parse_url(ExternalLocations.clean_location(location))
         if not parse_result:
             return []
         parts = [parse_result.scheme.replace("s3a", "s3"), parse_result.netloc]
@@ -167,21 +167,45 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         """Returns all mounts, sorted by longest prefixes first."""
         return sorted(self._mounts_crawler.snapshot(), key=lambda _: (len(_.name), _.name), reverse=True)
 
-    def get_dbfs_root(self) -> ExternalLocation | None:
+    @staticmethod
+    def clean_location(location: str) -> str:
+        # remove the s3a scheme and replace it with s3 as these can be considered the same and will be treated as such
+        # Having s3a and s3 as separate locations will cause issues when trying to find overlapping locations
+        return re.sub(r"^s3a:/", r"s3:/", location).rstrip("/")
+
+    def external_locations_with_root(self) -> list[ExternalLocation]:
+        # Returns a list of external locations with the DBFS root location appended to the list
+        # Used for HMS Federation use cases
+        external_locations = list(self.snapshot())
+        if not self._enable_hms_federation:
+            return external_locations
+        dbfs_root = self._get_dbfs_root()
+        if dbfs_root:
+            external_locations.append(dbfs_root)
+        return external_locations
+
+    def _get_dbfs_root(self) -> ExternalLocation | None:
         """
-        Get the root location of the DBFS
+        Get the root location of the DBFS only if HMS Fed is enabled.
+        Utilizes an undocumented Databricks API call
 
         Returns:
             Cloud storage root location for dbfs
 
         """
+        if not self._enable_hms_federation:
+            return None
         logger.debug("Retrieving DBFS root location")
-        response = self._ws.api_client.do("GET", "/api/2.0/dbfs/resolve-path", query={"path": "dbfs:/"})
-        if isinstance(response, dict):
-            resolved_path = response.get("resolved_path")
-            if resolved_path:
-                resolved_path = re.sub(r"^s3a:/", r"s3:/", resolved_path)
-                return ExternalLocation(resolved_path, 0)
+        try:
+            response = self._ws.api_client.do("GET", "/api/2.0/dbfs/resolve-path", query={"path": "dbfs:/"})
+            if isinstance(response, dict):
+                resolved_path = response.get("resolved_path")
+                if resolved_path:
+                    return ExternalLocation(self.clean_location(resolved_path), 0)
+        except NotFound:
+            # Couldn't retrieve the DBFS root location
+            logger.warning("DBFS root location not found")
+            return None
         return None
 
     def _external_locations(self) -> Iterable[ExternalLocation]:
@@ -231,9 +255,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         if not location.startswith('dbfs:'):
             return location  # not a mount, save some cycles
         for mount in self._mounts_snapshot:
-            # Skip the root mount
-            if mount.name == '/':
-                continue
             prefix = mount.as_scheme_prefix()
             if not location.startswith(prefix):
                 continue
@@ -278,14 +299,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
     def _try_fetch(self) -> Iterable[ExternalLocation]:
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield ExternalLocation(*row)
-
-    def snapshot(self, *, force_refresh: bool = False) -> list[ExternalLocation]:
-        external_locations = list(super().snapshot(force_refresh=force_refresh))
-        if self._enable_hms_federation:
-            dbfs_root = self.get_dbfs_root()
-            if dbfs_root:
-                external_locations.append(dbfs_root)
-        return external_locations
 
     @staticmethod
     def _get_ext_location_definitions(missing_locations: list[ExternalLocation]) -> list:

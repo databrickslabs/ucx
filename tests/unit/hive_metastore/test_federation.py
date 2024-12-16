@@ -32,7 +32,7 @@ def test_create_federated_catalog():
     workspace_info = create_autospec(WorkspaceInfo)
 
     workspace_info.current.return_value = 'a'
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation('s3://b/c/d', 1),
         ExternalLocation('s3://e/f/g', 1),
         ExternalLocation('s3://h/i/j', 1),
@@ -83,7 +83,7 @@ def test_already_existing_connection():
     workspace_info = create_autospec(WorkspaceInfo)
 
     workspace_info.current.return_value = 'a'
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation('s3://b/c/d', 1),
         ExternalLocation('s3://e/f/g', 1),
         ExternalLocation('s3://h/i/j', 1),

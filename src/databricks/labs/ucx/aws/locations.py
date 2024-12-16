@@ -38,7 +38,7 @@ class AWSExternalLocationsMigration:
         Create external location for the path using the credential identified
         """
         credential_dict = self._get_existing_credentials_dict()
-        external_locations = list(self._external_locations.snapshot())
+        external_locations = list(self._external_locations.external_locations_with_root())
         existing_external_locations = self._ws.external_locations.list()
         existing_paths = []
         for external_location in existing_external_locations:
