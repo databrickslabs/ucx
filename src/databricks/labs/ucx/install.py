@@ -262,7 +262,7 @@ class WorkspaceInstaller(WorkspaceContext):
         )
 
         query_statement_disposition = self.prompts.confirm(
-            "Do you want to use the EXTERNAL_LINKS disposition value for query statements? (Only needed with large workspaces)"
+            "Do you want to use the `EXTERNAL_LINKS` disposition for query statements? (Only needed when exporting more than 25 MiB of data from workspaces with many resources)"
         )
         query_statement_disposition = Disposition.EXTERNAL_LINKS if query_statement_disposition else None
 
