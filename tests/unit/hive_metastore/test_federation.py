@@ -9,7 +9,6 @@ from databricks.sdk.service.catalog import (
     ExternalLocationInfo,
     PermissionsList,
     PrivilegeAssignment,
-    Privilege,
     SecurableType,
     PermissionsChange,
     ConnectionInfo,
@@ -19,7 +18,11 @@ from databricks.sdk.service.iam import User
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
+from databricks.labs.ucx.hive_metastore.federation import (
+    HiveMetastoreFederation,
+    HiveMetastoreFederationEnabler,
+    Privilege,
+)
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
@@ -62,13 +65,13 @@ def test_create_federated_catalog():
         call.update(
             SecurableType.EXTERNAL_LOCATION,
             'b',
-            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_CATALOG])],
+            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
         call.get(SecurableType.EXTERNAL_LOCATION, 'e'),
         call.update(
             SecurableType.EXTERNAL_LOCATION,
             'e',
-            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_CATALOG])],
+            changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
     ]
     assert calls == workspace_client.grants.method_calls

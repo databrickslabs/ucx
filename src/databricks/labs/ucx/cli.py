@@ -687,16 +687,7 @@ def migrate_tables(
     for workspace_context in workspace_contexts:
         deployed_workflows = workspace_context.deployed_workflows
 
-        try:
-            workspace_context.verify_progress_tracking.verify()
-        except RuntimeWarning:
-            logger.warning(
-                "We couldn't detect a successful run of the assessment workflow."
-                "The assessment workflow is a prerequisite for the migrate-tables workflow."
-                "It can be run by using the `ensure-assessment-run` command."
-            )
-            return
-
+        workspace_context.verify_progress_tracking.verify()
         deployed_workflows.run_workflow("migrate-tables")
 
         tables = list(workspace_context.tables_crawler.snapshot())
@@ -775,14 +766,21 @@ def migrate_dbsql_dashboards(
     else:
         workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     for workspace_context in workspace_contexts:
-        workspace_context.redash.migrate_dashboards(dashboard_id)
+        if dashboard_id:
+            workspace_context.redash.migrate_dashboards(dashboard_id)
+        else:
+            workspace_context.redash.migrate_dashboards()
 
 
 @ucx.command
-def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
+def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None, ctx: WorkspaceContext | None = None):
     """Revert migrated DBSQL Dashboard queries back to their original state"""
-    ctx = WorkspaceContext(w)
-    ctx.redash.revert_dashboards(dashboard_id)
+    ctx = ctx or WorkspaceContext(w)
+    ctx.redash_crawler.snapshot(force_refresh=True)  # Need the latest tags before reverting dashboards
+    if dashboard_id:
+        ctx.redash.revert_dashboards(dashboard_id)
+    else:
+        ctx.redash.revert_dashboards()
 
 
 @ucx.command(is_account=True)

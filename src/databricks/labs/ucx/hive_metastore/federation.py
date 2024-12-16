@@ -8,9 +8,9 @@ from databricks.sdk.service.catalog import (
     ConnectionType,
     ConnectionInfo,
     SecurableType,
-    Privilege,
     PermissionsChange,
     CatalogInfo,
+    Privilege,
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -101,8 +101,8 @@ class HiveMetastoreFederation:
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
         grants = self._location_grants(location_name)
-        if Privilege.CREATE_FOREIGN_CATALOG not in grants[current_user]:
-            change = PermissionsChange(principal=current_user, add=[Privilege.CREATE_FOREIGN_CATALOG])
+        if Privilege.CREATE_FOREIGN_SECURABLE not in grants[current_user]:
+            change = PermissionsChange(principal=current_user, add=[Privilege.CREATE_FOREIGN_SECURABLE])
             self._workspace_client.grants.update(SecurableType.EXTERNAL_LOCATION, location_name, changes=[change])
 
     def _location_grants(self, location_name: str) -> dict[str, set[Privilege]]:

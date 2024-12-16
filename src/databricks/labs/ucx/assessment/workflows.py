@@ -7,7 +7,7 @@ from databricks.labs.ucx.framework.tasks import Workflow, job_task
 logger = logging.getLogger(__name__)
 
 
-class Assessment(Workflow):
+class Assessment(Workflow):  # pylint: disable=too-many-public-methods
     def __init__(self):
         super().__init__('assessment')
 
@@ -190,6 +190,16 @@ class Assessment(Workflow):
         ctx.group_manager.snapshot()
 
     @job_task
+    def crawl_redash_dashboards(self, ctx: RuntimeContext):
+        """Scans all Redash dashboards."""
+        ctx.redash_crawler.snapshot()
+
+    @job_task
+    def crawl_lakeview_dashboards(self, ctx: RuntimeContext):
+        """Scans all Lakeview dashboards."""
+        ctx.lakeview_crawler.snapshot()
+
+    @job_task(depends_on=[crawl_redash_dashboards, crawl_lakeview_dashboards])
     def assess_dashboards(self, ctx: RuntimeContext):
         """Scans all dashboards for migration issues in SQL code of embedded widgets.
 
