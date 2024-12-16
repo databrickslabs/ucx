@@ -9,13 +9,14 @@ from enum import Enum, auto
 from functools import cached_property, partial
 
 import sqlglot
+from sqlglot import expressions
+from sqlglot.expressions import LocationProperty
+from sqlglot.errors import ParseError
+
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import TableInfo
-from sqlglot import expressions
-from sqlglot.expressions import LocationProperty
-from sqlglot.errors import ParseError
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
