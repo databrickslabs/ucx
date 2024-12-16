@@ -653,6 +653,7 @@ class MockRuntimeContext(
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
             include_query_ids=self.created_queries,
+            include_object_permissions=self.created_object_permissions,
         )
 
     @cached_property
@@ -778,6 +779,35 @@ class MockRuntimeContext(
             else:
                 raise ValueError(f"Unsupported dashboard: {dashboard}")
         return dashboard_ids
+
+    @property
+    def created_object_permissions(self) -> list[str]:
+        # Initialize include_object_permissions for the created fixtures
+        # Currently only supports the object types for which the fixtures exist
+        created_object_permissions = set()
+
+        # GenericPermissionsSupport
+        for cluster_policy in self._cluster_policies:
+            created_object_permissions.add(f"cluster_policies:{cluster_policy.policy_id}")
+        for job in self._jobs:
+            created_object_permissions.add(f"jobs:{job.job_id}")
+
+        # TableAclSupport
+        for table in self._tables:
+            created_object_permissions.add(f"TABLE:{table.full_name}")
+        for schema in self._schemas:
+            created_object_permissions.add(f"DATABASE:{schema.full_name}")
+        for catalog in self._catalogs:
+            created_object_permissions.add(f"CATALOG:{catalog.name}")
+        for udf in self._udfs:
+            created_object_permissions.add(f"FUNCTION:{udf.name}")
+
+        for secret_scope in self._secret_scopes:
+            created_object_permissions.add(f"secrets:{secret_scope}")
+        for query in self._queries:
+            created_object_permissions.add(f"queries:{query.id}")
+
+        return list(created_object_permissions)
 
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
@@ -1086,34 +1116,6 @@ class MockInstallationContext(MockRuntimeContext):
     @cached_property
     def include_object_permissions(self) -> list[str] | None:
         return None
-
-    def configure_include_object_permissions(self) -> None:
-        # Initialize include_object_permissions for the created fixtures
-        # Currently only supports the object types for which the fixtures exist
-
-        if not self.config.include_object_permissions:
-            self.config.include_object_permissions = []
-
-        # GenericPermissionsSupport
-        for cluster_policy in self._cluster_policies:
-            self.config.include_object_permissions.append(f"cluster_policies:{cluster_policy.policy_id}")
-        for job in self._jobs:
-            self.config.include_object_permissions.append(f"jobs:{job.job_id}")
-
-        # TableAclSupport
-        for table in self._tables:
-            self.config.include_object_permissions.append(f"TABLE:{table.full_name}")
-        for schema in self._schemas:
-            self.config.include_object_permissions.append(f"DATABASE:{schema.full_name}")
-        for catalog in self._catalogs:
-            self.config.include_object_permissions.append(f"CATALOG:{catalog.name}")
-        for udf in self._udfs:
-            self.config.include_object_permissions.append(f"FUNCTION:{udf.name}")
-
-        for secret_scope in self._secret_scopes:
-            self.config.include_object_permissions.append(f"secrets:{secret_scope}")
-        for query in self._queries:
-            self.config.include_object_permissions.append(f"queries:{query.id}")
 
     @cached_property
     def config(self) -> WorkspaceConfig:
