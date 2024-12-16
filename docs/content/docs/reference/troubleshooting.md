@@ -1,30 +1,10 @@
-# UCX Troubleshooting guide
-This guide will help you troubleshoot potential issues running the UCX toolkit.
+---
+title: Troubleshooting
+linkTitle: Troubleshooting
+weight: 4
+---
 
-* [UCX Troubleshooting guide](#ucx-troubleshooting-guide)
-  * [Common errors](#common-errors)
-  * [Locating error messages](#locating-error-messages)
-    * [Databricks workspace](#databricks-workspace)
-      * [Databricks jobs](#databricks-jobs)
-      * [Databricks notebooks](#databricks-notebooks)
-    * [UCX command Line](#ucx-command-line)
-    * [UCX Log Files](#ucx-log-files)
-      * [Accessing Databricks UCX Logs through the Databricks UI](#accessing-databricks-ucx-logs-through-the-databricks-ui)
-      * [Accessing Databricks UCX logs via CLI](#accessing-databricks-ucx-logs-via-cli)
-    * [Reading log files](#reading-log-files)
-  * [Getting more help](#getting-more-help)
-    * [UCX GitHub repository](#ucx-github-repository)
-    * [Databricks community](#databricks-community)
-    * [Databricks support](#databricks-support)
-    * [Databricks partners](#databricks-partners)
-  * [Resolving common UCX errors](#resolving-common-ucx-errors)
-    * [Cryptic errors on authentication](#cryptic-errors-on-authentication)
-    * [Resolving common errors on UCX install](#resolving-common-errors-on-ucx-install)
-      * [Error on installing the ucx inventory database](#error-on-installing-the-ucx-inventory-database)
-      * [Error installing a wheel file](#error-installing-a-wheel-file)
-      * [Error running the assessment job](#error-running-the-assessment-job)
-      * [Specific assessment job tasks fail.](#specific-assessment-job-tasks-fail)
-    * [Resolving other common errors](#resolving-other-common-errors)
+This guide will help you troubleshoot potential issues running the UCX toolkit.
 
 ## Common errors
 Errors may occur during:
@@ -168,5 +148,5 @@ See the gathering log information sections elsewhere in this document.
 
 ### Resolving other common errors
 -  If you have an external Hive Metastore (HMS) such as Glue Catalog or a MySQL, Postgres or SQL server database, please consult the [External Hive Metastore Integration guide](external_hms_glue.md)
--  If you are running table upgrade commands and workflows. Please consult the [Table Upgrade guide](table_upgrade.md)
--  If you are trying to understand the Assessment report, please consult the [Assessment documentation](assessment.md)
+-  If you are running table upgrade commands and workflows. Please consult the [Table Upgrade guide](docs/process/table_migration.md)
+-  If you are trying to understand the Assessment report, please consult the [Assessment documentation](./assessment.md)
