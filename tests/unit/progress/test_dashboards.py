@@ -9,7 +9,6 @@ from databricks.labs.ucx.framework.owners import Ownership
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.progress.dashboards import DashboardProgressEncoder
 from databricks.labs.ucx.source_code.base import LineageAtom
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess, DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.used_table import UsedTable, UsedTablesCrawler
 
 
@@ -43,7 +42,7 @@ from databricks.labs.ucx.source_code.used_table import UsedTable, UsedTablesCraw
             object_id=["did3"],
             data={"id": "did3", "query_ids": "[]", "tags": "[]"},
             failures=[
-                "[direct-filesystem-access] query (did3/qid1) : "
+                "[direct-filesystem-access-in-query] my_query (did3/qid1) : "
                 "The use of direct filesystem references is deprecated: dfsa:/path/to/data/",
             ],
             owner="cor",
@@ -76,7 +75,17 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
                     query_name="my_query",
                     code="sql-parse-error",
                     message="Could not parse SQL",
-                )
+                ),
+                Row(
+                    dashboard_id="did3",
+                    dashboard_parent="dashbards/parent",
+                    dashboard_name="my_dashboard",
+                    query_id="qid1",
+                    query_parent="queries/parent",
+                    query_name="my_query",
+                    code="direct-filesystem-access-in-query",
+                    message="The use of direct filesystem references is deprecated: dfsa:/path/to/data/",
+                ),
             ],
             # A Hive table used by dashboard 4
             "SELECT \\* FROM objects_snapshot WHERE object_type = 'Table'": [
@@ -101,23 +110,6 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
     )
     ownership = create_autospec(Ownership)
     ownership.owner_of.return_value = "cor"
-    # Expect a direct filesystem failure message for dashboard 3
-    dfsa = DirectFsAccess(
-        source_id="/path/to/write_dfsa.py",
-        source_lineage=[
-            LineageAtom(
-                object_type="DASHBOARD",
-                object_id="did3",
-                other={"parent": "parent", "name": "dashboard"},
-            ),
-            LineageAtom(object_type="QUERY", object_id="did3/qid1", other={"name": "query"}),
-        ],
-        path="dfsa:/path/to/data/",
-        is_read=False,
-        is_write=True,
-    )
-    direct_fs_access_crawler = create_autospec(DirectFsAccessCrawler)
-    direct_fs_access_crawler.snapshot.return_value = [dfsa]
     # Expect a used Hive table failure message for dashboard 4
     used_table = UsedTable(
         catalog_name="hive_metastore",
@@ -138,7 +130,6 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
     encoder = DashboardProgressEncoder(
         mock_backend,
         ownership,
-        direct_fs_access_crawlers=[direct_fs_access_crawler],
         used_tables_crawlers=[used_tables_crawler],
         inventory_database="inventory",
         job_run_id=1,
@@ -152,5 +143,4 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
     rows = mock_backend.rows_written_for(escape_sql_identifier(encoder.full_name), "append")
     assert rows == [expected]
     ownership.owner_of.assert_called_once()
-    direct_fs_access_crawler.snapshot.assert_called_once()
     used_tables_crawler.snapshot.assert_called_once()
