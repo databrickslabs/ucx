@@ -20,6 +20,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  add-to-project:  # https://github.com/actions/add-to-project
+    name: Add pull request to project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/orgs/databrickslabs/projects/13
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
   integration:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
