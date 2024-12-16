@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
@@ -89,6 +90,8 @@ class Query:
 @dataclass
 class Dashboard:
     """UCX representation of a dashboard."""
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("id",)
 
     id: str
     """The ID for this dashboard."""
