@@ -310,11 +310,13 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         schema: str,
         *,
         include_dashboard_ids: list[str] | None = None,
+        exclude_dashboard_ids: list[str] | None = None,
         include_query_ids: list[str] | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids
+        self._exclude_dashboard_ids = exclude_dashboard_ids
         self._include_query_ids = include_query_ids
 
     def _crawl(self) -> Iterable[Dashboard]:
