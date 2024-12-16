@@ -29,6 +29,7 @@ class DashboardProgressEncoder(ProgressEncoder[Dashboard]):
         self,
         sql_backend: SqlBackend,
         ownership: DashboardOwnership,
+        *,
         direct_fs_access_crawlers: list[DirectFsAccessCrawler],
         used_tables_crawlers: list[UsedTablesCrawler],
         inventory_database: str,

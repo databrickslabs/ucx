@@ -251,12 +251,12 @@ class RuntimeContext(GlobalContext):
         return DashboardProgressEncoder(
             self.sql_backend,
             self.dashboard_ownership,
-            [self.directfs_access_crawler_for_queries],
-            [self.used_tables_crawler_for_queries],
-            self.config.inventory_database,
-            self.parent_run_id,
-            self.workspace_id,
-            self.config.ucx_catalog,
+            direct_fs_access_crawlers=[self.directfs_access_crawler_for_queries],
+            used_tables_crawlers=[self.used_tables_crawler_for_queries],
+            inventory_database=self.config.inventory_database,
+            job_run_id=self.parent_run_id,
+            workspace_id=self.workspace_id,
+            catalog=self.config.ucx_catalog,
         )
 
     @cached_property
