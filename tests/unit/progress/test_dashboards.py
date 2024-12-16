@@ -138,8 +138,8 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
     encoder = DashboardProgressEncoder(
         mock_backend,
         ownership,
-        [direct_fs_access_crawler],
-        [used_tables_crawler],
+        direct_fs_access_crawlers=[direct_fs_access_crawler],
+        used_tables_crawlers=[used_tables_crawler],
         inventory_database="inventory",
         job_run_id=1,
         workspace_id=123456789,
