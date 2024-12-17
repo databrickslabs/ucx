@@ -194,10 +194,10 @@ def policies() -> list[PolicyInfo]:
 
 @pytest.fixture
 def dashboards(make_dashboard) -> list[Dashboard]:
-    dashboards = [
+    records = [
         Dashboard.from_sdk_redash_dashboard(make_dashboard()),
     ]
-    return dashboards
+    return records
 
 
 @pytest.fixture
