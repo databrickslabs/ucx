@@ -318,6 +318,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     pipelines: list[PipelineInfo],
     policies: list[PolicyInfo],
     used_tables: list[UsedTable],
+    query_problems: list[QueryProblem],
     dashboards: list[Dashboard]
 ):
     """Populate the UCX catalog with multiworkspace tables.
@@ -358,6 +359,13 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         f'hive_metastore.{runtime_ctx.inventory_database}.used_tables_in_paths',
         used_tables,
         UsedTable,
+        mode='overwrite',
+    )
+    # Persists QueryProblems to propagate them to Dashboards
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.query_problems',
+        query_problems,
+        QueryProblem,
         mode='overwrite',
     )
     for parent_run_id in range(1, 3):  # No changes in progress between the two runs
