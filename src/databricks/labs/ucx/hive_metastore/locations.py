@@ -70,7 +70,7 @@ class LocationTrie:
         if not location:
             return []
         location = ExternalLocations.clean_location(location)
-        parse_result = cls._parse_url(ExternalLocations.clean_location(location))
+        parse_result = cls._parse_url(location)
         if not parse_result:
             return []
         parts = [parse_result.scheme, parse_result.netloc]
