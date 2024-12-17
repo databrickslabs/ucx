@@ -8,6 +8,7 @@ from databricks.labs.lsql.backends import SqlBackend, Row
 from databricks.labs.lsql.dashboards import DashboardMetadata, Dashboards
 
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
+from databricks.labs.ucx.assessment.dashboards import Dashboard
 from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -189,6 +190,14 @@ def policies() -> list[PolicyInfo]:
         ),
     ]
     return records
+
+
+@pytest.fixture
+def dashboards(make_dashboard) -> list[Dashboard]:
+    dashboards = [
+        Dashboard.from_sdk_redash_dashboard(make_dashboard()),
+    ]
+    return dashboards
 
 
 @pytest.fixture
