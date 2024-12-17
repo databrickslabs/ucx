@@ -9,7 +9,7 @@ from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import User, PermissionLevel
+from databricks.sdk.service.iam import User, ObjectPermissions, PermissionLevel
 from databricks.sdk.service.workspace import ObjectType
 
 logger = logging.getLogger(__name__)
@@ -235,7 +235,7 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         return None
 
     @staticmethod
-    def _infer_from_first_can_manage(object_permissions):
+    def _infer_from_first_can_manage(object_permissions: ObjectPermissions) -> str:
         for acl in object_permissions.access_control_list:
             for permission in acl.all_permissions:
                 if permission.permission_level != PermissionLevel.CAN_MANAGE:
