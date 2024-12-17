@@ -3,8 +3,11 @@ from collections.abc import Callable, Sequence
 from unittest.mock import create_autospec, Mock
 
 import pytest
+from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.framework.owners import (
     AccountAdministratorFinder,
@@ -13,6 +16,7 @@ from databricks.labs.ucx.framework.owners import (
     Ownership,
     Record,
     WorkspaceAdministratorFinder,
+    WorkspacePathOwnership,
 )
 
 
@@ -343,3 +347,19 @@ def test_ownership_no_fallback_admin_user_error() -> None:
 
     with pytest.raises(RuntimeError, match="Mocked admin lookup failure."):
         _ = ownership.owner_of("school")
+
+
+def test_workspace_path_ownership_for_directory() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.return_value = ObjectInfo(object_id=1, object_type=ObjectType.DIRECTORY)
+    can_manage_permission = iam.Permission(permission_level=iam.PermissionLevel.CAN_MANAGE)
+    access_control_list = [iam.AccessControlResponse(all_permissions=[can_manage_permission], user_name="cor")]
+    ws.permissions.get.return_value = iam.ObjectPermissions(access_control_list=access_control_list)
+    ownership = WorkspacePathOwnership(administrator_locator, ws)
+
+    owner = ownership.owner_of(WorkspacePath(ws, "/some/directory"))
+
+    assert owner == "cor"
+    administrator_locator.get_workspace_administrator.assert_not_called()
+    ws.permissions.get.assert_called_with("directories", "1")
