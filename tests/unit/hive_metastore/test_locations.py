@@ -739,7 +739,10 @@ def test_resolve_dbfs_root_in_hms_federation():
     )
     results = external_locations.external_locations_with_root()
     mounts_crawler.snapshot.assert_not_called()
-    assert results == [ExternalLocation("s3://test_location/test1", 1), ExternalLocation("s3:/foo/bar/user/hive/warehouse", 0)]
+    assert results == [
+        ExternalLocation("s3://test_location/test1", 1),
+        ExternalLocation("s3:/foo/bar/user/hive/warehouse", 0),
+    ]
     assert len(results) == 2
 
 
