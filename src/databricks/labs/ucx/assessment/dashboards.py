@@ -417,7 +417,7 @@ class DashboardOwnership(Ownership[Dashboard]):
     def _get_user_name(self, user_id: str) -> str | None:
         try:
             user = self._ws.users.get(user_id)
-            return user.display_name or user.user_name
+            return user.user_name
         except DatabricksError as e:
             logger.warning(f"Could not retrieve user: {user_id}", exc_info=e)
             return None

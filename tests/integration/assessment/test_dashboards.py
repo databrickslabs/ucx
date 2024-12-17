@@ -75,7 +75,7 @@ def test_redash_dashboard_ownership_is_me(runtime_ctx) -> None:
     owner = runtime_ctx.dashboard_ownership.owner_of(dashboard)
 
     me = runtime_ctx.workspace_client.current_user.me()
-    assert owner == me.display_name
+    assert owner == me.user_name
 
 
 def test_lakeview_dashboard_ownership_is_me(runtime_ctx, make_lakeview_dashboard) -> None:
