@@ -317,8 +317,6 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     clusters: list[ClusterInfo],
     pipelines: list[PipelineInfo],
     policies: list[PolicyInfo],
-    query_problems: list[QueryProblem],
-    dfsas: list[DirectFsAccess],
     used_tables: list[UsedTable],
     dashboards: list[Dashboard]
 ):
@@ -379,12 +377,6 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         del runtime_ctx.pipelines_progress
         runtime_ctx.policies_progress.append_inventory_snapshot(policies)
         del runtime_ctx.policies_progress
-        runtime_ctx.query_problem_progress.append_inventory_snapshot(query_problems)
-        del runtime_ctx.query_problem_progress
-        runtime_ctx.direct_filesystem_access_progress.append_inventory_snapshot(dfsas)
-        del runtime_ctx.direct_filesystem_access_progress
-        runtime_ctx.used_table_progress.append_inventory_snapshot(used_tables)
-        del runtime_ctx.used_table_progress
         runtime_ctx.dashboards_progress.append_inventory_snapshot(dashboards)
         del runtime_ctx.dashboards_progress
     return runtime_ctx.ucx_catalog
