@@ -1,6 +1,5 @@
 /*
---title 'Pending migration'
---description 'Tables, views and dfsa per owner'
+--title 'Dashboards pending migration'
 --width 5
 --overrides '{"spec": {
     "version": 3,
@@ -14,7 +13,7 @@
 WITH owners_with_failures AS (
     SELECT owner
     FROM ucx_catalog.multiworkspace.objects_snapshot
-    WHERE object_type IN ('DirectFsAccess', 'UsedTable') AND SIZE(failures) > 0
+    WHERE object_type = 'Dashboard' AND SIZE(failures) > 0
 )
 
 SELECT

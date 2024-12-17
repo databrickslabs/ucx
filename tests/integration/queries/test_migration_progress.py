@@ -320,7 +320,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     policies: list[PolicyInfo],
     used_tables: list[UsedTable],
     query_problems: list[QueryProblem],
-    dashboards: list[Dashboard]
+    dashboards: list[Dashboard],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
@@ -488,13 +488,13 @@ def test_migration_progress_dashboard(
             ],
         ),
         (
-            "03_01_pending_migration_data_asset_references",
+            "03_01_dashboards_pending_migration",
             [
                 Row(count=3),
             ],
         ),
         (
-            "03_03_migrated_data_asset_references",
+            "03_03_dashboards_migrated",
             [
                 Row(count=1),
             ],
@@ -519,7 +519,7 @@ def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
     sql_backend: SqlBackend,
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
-    query_name = "03_02_data_asset_references_by_owner_bar_graph"
+    query_name = "03_02_dashboards_pending_migration_by_owner_bar_graph"
     rows = [Row(owner=ws.current_user.me().user_name, count=1)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
