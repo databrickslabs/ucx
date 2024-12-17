@@ -220,6 +220,7 @@ def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
 
 @pytest.fixture
 def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
+    # TODO: Match the DFSAs with a job and dashboard
     workspace_file = make_workspace_file(content='df = spark.read.csv("dbfs://folder/file.csv")')
     query = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
