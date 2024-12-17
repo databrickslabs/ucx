@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Callable, Sequence
 from unittest.mock import create_autospec, Mock
@@ -359,6 +360,22 @@ def test_workspace_path_ownership_for_invalid_path() -> None:
     owner = ownership.owner_of(WorkspacePath(ws, "invalid/path/misses/leading/backslash"))
 
     assert owner == "Admin"
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    ws.permissions.get.assert_not_called()
+
+
+def test_workspace_path_ownership_warns_about_unsupported_object_type(caplog) -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    administrator_locator.get_workspace_administrator.return_value = "Admin"
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.return_value = ObjectInfo(object_id=1, object_type=ObjectType.REPO)
+    ownership = WorkspacePathOwnership(administrator_locator, ws)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.framework.owners"):
+        owner = ownership.owner_of(WorkspacePath(ws, "/Workspace/Repose/repo"))
+
+    assert owner == "Admin"
+    assert "Unsupported object type: REPO" in caplog.messages
     administrator_locator.get_workspace_administrator.assert_called_once()
     ws.permissions.get.assert_not_called()
 
