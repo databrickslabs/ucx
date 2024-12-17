@@ -66,3 +66,13 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
     dashboards = list(crawler.snapshot())
 
     assert dashboards == [Dashboard.from_sdk_lakeview_dashboard(dashboard)]
+
+
+def test_redash_dashboard_ownership_is_me(runtime_ctx) -> None:
+    sdk_redash_dashboard = runtime_ctx.make_dashboard()
+    dashboard = Dashboard.from_sdk_redash_dashboard(sdk_redash_dashboard)
+
+    owner = runtime_ctx.dashboard_ownership.owner_of(dashboard)
+
+    me = runtime_ctx.workspace_client.current_user.me()
+    assert owner == me.display_name
