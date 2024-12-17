@@ -5,7 +5,7 @@ from unittest.mock import create_autospec, Mock
 import pytest
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
@@ -347,6 +347,20 @@ def test_ownership_no_fallback_admin_user_error() -> None:
 
     with pytest.raises(RuntimeError, match="Mocked admin lookup failure."):
         _ = ownership.owner_of("school")
+
+
+def test_workspace_path_ownership_for_invalid_path() -> None:
+    administrator_locator = create_autospec(AdministratorLocator)
+    administrator_locator.get_workspace_administrator.return_value = "Admin"
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.side_effect = InvalidParameterValue("Invalid path")
+    ownership = WorkspacePathOwnership(administrator_locator, ws)
+
+    owner = ownership.owner_of(WorkspacePath(ws, "invalid/path/misses/leading/backslash"))
+
+    assert owner == "Admin"
+    administrator_locator.get_workspace_administrator.assert_called_once()
+    ws.permissions.get.assert_not_called()
 
 
 def test_workspace_path_ownership_for_directory() -> None:
