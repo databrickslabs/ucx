@@ -239,8 +239,12 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         return None
 
     @staticmethod
-    def _infer_from_first_can_manage(object_permissions: ObjectPermissions) -> str:
+    def _infer_from_first_can_manage(object_permissions: ObjectPermissions) -> str | None:
+        if object_permissions.access_control_list is None:
+            return None
         for acl in object_permissions.access_control_list:
+            if acl.all_permissions is None:
+                return None
             for permission in acl.all_permissions:
                 if permission.permission_level != PermissionLevel.CAN_MANAGE:
                     continue
