@@ -86,12 +86,12 @@ def test_file_owner(make_workspace_file, ws):
 
 
 def test_home_directory_owner_is_me(runtime_ctx) -> None:
-    me = runtime_ctx.workspace_client.current_user.me()
-    home = f"/Users/{me.user_name}"
+    current_user = runtime_ctx.workspace_client.current_user.me()
+    home = f"/Users/{current_user.user_name}"
 
     name = runtime_ctx.workspace_path_ownership.owner_of_path(home)
 
-    assert name == me.user_name
+    assert name == current_user.user_name
 
 
 def test_workspace_path_owner_of_invalid_path(runtime_ctx) -> None:
