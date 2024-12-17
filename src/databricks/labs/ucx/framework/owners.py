@@ -224,6 +224,8 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
         except InvalidParameterValue:
             logger.warning(f"Cannot retrieve status for: {path}")
             return None
+        if not (object_info.object_id and object_info.object_type):
+            return None
         object_id = str(object_info.object_id)
         match object_info.object_type:
             case ObjectType.NOTEBOOK:
@@ -232,6 +234,8 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
                 return 'files', object_id
             case ObjectType.DIRECTORY:
                 return 'directories', object_id
+            case _:
+                logger.warning(f"Unsupported object type: {object_info.object_type.value}")
         return None
 
     @staticmethod
