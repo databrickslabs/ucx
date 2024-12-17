@@ -92,3 +92,8 @@ def test_home_directory_owner_is_me(runtime_ctx) -> None:
     name = runtime_ctx.workspace_path_ownership.owner_of_path(home)
 
     assert name == me.user_name
+
+
+def test_workspace_path_owner_of_invalid_path(runtime_ctx) -> None:
+    owner = runtime_ctx.workspace_path_ownership.owner_of_path("invalid/path")
+    assert owner is None
