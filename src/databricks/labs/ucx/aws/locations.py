@@ -29,7 +29,7 @@ class AWSExternalLocationsMigration:
         self._principal_acl = principal_acl
         # When HMS federation is enabled, the fallback bit is set for all the
         # locations which are created by UCX.
-        self._enable_fallback_mode = enable_hms_federation
+        self._enable_hms_federation = enable_hms_federation
 
     def run(self) -> None:
         """
@@ -38,7 +38,7 @@ class AWSExternalLocationsMigration:
         Create external location for the path using the credential identified
         """
         credential_dict = self._get_existing_credentials_dict()
-        external_locations = self._external_locations.snapshot()
+        external_locations = list(self._external_locations.external_locations_with_root())
         existing_external_locations = self._ws.external_locations.list()
         existing_paths = []
         for external_location in existing_external_locations:
@@ -56,7 +56,7 @@ class AWSExternalLocationsMigration:
                 path,
                 credential_dict[role_arn],
                 skip_validation=True,
-                fallback=self._enable_fallback_mode,
+                fallback=self._enable_hms_federation,
             )
         self._principal_acl.apply_location_acl()
 
@@ -91,7 +91,7 @@ class AWSExternalLocationsMigration:
                 path = role.resource_path
                 if path.endswith("/*"):
                     path = path[:-2]
-                if new_path.match(path + "/*") or new_path.match(path):
+                if PurePath(path) in new_path.parents or new_path.match(path):
                     matching_role = role.role_arn
                     continue
             if matching_role:

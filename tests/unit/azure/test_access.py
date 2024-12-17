@@ -62,7 +62,7 @@ def test_save_spn_permissions_no_external_table(caplog):
 def test_save_spn_permissions_no_external_tables():
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [ExternalLocation('s3://bucket1/folder1', 0)]
+    external_locations.external_locations_with_root.return_value = [ExternalLocation('s3://bucket1/folder1', 0)]
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, external_locations)
@@ -79,7 +79,7 @@ def test_save_spn_permissions_no_external_tables():
 def test_save_spn_permissions_no_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
     ]
     installation = MockInstallation()
@@ -98,7 +98,7 @@ def test_save_spn_permissions_no_azure_storage_account():
 def test_save_spn_permissions_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("s3://bucket1/folder1", 1),
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
     ]
@@ -180,7 +180,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
 def test_save_spn_permissions_custom_role_valid_azure_storage_account():
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("s3://bucket1/folder1", 1),
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
     ]
@@ -570,7 +570,7 @@ def test_create_global_spn_no_policy():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
-    external_locations.snapshot.assert_not_called()
+    external_locations.external_locations_with_root.assert_not_called()
 
 
 def test_create_global_spn_spn_present():
@@ -604,7 +604,7 @@ def test_create_global_spn_spn_present():
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
     w.warehouses.set_workspace_warehouse_config.assert_not_called()
-    external_locations.snapshot.assert_not_called()
+    external_locations.external_locations_with_root.assert_not_called()
 
 
 def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None:
@@ -622,7 +622,7 @@ def test_create_uber_service_principal_when_no_storage_accounts_listed() -> None
         }
     )
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 0),
     ]
     azure_resources = create_autospec(AzureResources)
@@ -655,7 +655,7 @@ def setup_create_uber_principal():
         data_access_config=[EndpointConfPair(key="foo", value="bar")]
     )
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@sto2.dfs.core.windows.net/folder1", 1),
     ]
     installation = MockInstallation(
@@ -780,7 +780,7 @@ def test_create_global_spn_set_warehouse_config_security_policy(get_security_pol
         security_policy=get_security_policy
     )
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@sto2.dfs.core.windows.net/folder1", 1),
     ]
     installation = MockInstallation(DEFAULT_CONFIG.copy())
@@ -933,7 +933,7 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     """A warning should be logged when no storage account is present."""
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
+    external_locations.external_locations_with_root.return_value = []
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
@@ -958,7 +958,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     w = create_autospec(WorkspaceClient)
 
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
     ]
     installation = MockInstallation()
@@ -1013,7 +1013,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     """Log that the permissions for the access connector are applied."""
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
     ]
     installation = MockInstallation()
@@ -1056,7 +1056,7 @@ def test_create_access_connectors_for_storage_accounts_rollback(caplog):
     """Log that the permissions for the access connector are applied."""
     w = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("abfss://container1@storage1.dfs.core.windows.net/folder1", 1),
         ExternalLocation("abfss://container2@storage2.dfs.core.windows.net/folder2", 1),
     ]

@@ -690,7 +690,7 @@ class AzureResourcePermissions:
         return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
 
     def _get_storage_accounts(self) -> list[StorageAccount]:
-        external_locations = self._locations.snapshot()
+        external_locations = self._locations.external_locations_with_root()
         used_storage_accounts = []
         for location in external_locations:
             if location.location.startswith("abfss://"):
