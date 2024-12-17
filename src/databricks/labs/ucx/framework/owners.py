@@ -7,7 +7,7 @@ from typing import Generic, TypeVar, final
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import InternalError, InvalidParameterValue, NotFound
+from databricks.sdk.errors import InternalError, InvalidParameterValue, NotFound, ResourceDoesNotExist
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import User, ObjectPermissions, PermissionLevel
 from databricks.sdk.service.workspace import ObjectType
@@ -221,7 +221,7 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
     def _maybe_type_and_id(path: WorkspacePath) -> tuple[str, str] | None:
         try:
             object_info = path._object_info  # pylint: disable=protected-access
-        except InvalidParameterValue:
+        except (InvalidParameterValue, ResourceDoesNotExist):
             logger.warning(f"Cannot retrieve status for: {path}")
             return None
         if not (object_info.object_id and object_info.object_type):
