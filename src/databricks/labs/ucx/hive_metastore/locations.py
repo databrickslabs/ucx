@@ -69,10 +69,11 @@ class LocationTrie:
     def _parse_location(cls, location: str | None) -> list[str]:
         if not location:
             return []
+        location = ExternalLocations.clean_location(location)
         parse_result = cls._parse_url(ExternalLocations.clean_location(location))
         if not parse_result:
             return []
-        parts = [parse_result.scheme.replace("s3a", "s3"), parse_result.netloc]
+        parts = [parse_result.scheme, parse_result.netloc]
         for part in parse_result.path.split("/"):
             if not part:
                 continue  # remove empty strings
@@ -174,11 +175,16 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return re.sub(r"^s3a:/", r"s3:/", location).rstrip("/")
 
     def external_locations_with_root(self) -> list[ExternalLocation]:
-        # Returns a list of external locations with the DBFS root location appended to the list
-        # Used for HMS Federation use cases
+        """
+        Produces a list of external locations with the DBFS root location appended to the list.
+        Utilizes the snapshot method.
+        Used for HMS Federation.
+
+        Returns:
+                List of ExternalLocation objects
+        """
+
         external_locations = list(self.snapshot())
-        if not self._enable_hms_federation:
-            return external_locations
         dbfs_root = self._get_dbfs_root()
         if dbfs_root:
             external_locations.append(dbfs_root)
@@ -201,7 +207,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             if isinstance(response, dict):
                 resolved_path = response.get("resolved_path")
                 if resolved_path:
-                    return ExternalLocation(self.clean_location(resolved_path), 0)
+                    path = f"{self.clean_location(resolved_path)}/user/hive/warehouse"
+                    return ExternalLocation(path, 0)
         except NotFound:
             # Couldn't retrieve the DBFS root location
             logger.warning("DBFS root location not found")
@@ -315,7 +322,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     container_sep_loc = loc.location.index("@")
                     container_name = loc.location[prefix_len:container_sep_loc]
                     res_name = (
-                        loc.location[container_sep_loc + 1 :]
+                        loc.location[container_sep_loc + 1:]
                         .replace(".dfs.core.windows.net", "")
                         .rstrip("/")
                         .replace("/", "_")

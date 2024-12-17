@@ -91,7 +91,7 @@ class AWSExternalLocationsMigration:
                 path = role.resource_path
                 if path.endswith("/*"):
                     path = path[:-2]
-                if PurePath(path) in new_path.parents or new_path.match(path + "/*") or new_path.match(path):
+                if PurePath(path) in new_path.parents or new_path.match(path):
                     matching_role = role.role_arn
                     continue
             if matching_role:
