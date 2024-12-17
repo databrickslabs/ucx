@@ -226,6 +226,8 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
                 return 'notebooks', object_id
             case ObjectType.FILE:
                 return 'files', object_id
+            case ObjectType.DIRECTORY:
+                return 'directories', object_id
         return None
 
     @staticmethod
