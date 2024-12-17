@@ -2,7 +2,7 @@
 with failures AS (
   SELECT object_type, explode(failures) AS failure
   FROM ucx_catalog.multiworkspace.objects_snapshot
-  WHERE object_type IN ('ClusterInfo', 'DirectFsAccess', 'Grant', 'JobInfo', 'PipelineInfo', 'PolicyInfo', 'QueryProblem', 'Table', 'Udf', 'UsedTable')
+  WHERE object_type IN ('ClusterInfo', 'Grant', 'JobInfo', 'PipelineInfo', 'PolicyInfo', 'Table', 'Udf')
 )
 
 SELECT
