@@ -54,7 +54,7 @@ from databricks.labs.ucx.source_code.used_table import UsedTable, UsedTablesCraw
             object_type="Dashboard",
             object_id=["did4"],
             data={"id": "did4", "query_ids": "[]", "tags": "[]"},
-            failures=["Used by TABLE: hive_metastore.schema.table"],
+            failures=["Pending migration: hive_metastore.schema.table"],
             owner="cor",
             ucx_version=ucx_version,
         ),
@@ -101,7 +101,7 @@ def test_dashboard_progress_encoder(expected: Row) -> None:
                         "object_type": "TABLE",
                         "table_format": "DELTA",
                     },
-                    failures=["Used by TABLE: hive_metastore.schema.table"],
+                    failures=["Pending migration"],
                     owner="cor",
                     ucx_version=ucx_version,
                 )
