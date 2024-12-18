@@ -311,12 +311,8 @@ def used_tables(
 ) -> list[UsedTable]:
     assert len(dashboards) == 3, "Expecting three dashboards"
     dashboard, table_migration_status = dashboards[0], statuses_pending_migration[0]
-    table_full_name_pending_migration = ".".join(
-        ["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table]
-    )
-    workspace_file = make_workspace_file(
-        content=f'df = spark.read.table("{table_full_name_pending_migration}")\ndisplay(df)'
-    )
+    table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
+    workspace_file = make_workspace_file(content=f'df = spark.read.table("{table_full_name}")\ndisplay(df)')
     query = ws.queries.get(dashboard.query_ids[0])
     assert query.id is not None and query.display_name is not None and dashboard.name is not None
     records = [
