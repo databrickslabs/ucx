@@ -598,7 +598,7 @@ def test_migration_progress_dashboard(
 @pytest.mark.parametrize(
     "query_name, rows",
     [
-        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 39, 2))]),
+        ("01_00_percentage_migration_progress", [Row(percentage=round(100 * 23 / 36, 2))]),
         ("01_01_percentage_udf_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_02_percentage_grant_migration_progress", [Row(percentage=round(100 * 12 / 13, 2))]),
         ("01_03_percentage_job_migration_progress", [Row(percentage=round(100 * 1 / 3, 2))]),
@@ -606,6 +606,7 @@ def test_migration_progress_dashboard(
         ("01_05_percentage_table_migration_progress", [Row(percentage=round(100 * 5 / 10, 2))]),
         ("01_06_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_07_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
+        ("01_08_percentage_dashboard_migration_progress", [Row(percentage=round(100 * 1 / 4, 2))]),
         (
             "99_99_distinct_failures_per_object_type",
             [
