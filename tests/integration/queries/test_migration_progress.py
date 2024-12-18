@@ -261,6 +261,7 @@ def dashboards(
     make_dashboard,
     make_query,
     dashboard_with_hive_tables: Dashboard,
+    dashboard_with_uc_tables: Dashboard,
     dbfs_location: str,
 ) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
@@ -269,6 +270,7 @@ def dashboards(
         dashboard_with_hive_tables,
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
+        dashboard_with_uc_tables,
     ]
     return records
 
