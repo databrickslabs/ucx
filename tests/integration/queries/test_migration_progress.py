@@ -200,7 +200,7 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, statuses_pending_migration) -> list[Dashboard]:
+def dashboards(make_dashboard, make_query, statuses_pending_migration: list[TableMigrationStatus]) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     table_migration_status = statuses_pending_migration[0]
