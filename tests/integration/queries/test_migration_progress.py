@@ -281,13 +281,14 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
-def used_tables(make_workspace_file, make_table) -> list[UsedTable]:
-    table = make_table(catalog_name="hive_metastore")
+def used_tables(make_workspace_file, tables: list[Table]) -> list[UsedTable]:
+    assert "hive_metastore" == tables[0].catalog, "Expecting table to be a hive table"
+    table = tables[0]
     workspace_file = make_workspace_file(content=f'df = spark.read.table("{table.full_name}")\ndisplay(df)')
     records = [
         UsedTable(
-            catalog_name=table.catalog_name,  # This table is pending migration
-            schema_name=table.schema_name,
+            catalog_name=table.catalog,  # This table is pending migration
+            schema_name=table.database,
             table_name=table.name,
             is_read=False,
             # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
