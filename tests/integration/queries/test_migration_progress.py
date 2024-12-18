@@ -199,6 +199,7 @@ def dashboards(make_dashboard, make_query) -> list[Dashboard]:
     records = [
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
+        Dashboard.from_sdk_redash_dashboard(make_dashboard()),  # Correct dashboard
     ]
     return records
 
