@@ -238,9 +238,7 @@ def dashboard_with_hive_tables(
 
 
 @pytest.fixture
-def dashboard_with_uc_tables(
-    make_query, make_dashboard, statuses_migrated: list[TableMigrationStatus]
-) -> Dashboard:
+def dashboard_with_uc_tables(make_query, make_dashboard, statuses_migrated: list[TableMigrationStatus]) -> Dashboard:
     """A dashboard with all the UC migrated tables"""
     table_full_names = []
     for status in statuses_migrated:
@@ -420,17 +418,21 @@ def used_hive_tables(
 
 @pytest.fixture
 def used_uc_tables(
+    ws,
     make_workspace_file,
     job_without_failures: JobInfo,
+    dashboard_with_uc_tables: Dashboard,
     statuses_migrated: list[TableMigrationStatus],
 ) -> list[UsedTable]:
     """The UC tables are used by the job without failures."""
-    job = job_without_failures
+    job, dashboard = job_without_failures, dashboard_with_uc_tables
+    query = ws.queries.get(dashboard.query_ids[0])
+    assert query.id is not None and query.display_name is not None and dashboard.name is not None
     workspace_file = make_workspace_file()
     records = []
     for status in statuses_migrated:
         assert status.dst_catalog and status.dst_schema and status.dst_table, "Migrated tables are missing destination"
-        used_uc_table = UsedTable(
+        used_python_table = UsedTable(
             catalog_name=status.dst_catalog,
             schema_name=status.dst_schema,
             table_name=status.dst_table,
@@ -445,7 +447,26 @@ def used_uc_tables(
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
-        records.append(used_uc_table)
+        used_sql_table = UsedTable(
+            catalog_name="hive_metastore",
+            schema_name=status.src_schema,
+            table_name=status.src_table,
+            is_read=False,
+            # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
+            is_write=True,
+            source_id=query.id,
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id=dashboard.id, other={"name": dashboard.name}),
+                LineageAtom(
+                    object_type="QUERY", object_id=f"{dashboard.id}/{query.id}", other={"name": query.display_name}
+                ),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        )
+        records.extend([used_python_table, used_sql_table])
     return records
 
 
