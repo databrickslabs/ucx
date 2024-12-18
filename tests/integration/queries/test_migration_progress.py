@@ -76,9 +76,7 @@ def table_migration_statuses(tables: list[Table]) -> list[TableMigrationStatus]:
 
 
 @pytest.fixture
-def table_migration_status_pending_migration(
-    table_migration_statuses,
-) -> list[TableMigrationStatus]:
+def statuses_pending_migration(table_migration_statuses: list[TableMigrationStatus]) -> list[TableMigrationStatus]:
     records = [status for status in table_migration_statuses if status.dst_catalog is None]
     assert records, "Expecting a table pending migration"
     return records
@@ -202,12 +200,10 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboards(
-    make_dashboard, make_query, table_migration_status_pending_migration: list[TableMigrationStatus]
-) -> list[Dashboard]:
+def dashboards(make_dashboard, make_query, statuses_pending_migration) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
-    table_migration_status = table_migration_status_pending_migration[0]
+    table_migration_status = statuses_pending_migration[0]
     table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
     query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name}")
     records = [
@@ -311,10 +307,10 @@ def used_tables(
     ws: WorkspaceClient,
     make_workspace_file,
     dashboards: list[Dashboard],
-    table_migration_status_pending_migration: list[TableMigrationStatus],
+    statuses_pending_migration,
 ) -> list[UsedTable]:
     assert len(dashboards) == 3, "Expecting three dashboards"
-    dashboard, table_migration_status = dashboards[0], table_migration_status_pending_migration[0]
+    dashboard, table_migration_status = dashboards[0], statuses_pending_migration[0]
     table_full_name_pending_migration = ".".join(
         ["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table]
     )
