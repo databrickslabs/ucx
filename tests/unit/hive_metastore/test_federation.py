@@ -89,7 +89,7 @@ def test_create_federated_catalog_ext(mock_installation):
     workspace_info = create_autospec(WorkspaceInfo)
 
     workspace_info.current.return_value = 'a'
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation('s3://b/c/d', 1),
     ]
     workspace_client.current_user.me.return_value = User(user_name='serge')
