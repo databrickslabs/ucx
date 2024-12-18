@@ -231,9 +231,14 @@ def dashboard_with_hive_tables(
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard) -> list[Dashboard]:
+def dbfs_location() -> str:
+    return "dbfs://folder/file.csv"
+
+
+@pytest.fixture
+def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard, dbfs_location: str) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
-    query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
+    query_with_dfsa = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
         dashboard_with_hive_tables,
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
@@ -243,7 +248,7 @@ def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard
 
 
 @pytest.fixture
-def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[QueryProblem]:
+def query_problems(ws: WorkspaceClient, dashboards: list[Dashboard], dbfs_location: str) -> list[QueryProblem]:
     """Query problems
 
     Supported problem codes:
@@ -271,7 +276,7 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
                 "Could not parse SQL",
             )
             records.append(query_problem)
-        if "dbfs://" in query.query_text:
+        if dbfs_location in query.query_text:
             query_problem = QueryProblem(
                 dashboard.id,
                 dashboard.parent or "UNKNOWN",
@@ -280,20 +285,20 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
                 query.parent_path or "UNKNOWN",
                 query.display_name or "UNKNOWN",
                 "direct-filesystem-access-in-sql-query",
-                "The use of direct filesystem references is deprecated: dbfs://...",
+                f"The use of direct filesystem references is deprecated: {dbfs_location}",
             )
             records.append(query_problem)
     return records
 
 
 @pytest.fixture
-def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
+def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsAccess]:
     # TODO: Match the DFSAs with a job and dashboard
-    workspace_file = make_workspace_file(content='df = spark.read.csv("dbfs://folder/file.csv")')
-    query = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
+    workspace_file = make_workspace_file(content=f'df = spark.read.csv("{dbfs_location}")')
+    query = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
         DirectFsAccess(
-            path="dbfs://folder/file.csv",
+            path=dbfs_location,
             is_read=False,
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
@@ -310,7 +315,7 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         ),
         DirectFsAccess(
-            path="dbfs://folder/file.csv",
+            path=dbfs_location,
             is_read=False,
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
