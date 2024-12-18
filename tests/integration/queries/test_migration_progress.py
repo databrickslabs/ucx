@@ -221,6 +221,7 @@ def policies() -> list[PolicyInfo]:
 def dashboard_with_hive_tables(
     make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]
 ) -> Dashboard:
+    """A dashboard with all the Hive tables pending migration"""
     table_full_names = []
     for status in statuses_pending_migration:
         table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
@@ -243,6 +244,12 @@ def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard
 
 @pytest.fixture
 def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[QueryProblem]:
+    """Query problems
+
+    Supported problem codes:
+    - sql-parse-error
+    - direct-filesystem-access-in-sql-query
+    """
     records = []
     for dashboard in dashboards:
         if len(dashboard.query_ids) == 0:
