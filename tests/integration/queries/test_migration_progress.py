@@ -233,7 +233,22 @@ def dashboard_with_hive_tables(
         table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
         table_full_names.append(table_full_name)
     query_with_hive_table = make_query(sql_query=f"SELECT * FROM {', '.join(table_full_names)}")
-    return Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table))
+    dashboard = Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table))
+    return dashboard
+
+
+@pytest.fixture
+def dashboard_with_uc_tables(
+    make_query, make_dashboard, statuses_migrated: list[TableMigrationStatus]
+) -> Dashboard:
+    """A dashboard with all the UC migrated tables"""
+    table_full_names = []
+    for status in statuses_migrated:
+        table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
+        table_full_names.append(table_full_name)
+    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {', '.join(table_full_names)}")
+    dashboard = Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table))
+    return dashboard
 
 
 @pytest.fixture
