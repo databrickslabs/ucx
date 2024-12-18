@@ -19,12 +19,12 @@ SELECT
   workspace_id,
   owner,
   data.name AS name,
-  EXPLODE(failures) AS failure,
   CASE
       -- Simple heuristic to differentiate between Redash and Lakeview dashboards
       WHEN CONTAINS(data.id, '-') THEN 'Redash'
       ELSE 'Lakeview'
   END AS dashboard_type,
+  EXPLODE(failures) AS failure,
   -- Below are invisible column(s) used in links url templates
   CASE
     WHEN CONTAINS(data.id, '-') THEN CONCAT('/sql/dashboards/', data.id)
