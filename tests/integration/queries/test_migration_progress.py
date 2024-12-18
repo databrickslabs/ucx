@@ -334,29 +334,26 @@ def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsA
 
 
 @pytest.fixture
-def used_tables(
+def used_hive_tables(
     ws: WorkspaceClient,
     make_workspace_file,
-    dashboard_with_hive_tables: Dashboard,
     job_with_failures: JobInfo,
-    job_without_failures: JobInfo,
+    dashboard_with_hive_tables: Dashboard,
     statuses_pending_migration: list[TableMigrationStatus],
-    statuses_migrated: list[TableMigrationStatus],
 ) -> list[UsedTable]:
-    dashboard = dashboard_with_hive_tables
+    """The Hive tables are added to the `job_with_failures` and `dashboard_with_hive_tables`."""
+    job, dashboard = job_with_failures, dashboard_with_hive_tables
     query = ws.queries.get(dashboard.query_ids[0])
     assert query.id is not None and query.display_name is not None and dashboard.name is not None
     records = []
-    for table_migration_status in statuses_pending_migration:
-        table_full_name = ".".join(
-            ["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table]
-        )
+    for status in statuses_pending_migration:
+        table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
         assert table_full_name in (query.query_text or ""), f"Expecting table '{table_full_name} in query: {query.id}"
         workspace_file = make_workspace_file(content=f'df = spark.read.table("{table_full_name}")\ndisplay(df)')
         used_python_table = UsedTable(
             catalog_name="hive_metastore",
-            schema_name=table_migration_status.src_schema,
-            table_name=table_migration_status.src_table,
+            schema_name=status.src_schema,
+            table_name=status.src_table,
             is_read=False,
             # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
@@ -364,16 +361,16 @@ def used_tables(
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id=job_with_failures.job_id, other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id=f"{job_with_failures.job_id}/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id=job.job_id, other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id=f"{job.job_id}/my_task_id"),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
         used_sql_table = UsedTable(
             catalog_name="hive_metastore",
-            schema_name=table_migration_status.src_schema,
-            table_name=table_migration_status.src_table,
+            schema_name=status.src_schema,
+            table_name=status.src_table,
             is_read=False,
             # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
@@ -390,6 +387,19 @@ def used_tables(
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
         records.extend([used_python_table, used_sql_table])
+    return records
+
+
+@pytest.fixture
+def used_uc_tables(
+    make_workspace_file,
+    job_without_failures: JobInfo,
+    statuses_migrated: list[TableMigrationStatus],
+) -> list[UsedTable]:
+    """The UC tables are used by the job without failures."""
+    job = job_without_failures
+    workspace_file = make_workspace_file()
+    records = []
     for status in statuses_migrated:
         assert status.dst_catalog and status.dst_schema and status.dst_table, "Migrated tables are missing destination"
         used_uc_table = UsedTable(
@@ -398,19 +408,22 @@ def used_tables(
             table_name=status.dst_table,
             is_read=False,
             is_write=True,
-            source_id=str(make_workspace_file()),
+            source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(
-                    object_type="WORKFLOW", object_id=job_without_failures.job_id, other={"name": "my_workflow"}
-                ),
-                LineageAtom(object_type="TASK", object_id=f"{job_without_failures}/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id=job.job_id, other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id=f"{job}/my_task_id"),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
         records.append(used_uc_table)
     return records
+
+
+@pytest.fixture
+def used_tables(used_hive_tables: list[UsedTable], used_uc_tables: list[UsedTable]) -> list[UsedTable]:
+    return used_hive_tables + used_uc_tables
 
 
 @pytest.fixture
