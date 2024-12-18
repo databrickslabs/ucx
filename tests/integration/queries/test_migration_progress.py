@@ -194,24 +194,26 @@ def policies() -> list[PolicyInfo]:
 
 @pytest.fixture
 def dashboards(make_dashboard, make_query) -> list[Dashboard]:
-    query = make_query()
+    query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     records = [
-        Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query)),
+        Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
     ]
     return records
 
 
 @pytest.fixture
-def query_problems(make_dashboard, make_query) -> list[QueryProblem]:
-    dashboard, query = make_dashboard(), make_query()
+def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[QueryProblem]:
+    assert len(dashboards) == 1, "This fixtures expects one dashboard"
+    dashboard_with_invalid_sql, query_id_with_invalid_sql = dashboards[0], dashboards[0].query_ids[0]
+    query_with_invalid_sql = ws.queries.get(query_id_with_invalid_sql)
     records = [
         QueryProblem(
-            dashboard.id,
-            dashboard.parent,
-            dashboard.name,
-            query.id,
-            query.parent,
-            query.name,
+            dashboard_with_invalid_sql.id,
+            dashboard_with_invalid_sql.parent,
+            dashboard_with_invalid_sql.name,
+            query_with_invalid_sql.id,
+            query_with_invalid_sql.parent_path,
+            query_with_invalid_sql.display_name,
             "sql-parse-error",
             "Could not parse SQL",
         )
