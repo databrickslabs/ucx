@@ -76,6 +76,15 @@ def table_migration_status(tables: list[Table]) -> list[TableMigrationStatus]:
 
 
 @pytest.fixture
+def table_migration_status_pending_migration(
+    table_migration_status: list[TableMigrationStatus],
+) -> list[TableMigrationStatus]:
+    records = [status for status in table_migration_status if status.dst_catalog is None]
+    assert records, "Expecting a table pending migration"
+    return records
+
+
+@pytest.fixture
 def udfs() -> list[Udf]:
     records = [
         Udf(
@@ -193,11 +202,19 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, tables: list[Table]) -> list[Dashboard]:
-    assert "hive_metastore" == tables[0].catalog, "Expecting table to be a hive table"
+def dashboards(
+    make_dashboard, make_query, table_migration_status_pending_migration: list[TableMigrationStatus]
+) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
-    query_with_hive_table = make_query(sql_query="SELECT * FROM {tables[0].full_name}")
+    table_full_name_pending_migration = ".".join(
+        [
+            "hive_metastore",
+            table_migration_status_pending_migration[0].src_schema,
+            table_migration_status_pending_migration[0].src_table,
+        ]
+    )
+    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name_pending_migration}")
     records = [
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
@@ -282,18 +299,25 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 @pytest.fixture
 def used_tables(
-    ws: WorkspaceClient, make_workspace_file, dashboards: list[Dashboard], tables: list[Table]
+    ws: WorkspaceClient,
+    make_workspace_file,
+    dashboards: list[Dashboard],
+    table_migration_status_pending_migration: list[TableMigrationStatus],
 ) -> list[UsedTable]:
     assert len(dashboards) == 3, "Expecting three dashboards"
-    assert "hive_metastore" == tables[0].catalog, "Expecting table to be a hive table"
-    dashboard, table = dashboards[0], tables[0]
+    dashboard, table_migration_status = dashboards[0], table_migration_status_pending_migration[0]
+    table_full_name_pending_migration = ".".join(
+        ["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table]
+    )
+    workspace_file = make_workspace_file(
+        content=f'df = spark.read.table("{table_full_name_pending_migration}")\ndisplay(df)'
+    )
     query = ws.queries.get(dashboard.query_ids[0])
-    workspace_file = make_workspace_file(content=f'df = spark.read.table("{table.full_name}")\ndisplay(df)')
     records = [
         UsedTable(
-            catalog_name=table.catalog,  # This table is pending migration
-            schema_name=table.database,
-            table_name=table.name,
+            catalog_name="hive_metastore",
+            schema_name=table_migration_status.src_schema,
+            table_name=table_migration_status.src_table,
             is_read=False,
             # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
@@ -310,9 +334,9 @@ def used_tables(
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         ),
         UsedTable(
-            catalog_name=table.catalog,  # This table is pending migration
-            schema_name=table.database,
-            table_name=table.name,
+            catalog_name="hive_metastore",
+            schema_name=table_migration_status.src_schema,
+            table_name=table_migration_status.src_table,
             is_read=False,
             # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
