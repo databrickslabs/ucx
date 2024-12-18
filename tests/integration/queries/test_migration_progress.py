@@ -230,6 +230,20 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
     query_with_invalid_sql = ws.queries.get(query_id_with_invalid_sql)
     dashboard_with_dfsa, query_id_with_dfsa = dashboards[1], dashboards[1].query_ids[0]
     query_with_dfsa = ws.queries.get(query_id_with_dfsa)
+    assert (
+        dashboard_with_invalid_sql.id is not None
+        and dashboard_with_invalid_sql.parent is not None
+        and dashboard_with_invalid_sql.name is not None
+        and query_with_invalid_sql.id is not None
+        and query_with_invalid_sql.parent_path is not None
+        and query_with_invalid_sql.display_name is not None
+        and dashboard_with_dfsa.id is not None
+        and dashboard_with_dfsa.parent is not None
+        and dashboard_with_dfsa.name is not None
+        and query_with_dfsa.id is not None
+        and query_with_dfsa.parent_path is not None
+        and query_with_dfsa.display_name is not None
+    )
     records = [
         QueryProblem(
             dashboard_with_invalid_sql.id,
@@ -313,6 +327,7 @@ def used_tables(
         content=f'df = spark.read.table("{table_full_name_pending_migration}")\ndisplay(df)'
     )
     query = ws.queries.get(dashboard.query_ids[0])
+    assert query.id is not None and query.display_name is not None and dashboard.name is not None
     records = [
         UsedTable(
             catalog_name="hive_metastore",
