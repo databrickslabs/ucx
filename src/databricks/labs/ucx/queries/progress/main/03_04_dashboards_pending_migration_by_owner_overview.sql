@@ -1,13 +1,13 @@
 /* --title 'Dashboard pending migration' --width 5 */
 WITH migration_statuses AS (
-    SELECT owner, object_type, failures
+    SELECT owner, failures
     FROM ucx_catalog.multiworkspace.objects_snapshot
     WHERE object_type = 'Dashboard'
 )
 
 SELECT
     owner,
-    DOUBLE(CEIL(100 * COUNT_IF(SIZE(failures) = 0) / SUM(COUNT(*)) OVER (PARTITION BY owner, object_type), 2)) AS percentage,
+    DOUBLE(CEIL(100 * COUNT_IF(SIZE(failures) = 0) / SUM(COUNT(*)) OVER (PARTITION BY owner), 2)) AS percentage,
     COUNT(*) AS total,
     COUNT_IF(SIZE(failures) = 0) AS total_migrated,
     COUNT_IF(SIZE(failures) > 0) AS total_not_migrated
