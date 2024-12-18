@@ -208,7 +208,9 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboard_with_hive_tables(make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]) -> Dashboard:
+def dashboard_with_hive_tables(
+    make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]
+) -> Dashboard:
     table_full_names = []
     for status in statuses_pending_migration:
         table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
@@ -313,10 +315,10 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 def used_tables(
     ws: WorkspaceClient,
     make_workspace_file,
-    dashboards: list[Dashboard],
+    dashboard_with_hive_tables: Dashboard,
     statuses_pending_migration: list[TableMigrationStatus],
 ) -> list[UsedTable]:
-    dashboard = dashboards[-1]
+    dashboard = dashboard_with_hive_tables
     query = ws.queries.get(dashboard.query_ids[0])
     assert query.id is not None and query.display_name is not None and dashboard.name is not None
     records = []
