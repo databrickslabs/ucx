@@ -333,6 +333,8 @@ def used_tables(
     ws: WorkspaceClient,
     make_workspace_file,
     dashboard_with_hive_tables: Dashboard,
+    job_with_failures: JobInfo,
+    job_without_failures: JobInfo,
     statuses_pending_migration: list[TableMigrationStatus],
     statuses_migrated: list[TableMigrationStatus],
 ) -> list[UsedTable]:
@@ -357,8 +359,8 @@ def used_tables(
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id=job_with_failures.job_id, other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id=f"{job_with_failures.job_id}/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
@@ -395,8 +397,8 @@ def used_tables(
             source_id=str(make_workspace_file()),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id=job_without_failures.job_id, other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id=f"{job_without_failures}/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
