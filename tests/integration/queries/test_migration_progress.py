@@ -608,6 +608,38 @@ def test_migration_progress_dashboard(
         ("01_07_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_08_percentage_dashboard_migration_progress", [Row(percentage=round(100 * 1 / 4, 2))]),
         (
+            "02_1_pending_migration_data_objects",
+            [Row(count=5)],
+        ),
+        (
+            "02_2_migration_status_by_owner_bar_graph",
+            [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
+        ),
+        (
+            "02_3_migrated_data_objects",
+            [Row(count=5)],
+        ),
+        (
+            "02_4_migration_status_by_owner_overview",
+            [
+                Row(owner="Andrew", percentage=round(100 * 1 / 2, 2), total=2, total_migrated=1, total_not_migrated=1),
+                Row(owner="Cor", percentage=round(100 * 3 / 7, 2), total=7, total_migrated=3, total_not_migrated=4),
+                Row(owner="Eric", percentage=round(100 * 1 / 1, 2), total=1, total_migrated=1, total_not_migrated=0),
+            ],
+        ),
+        (
+            "03_01_dashboards_pending_migration",
+            [
+                Row(count=3),
+            ],
+        ),
+        (
+            "03_03_dashboards_migrated",
+            [
+                Row(count=1),
+            ],
+        ),
+        (
             "99_99_distinct_failures_per_object_type",
             [
                 Row(
@@ -638,38 +670,6 @@ def test_migration_progress_dashboard(
                 ),
                 Row(object_type="Table", count=5, failure="Pending migration"),
                 Row(object_type="Udf", count=1, failure="UDF not supported by UC"),
-            ],
-        ),
-        (
-            "02_1_pending_migration_data_objects",
-            [Row(count=5)],
-        ),
-        (
-            "02_2_migration_status_by_owner_bar_graph",
-            [Row(owner="Andrew", count=1), Row(owner="Cor", count=4)],
-        ),
-        (
-            "02_3_migrated_data_objects",
-            [Row(count=5)],
-        ),
-        (
-            "02_4_migration_status_by_owner_overview",
-            [
-                Row(owner="Andrew", percentage=round(100 * 1 / 2, 2), total=2, total_migrated=1, total_not_migrated=1),
-                Row(owner="Cor", percentage=round(100 * 3 / 7, 2), total=7, total_migrated=3, total_not_migrated=4),
-                Row(owner="Eric", percentage=round(100 * 1 / 1, 2), total=1, total_migrated=1, total_not_migrated=0),
-            ],
-        ),
-        (
-            "03_01_dashboards_pending_migration",
-            [
-                Row(count=3),
-            ],
-        ),
-        (
-            "03_03_dashboards_migrated",
-            [
-                Row(count=1),
             ],
         ),
     ],
