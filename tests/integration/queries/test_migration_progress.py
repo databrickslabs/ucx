@@ -207,14 +207,9 @@ def dashboards(
 ) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
-    table_full_name_pending_migration = ".".join(
-        [
-            "hive_metastore",
-            table_migration_status_pending_migration[0].src_schema,
-            table_migration_status_pending_migration[0].src_table,
-        ]
-    )
-    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name_pending_migration}")
+    table_migration_status = table_migration_status_pending_migration[0]
+    table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
+    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name}")
     records = [
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
