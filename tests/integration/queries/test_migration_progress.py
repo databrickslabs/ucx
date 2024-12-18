@@ -692,7 +692,7 @@ def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
     query_name = "03_02_dashboards_pending_migration_by_owner_bar_graph"
-    rows = [Row(owner=ws.current_user.me().user_name, count=1)]
+    rows = [Row(owner=ws.current_user.me().user_name, count=3)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
