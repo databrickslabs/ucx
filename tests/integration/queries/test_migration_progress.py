@@ -206,9 +206,11 @@ def dashboards(make_dashboard, make_query) -> list[Dashboard]:
 
 @pytest.fixture
 def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[QueryProblem]:
-    assert len(dashboards) == 1, "This fixtures expects one dashboard"
+    assert len(dashboards) == 3, "This fixtures expects three dashboards"
     dashboard_with_invalid_sql, query_id_with_invalid_sql = dashboards[0], dashboards[0].query_ids[0]
     query_with_invalid_sql = ws.queries.get(query_id_with_invalid_sql)
+    dashboard_with_dfsa, query_id_dfsa = dashboards[1], dashboards[1].query_ids[0]
+    query_with_dfsa = ws.queries.get(query_id_with_invalid_sql)
     records = [
         QueryProblem(
             dashboard_with_invalid_sql.id,
@@ -219,7 +221,17 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
             query_with_invalid_sql.display_name,
             "sql-parse-error",
             "Could not parse SQL",
-        )
+        ),
+        QueryProblem(
+            dashboard_with_dfsa.id,
+            dashboard_with_dfsa.parent,
+            dashboard_with_dfsa.name,
+            query_with_dfsa.id,
+            query_with_dfsa.parent_path,
+            query_with_dfsa.display_name,
+            "direct-filesystem-access-in-sql-query"
+            "The use of direct filesystem references is deprecated: dbfs://folder/file.csv"
+        ),
     ]
     return records
 
