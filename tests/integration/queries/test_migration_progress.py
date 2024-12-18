@@ -742,7 +742,7 @@ def test_migration_progress_query_dashboards_pending_migration(
             owner=current_user,
             dashboard_type="Redash",
             failure=f"Pending migration: {table_full_name}",
-            dashboard_link=f"/sql/dashboards/{dashboard_with_hive_tables.id}"
+            dashboard_link=f"/sql/dashboards/{dashboard_with_hive_tables.id}",
         )
         rows.append(row)
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
