@@ -705,7 +705,7 @@ def test_migration_progress_query_data_asset_references_pending_migration_overvi
     sql_backend: SqlBackend,
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
-    query_name = "03_04_data_asset_references_pending_migration_overview"
+    query_name = "03_04_dashboards_pending_migration_by_owner_overview"
     current_user = ws.current_user.me().user_name
     rows = [
         Row(
@@ -739,7 +739,7 @@ def test_migration_progress_query_data_asset_references_pending_migration(
     used_tables: list[UsedTable],
 ) -> None:
     """Separate test is required to set the dfsas and used table dynamically"""
-    query_name = "03_05_data_asset_references_pending_migration"
+    query_name = "03_05_dashboards_pending_migration"
     workspace_id = ws.get_workspace_id()
     current_user = ws.current_user.me().user_name
     rows = []
