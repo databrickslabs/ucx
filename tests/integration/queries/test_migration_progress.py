@@ -402,6 +402,13 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         UsedTable,
         mode='overwrite',
     )
+    # Persist UsedTable to match with dashboard queries
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.used_tables_in_queries',
+        used_tables,
+        UsedTable,
+        mode='overwrite',
+    )
     # Persists QueryProblems to propagate them to Dashboards
     runtime_ctx.sql_backend.save_table(
         f'hive_metastore.{runtime_ctx.inventory_database}.query_problems',
