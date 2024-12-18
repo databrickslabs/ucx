@@ -361,8 +361,6 @@ def used_tables(
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id=job_with_failures.job_id, other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id=f"{job_with_failures.job_id}/my_task_id"),
-                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
@@ -399,8 +397,6 @@ def used_tables(
             source_lineage=[
                 LineageAtom(object_type="WORKFLOW", object_id=job_without_failures.job_id, other={"name": "my_workflow"}),
                 LineageAtom(object_type="TASK", object_id=f"{job_without_failures}/my_task_id"),
-                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id="my file_path"),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
