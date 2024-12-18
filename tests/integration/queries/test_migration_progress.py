@@ -311,7 +311,7 @@ def used_tables(
     ws: WorkspaceClient,
     make_workspace_file,
     dashboards: list[Dashboard],
-    statuses_pending_migration,
+    statuses_pending_migration: list[TableMigrationStatus],
 ) -> list[UsedTable]:
     dashboard = dashboards[-1]
     query = ws.queries.get(dashboard.query_ids[0])
