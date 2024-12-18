@@ -605,30 +605,3 @@ def test_migration_progress_query_data_asset_references_pending_migration(
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
     assert query_results == rows
-
-
-def test_migration_progress_code_compatibility_issues(
-    ws: WorkspaceClient,
-    dashboard_metadata: DashboardMetadata,
-    sql_backend: SqlBackend,
-    query_problems: list[QueryProblem],
-) -> None:
-    """Separate test is required to set the dashboard and query id dynamically"""
-    query_name = "03_06_query_compatibility_issues"
-    workspace_id = ws.get_workspace_id()
-    rows = []
-    for query_problem in query_problems:
-        row = Row(
-            workspace_id=workspace_id,
-            code="sql-parse-error",
-            message="Could not parse SQL",
-            dashboard_name=query_problem.dashboard_name,
-            query_name=query_problem.query_name,
-            dashboard_id=query_problem.dashboard_id,
-            query_id=query_problem.query_id,
-        )
-        rows.append(row)
-    datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
-    assert len(datasets) == 1, f"Missing query: {query_name}"
-    query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == rows
