@@ -406,12 +406,6 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     "function" scoped, thus one should first evaluate if those can be changed.
     """
     ProgressTrackingInstallation(runtime_ctx.sql_backend, runtime_ctx.ucx_catalog).run()
-    runtime_ctx.sql_backend.save_table(
-        f"{runtime_ctx.ucx_catalog}.multiworkspace.workflow_runs",
-        workflow_runs,
-        WorkflowRun,
-        mode="overwrite",
-    )
     # Persist workflow problems to propagate failures to jobs
     runtime_ctx.sql_backend.save_table(
         f'hive_metastore.{runtime_ctx.inventory_database}.workflow_problems',
@@ -454,8 +448,14 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         QueryProblem,
         mode='overwrite',
     )
-    for parent_run_id in range(1, 3):  # No changes in progress between the two runs
-        runtime_ctx = runtime_ctx.replace(parent_run_id=parent_run_id)
+    for workflow_run in workflow_runs:  # No changes in progress between the two runs
+        runtime_ctx.sql_backend.save_table(
+            f"{runtime_ctx.ucx_catalog}.multiworkspace.workflow_runs",
+            [workflow_run],
+            WorkflowRun,
+            mode="append",
+        )
+        runtime_ctx = runtime_ctx.replace(parent_run_id=workflow_run.workflow_run_id)
         runtime_ctx.tables_progress.append_inventory_snapshot(tables)
         # The deletes below reset the cached parent run ids on the encoders
         del runtime_ctx.tables_progress
