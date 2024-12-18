@@ -710,19 +710,10 @@ def test_migration_progress_query_data_asset_references_pending_migration_overvi
     rows = [
         Row(
             owner=current_user,
-            object_type="Direct filesystem access",
-            percentage=0,
-            total=2,
-            total_migrated=0,
-            total_not_migrated=2,
-        ),
-        Row(
-            owner=current_user,
-            object_type="Table or view reference",
-            percentage=50,
-            total=2,
+            percentage=round(100 * 1 / 4, 2),
+            total=4,
             total_migrated=1,
-            total_not_migrated=1,
+            total_not_migrated=3,
         ),
     ]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
