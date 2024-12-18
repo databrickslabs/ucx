@@ -727,42 +727,26 @@ def test_migration_progress_query_data_asset_references_pending_migration(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
-    dfsas: list[DirectFsAccess],
-    used_tables: list[UsedTable],
+    dashboard_with_hive_tables: Dashboard,
+    statuses_pending_migration: list[TableMigrationStatus],
 ) -> None:
-    """Separate test is required to set the dfsas and used table dynamically"""
+    """Test the pending tables are mentioned"""
     query_name = "03_05_dashboards_pending_migration"
     workspace_id = ws.get_workspace_id()
     current_user = ws.current_user.me().user_name
     rows = []
-    for dfsa in dfsas:
-        link_prefix = "/sql/editor/" if dfsa.source_type == "QUERY" else "/#workspace"
+    for status in statuses_pending_migration:
+        table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
         row = Row(
             workspace_id=workspace_id,
             owner=current_user,
-            object_type="Direct filesystem access",
-            object_id=dfsas[0].path,
-            failure="Direct filesystem access is not supported in Unity Catalog",
-            is_read=False,
-            is_write=True,
-            link=f"{link_prefix}{dfsa.source_id}",
-        )
-        rows.append(row)
-    for used_table in used_tables:
-        if used_table.catalog_name != "hive_metastore":
-            continue
-        row = Row(
-            workspace_id=workspace_id,
-            owner=current_user,
-            object_type="Table or view reference",
-            object_id=f"{used_table.catalog_name}.{used_table.schema_name}.{used_table.table_name}",
-            failure="Pending migration",
-            is_read=False,
-            is_write=True,
-            link=f"/#workspace{used_table.source_id}",
+            dashboard_type="Redash",
+            failure=f"Pending migration: {table_full_name}",
+            dashboard_link=f"/sql/dashboards/{dashboard_with_hive_tables.id}"
         )
         rows.append(row)
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == rows
+    query_results_filtered = [r for r in query_results if r.name == dashboard_with_hive_tables.name]
+    assert query_results_filtered == sorted(rows, key=lambda el: el.failure)
