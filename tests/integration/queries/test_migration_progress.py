@@ -245,11 +245,11 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
         except sqlglot.ParseError:
             query_problem = QueryProblem(
                 dashboard.id,
-                dashboard.parent,
-                dashboard.name,
+                dashboard.parent or "UNKNOWN",
+                dashboard.name or "UNKNOWN",
                 query.id,
-                query.parent_path,
-                query.display_name,
+                query.parent_path or "UNKNOWN",
+                query.display_name or "UNKNOWN",
                 "sql-parse-error",
                 "Could not parse SQL",
             )
@@ -257,11 +257,11 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
         if "dbfs://" in query.query_text:
             query_problem = QueryProblem(
                 dashboard.id,
-                dashboard.parent,
-                dashboard.name,
+                dashboard.parent or "UNKNOWN",
+                dashboard.name or "UNKNOWN",
                 query.id,
-                query.parent_path,
-                query.display_name,
+                query.parent_path or "UNKNOWN",
+                query.display_name or "UNKNOWN",
                 "direct-filesystem-access-in-sql-query",
                 "The use of direct filesystem references is deprecated: dbfs://...",
             )
