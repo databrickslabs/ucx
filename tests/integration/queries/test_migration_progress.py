@@ -2,6 +2,7 @@ import datetime as dt
 import webbrowser
 
 import pytest
+import sqlglot
 from databricks.sdk import WorkspaceClient
 from databricks.labs.blueprint.wheels import find_project_root
 from databricks.labs.lsql.backends import SqlBackend, Row
@@ -216,51 +217,39 @@ def dashboards(make_dashboard, make_query, statuses_pending_migration: list[Tabl
 
 @pytest.fixture
 def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[QueryProblem]:
-    assert len(dashboards) == 3, "This fixtures expects three dashboards"
-    dashboard_with_invalid_sql, query_id_with_invalid_sql = dashboards[0], dashboards[0].query_ids[0]
-    query_with_invalid_sql = ws.queries.get(query_id_with_invalid_sql)
-    assert "SELECT SUM(1" in (
-        query_with_invalid_sql.query_text or ""
-    ), f"Expecting invalid query: {query_with_invalid_sql.id}"
-    dashboard_with_dfsa, query_id_with_dfsa = dashboards[1], dashboards[1].query_ids[0]
-    query_with_dfsa = ws.queries.get(query_id_with_dfsa)
-    assert "dbfs:" in (query_with_dfsa.query_text or ""), f"Expecting direct filesystem access: {query_with_dfsa.id}"
-    assert (
-        dashboard_with_invalid_sql.id is not None
-        and dashboard_with_invalid_sql.parent is not None
-        and dashboard_with_invalid_sql.name is not None
-        and query_with_invalid_sql.id is not None
-        and query_with_invalid_sql.parent_path is not None
-        and query_with_invalid_sql.display_name is not None
-        and dashboard_with_dfsa.id is not None
-        and dashboard_with_dfsa.parent is not None
-        and dashboard_with_dfsa.name is not None
-        and query_with_dfsa.id is not None
-        and query_with_dfsa.parent_path is not None
-        and query_with_dfsa.display_name is not None
-    )
-    records = [
-        QueryProblem(
-            dashboard_with_invalid_sql.id,
-            dashboard_with_invalid_sql.parent,
-            dashboard_with_invalid_sql.name,
-            query_with_invalid_sql.id,
-            query_with_invalid_sql.parent_path,
-            query_with_invalid_sql.display_name,
-            "sql-parse-error",
-            "Could not parse SQL",
-        ),
-        QueryProblem(
-            dashboard_with_dfsa.id,
-            dashboard_with_dfsa.parent,
-            dashboard_with_dfsa.name,
-            query_with_dfsa.id,
-            query_with_dfsa.parent_path,
-            query_with_dfsa.display_name,
-            "direct-filesystem-access-in-sql-query",
-            "The use of direct filesystem references is deprecated: dbfs://folder/file.csv",
-        ),
-    ]
+    records = []
+    for dashboard in dashboards:
+        if len(dashboard.query_ids) == 0:
+            continue
+        query = ws.queries.get(dashboard.query_ids[0])
+        if query.id is None or query.query_text is None:
+            continue
+        try:
+            sqlglot.parse_one(query.query_text, dialect="databricks")
+        except sqlglot.ParseError:
+            query_problem = QueryProblem(
+                dashboard.id,
+                dashboard.parent,
+                dashboard.name,
+                query.id,
+                query.parent_path,
+                query.display_name,
+                "sql-parse-error",
+                "Could not parse SQL",
+            )
+            records.append(query_problem)
+        if "dbfs://" in query.query_text:
+            query_problem = QueryProblem(
+                dashboard.id,
+                dashboard.parent,
+                dashboard.name,
+                query.id,
+                query.parent_path,
+                query.display_name,
+                "direct-filesystem-access-in-sql-query",
+                "The use of direct filesystem references is deprecated: dbfs://...",
+            )
+            records.append(query_problem)
     return records
 
 
