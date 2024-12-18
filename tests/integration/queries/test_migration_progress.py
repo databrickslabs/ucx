@@ -317,6 +317,7 @@ def used_tables(
     make_workspace_file,
     dashboard_with_hive_tables: Dashboard,
     statuses_pending_migration: list[TableMigrationStatus],
+    statuses_migrated: list[TableMigrationStatus],
 ) -> list[UsedTable]:
     dashboard = dashboard_with_hive_tables
     query = ws.queries.get(dashboard.query_ids[0])
@@ -367,24 +368,25 @@ def used_tables(
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
         )
         records.extend([used_python_table, used_sql_table])
-    used_uc_table = UsedTable(
-        catalog_name="catalog",  # This table is migrated
-        schema_name="staff_db",
-        table_name="employees",
-        is_read=False,
-        is_write=True,
-        source_id=str(make_workspace_file()),
-        source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
-        source_lineage=[
-            LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
-            LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
-            LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-            LineageAtom(object_type="FILE", object_id="my file_path"),
-        ],
-        assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
-        assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
-    )
-    records.append(used_uc_table)
+    for status in statuses_migrated:
+        used_uc_table = UsedTable(
+            catalog_name=status.dst_catalog,
+            schema_name=status.dst_schema,
+            table_name=status.dst_table,
+            is_read=False,
+            is_write=True,
+            source_id=str(make_workspace_file()),
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+                LineageAtom(object_type="FILE", object_id="my file_path"),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        )
+        records.append(used_uc_table)
     return records
 
 
