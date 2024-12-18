@@ -201,16 +201,21 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, statuses_pending_migration: list[TableMigrationStatus]) -> list[Dashboard]:
-    query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
-    query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
+def dashboard_with_hive_table(make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]) -> Dashboard:
     table_migration_status = statuses_pending_migration[0]
     table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
     query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name}")
+    return Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table))
+
+
+@pytest.fixture
+def dashboards(make_dashboard, make_query, dashboard_with_hive_table: Dashboard) -> list[Dashboard]:
+    query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
+    query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
+        dashboard_with_hive_table,
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
-        Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table)),
     ]
     return records
 
