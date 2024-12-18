@@ -224,7 +224,7 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
     ), f"Expecting invalid query: {query_with_invalid_sql.id}"
     dashboard_with_dfsa, query_id_with_dfsa = dashboards[1], dashboards[1].query_ids[0]
     query_with_dfsa = ws.queries.get(query_id_with_dfsa)
-    assert "dbfs:" in (query_id_with_dfsa.query_text or ""), f"Expecting direct filesystem access: {query_with_dfsa.id}"
+    assert "dbfs:" in (query_with_dfsa.query_text or ""), f"Expecting direct filesystem access: {query_with_dfsa.id}"
     assert (
         dashboard_with_invalid_sql.id is not None
         and dashboard_with_invalid_sql.parent is not None
