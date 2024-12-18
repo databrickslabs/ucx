@@ -84,6 +84,13 @@ def statuses_pending_migration(table_migration_statuses: list[TableMigrationStat
 
 
 @pytest.fixture
+def statuses_migrated(table_migration_statuses: list[TableMigrationStatus]) -> list[TableMigrationStatus]:
+    records = [status for status in table_migration_statuses if status.dst_catalog is not None]
+    assert records, "Expecting a migrated table"
+    return records
+
+
+@pytest.fixture
 def udfs() -> list[Udf]:
     records = [
         Udf(
@@ -201,19 +208,21 @@ def policies() -> list[PolicyInfo]:
 
 
 @pytest.fixture
-def dashboard_with_hive_table(make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]) -> Dashboard:
-    table_migration_status = statuses_pending_migration[0]
-    table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
-    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {table_full_name}")
+def dashboard_with_hive_tables(make_query, make_dashboard, statuses_pending_migration: list[TableMigrationStatus]) -> Dashboard:
+    table_full_names = []
+    for status in statuses_pending_migration:
+        table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
+        table_full_names.append(table_full_name)
+    query_with_hive_table = make_query(sql_query=f"SELECT * FROM {', '.join(table_full_names)}")
     return Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_hive_table))
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, dashboard_with_hive_table: Dashboard) -> list[Dashboard]:
+def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
-        dashboard_with_hive_table,
+        dashboard_with_hive_tables,
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
     ]
