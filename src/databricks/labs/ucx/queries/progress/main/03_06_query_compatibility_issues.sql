@@ -1,5 +1,5 @@
 /*
---title 'Code compatability issues'
+--title 'Query compatability issues'
 --width 6
 --overrides '{"spec":{
     "encodings":{
