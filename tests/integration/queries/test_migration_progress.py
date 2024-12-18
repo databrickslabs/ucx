@@ -65,11 +65,13 @@ def tables() -> list[Table]:
 
 
 @pytest.fixture
-def table_migration_statuses(tables: list[Table]) -> list[TableMigrationStatus]:
+def table_migration_statuses(make_catalog, make_schema, tables: list[Table]) -> list[TableMigrationStatus]:
+    catalog = make_catalog()
+    schema = make_schema(catalog_name=catalog.name)
     records = []
     for table in tables:
         if table.database == "schema1":  # schema1 tables are migrated
-            migration_status = TableMigrationStatus(table.database, table.name, "catalog", table.database, table.name)
+            migration_status = TableMigrationStatus(table.database, table.name, catalog.name, schema.name, table.name)
         else:
             migration_status = TableMigrationStatus(table.database, table.name)
         records.append(migration_status)
