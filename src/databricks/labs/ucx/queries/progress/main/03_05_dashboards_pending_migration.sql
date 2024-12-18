@@ -22,12 +22,12 @@ SELECT
   EXPLODE(failures) AS failure,
   CASE
       -- Simple heuristic to differentiate between Redash and Lakeview dashboards
-      WHEN '-' IN data.id THEN 'Redash'
+      WHEN CONTAINS('-', data.id) THEN 'Redash'
       ELSE 'Lakeview'
   END AS dashboard_type,
   -- Below are invisible column(s) used in links url templates
   CASE
-    WHEN '-' IN data.id THEN CONCAT('/sql/dashboards/', data.id)
+    WHEN CONTAINS('-', data.id) THEN CONCAT('/sql/dashboards/', data.id)
     ELSE CONCAT('/dashboardsv3/', data.id, '/published')
   END AS dashboard_link
 FROM ucx_catalog.multiworkspace.objects_snapshot
