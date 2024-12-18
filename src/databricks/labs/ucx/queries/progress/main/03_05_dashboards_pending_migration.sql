@@ -32,4 +32,4 @@ SELECT
   END AS dashboard_link
 FROM ucx_catalog.multiworkspace.objects_snapshot
 WHERE object_type = 'Dashboard' AND SIZE(failures) > 0
-ORDER BY workspace_id, owner, name
+ORDER BY workspace_id, owner, name, failure
