@@ -309,14 +309,17 @@ def used_tables(
     dashboards: list[Dashboard],
     statuses_pending_migration,
 ) -> list[UsedTable]:
-    assert len(dashboards) == 3, "Expecting three dashboards"
-    dashboard, table_migration_status = dashboards[0], statuses_pending_migration[0]
-    table_full_name = ".".join(["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table])
-    workspace_file = make_workspace_file(content=f'df = spark.read.table("{table_full_name}")\ndisplay(df)')
+    dashboard = dashboards[-1]
     query = ws.queries.get(dashboard.query_ids[0])
     assert query.id is not None and query.display_name is not None and dashboard.name is not None
-    records = [
-        UsedTable(
+    records = []
+    for table_migration_status in statuses_pending_migration:
+        table_full_name = ".".join(
+            ["hive_metastore", table_migration_status.src_schema, table_migration_status.src_table]
+        )
+        assert table_full_name in query.query_text or "", f"Expecting table '{table_full_name} in query: {query.id}"
+        workspace_file = make_workspace_file(content=f'df = spark.read.table("{table_full_name}")\ndisplay(df)')
+        used_python_table = UsedTable(
             catalog_name="hive_metastore",
             schema_name=table_migration_status.src_schema,
             table_name=table_migration_status.src_table,
@@ -334,8 +337,8 @@ def used_tables(
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
-        ),
-        UsedTable(
+        )
+        used_sql_table = UsedTable(
             catalog_name="hive_metastore",
             schema_name=table_migration_status.src_schema,
             table_name=table_migration_status.src_table,
@@ -353,25 +356,26 @@ def used_tables(
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
-        ),
-        UsedTable(
-            catalog_name="catalog",  # This table is migrated
-            schema_name="staff_db",
-            table_name="employees",
-            is_read=False,
-            is_write=True,
-            source_id=str(make_workspace_file()),
-            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
-            source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
-                LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
-                LineageAtom(object_type="FILE", object_id="my file_path"),
-            ],
-            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
-            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
-        ),
-    ]
+        )
+        records.extend([used_python_table, used_sql_table])
+    used_uc_table = UsedTable(
+        catalog_name="catalog",  # This table is migrated
+        schema_name="staff_db",
+        table_name="employees",
+        is_read=False,
+        is_write=True,
+        source_id=str(make_workspace_file()),
+        source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+        source_lineage=[
+            LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
+            LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+            LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
+            LineageAtom(object_type="FILE", object_id="my file_path"),
+        ],
+        assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+        assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+    )
+    records.append(used_uc_table)
     return records
 
 
