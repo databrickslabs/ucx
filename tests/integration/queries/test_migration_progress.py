@@ -55,25 +55,29 @@ def workflow_runs(ws: WorkspaceClient) -> list[WorkflowRun]:
 
 
 @pytest.fixture
-def tables() -> list[Table]:
+def tables(make_schema, make_table) -> list[Table]:
     records = []
-    for schema in "schema1", "schema2":
-        for table_name in "table1", "table2", "table3", "table4", "table5":
-            table = Table("hive_metastore", schema, table_name, "MANAGED", "delta")
+    for _ in range(2):
+        schema = make_schema()
+        for _ in range(5):
+            table = Table.from_table_info(make_table(schema_name=schema.name))
             records.append(table)
     return records
 
 
 @pytest.fixture
-def table_migration_statuses(make_catalog, make_schema, tables: list[Table]) -> list[TableMigrationStatus]:
+def table_migration_statuses(make_catalog, make_schema, make_table, tables: list[Table]) -> list[TableMigrationStatus]:
     catalog = make_catalog()
     schema = make_schema(catalog_name=catalog.name)
     records = []
-    for table in tables:
-        if table.database == "schema1":  # schema1 tables are migrated
-            migration_status = TableMigrationStatus(table.database, table.name, catalog.name, schema.name, table.name)
-        else:
-            migration_status = TableMigrationStatus(table.database, table.name)
+    for table in tables[: int(len(tables) / 2)]:  # First half is migrated
+        migrated_table = make_table(catalog_name=catalog.name, schema_name=schema.name, name=table.name)
+        migration_status = TableMigrationStatus(
+            table.database, table.name, migrated_table.catalog_name, migrated_table.schema_name, migrated_table.name
+        )
+        records.append(migration_status)
+    for table in tables[int(len(tables) / 2) :]:  # Second half is pending migration
+        migration_status = TableMigrationStatus(table.database, table.name)
         records.append(migration_status)
     return records
 
