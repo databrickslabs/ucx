@@ -164,11 +164,11 @@ def jobs(job_without_failures: JobInfo, job_with_failures: JobInfo) -> list[JobI
 
 
 @pytest.fixture
-def workflow_problems() -> list[JobProblem]:
+def workflow_problems(job_with_failures: JobInfo) -> list[JobProblem]:
     """Workflow problems are detected by the linter"""
     records = [
         JobProblem(
-            job_id=3,
+            job_id=int(job_with_failures.job_id),
             job_name="Job",
             task_key="4",
             path="file.py",
