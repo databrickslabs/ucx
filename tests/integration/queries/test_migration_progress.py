@@ -386,6 +386,7 @@ def used_tables(
         )
         records.extend([used_python_table, used_sql_table])
     for status in statuses_migrated:
+        assert status.dst_catalog and status.dst_schema and status.dst_table, "Migrated tables are missing destination"
         used_uc_table = UsedTable(
             catalog_name=status.dst_catalog,
             schema_name=status.dst_schema,
@@ -395,7 +396,9 @@ def used_tables(
             source_id=str(make_workspace_file()),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id=job_without_failures.job_id, other={"name": "my_workflow"}),
+                LineageAtom(
+                    object_type="WORKFLOW", object_id=job_without_failures.job_id, other={"name": "my_workflow"}
+                ),
                 LineageAtom(object_type="TASK", object_id=f"{job_without_failures}/my_task_id"),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
