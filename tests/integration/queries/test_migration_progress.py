@@ -686,7 +686,7 @@ def test_migration_progress_query(
     assert query_results == rows
 
 
-def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
+def test_migration_progress_query_dashboard_pending_migration_by_owner_bar_graph(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
@@ -700,7 +700,7 @@ def test_migration_progress_query_data_asset_references_by_owner_bar_graph(
     assert query_results == rows
 
 
-def test_migration_progress_query_data_asset_references_pending_migration_overview(
+def test_migration_progress_query_dashboards_pending_migration_by_owner_overview(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
@@ -723,14 +723,14 @@ def test_migration_progress_query_data_asset_references_pending_migration_overvi
     assert query_results == rows
 
 
-def test_migration_progress_query_data_asset_references_pending_migration(
+def test_migration_progress_query_dashboards_pending_migration(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
     dashboard_with_hive_tables: Dashboard,
     statuses_pending_migration: list[TableMigrationStatus],
 ) -> None:
-    """Test the pending tables are mentioned"""
+    """Test if the tables migration are mentioned"""
     query_name = "03_05_dashboards_pending_migration"
     workspace_id = ws.get_workspace_id()
     current_user = ws.current_user.me().user_name
