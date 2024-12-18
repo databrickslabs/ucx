@@ -211,8 +211,8 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
     assert len(dashboards) == 3, "This fixtures expects three dashboards"
     dashboard_with_invalid_sql, query_id_with_invalid_sql = dashboards[0], dashboards[0].query_ids[0]
     query_with_invalid_sql = ws.queries.get(query_id_with_invalid_sql)
-    dashboard_with_dfsa, query_id_dfsa = dashboards[1], dashboards[1].query_ids[0]
-    query_with_dfsa = ws.queries.get(query_id_with_invalid_sql)
+    dashboard_with_dfsa, query_id_with_dfsa = dashboards[1], dashboards[1].query_ids[0]
+    query_with_dfsa = ws.queries.get(query_id_with_dfsa)
     records = [
         QueryProblem(
             dashboard_with_invalid_sql.id,
@@ -281,7 +281,9 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
-def used_tables(ws: WorkspaceClient, make_workspace_file, dashboards: list[Dashboard], tables: list[Table]) -> list[UsedTable]:
+def used_tables(
+    ws: WorkspaceClient, make_workspace_file, dashboards: list[Dashboard], tables: list[Table]
+) -> list[UsedTable]:
     assert len(dashboards) == 3, "Expecting three dashboards"
     assert "hive_metastore" == tables[0].catalog, "Expecting table to be a hive table"
     dashboard, table = dashboards[0], tables[0]
@@ -319,7 +321,9 @@ def used_tables(ws: WorkspaceClient, make_workspace_file, dashboards: list[Dashb
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
                 LineageAtom(object_type="DASHBOARD", object_id=dashboard.id, other={"name": dashboard.name}),
-                LineageAtom(object_type="QUERY", object_id=f"{dashboard.id}/{query.id}", other={"name": query.display_name}),
+                LineageAtom(
+                    object_type="QUERY", object_id=f"{dashboard.id}/{query.id}", other={"name": query.display_name}
+                ),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
