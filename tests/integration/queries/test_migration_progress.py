@@ -607,7 +607,7 @@ def test_migration_progress_dashboard(
         ("01_06_percentage_pipeline_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         ("01_07_percentage_policy_migration_progress", [Row(percentage=round(100 * 1 / 2, 2))]),
         (
-            "01_08_distinct_failures_per_object_type",
+            "99_99_distinct_failures_per_object_type",
             [
                 Row(
                     object_type="ClusterInfo",
