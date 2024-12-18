@@ -7,8 +7,8 @@
         {"fieldName": "workspace_id", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "workspace_id"},
         {"fieldName": "owner", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "owner"},
         {"fieldName": "name", "title": "Name", "type": "string", "displayAs": "link", "linkUrlTemplate": "{{ dashboard_link }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "booleanValues": ["false", "true"]},
-        {"fieldName": "failure", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "failure"},
-        {"fieldName": "dashboard_type", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "dashboard_type"}
+        {"fieldName": "dashboard_type", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "dashboard_type"},
+        {"fieldName": "failure", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "failure"}
       ]},
     "invisibleColumns": [
       {"fieldName": "dashboard_link", "title": "dashboard_link", "type": "string", "displayAs": "string", "booleanValues": ["false", "true"]}
