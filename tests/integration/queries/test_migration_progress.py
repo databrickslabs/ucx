@@ -195,8 +195,10 @@ def policies() -> list[PolicyInfo]:
 @pytest.fixture
 def dashboards(make_dashboard, make_query) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
+    query_with_dfsa = make_query(sql_query="SELECT * FROM csv.`dbfs://folder/file.csv`")
     records = [
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
+        Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
     ]
     return records
 
