@@ -64,7 +64,7 @@ def tables() -> list[Table]:
 
 
 @pytest.fixture
-def table_migration_status(tables: list[Table]) -> list[TableMigrationStatus]:
+def table_migration_statuses(tables: list[Table]) -> list[TableMigrationStatus]:
     records = []
     for table in tables:
         if table.database == "schema1":  # schema1 tables are migrated
@@ -77,9 +77,9 @@ def table_migration_status(tables: list[Table]) -> list[TableMigrationStatus]:
 
 @pytest.fixture
 def table_migration_status_pending_migration(
-    table_migration_status: list[TableMigrationStatus],
+    table_migration_statuses,
 ) -> list[TableMigrationStatus]:
-    records = [status for status in table_migration_status if status.dst_catalog is None]
+    records = [status for status in table_migration_statuses if status.dst_catalog is None]
     assert records, "Expecting a table pending migration"
     return records
 
@@ -388,7 +388,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     runtime_ctx: MockRuntimeContext,
     workflow_runs: list[WorkflowRun],
     tables: list[Table],
-    table_migration_status: list[TableMigrationStatus],
+    table_migration_statuses,
     udfs: list[Udf],
     grants: list[Grant],
     jobs: list[JobInfo],
@@ -416,7 +416,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     # Persists table migration status to propagate which tables are pending migration
     runtime_ctx.sql_backend.save_table(
         f'hive_metastore.{runtime_ctx.inventory_database}.migration_status',
-        table_migration_status,
+        table_migration_statuses,
         TableMigrationStatus,
         mode='overwrite',
     )
