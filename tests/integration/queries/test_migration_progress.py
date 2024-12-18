@@ -281,9 +281,11 @@ def dfsas(make_workspace_file, make_query) -> list[DirectFsAccess]:
 
 
 @pytest.fixture
-def used_tables(make_workspace_file, tables: list[Table]) -> list[UsedTable]:
+def used_tables(ws: WorkspaceClient, make_workspace_file, dashboards: list[Dashboard], tables: list[Table]) -> list[UsedTable]:
+    assert len(dashboards) == 3, "Expecting three dashboards"
     assert "hive_metastore" == tables[0].catalog, "Expecting table to be a hive table"
-    table = tables[0]
+    dashboard, table = dashboards[0], tables[0]
+    query = ws.queries.get(dashboard.query_ids[0])
     workspace_file = make_workspace_file(content=f'df = spark.read.table("{table.full_name}")\ndisplay(df)')
     records = [
         UsedTable(
@@ -301,6 +303,23 @@ def used_tables(make_workspace_file, tables: list[Table]) -> list[UsedTable]:
                 LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id=str(workspace_file)),
+            ],
+            assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
+            assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
+        ),
+        UsedTable(
+            catalog_name=table.catalog,  # This table is pending migration
+            schema_name=table.database,
+            table_name=table.name,
+            is_read=False,
+            # Technically, the mocked code is reading the table, but marking it as write allows us to set the owner to
+            # the current user, which we can test below.
+            is_write=True,
+            source_id=query.id,
+            source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
+            source_lineage=[
+                LineageAtom(object_type="DASHBOARD", object_id=dashboard.id, other={"name": dashboard.name}),
+                LineageAtom(object_type="QUERY", object_id=f"{dashboard.id}/{query.id}", other={"name": query.display_name}),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
