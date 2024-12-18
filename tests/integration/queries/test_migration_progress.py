@@ -611,7 +611,7 @@ def test_migration_progress_code_compatibility_issues(
     query_problems: list[QueryProblem],
 ) -> None:
     """Separate test is required to set the dashboard and query id dynamically"""
-    query_name = "03_06_code_compatibility_issues"
+    query_name = "03_06_query_compatibility_issues"
     workspace_id = ws.get_workspace_id()
     rows = []
     for query_problem in query_problems:
