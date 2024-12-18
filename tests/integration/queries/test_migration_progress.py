@@ -144,11 +144,21 @@ def grants() -> list[Grant]:
 
 
 @pytest.fixture
-def jobs() -> list[JobInfo]:
+def job_without_failures() -> JobInfo:
+    return JobInfo("1", success=1, failures="")
+
+
+@pytest.fixture
+def job_with_failures() -> JobInfo:
+    return JobInfo("3", success=0, failures="")  # Failure come from workflow problems below
+
+
+@pytest.fixture
+def jobs(job_without_failures: JobInfo, job_with_failures: JobInfo) -> list[JobInfo]:
     records = [
-        JobInfo("1", success=1, failures=""),
+        job_without_failures,
         JobInfo("2", success=0, failures='["No isolation shared clusters not supported in UC"]'),
-        JobInfo("3", success=0, failures=""),  # Failure from workflow problems below
+        job_with_failures,
     ]
     return records
 
