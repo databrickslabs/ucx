@@ -231,8 +231,8 @@ def query_problems(dashboards: list[Dashboard], ws: WorkspaceClient) -> list[Que
             query_with_dfsa.id,
             query_with_dfsa.parent_path,
             query_with_dfsa.display_name,
-            "direct-filesystem-access-in-sql-query"
-            "The use of direct filesystem references is deprecated: dbfs://folder/file.csv"
+            "direct-filesystem-access-in-sql-query",
+            "The use of direct filesystem references is deprecated: dbfs://folder/file.csv",
         ),
     ]
     return records
