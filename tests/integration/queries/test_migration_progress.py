@@ -129,23 +129,18 @@ def udfs() -> list[Udf]:
 
 
 @pytest.fixture
-def grants() -> list[Grant]:
+def grants(tables: list[Table]) -> list[Grant]:
     records = [
         Grant("service_principal", "USAGE", "hive_metastore"),
         Grant("Eric", "OWN", "hive_metastore", "sales"),
         Grant("Liran", "DENY", "hive_metastore", "sales"),  # DENY creates a failure
-        # Set ownership of mocked tables above
-        Grant("Andrew", "OWN", "hive_metastore", "schema1", "table1"),
-        Grant("Eric", "OWN", "hive_metastore", "schema1", "table2"),
-        Grant("Cor", "OWN", "hive_metastore", "schema1", "table3"),
-        Grant("Cor", "OWN", "hive_metastore", "schema1", "table4"),
-        Grant("Cor", "OWN", "hive_metastore", "schema1", "table5"),
-        Grant("Andrew", "OWN", "hive_metastore", "schema2", "table1"),
-        Grant("Cor", "OWN", "hive_metastore", "schema2", "table2"),
-        Grant("Cor", "OWN", "hive_metastore", "schema2", "table3"),
-        Grant("Cor", "OWN", "hive_metastore", "schema2", "table4"),
-        Grant("Cor", "OWN", "hive_metastore", "schema2", "table5"),
+        Grant("Andrew", "OWN", tables[0].catalog, tables[0].database, tables[0].name),
+        Grant("Eric", "OWN", tables[1].catalog, tables[1].database, tables[1].name),
+        Grant("Andrew", "OWN", tables[-1].catalog, tables[-1].database, tables[-1].name),
     ]
+    for table in tables[2:-1]:  # Remaining tables
+        grant = Grant("Cor", "OWN", table.catalog, table.database, table.name)
+        records.append(grant)
     return records
 
 
