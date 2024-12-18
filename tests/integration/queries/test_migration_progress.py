@@ -236,7 +236,12 @@ def dbfs_location() -> str:
 
 
 @pytest.fixture
-def dashboards(make_dashboard, make_query, dashboard_with_hive_tables: Dashboard, dbfs_location: str) -> list[Dashboard]:
+def dashboards(
+    make_dashboard,
+    make_query,
+    dashboard_with_hive_tables: Dashboard,
+    dbfs_location: str,
+) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
     query_with_dfsa = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
