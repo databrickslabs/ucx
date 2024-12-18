@@ -740,6 +740,7 @@ def test_migration_progress_query_dashboards_pending_migration(
         row = Row(
             workspace_id=workspace_id,
             owner=current_user,
+            name=dashboard_with_hive_tables.name,
             dashboard_type="Redash",
             failure=f"Pending migration: {table_full_name}",
             dashboard_link=f"/sql/dashboards/{dashboard_with_hive_tables.id}",
