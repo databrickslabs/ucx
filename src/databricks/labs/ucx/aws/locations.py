@@ -21,6 +21,7 @@ class AWSExternalLocationsMigration:
         external_locations: ExternalLocations,
         aws_resource_permissions: AWSResourcePermissions,
         principal_acl: PrincipalACL,
+        *,
         enable_hms_federation: bool = False,
     ):
         self._ws = ws

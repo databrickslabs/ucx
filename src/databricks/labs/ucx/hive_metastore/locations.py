@@ -155,6 +155,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         schema: str,
         tables_crawler: TablesCrawler,
         mounts_crawler: 'MountsCrawler',
+        *,
         enable_hms_federation: bool = False,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "external_locations", ExternalLocation)

@@ -118,7 +118,7 @@ class WorkspaceContext(CliContext):
                 self.external_locations,
                 self.aws_resource_permissions,
                 self.principal_acl,
-                self.config.enable_hms_federation,
+                enable_hms_federation=self.config.enable_hms_federation,
             )
         if self.is_azure:
             return ExternalLocationsMigration(
@@ -127,7 +127,7 @@ class WorkspaceContext(CliContext):
                 self.azure_resource_permissions,
                 self.azure_resources,
                 self.principal_acl,
-                self.config.enable_hms_federation,
+                enable_hms_federation=self.config.enable_hms_federation,
             )
         raise NotImplementedError
 
@@ -200,7 +200,8 @@ class WorkspaceContext(CliContext):
             self.workspace_client,
             self.external_locations,
             self.workspace_info,
-            self.config.enable_hms_federation,
+            self.config,
+            enable_hms_federation=self.config.enable_hms_federation,
         )
 
 
