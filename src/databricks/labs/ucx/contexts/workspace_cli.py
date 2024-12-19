@@ -43,7 +43,9 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def sql_backend(self) -> SqlBackend:
-        return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
+        return StatementExecutionBackend(
+            self.workspace_client, self.config.warehouse_id, disposition=self.config.query_statement_disposition
+        )
 
     @cached_property
     def cluster_access(self) -> ClusterAccess:
