@@ -31,4 +31,12 @@ known:
 solacc:
 	hatch run python tests/integration/source_code/solacc.py
 
-.PHONY: all clean dev lint fmt test integration coverage known solacc
+docs:
+	cd docs && hugo server --buildDrafts --disableFastRender
+
+docs-test:
+	@echo 'Make sure to run `make docs` in another terminal'
+	cd docs && yarn linkinator http://localhost:1313/ucx/
+
+
+.PHONY: all clean dev lint fmt test integration coverage known solacc docs docs-test

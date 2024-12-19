@@ -1,0 +1,51 @@
+{{- $attrs := dict }}
+{{- $u := urls.Parse .Destination }}
+
+{{- if $u.IsAbs }}
+  {{- /* Remote */}}
+  {{- $attrs = dict "href" $u.String "rel" "external" }}
+{{- else }}
+  {{- with $u.Path }}
+    {{- with $.Page.GetPage . }}
+      {{- /* Page */}}
+      {{- $href := .RelPermalink }}
+      {{- with $u.RawQuery }}
+        {{- $href = printf "%s?%s" $href $u.RawQuery }}
+      {{- end }}
+      {{- with $u.Fragment }}
+        {{- $href = printf "%s#%s" $href $u.Fragment }}
+      {{- end }}
+      {{- $attrs = dict "href" $href }}
+    {{- else }}
+      {{- with $.Page.Resources.GetMatch $u.Path }}
+        {{- /* Page resource; drop query and fragment */}}
+        {{- $attrs = dict "href" .RelPermalink }}
+      {{- else }}
+        {{- with resources.Get $u.Path }}
+          {{- /* Global resource; drop query and fragment */}}
+          {{- $attrs = dict "href" .RelPermalink }}
+        {{- else }}
+          {{- warnf "Unable to resolve reference to %s" $u.Path }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- else }}
+    {{- with $u.Fragment }}
+      {{- /* Fragment only; prepend page's relative permalink */}}
+      {{- $attrs = dict "href" (printf "%s#%s" $.Page.RelPermalink .) }}
+    {{- else }}
+      {{- errorf "Unable to resolve reference to %s from %s" $u.Path $.Page.File.Path }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- with .Title }}
+  {{- $attrs = merge $attrs (dict "title" .) }}
+{{- end -}}
+
+<a
+{{- range $k, $v := $attrs }}
+  {{- printf " %s=%q" $k $v | safeHTMLAttr }}
+{{- end -}}
+>{{ .Text | safe.HTML }}</a>
+{{- /**/ -}}
