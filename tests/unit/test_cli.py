@@ -617,7 +617,7 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
         storage_accounts_mock.append(storage_account)
         external_locations_mock.append(external_location)
     azure_resources.storage_accounts.return_value = storage_accounts_mock
-    external_locations.snapshot.return_value = external_locations_mock
+    external_locations.external_locations_with_root.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -668,7 +668,7 @@ def test_migrate_credentials_limit_aws(ws, acc_client):
                 resource_type="s3",
             )
         )
-    external_locations.snapshot.return_value = external_locations_mock
+    external_locations.external_locations_with_root.return_value = external_locations_mock
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
 
     prompts = MockPrompts({'.*': 'yes'})

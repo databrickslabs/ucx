@@ -389,7 +389,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
+    external_locations.external_locations_with_root.return_value = []
     prompts = MockPrompts({})
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
@@ -459,7 +459,7 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
+    external_locations.external_locations_with_root.return_value = []
     aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_no_roles,
@@ -867,7 +867,7 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
     aws = AWSResources("profile", command_call)
 
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = [
+    external_locations.external_locations_with_root.return_value = [
         ExternalLocation("s3://BUCKET1", 1),
         ExternalLocation("s3://BUCKET2/Folder1", 1),
     ]
@@ -875,7 +875,7 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
     roles = resource_permissions.get_roles_to_migrate()
     assert len(roles) == 1
     assert len(roles[0].paths) == 2
-    external_locations.snapshot.assert_called_once()
+    external_locations.external_locations_with_root.assert_called_once()
 
 
 def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, locations):
@@ -939,7 +939,7 @@ def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
 
     aws = AWSResources("profile", command_call)
     external_locations = create_autospec(ExternalLocations)
-    external_locations.snapshot.return_value = []
+    external_locations.external_locations_with_root.return_value = []
     resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
     assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls

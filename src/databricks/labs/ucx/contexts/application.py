@@ -398,7 +398,6 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.workspace_client,
             self.inventory_database,
-            self.config.enable_hms_federation,
         )
 
     @cached_property
@@ -417,6 +416,7 @@ class GlobalContext(abc.ABC):
             self.inventory_database,
             self.tables_crawler,
             self.mounts_crawler,
+            self.config.enable_hms_federation,
         )
 
     @cached_property

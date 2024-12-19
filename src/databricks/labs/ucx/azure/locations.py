@@ -27,7 +27,7 @@ class ExternalLocationsMigration:
         self._resource_permissions = resource_permissions
         self._azurerm = azurerm
         self._principal_acl = principal_acl
-        self._enable_fallback_mode = enable_hms_federation
+        self._enable_hms_federation = enable_hms_federation
 
     def _app_id_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
         # list all storage credentials.
@@ -128,7 +128,7 @@ class ExternalLocationsMigration:
                 comment=comment,
                 read_only=read_only,
                 skip_validation=skip_validation,
-                fallback=self._enable_fallback_mode,
+                fallback=self._enable_hms_federation,
             )
             return url
         except InvalidParameterValue as invalid:

@@ -85,8 +85,8 @@ class HiveMetastoreFederation:
         current_user = self._workspace_client.current_user.me()
         if not current_user.user_name:
             raise NotFound('Current user not found')
-        for external_location_info in self._external_locations.snapshot():
-            location = external_location_info.location.rstrip('/').replace('s3a://', 's3://')
+        for external_location_info in self._external_locations.external_locations_with_root():
+            location = ExternalLocations.clean_location(external_location_info.location)
             existing_location = existing.get(location)
             if not existing_location:
                 logger.warning(f'External location {location} not found')
