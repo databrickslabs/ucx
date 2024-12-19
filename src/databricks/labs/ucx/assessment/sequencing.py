@@ -5,6 +5,7 @@ import itertools
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
@@ -12,8 +13,9 @@ from databricks.sdk.service.jobs import Job, JobCluster, Task
 
 from databricks.labs.ucx.assessment.clusters import ClusterOwnership, ClusterInfo
 from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo
-from databricks.labs.ucx.framework.owners import AdministratorLocator
-from databricks.labs.ucx.source_code.graph import DependencyProblem
+from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspaceObjectOwnership
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 @dataclass
@@ -39,6 +41,9 @@ class MigrationStep:
     required_step_ids: list[int]
     """The step ids that should be completed before this step is started."""
 
+    @property
+    def key(self) -> tuple[str, str]:
+        return self.object_type, self.object_id
 
 MigrationNodeKey = tuple[str, str]
 
@@ -148,8 +153,9 @@ class MigrationSequencer:
     Analysing the graph in this case means: computing the migration sequence in `meth:generate_steps`.
     """
 
-    def __init__(self, ws: WorkspaceClient, administrator_locator: AdministratorLocator):
+    def __init__(self, ws: WorkspaceClient, path_lookup: PathLookup, administrator_locator: AdministratorLocator):
         self._ws = ws
+        self._path_lookup = path_lookup
         self._admin_locator = administrator_locator
         self._counter = itertools.count()
         self._nodes: dict[MigrationNodeKey, MigrationNode] = {}
@@ -220,7 +226,7 @@ class MigrationSequencer:
                     problems.append(problem)
         return MaybeMigrationNode(job_node, problems)
 
-    def _register_workflow_task(self, task: Task, parent: MigrationNode) -> MaybeMigrationNode:
+    def _register_workflow_task(self, task: Task, parent: MigrationNode, graph: DependencyGraph) -> MaybeMigrationNode:
         """Register a workflow task.
 
         TODO:
@@ -262,7 +268,50 @@ class MigrationSequencer:
             else:
                 problem = DependencyProblem('cluster-not-found', f"Could not find cluster: {task.job_cluster_key}")
                 problems.append(problem)
+        graph.visit(self._visit_dependency, None)
         return MaybeMigrationNode(task_node, problems)
+
+    def _visit_dependency(self, graph: DependencyGraph) -> bool | None:
+        lineage = graph.dependency.lineage[-1]
+        parent_node = self._nodes[(lineage.object_type, lineage.object_id)]
+        for dependency in graph.local_dependencies:
+            lineage = dependency.lineage[-1]
+            self.register_dependency(parent_node, lineage.object_type, lineage.object_id)
+            # TODO tables and dfsas
+        return False
+
+    def register_dependency(self, parent_node: MigrationNode, object_type: str, object_id: str) -> MigrationNode:
+        dependency_node = self._nodes.get((object_type, object_id), None)
+        if not dependency_node:
+            dependency_node = self._create_dependency_node(object_type, object_id)
+        if parent_node:
+            self._incoming[parent_node.key].add(dependency_node.key)
+            self._outgoing[dependency_node.key].add(parent_node.key)
+        return dependency_node
+
+    def _create_dependency_node(self, object_type: str, object_id: str) -> MigrationNode:
+        object_name: str = "<ANONYMOUS>"
+        _object_owner: str = "<UNKNOWN>"
+        if object_type in {"NOTEBOOK", "FILE"}:
+            path = Path(object_id)
+            for library_root in self._path_lookup.library_roots:
+                if not path.is_relative_to(library_root):
+                    continue
+                object_name = path.relative_to(library_root).as_posix()
+                break
+            object_owner = WorkspaceObjectOwnership(self._admin_locator).owner_of((object_type, object_id))
+        else:
+            raise ValueError(f"{object_type} not supported yet!")
+        self._last_node_id += 1
+        dependency_node = MigrationNode(
+            node_id=self._last_node_id,
+            object_type=object_type,
+            object_id=object_id,
+            object_name=object_name,
+            object_owner=object_owner,
+        )
+        self._nodes[dependency_node.key] = dependency_node
+        return dependency_node
 
     def _register_job_cluster(self, cluster: JobCluster, parent: MigrationNode) -> MaybeMigrationNode:
         """Register a job cluster.
@@ -321,6 +370,16 @@ class MigrationSequencer:
           queue, we rebuild it once all leaf nodes are processed (these are transient leaf nodes i.e. they only become
           leaf during processing)
         - We handle cyclic dependencies (implemented in PR #3009)
+        """
+        """The below algo is adapted from Kahn's topological sort.
+        The main differences are as follows:
+        1) we want the same step number for all nodes with same dependency depth
+            so instead of pushing 'leaf' nodes to a queue, we fetch them again once all current 'leaf' nodes are processed
+            (these are transient 'leaf' nodes i.e. they only become 'leaf' during processing)
+        2) Kahn only supports DAGs but python code allows cyclic dependencies i.e. A -> B -> C -> A is not a DAG
+            so when fetching 'leaf' nodes, we relax the 0-incoming-vertex rule in order
+            to avoid an infinite loop. We also avoid side effects (such as negative counts).
+            This algo works correctly for simple cases, but is not tested on large trees.
         """
         ordered_steps: list[MigrationStep] = []
         # For updating the priority of steps that depend on other steps
