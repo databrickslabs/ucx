@@ -415,7 +415,7 @@ class GlobalContext(abc.ABC):
             self.inventory_database,
             self.tables_crawler,
             self.mounts_crawler,
-            self.config.enable_hms_federation,
+            enable_hms_federation=self.config.enable_hms_federation,
         )
 
     @cached_property

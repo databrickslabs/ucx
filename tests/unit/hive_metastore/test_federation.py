@@ -35,7 +35,7 @@ def test_create_federated_catalog_int(mock_installation):
     workspace_info = create_autospec(WorkspaceInfo)
 
     workspace_info.current.return_value = 'a'
-    external_locations.external_locations_with_root.return_value = [
+    external_locations.snapshot.return_value = [
         ExternalLocation('s3://b/c/d', 1),
         ExternalLocation('s3://e/f/g', 1),
         ExternalLocation('s3://h/i/j', 1),
@@ -51,10 +51,14 @@ def test_create_federated_catalog_int(mock_installation):
     )
 
     hms_fed = HiveMetastoreFederation(
-        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+        workspace_client,
+        external_locations,
+        workspace_info,
+        mock_installation.load(WorkspaceConfig),
+        enable_hms_federation=True,
     )
 
-    hms_fed.create_from_cli(MockPrompts({}))
+    hms_fed.create_from_cli(MockPrompts({".*": ""}))
 
     workspace_client.connections.create.assert_called_with(
         name='a',
@@ -116,13 +120,19 @@ def test_create_federated_catalog_ext(mock_installation):
     )
 
     hms_fed = HiveMetastoreFederation(
-        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+        workspace_client,
+        external_locations,
+        workspace_info,
+        mock_installation.load(WorkspaceConfig),
+        enable_hms_federation=True,
     )
 
-    hms_fed.create_from_cli(MockPrompts({"A supported external Hive Metastore.*": "yes"}))
+    hms_fed.create_from_cli(
+        MockPrompts({"A supported external Hive Metastore.*": "yes", "Enter the name*": "fed_source"})
+    )
 
     workspace_client.connections.create.assert_called_with(
-        name='a',
+        name='fed_source',
         connection_type=ConnectionType.HIVE_METASTORE,
         options={
             'database': 'metastore',
@@ -156,7 +166,7 @@ def test_already_existing_connection(mock_installation):
     workspace_info = create_autospec(WorkspaceInfo)
 
     workspace_info.current.return_value = 'a'
-    external_locations.external_locations_with_root.return_value = [
+    external_locations.snapshot.return_value = [
         ExternalLocation('s3://b/c/d', 1),
         ExternalLocation('s3://e/f/g', 1),
         ExternalLocation('s3://h/i/j', 1),
@@ -173,10 +183,14 @@ def test_already_existing_connection(mock_installation):
     )
 
     hms_fed = HiveMetastoreFederation(
-        mock_installation, workspace_client, external_locations, workspace_info, enable_hms_federation=True
+        workspace_client,
+        external_locations,
+        workspace_info,
+        mock_installation.load(WorkspaceConfig),
+        enable_hms_federation=True,
     )
 
-    prompts = MockPrompts({})
+    prompts = MockPrompts({".*": ""})
 
     hms_fed.create_from_cli(prompts)
 
