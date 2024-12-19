@@ -128,7 +128,7 @@ class HiveMetastoreFederation(SecretsMixin):
         if not supported_versions:
             logger.info(f'Unsupported Hive Metastore: {external_hms.database_type}')
             return None
-        if version not in supported_versions:
+        if major_minor_version not in supported_versions:
             logger.info(f'Unsupported Hive Metastore Version: {external_hms.database_type} - {version}')
             return None
 
