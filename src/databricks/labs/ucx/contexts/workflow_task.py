@@ -6,6 +6,7 @@ from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.assessment.dashboards import Dashboard
 from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
     PoliciesCrawler,
@@ -25,6 +26,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler, Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
+from databricks.labs.ucx.progress.dashboards import DashboardProgressEncoder
 from databricks.labs.ucx.progress.grants import Grant, GrantProgressEncoder
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
@@ -227,7 +229,6 @@ class RuntimeContext(GlobalContext):
             self.sql_backend,
             self.table_ownership,
             self.migration_status_refresher,
-            [self.used_tables_crawler_for_paths, self.used_tables_crawler_for_queries],
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
@@ -242,6 +243,18 @@ class RuntimeContext(GlobalContext):
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def dashboards_progress(self) -> ProgressEncoder[Dashboard]:
+        return DashboardProgressEncoder(
+            self.sql_backend,
+            self.dashboard_ownership,
+            used_tables_crawlers=[self.used_tables_crawler_for_queries],
+            inventory_database=self.config.inventory_database,
+            job_run_id=self.parent_run_id,
+            workspace_id=self.workspace_id,
+            catalog=self.config.ucx_catalog,
         )
 
     @cached_property

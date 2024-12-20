@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import re
 import typing
@@ -14,6 +16,7 @@ from sqlglot.errors import ParseError
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -85,6 +88,50 @@ class Table:  # pylint: disable=too-many-public-methods
     def __post_init__(self) -> None:
         if isinstance(self.table_format, str):  # Should not happen according to type hint, still safer
             self.table_format = self.table_format.upper()
+
+    @classmethod
+    def from_table_info(cls, table: TableInfo) -> Table:
+        if table.catalog_name is None or table.schema_name is None or table.name is None:
+            raise ValueError(f"Catalog, schema and table name are missing: {table}")
+        if table.table_type is None:
+            raise ValueError(f"Table type is missing: {table.table_type}")
+        if table.data_source_format is None:
+            raise ValueError(f"Data source format is missing: {table.data_source_format}")
+        kwargs: dict[str, str | bool] = {
+            "catalog": table.catalog_name,
+            "database": table.schema_name,
+            "name": table.name,
+            "object_type": table.table_type.value,
+            "table_format": table.data_source_format.value,
+        }
+        if table.storage_location:
+            kwargs["location"] = table.storage_location
+        if table.view_definition:
+            kwargs["view_text"] = table.view_definition
+        if table.properties and "upgraded_to" in table.properties:
+            kwargs["upgraded_to"] = bool(table.properties.get("upgraded_to"))
+        return cls(**kwargs)  # type: ignore
+
+    @classmethod
+    def from_historical_data(cls, data: dict[str, str]) -> Table:
+        kwargs: dict[str, str | bool] = {
+            "catalog": data["catalog"],
+            "database": data["database"],
+            "name": data["name"],
+            "object_type": data["object_type"],
+            "table_format": data["table_format"],
+        }
+        if "location" in data:
+            kwargs["location"] = data["location"]
+        if "view_text" in data:
+            kwargs["view_text"] = data["view_text"]
+        if "upgraded_to" in data:
+            kwargs["upgraded_to"] = data["upgraded_to"]
+        if "storage_properties" in data:
+            kwargs["storage_properties"] = data["storage_properties"]
+        if "is_partitioned" in data:
+            kwargs["is_partitioned"] = bool(data["is_partitioned"])
+        return cls(**kwargs)  # type: ignore
 
     @property
     def is_delta(self) -> bool:
