@@ -228,7 +228,7 @@ class HiveMetastoreFederation(SecretsMixin):
         if self._external_hms is not None:
             external_locations = self._external_locations.external_locations_with_root()
         else:
-            external_locations = list(self._external_locations.snapshot())
+            external_locations = self._external_locations.snapshot()
 
         for external_location_info in external_locations:
             location = ExternalLocations.clean_location(external_location_info.location)
