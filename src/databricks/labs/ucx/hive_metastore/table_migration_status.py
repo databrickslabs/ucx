@@ -79,7 +79,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
-    _skip_catalogs_with_securable_kinds = [
+    _skip_catalog_securable_kinds = [
         CatalogInfoSecurableKind.CATALOG_INTERNAL,
         CatalogInfoSecurableKind.CATALOG_SYSTEM,
     ]
@@ -163,7 +163,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def _iter_catalogs(self) -> Iterable[CatalogInfo]:
         try:
             for catalog in self._ws.catalogs.list():
-                if catalog.securable_kind in self._skip_catalogs_with_securable_kinds:
+                if catalog.securable_kind in self._skip_catalog_securable_kinds:
                     continue
                 yield catalog
         except DatabricksError as e:
