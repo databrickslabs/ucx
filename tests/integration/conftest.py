@@ -1135,7 +1135,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
             include_query_ids=self.created_queries,
-            include_object_permissions=self.include_object_permissions,
+            include_object_permissions=self.created_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             ucx_catalog=self.ucx_catalog,
         )
