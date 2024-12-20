@@ -293,7 +293,7 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
-    def _convert_hms_table_to_external(self, src_table: Table) -> None:
+    def _convert_hms_table_to_external(self, src_table: Table) -> bool:
         """Converts a Hive metastore table to external using Spark JVM methods.
 
         TODO:
