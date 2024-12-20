@@ -20,6 +20,7 @@ class ExternalLocationsMigration:
         resource_permissions: AzureResourcePermissions,
         azurerm: AzureResources,
         principal_acl: PrincipalACL,
+        *,
         enable_hms_federation: bool = False,
     ):
         self._ws = ws
