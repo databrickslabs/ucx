@@ -226,7 +226,7 @@ class AWSResourcePermissions:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
-        external_locations = self._locations.external_locations_with_root()
+        external_locations = list(self._locations.external_locations_with_root())
         logger.info(f"Found {len(external_locations)} external locations")
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}

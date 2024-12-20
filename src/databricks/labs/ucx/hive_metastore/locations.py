@@ -175,21 +175,20 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         # Having s3a and s3 as separate locations will cause issues when trying to find overlapping locations
         return re.sub(r"^s3a:/", r"s3:/", location).rstrip("/")
 
-    def external_locations_with_root(self) -> list[ExternalLocation]:
+    def external_locations_with_root(self) -> Iterable[ExternalLocation]:
         """
         Produces a list of external locations with the DBFS root location appended to the list.
         Utilizes the snapshot method.
         Used for HMS Federation.
 
-        Returns:
-                List of ExternalLocation objects
+        Yields:
+                Iterable[Result]: Combination of all the external locations and the DBFS root location
         """
 
-        external_locations = list(self.snapshot())
+        yield from self.snapshot()
         dbfs_root = self._get_dbfs_root()
         if dbfs_root:
-            external_locations.append(dbfs_root)
-        return external_locations
+            yield dbfs_root
 
     def _get_dbfs_root(self) -> ExternalLocation | None:
         """
