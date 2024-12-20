@@ -108,7 +108,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
-def test_job_cluster_policy(ws, installation_ctx):
+def test_job_cluster_policy(ws, installation_ctx) -> None:
     installation_ctx.workspace_installation.run()
     user_name = ws.current_user.me().user_name
     cluster_policy = ws.cluster_policies.get(policy_id=installation_ctx.config.policy_id)
@@ -116,7 +116,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
     assert cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.inventory_database}) ({user_name})"
 
-    spark_version = ws.clusters.select_spark_version(latest=True)
+    spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
     assert policy_definition["spark_version"]["value"] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
     if ws.config.is_azure:

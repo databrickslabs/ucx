@@ -7,7 +7,7 @@ from typing import ClassVar
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
-from databricks.sdk.service.catalog import CatalogInfo
+from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -79,6 +79,11 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
+    _skip_catalog_securable_kinds = [
+        CatalogInfoSecurableKind.CATALOG_INTERNAL,
+        CatalogInfoSecurableKind.CATALOG_SYSTEM,
+    ]
+
     def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
         super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
@@ -90,6 +95,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
+            if schema.catalog_name is None or schema.name is None:
+                continue
             try:
                 # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
                 tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
@@ -136,9 +143,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             src_schema = table.database.lower()
             src_table = table.name.lower()
             table_migration_status = TableMigrationStatus(
-                src_schema=src_schema,
-                src_table=src_table,
-                update_ts=str(timestamp),
+                src_schema=src_schema, src_table=src_table, update_ts=str(timestamp)
             )
             if table.key in reverse_seen and self.is_migrated(src_schema, src_table):
                 target_table = reverse_seen[table.key]
@@ -157,12 +162,17 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def _iter_catalogs(self) -> Iterable[CatalogInfo]:
         try:
-            yield from self._ws.catalogs.list()
+            for catalog in self._ws.catalogs.list():
+                if catalog.securable_kind in self._skip_catalog_securable_kinds:
+                    continue
+                yield catalog
         except DatabricksError as e:
             logger.error("Cannot list catalogs", exc_info=e)
 
-    def _iter_schemas(self):
+    def _iter_schemas(self) -> Iterable[SchemaInfo]:
         for catalog in self._iter_catalogs():
+            if catalog.name is None:
+                continue
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
             except NotFound:
