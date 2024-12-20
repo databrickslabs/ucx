@@ -123,7 +123,6 @@ def test_running_legacy_validate_groups_permissions_job(
     secret_scope = make_secret_scope()
     make_secret_scope_acl(scope=secret_scope, principal=ws_group_a.display_name, permission=AclPermission.WRITE)
 
-    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.__dict__['config_transform'] = lambda c: replace(c, use_legacy_permission_migration=True)
     installation_ctx.workspace_installation.run()
     installation_ctx.permission_manager.snapshot()
