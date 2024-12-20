@@ -96,4 +96,4 @@ def test_home_directory_owner_is_me(runtime_ctx) -> None:
 
 def test_workspace_path_owner_of_invalid_path(runtime_ctx) -> None:
     owner = runtime_ctx.workspace_path_ownership.owner_of_path("invalid/path")
-    assert owner is None
+    assert owner == runtime_ctx.administrator_locator.get_workspace_administrator()
