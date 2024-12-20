@@ -1114,10 +1114,6 @@ class MockInstallationContext(MockRuntimeContext):
         return lambda wc: wc
 
     @cached_property
-    def include_object_permissions(self) -> list[str] | None:
-        return None
-
-    @cached_property
     def config(self) -> WorkspaceConfig:
         workspace_config = self.workspace_installer.configure()
         default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
