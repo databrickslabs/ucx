@@ -171,6 +171,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def _iter_schemas(self) -> Iterable[SchemaInfo]:
         for catalog in self._iter_catalogs():
+            if catalog.name is None:
+                continue
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
             except NotFound:
