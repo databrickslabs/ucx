@@ -686,31 +686,41 @@ def test_migration_progress_query(
     assert query_results == rows
 
 
+def exclude_fields_from_rows(rows: list[Row], *fields: str) -> list[Row]:
+    """Exclude the owner field from the row."""
+    rows_without_fields = []
+    for row in rows:
+        data = row.asDict()
+        for field in fields:
+            if field in data:
+                data.pop(field)
+        row = Row(**data)
+        rows_without_fields.append(row)
+    return rows_without_fields
+
+
 def test_migration_progress_query_dashboard_pending_migration_by_owner_bar_graph(
-    ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
     query_name = "03_02_dashboards_pending_migration_by_owner_bar_graph"
-    rows = [Row(owner=ws.current_user.me().user_name, count=3)]
+    rows = [Row(count=3)]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == rows
+    # See `test_redash_dashboard_ownership_is_me` for why we exclude the owner
+    assert exclude_fields_from_rows(query_results, "owner") == rows
 
 
 def test_migration_progress_query_dashboards_pending_migration_by_owner_overview(
-    ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
 ) -> None:
     """Separate test is required to set the owner of the used table at runtime"""
     query_name = "03_04_dashboards_pending_migration_by_owner_overview"
-    current_user = ws.current_user.me().user_name
     rows = [
         Row(
-            owner=current_user,
             percentage=round(100 * 1 / 4, 2),
             total=4,
             total_migrated=1,
@@ -719,8 +729,9 @@ def test_migration_progress_query_dashboards_pending_migration_by_owner_overview
     ]
     datasets = [d for d in dashboard_metadata.get_datasets() if d.name == query_name]
     assert len(datasets) == 1, f"Missing query: {query_name}"
+    # See `test_redash_dashboard_ownership_is_me` for why we exclude the owner
     query_results = list(sql_backend.fetch(datasets[0].query))
-    assert query_results == rows
+    assert exclude_fields_from_rows(query_results, "owner") == rows
 
 
 def test_migration_progress_query_dashboards_pending_migration(
@@ -733,13 +744,11 @@ def test_migration_progress_query_dashboards_pending_migration(
     """Test if the tables migration are mentioned"""
     query_name = "03_05_dashboards_pending_migration"
     workspace_id = ws.get_workspace_id()
-    current_user = ws.current_user.me().user_name
     rows = []
     for status in statuses_pending_migration:
         table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
         row = Row(
             workspace_id=workspace_id,
-            owner=current_user,
             name=dashboard_with_hive_tables.name,
             dashboard_type="Redash",
             failure=f"Pending migration: {table_full_name}",
@@ -750,4 +759,5 @@ def test_migration_progress_query_dashboards_pending_migration(
     assert len(datasets) == 1, f"Missing query: {query_name}"
     query_results = list(sql_backend.fetch(datasets[0].query))
     query_results_filtered = [r for r in query_results if r.name == dashboard_with_hive_tables.name]
-    assert query_results_filtered == sorted(rows, key=lambda el: el.failure)
+    # See `test_redash_dashboard_ownership_is_me` for why we exclude the owner
+    assert exclude_fields_from_rows(query_results_filtered, "owner") == rows
