@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from unittest.mock import create_autospec
 
 import pytest
@@ -81,20 +82,33 @@ def test_table_migration_status_refresher_get_seen_tables_skips_builtin_catalog(
         CatalogInfo(name="test"),
         CatalogInfo(name="system", securable_kind=securable_kind),
     ]
-    ws.schemas.list.return_value = [
-        SchemaInfo(catalog_name="test", name="test"),
-        SchemaInfo(catalog_name="system", name="access"),
-    ]
-    ws.tables.list.return_value = [
-        TableInfo(
-            full_name="test.test.test",
-            catalog_name="test",
-            schema_name="test",
-            name="test",
-            properties={"upgraded_from": "test"},
-        ),
-        TableInfo(catalog_name="system", schema_name="access", name="audit"),
-    ]
+
+    def schemas_list(catalog_name: str) -> Iterable[SchemaInfo]:
+        schemas = [
+            SchemaInfo(catalog_name="test", name="test"),
+            SchemaInfo(catalog_name="system", name="access"),
+        ]
+        for schema in schemas:
+            if schema.catalog_name == catalog_name:
+                yield schema
+
+    def tables_list(catalog_name: str, schema_name: str) -> Iterable[TableInfo]:
+        tables = [
+            TableInfo(
+                full_name="test.test.test",
+                catalog_name="test",
+                schema_name="test",
+                name="test",
+                properties={"upgraded_from": "test"},
+            ),
+            TableInfo(catalog_name="system", schema_name="access", name="audit"),
+        ]
+        for table in tables:
+            if table.catalog_name == catalog_name and table.schema_name == schema_name:
+                yield table
+
+    ws.schemas.list.side_effect = schemas_list
+    ws.tables.list.side_effect = tables_list
     tables_crawler = create_autospec(TablesCrawler)
     refresher = TableMigrationStatusRefresher(ws, mock_backend, "test", tables_crawler)
 
