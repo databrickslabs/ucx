@@ -95,6 +95,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
+            if schema.catalog_name is None or schema.name is None:
+                continue
             try:
                 # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
                 tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
