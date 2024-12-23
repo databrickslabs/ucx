@@ -27,6 +27,67 @@ from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 
+@pytest.mark.parametrize(
+    "data, expected",
+    [
+        (
+            {
+                "catalog": "catalog",
+                "database": "database",
+                "name": "name",
+                "object_type": "TABLE",
+                "table_format": "DELTA",
+            },
+            Table("catalog", "database", "name", "TABLE", "DELTA"),
+        ),
+        (
+            {
+                "catalog": "catalog",
+                "database": "database",
+                "name": "name",
+                "object_type": "TABLE",
+                "table_format": "DELTA",
+                "location": "dbfs://folder",
+                "upgraded_to": "catalog.schema.name",
+                "storage_properties": "property",
+                "is_partitioned": "false",
+            },
+            Table(
+                "catalog",
+                "database",
+                "name",
+                "TABLE",
+                "DELTA",
+                "dbfs://folder",
+                upgraded_to="catalog.schema.name",
+                storage_properties="property",
+                is_partitioned=False,
+            ),
+        ),
+        (
+            {
+                "catalog": "catalog",
+                "database": "database",
+                "name": "name",
+                "object_type": "VIEW",
+                "table_format": "UNKNOWN",
+                "view_text": "SELECT 1",
+            },
+            Table(
+                "catalog",
+                "database",
+                "name",
+                "VIEW",
+                "UNKNOWN",
+                view_text="SELECT 1",
+            ),
+        ),
+    ],
+)
+def test_table_from_historical_data(data: dict[str, str], expected: Table) -> None:
+    assert Table.from_historical_data(data) == expected
+
+
 def test_is_delta_true():
     delta_table = Table(catalog="catalog", database="db", name="table", object_type="type", table_format="DELTA")
     assert delta_table.is_delta
