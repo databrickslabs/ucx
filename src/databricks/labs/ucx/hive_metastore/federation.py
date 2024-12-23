@@ -4,7 +4,6 @@ import re
 from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import ClassVar
-from packaging.version import Version, InvalidVersion
 
 
 from databricks.labs.blueprint.installation import Installation
@@ -113,16 +112,15 @@ class HiveMetastoreFederation(SecretsMixin):
         if not jdbc_url:
             logger.info('JDBC URL not found')
             return None
-        version_value = self._get_value_from_config_key(spark_config, 'spark.sql.hive.metastore.version')
-        if not version_value:
+        version = self._get_value_from_config_key(spark_config, 'spark.sql.hive.metastore.version')
+        if not version:
             logger.info('Hive Metastore version not found')
             return None
-        try:
-            version = Version(version_value)
-        except InvalidVersion:
-            logger.info('Hive Metastore version is not valid')
+        major_minor_match = re.match(r'(^\d+\.\d+)', version)
+        if not major_minor_match:
+            logger.info(f'Wrong Hive Metastore Database Version Format: {version}')
             return None
-        major_minor_version = f"{version.major}.{version.minor}"
+        major_minor_version = major_minor_match.group(1)
         external_hms = replace(self._split_jdbc_url(jdbc_url), version=major_minor_version)
         supported_versions = self.supported_database_versions.get(external_hms.database_type)
         if not supported_versions:
