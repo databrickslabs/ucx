@@ -1,5 +1,10 @@
 # Version changelog
 
+## 0.53.1
+
+* Removed `packaging` package dependency ([#3469](https://github.com/databrickslabs/ucx/issues/3469)). In this release, we have removed the dependency on the `packaging` package in the open-source library to address a release issue. The import statements for "packaging.version.Version" and "packaging.version.InvalidVersion" have been removed. The function _external_hms in the federation.py file has been updated to retrieve the Hive Metastore version using the "spark.sql.hive.metastore.version" configuration key and validate it using a regular expression pattern. If the version is not valid, the function logs an informational message and returns None. This change modifies the Hive Metastore version validation logic and improves the overall reliability and maintainability of the library.
+
+
 ## 0.53.0
 
 * Added dashboard crawlers ([#3397](https://github.com/databrickslabs/ucx/issues/3397)). The open-source library has been updated with new dashboard crawlers for the assessment workflow, Redash migration, and QueryLinter. These crawlers are responsible for crawling and persisting dashboards, as well as migrating or reverting them during Redash migration. They also lint the queries of the crawled dashboards using QueryLinter. This change resolves issues [#3366](https://github.com/databrickslabs/ucx/issues/3366) and [#3367](https://github.com/databrickslabs/ucx/issues/3367), and progresses [#2854](https://github.com/databrickslabs/ucx/issues/2854). The 'databricks labs ucx {migrate-dbsql-dashboards|revert-dbsql-dashboards}' command and the `assessment` workflow have been modified to incorporate these new features. Unit tests and integration tests have been added to ensure proper functionality of the new dashboard crawlers. Additionally, two new tables, _.redash_dashboards and _.lakeview_dashboards, have been introduced to hold a list of all Redash or Lakeview dashboards and are used by the `QueryLinter` and `Redash` migration. These changes improve the assessment, migration, and linting processes for dashboards in the library.
