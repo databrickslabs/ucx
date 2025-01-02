@@ -28,6 +28,7 @@ from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.dashboards import LakeviewDashboardCrawler, RedashDashboardCrawler
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -285,6 +286,27 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def redash_crawler(self) -> RedashDashboardCrawler:
+        return RedashDashboardCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            include_dashboard_ids=self.config.include_dashboard_ids,
+            include_query_ids=self.config.include_query_ids,
+            debug_listing_upper_limit=self.config.debug_listing_upper_limit,
+        )
+
+    @cached_property
+    def lakeview_crawler(self) -> LakeviewDashboardCrawler:
+        return LakeviewDashboardCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            include_dashboard_ids=self.config.include_dashboard_ids,
+            include_query_ids=self.config.include_query_ids,
+        )
+
+    @cached_property
     def default_securable_ownership(self) -> DefaultSecurableOwnership:
         # validate that the default_owner_group is set and is a valid group (the current user is a member)
 
@@ -375,7 +397,6 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.workspace_client,
             self.inventory_database,
-            self.config.enable_hms_federation,
         )
 
     @cached_property
@@ -394,6 +415,7 @@ class GlobalContext(abc.ABC):
             self.inventory_database,
             self.tables_crawler,
             self.mounts_crawler,
+            enable_hms_federation=self.config.enable_hms_federation,
         )
 
     @cached_property
@@ -552,13 +574,12 @@ class GlobalContext(abc.ABC):
     @cached_property
     def query_linter(self) -> QueryLinter:
         return QueryLinter(
-            self.workspace_client,
             self.sql_backend,
             self.inventory_database,
             TableMigrationIndex([]),
             self.directfs_access_crawler_for_queries,
             self.used_tables_crawler_for_queries,
-            self.config.include_dashboard_ids,
+            [self.redash_crawler, self.lakeview_crawler],
             self.config.debug_listing_upper_limit,
         )
 
@@ -584,6 +605,7 @@ class GlobalContext(abc.ABC):
             self.migration_status_refresher.index(),
             self.workspace_client,
             self.installation,
+            self.redash_crawler,
         )
 
     @cached_property

@@ -22,6 +22,7 @@ from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
+from databricks.labs.ucx.assessment.dashboards import RedashDashboardCrawler
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
@@ -73,6 +74,7 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.redash import Redash
 
 
 def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:
@@ -615,7 +617,7 @@ def test_migrate_credentials_raises_runtime_warning_when_hitting_storage_credent
         storage_accounts_mock.append(storage_account)
         external_locations_mock.append(external_location)
     azure_resources.storage_accounts.return_value = storage_accounts_mock
-    external_locations.snapshot.return_value = external_locations_mock
+    external_locations.external_locations_with_root.return_value = external_locations_mock
     prompts = MockPrompts({'.*': 'yes'})
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
@@ -666,7 +668,7 @@ def test_migrate_credentials_limit_aws(ws, acc_client):
                 resource_type="s3",
             )
         )
-    external_locations.snapshot.return_value = external_locations_mock
+    external_locations.external_locations_with_root.return_value = external_locations_mock
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
 
     prompts = MockPrompts({'.*': 'yes'})
@@ -1028,28 +1030,15 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
-@pytest.mark.parametrize("run_as_collection", [False, True])
-def test_migrate_tables_errors_out_before_assessment(
-    run_as_collection,
-    workspace_clients,
-    acc_client,
-) -> None:
-    if not run_as_collection:
-        workspace_clients = [workspace_clients[0]]
-    run = Run(
-        state=RunState(result_state=RunResultState.SUCCESS),
-        start_time=0,
-        end_time=1000,
-        run_duration=1000,
-    )
-    for workspace_client in workspace_clients:
-        workspace_client.jobs.wait_get_run_job_terminated_or_skipped.return_value = run
-        workspace_client.jobs.list_runs.return_value = [Run(state=RunState(result_state=RunResultState.FAILED))]
+def test_migrate_tables_errors_out_before_assessment(ws, acc_client) -> None:
+    verify_progress_tracking = create_autospec(VerifyProgressTracking)
+    verify_progress_tracking.verify.side_effect = RuntimeWarning("Verification failed")
+    ctx = WorkspaceContext(ws).replace(verify_progress_tracking=verify_progress_tracking)
 
-    migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
+    with pytest.raises(RuntimeWarning, match="Verification failed"):
+        migrate_tables(ws, MockPrompts({}), ctx=ctx, a=acc_client)
 
-    for workspace_client in workspace_clients:
-        workspace_client.jobs.run_now.assert_not_called()
+    ws.jobs.run_now.assert_not_called()
 
 
 def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
@@ -1147,26 +1136,40 @@ def test_create_missing_principal_azure(ws, caplog, acc_client):
     assert str(failure.value) == "Unsupported cloud provider"
 
 
-@pytest.mark.parametrize("run_as_collection", [False, True])
-def test_migrate_dbsql_dashboards_list_dashboards(
-    run_as_collection,
-    workspace_clients,
-    acc_client,
-) -> None:
-    if not run_as_collection:
-        workspace_clients = [workspace_clients[0]]
-    migrate_dbsql_dashboards(
-        workspace_clients[0],
-        run_as_collection=run_as_collection,
-        a=acc_client,
-    )
-    for workspace_client in workspace_clients:
-        workspace_client.dashboards.list.assert_called_once()
+def test_migrate_dbsql_dashboards_calls_migrate_dashboards_on_redash(ws) -> None:
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    migrate_dbsql_dashboards(ws, ctx=ctx)
+    redash.migrate_dashboards.assert_called_once()
 
 
-def test_revert_dbsql_dashboards(ws, caplog):
-    revert_dbsql_dashboards(ws)
-    ws.dashboards.list.assert_called_once()
+def test_migrate_dbsql_dashboards_calls_migrate_dashboards_on_redash_with_dashboard_id(ws) -> None:
+    redash = create_autospec(Redash)
+    ctx = WorkspaceContext(ws).replace(redash=redash)
+    migrate_dbsql_dashboards(ws, dashboard_id="id", ctx=ctx)
+    redash.migrate_dashboards.assert_called_once_with("id")
+
+
+def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash(ws):
+    redash = create_autospec(Redash)
+    redash_crawler = create_autospec(RedashDashboardCrawler)
+    ctx = WorkspaceContext(ws).replace(redash=redash, redash_crawler=redash_crawler)
+
+    revert_dbsql_dashboards(ws, ctx=ctx)
+
+    redash.revert_dashboards.assert_called_once_with()
+    redash_crawler.snapshot.assert_called_once_with(force_refresh=True)
+
+
+def test_revert_dbsql_dashboards_calls_revert_dashboards_on_redash_with_dashboard_id(ws):
+    redash = create_autospec(Redash)
+    redash_crawler = create_autospec(RedashDashboardCrawler)
+    ctx = WorkspaceContext(ws).replace(redash=redash, redash_crawler=redash_crawler)
+
+    revert_dbsql_dashboards(ws, dashboard_id="id", ctx=ctx)
+
+    redash.revert_dashboards.assert_called_once_with("id")
+    redash_crawler.snapshot.assert_called_once_with(force_refresh=True)
 
 
 def test_cli_missing_awscli(ws, mocker, caplog):

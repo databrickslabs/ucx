@@ -1,14 +1,15 @@
 import json
-from collections.abc import Callable, Generator
 import functools
 import collections
 import os
 import logging
+import shutil
+import subprocess
+from collections.abc import Callable, Generator
 from dataclasses import replace
 from datetime import timedelta
 from functools import cached_property
-import shutil
-import subprocess
+from typing import Literal
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.commands import CommandExecutor
@@ -22,13 +23,13 @@ from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import iam, dashboards
+from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import CreatePolicyResponse
-from databricks.sdk.service.dashboards import Dashboard as SDKDashboard
+from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.iam import Group
 from databricks.sdk.service.jobs import Job, SparkPythonTask
-from databricks.sdk.service.sql import Dashboard, WidgetPosition, WidgetOptions, LegacyQuery
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, WidgetPosition, WidgetOptions, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
@@ -79,46 +80,47 @@ def inventory_schema(make_schema):
 def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix):
     """Create a lakeview dashboard."""
     warehouse_id = env_or_skip("TEST_DEFAULT_WAREHOUSE_ID")
-    serialized_dashboard = {
-        "datasets": [{"name": "fourtytwo", "displayName": "count", "query": "SELECT 42 AS count"}],
-        "pages": [
-            {
-                "name": "count",
-                "displayName": "Counter",
-                "layout": [
-                    {
-                        "widget": {
-                            "name": "counter",
-                            "queries": [
-                                {
-                                    "name": "main_query",
-                                    "query": {
-                                        "datasetName": "fourtytwo",
-                                        "fields": [{"name": "count", "expression": "`count`"}],
-                                        "disaggregated": True,
-                                    },
-                                }
-                            ],
-                            "spec": {
-                                "version": 2,
-                                "widgetType": "counter",
-                                "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
-                            },
-                        },
-                        "position": {"x": 0, "y": 0, "width": 1, "height": 3},
-                    }
-                ],
-            }
-        ],
-    }
 
-    def create(display_name: str = "") -> SDKDashboard:
+    def create(*, display_name: str = "", query: str = "SELECT 42 AS count") -> SdkLakeviewDashboard:
+        serialized_dashboard = {
+            "datasets": [{"name": "query", "displayName": "count", "query": query}],
+            "pages": [
+                {
+                    "name": "count",
+                    "displayName": "Counter",
+                    "layout": [
+                        {
+                            "widget": {
+                                "name": "counter",
+                                "queries": [
+                                    {
+                                        "name": "main_query",
+                                        "query": {
+                                            "datasetName": "query",
+                                            "fields": [{"name": "count", "expression": "`count`"}],
+                                            "disaggregated": True,
+                                        },
+                                    }
+                                ],
+                                "spec": {
+                                    "version": 2,
+                                    "widgetType": "counter",
+                                    "encodings": {"value": {"fieldName": "count", "displayName": "count"}},
+                                },
+                            },
+                            "position": {"x": 0, "y": 0, "width": 1, "height": 3},
+                        }
+                    ],
+                }
+            ],
+        }
+
         if display_name:
             display_name = f"{display_name} ({make_random()})"
         else:
             display_name = f"created_by_ucx_{make_random()}_{watchdog_purge_suffix}"
         dashboard = ws.lakeview.create(
-            dashboard=dashboards.Dashboard(
+            dashboard=SdkLakeviewDashboard(
                 display_name=display_name,
                 serialized_dashboard=json.dumps(serialized_dashboard),
                 warehouse_id=warehouse_id,
@@ -127,7 +129,7 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         ws.lakeview.publish(dashboard.dashboard_id)
         return dashboard
 
-    def delete(dashboard: SDKDashboard) -> None:
+    def delete(dashboard: SdkLakeviewDashboard) -> None:
         ws.lakeview.trash(dashboard.dashboard_id)
 
     yield from factory("dashboard", create, delete)
@@ -144,7 +146,7 @@ def make_dashboard(
     This fixture is used to test migrating legacy dashboards to Lakeview.
     """
 
-    def create(query: LegacyQuery | None = None) -> Dashboard:
+    def create(query: LegacyQuery | None = None) -> SdkRedashDashboard:
         if not query:
             query = make_query()
         assert query
@@ -181,9 +183,9 @@ def make_dashboard(
             ),
         )
         logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
-        return dashboard
+        return ws.dashboards.get(dashboard.id)  # Dashboard with widget
 
-    def remove(dashboard: Dashboard) -> None:
+    def remove(dashboard: SdkRedashDashboard) -> None:
         try:
             assert dashboard.id is not None
             ws.dashboards.delete(dashboard_id=dashboard.id)
@@ -466,6 +468,7 @@ class MockRuntimeContext(
         make_notebook_fixture,
         make_query_fixture,
         make_dashboard_fixture,
+        make_lakeview_dashboard_fixture,
         make_cluster_policy_fixture,
         make_cluster_policy_permissions_fixture,
         env_or_skip_fixture,
@@ -488,6 +491,7 @@ class MockRuntimeContext(
         self._make_notebook = make_notebook_fixture
         self._make_query = make_query_fixture
         self._make_dashboard = make_dashboard_fixture
+        self._make_lakeview_dashboard = make_lakeview_dashboard_fixture
         self._make_cluster_policy = make_cluster_policy_fixture
         self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
         self._env_or_skip = env_or_skip_fixture
@@ -497,7 +501,9 @@ class MockRuntimeContext(
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
         self._jobs: list[Job] = []
-        self._dashboards: list[Dashboard] = []
+        self._queries: list[LegacyQuery] = []
+        self._lakeview_query_id: str | None = None
+        self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
@@ -575,8 +581,21 @@ class MockRuntimeContext(
         self._jobs.append(job)
         return job
 
-    def make_dashboard(self, **kwargs) -> Dashboard:
-        dashboard = self._make_dashboard(**kwargs)
+    def make_query(self, **kwargs) -> LegacyQuery:
+        query = self._make_query(**kwargs)
+        self._queries.append(query)
+        return query
+
+    def make_dashboard(self, *, query: LegacyQuery | None = None, **kwargs) -> SdkRedashDashboard:
+        dashboard = self._make_dashboard(query=query, **kwargs)
+        if query:
+            self._queries.append(query)
+        self._dashboards.append(dashboard)
+        return dashboard
+
+    def make_lakeview_dashboard(self, **kwargs) -> SdkLakeviewDashboard:
+        dashboard = self._make_lakeview_dashboard(**kwargs)
+        self._lakeview_query_id = "query"  # Hardcoded query name in the `make_lakeview_dashboard` fixture
         self._dashboards.append(dashboard)
         return dashboard
 
@@ -592,9 +611,9 @@ class MockRuntimeContext(
         self.make_job(content="spark.table('old.stuff')")
         self.make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
         self.make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
-        query_1 = self._make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
+        query_1 = self.make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
         self._make_dashboard(query=query_1)
-        query_2 = self._make_query(sql_query='SELECT * from my_schema.my_table')
+        query_2 = self.make_query(sql_query='SELECT * from my_schema.my_table')
         self._make_dashboard(query=query_2)
 
     def add_table(self, table: TableInfo):
@@ -612,6 +631,7 @@ class MockRuntimeContext(
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
+            include_query_ids=self.created_queries,
         )
 
     @cached_property
@@ -720,8 +740,23 @@ class MockRuntimeContext(
         return [job.job_id for job in self._jobs if job.job_id is not None]
 
     @property
+    def created_queries(self) -> list[str]:
+        query_ids = {query.id for query in self._queries if query.id}
+        if self._lakeview_query_id:
+            query_ids.add(self._lakeview_query_id)
+        return list(query_ids)
+
+    @property
     def created_dashboards(self) -> list[str]:
-        return [dashboard.id for dashboard in self._dashboards if dashboard.id is not None]
+        dashboard_ids = []
+        for dashboard in self._dashboards:
+            if isinstance(dashboard, SdkRedashDashboard) and dashboard.id:
+                dashboard_ids.append(dashboard.id)
+            elif isinstance(dashboard, SdkLakeviewDashboard) and dashboard.dashboard_id:
+                dashboard_ids.append(dashboard.dashboard_id)
+            else:
+                raise ValueError(f"Unsupported dashboard: {dashboard}")
+        return dashboard_ids
 
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
@@ -772,6 +807,7 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
     make_notebook,
     make_query,
     make_dashboard,
+    make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
     env_or_skip,
@@ -787,6 +823,7 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
         make_notebook,
         make_query,
         make_dashboard,
+        make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
         env_or_skip,
@@ -927,6 +964,7 @@ class MockInstallationContext(MockRuntimeContext):
         make_notebook_fixture,
         make_query_fixture,
         make_dashboard_fixture,
+        make_lakeview_dashboard_fixture,
         make_cluster_policy,
         make_cluster_policy_permissions,
         ws_fixture,
@@ -942,6 +980,7 @@ class MockInstallationContext(MockRuntimeContext):
             make_notebook_fixture,
             make_query_fixture,
             make_dashboard_fixture,
+            make_lakeview_dashboard_fixture,
             make_cluster_policy,
             make_cluster_policy_permissions,
             env_or_skip_fixture,
@@ -1036,6 +1075,7 @@ class MockInstallationContext(MockRuntimeContext):
             include_databases=self.created_databases,
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
+            include_query_ids=self.created_queries,
             include_object_permissions=self.include_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             ucx_catalog=self.ucx_catalog,
@@ -1108,7 +1148,7 @@ class MockInstallationContext(MockRuntimeContext):
 
 
 @pytest.fixture
-def installation_ctx(  # pylint: disable=too-many-arguments
+def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
     ws,
     sql_backend,
     make_catalog,
@@ -1124,6 +1164,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_notebook,
     make_query,
     make_dashboard,
+    make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
     watchdog_purge_suffix,
@@ -1142,6 +1183,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_notebook,
         make_query,
         make_dashboard,
+        make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
         ws,
@@ -1222,42 +1264,49 @@ def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo
 
 
 @pytest.fixture
-def prepare_tables_for_migration(
-    installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
-) -> tuple[dict[str, TableInfo], SchemaInfo]:
-    # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
-    # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
-    # tables, otherwise we will prepare regular tables.
-    # see documents here for details https://docs.pytest.org/en/8.1.x/example/parametrize.html#indirect-parametrization
-    scenario = request.param
-    is_hiveserde = scenario == "hiveserde"
-    random = make_random(5).lower()
-    # create external and managed tables to be migrated
-    if scenario == "hiveserde":
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
-        table_base_dir = make_storage_dir(
-            path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
-        )
-        tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
-    elif scenario == "managed":
-        schema_name = f"managed_{random}"
-        schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
-        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
-    elif scenario == "regular":
-        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
-        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+def make_table_migration_context(
+    env_or_skip,
+    make_random,
+    make_mounted_location,
+    make_storage_dir,
+) -> Callable[
+    [Literal["hiveserde", "managed", "regular"], MockInstallationContext], tuple[dict[str, TableInfo], SchemaInfo]
+]:
 
-    # create destination catalog and schema
-    dst_catalog = make_catalog()
-    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
-    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
-    installation_ctx.with_table_mapping_rules(migrate_rules)
-    installation_ctx.with_dummy_resource_permission()
-    installation_ctx.save_tables(is_hiveserde=is_hiveserde)
-    installation_ctx.save_mounts()
-    installation_ctx.with_dummy_grants_and_tacls()
-    return tables, dst_schema
+    def prepare(
+        scenario: Literal["hiveserde", "managed", "regular"], ctx: MockInstallationContext
+    ) -> tuple[dict[str, TableInfo], SchemaInfo]:
+        random = make_random(5).lower()
+        # create external and managed tables to be migrated
+        if scenario == "hiveserde":
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+            table_base_dir = make_storage_dir(
+                path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
+            )
+            tables = prepare_hiveserde_tables(ctx, random, schema, table_base_dir)
+        elif scenario == "managed":
+            schema_name = f"managed_{random}"
+            schema_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/managed_{random}'
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=schema_name, location=schema_location)
+            tables = prepare_regular_tables(ctx, make_mounted_location, schema)
+        elif scenario == "regular":
+            schema = ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
+            tables = prepare_regular_tables(ctx, make_mounted_location, schema)
+        else:
+            raise ValueError(f"Unsupported scenario {scenario}")
+
+        # create destination catalog and schema
+        dst_catalog = ctx.make_catalog()
+        dst_schema = ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+        migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
+        ctx.with_table_mapping_rules(migrate_rules)
+        ctx.with_dummy_resource_permission()
+        ctx.save_tables(is_hiveserde=scenario == "hiveserde")
+        ctx.save_mounts()
+        ctx.with_dummy_grants_and_tacls()
+        return tables, dst_schema
+
+    return prepare
 
 
 @pytest.fixture

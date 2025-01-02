@@ -25,14 +25,14 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-@pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip) -> None:
+def test_migration_job_ext_hms(ws, installation_ctx, make_table_migration_context, env_or_skip) -> None:
     main_cluster_id = env_or_skip("TEST_EXT_HMS_NOUC_CLUSTER_ID")
     table_migration_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
-    tables, dst_schema = prepare_tables_for_migration
+    tables, dst_schema = make_table_migration_context("regular", installation_ctx)
     ext_hms_ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(
             wc,
+            skip_tacl_migration=True,
             override_clusters={
                 "main": main_cluster_id,
                 "user_isolation": table_migration_cluster_id,
@@ -63,11 +63,13 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
     assert workflow_completed_correctly, "Workflow failed: migrate-tables"
 
     # assert the tables are migrated
+    missing_tables = set[str]()
     for table in tables.values():
-        try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+        migrated_table_name = f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}"
+        if not ext_hms_ctx.workspace_client.tables.exists(migrated_table_name):
+            missing_tables.add(migrated_table_name)
+    assert not missing_tables, f"Missing migrated tables: {missing_tables}"
+
     # assert the cluster is configured correctly with ext hms
     install_state = ext_hms_ctx.installation.load(RawState)
     for job_cluster in ws.jobs.get(install_state.resources["jobs"]["migrate-tables"]).settings.job_clusters:

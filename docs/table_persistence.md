@@ -32,6 +32,8 @@ Table utilization per workflow:
 | udfs                     | RW                  | RW                        | RO             |                         |              |                |                             |
 | logs                     | RW                  | RW                        | RW             | RW                      | RW           | RW             | RW                          |
 | recon_results            |                     |                           |                |                         |              |                | RW                          |
+| redash_dashboards        | RW                  |                           |                |                         |              |                | RW                          |
+| lakeview_dashboards      | RW                  |                           |                |                         |              |                | RW                          |
 
 **RW** - Read/Write, the job generates or updates the table.<br/>
 **RO** - Read Only
@@ -139,3 +141,16 @@ This is used by the permission crawler.
 | object_type | string   | type of object (NOTEBOOK, DIRECTORY, REPO, FILE, LIBRARY) |
 | path        | string   | full path of the object in the workspace                  |
 | language    | string   | language of the object (applicable for notebooks only)    |
+
+
+#### _$inventory_.redash_dashboards and _$inventory_.lakeview_dashboards
+
+Holds a list of all Redash or Lakeview dashboards. This is used by the `QueryLinter` and `Redash` migration.
+
+| Column    | Datatype     | Description                                                                                 | Comments |
+|-----------|--------------|---------------------------------------------------------------------------------------------|----------|
+| id        | string       | The ID for this dashboard.                                                                  |          |
+| name      | string       | The title of the dashboard that appears in list views and at the top of the dashboard page. |          |
+| parent    | string       | The identifier of the workspace folder containing the object.                               |          |
+| query_ids | list[string] | The IDs of the queries referenced by this dashboard.                                        |          |
+| tags      | list[string] | The tags set on this dashboard.                                                             |          |

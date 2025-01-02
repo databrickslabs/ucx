@@ -208,7 +208,7 @@ class AWSResourcePermissions:
         return policy_actions
 
     def _identify_missing_paths(self):
-        external_locations = self._locations.snapshot()
+        external_locations = self._locations.external_locations_with_root()
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
@@ -226,13 +226,14 @@ class AWSResourcePermissions:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
-        external_locations = self._locations.snapshot()
+        external_locations = list(self._locations.external_locations_with_root())
+        logger.info(f"Found {len(external_locations)} external locations")
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}
         for external_location in external_locations:
             path = PurePath(external_location.location)
             for role in compatible_roles:
-                if not (path.match(role.resource_path) or path.match(role.resource_path + "/*")):
+                if not (PurePath(role.resource_path) in path.parents or path.match(role.resource_path)):
                     continue
                 if role.role_arn not in roles:
                     roles[role.role_arn] = AWSCredentialCandidate(
@@ -323,7 +324,7 @@ class AWSResourcePermissions:
 
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
-        s3_paths = {loc.location for loc in self._locations.snapshot()}
+        s3_paths = {loc.location for loc in self._locations.external_locations_with_root()}
         if len(s3_paths) == 0:
             logger.info("No S3 paths to migrate found")
             return
@@ -374,11 +375,16 @@ class AWSResourcePermissions:
             logger.error(f"Failed to assign instance profile to cluster policy {iam_role_name}")
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
 
+    @classmethod
+    def _clean_external_location_name(cls, location: str) -> str:
+        # Remove leading s3:// s3a:// and trailing /
+        return location.replace("s3://", "").replace("s3a://", "").replace("/", "_").replace(":", "_").replace(".", "_")
+
     def _generate_role_name(self, single_role: bool, role_name: str, location: str) -> str:
         if single_role:
             metastore_id = self._ws.metastores.current().as_dict()["metastore_id"]
             return f"{role_name}_{metastore_id}"
-        return f"{role_name}_{location[5:]}"
+        return f"{role_name}_{self._clean_external_location_name(location)}"
 
     def delete_uc_role(self, role_name: str):
         self._aws_resources.delete_role(role_name)

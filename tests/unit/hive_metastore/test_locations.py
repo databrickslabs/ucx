@@ -23,7 +23,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
     "location",
     [
         "s3://databricks-e2demofieldengwest/b169/b50",
-        "s3a://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
+        "s3://databricks-datasets-oregon/delta-sharing/share/open-datasets.share",
         "s3n://bucket-name/path-to-file-in-bucket",
         "s3n://bucket-name/path-to-another-file",
         "s3n://bucket-name",
@@ -725,20 +725,25 @@ def test_mount_listing_seen_tables():
 
 
 def test_resolve_dbfs_root_in_hms_federation():
-    jvm = Mock()
     sql_backend = MockBackend()
-    client = create_autospec(WorkspaceClient)
-    client.dbutils.fs.mounts.return_value = [MountInfo('/', 'DatabricksRoot', '')]
+    ws = create_autospec(WorkspaceClient)
+    ws.api_client.do.return_value = {"resolved_path": "s3:/foo/bar"}
 
-    mounts_crawler = MountsCrawler(sql_backend, client, "test", enable_hms_federation=True)
-    mounts_crawler.__dict__['_jvm'] = jvm
-
-    hms_fed_dbfs_utils = jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
-    hms_fed_dbfs_utils.resolveDbfsPath().get().toString.return_value = 's3://original/bucket/user/hive/warehouse'
-
-    mounts = mounts_crawler.snapshot()
-
-    assert [Mount("/", 's3://original/bucket/')] == mounts
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        table_factory(["s3://test_location/test1/table1", ""]),
+    ]
+    mounts_crawler = create_autospec(MountsCrawler)
+    external_locations = ExternalLocations(
+        ws, sql_backend, "test", tables_crawler, mounts_crawler, enable_hms_federation=True
+    )
+    results = list(external_locations.external_locations_with_root())
+    mounts_crawler.snapshot.assert_not_called()
+    assert results == [
+        ExternalLocation("s3://test_location/test1", 1),
+        ExternalLocation("s3:/foo/bar/user/hive/warehouse", 0),
+    ]
+    assert len(results) == 2
 
 
 def test_mount_listing_misplaced_flat_file():
