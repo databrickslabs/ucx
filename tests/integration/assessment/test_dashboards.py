@@ -66,3 +66,26 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
     dashboards = list(crawler.snapshot())
 
     assert dashboards == [Dashboard.from_sdk_lakeview_dashboard(dashboard)]
+
+
+def test_redash_dashboard_ownership_is_me(runtime_ctx, is_in_debug) -> None:
+    """The Redash owner should be the user that creates the dashboard, i.e. who runs this integration test."""
+    _ = is_in_debug  # The user cannot be found using the Dashboard creator user ID when running this test from the CI
+    sdk_redash_dashboard = runtime_ctx.make_dashboard()
+    dashboard = Dashboard.from_sdk_redash_dashboard(sdk_redash_dashboard)
+
+    owner = runtime_ctx.dashboard_ownership.owner_of(dashboard)
+
+    current_user = runtime_ctx.workspace_client.current_user.me()
+    assert owner == current_user.user_name, f"Invalid owner for dashboard: {dashboard}"
+
+
+def test_lakeview_dashboard_ownership_is_me(runtime_ctx, make_lakeview_dashboard) -> None:
+    """Lakeview dashboard do not have a `creator` field, thus we fall back on the parent workspace path owner"""
+    sdk_lakeview_dashboard = make_lakeview_dashboard()
+    dashboard = Dashboard.from_sdk_lakeview_dashboard(sdk_lakeview_dashboard)
+
+    owner = runtime_ctx.dashboard_ownership.owner_of(dashboard)
+
+    current_user = runtime_ctx.workspace_client.current_user.me()
+    assert owner == current_user.user_name
