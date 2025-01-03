@@ -812,7 +812,7 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
-    def _job_settings(self, step_name: str, remote_wheels: list[str]) -> dict[str, Any]:
+    def _job_settings(self, workflow_name: str, remote_wheels: list[str]) -> dict[str, Any]:
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -824,11 +824,11 @@ class WorkflowsDeployment(InstallationMixin):
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
         for task in self._tasks:
-            if task.workflow != step_name:
+            if task.workflow != workflow_name:
                 continue
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
-        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheels))
+        job_tasks.append(self._job_parse_logs_task(job_tasks, workflow_name, remote_wheels))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         tags = {"version": f"v{version}"}
@@ -837,7 +837,7 @@ class WorkflowsDeployment(InstallationMixin):
             date_to_remove = self._get_test_purge_time()
             tags.update({"RemoveAfter": date_to_remove})
         return {
-            "name": self._name(step_name),
+            "name": self._name(workflow_name),
             "tags": tags,
             "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
