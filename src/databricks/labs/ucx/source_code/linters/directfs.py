@@ -1,10 +1,12 @@
 import logging
 from abc import ABC
 from collections.abc import Iterable
+from typing import Any
 
 from astroid import Call, InferenceError, NodeNG  # type: ignore
 from sqlglot.expressions import Alter, Create, Delete, Drop, Expression, Identifier, Insert, Literal, Select
 
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Deprecation,
@@ -14,6 +16,7 @@ from databricks.labs.ucx.source_code.base import (
     DirectFsAccess,
 )
 from databricks.labs.ucx.source_code.linters.base import SqlLinter, PythonLinter, DfsaPyCollector
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python.python_ast import (
     Tree,
     TreeVisitor,
@@ -205,3 +208,77 @@ class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
         if isinstance(expression, (Create, Alter, Drop, Insert, Delete, Select)):
             return expression
         return cls._walk_up(expression.parent)
+
+class DirectFsAccessPyFixer(DirectFsAccessPyLinter):
+    def __init__(self,
+                 session_state: CurrentSessionState,
+                 directfs_crawler: DirectFsAccessCrawler,
+                 tables_crawler: TablesCrawler,
+                 prevent_spark_duplicates=True,
+                 ):
+        super().__init__(session_state, prevent_spark_duplicates)
+        self.directfs_crawler = directfs_crawler
+        self.tables_crawler = tables_crawler
+        self.direct_fs_table_list = [Any, [dict[str,str], Any]]
+
+    def fix_tree(self, tree: Tree) -> Tree:
+       for directfs_node in self.collect_dfsas_from_tree(tree):
+            self._fix_node(directfs_node)
+       return tree
+
+    def _fix_node(self, directfs_node: DirectFsAccessNode) -> None:
+       dfsa = directfs_node.dfsa
+       if dfsa.is_read:
+              self._replace_read(directfs_node)
+       elif dfsa.is_write:
+              self._replace_write(directfs_node)
+
+    def _replace_read(self, directfs_node: DirectFsAccessNode) -> None:
+        dfsa = directfs_node.dfsa
+        dfsa_details = self.direct_fs_table_list[dfsa.path]
+
+        # TODO: Actual code replacement
+        logger.info(f"Replacing read of {dfsa.path} with table {dfsa_details.dst_schema}.{dfsa_details.dst_table}")
+
+    def _replace_write(self, directfs_node):
+        dfsa = directfs_node.dfsa
+        logger.info(f"Replacing read of {dfsa.path} with table")
+
+    def populate_directfs_table_list(
+        self,
+        directfs_crawlers: list[DirectFsAccessCrawler],
+        tables_crawler: TablesCrawler,
+        workspace_name: str,
+        catalog_name: str,
+    ) -> None:
+        """
+        List all direct filesystem access records.
+        """
+        directfs_snapshot = []
+        for crawler in directfs_crawlers:
+            for directfs_access in crawler.snapshot():
+                directfs_snapshot.append(directfs_access)
+        tables_snapshot = list(tables_crawler.snapshot())
+        if not tables_snapshot:
+            msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
+            raise ValueError(msg)
+        if not directfs_snapshot:
+            msg = "No directfs references found in code"
+            raise ValueError(msg)
+
+        # TODO: very inefficient search, just for initial testing
+        #
+        for table in tables_snapshot:
+            for directfs_record in directfs_snapshot:
+                if table.location:
+                    if directfs_record.path in table.location:
+                        self.direct_fs_table_list.append({
+                            directfs_record.path:{
+                                "workspace_name":workspace_name,
+                                "is_read":directfs_record.is_read,
+                                "is_write":directfs_record.is_write,
+                                "catalog_name":catalog_name,
+                                "dst_schema":table.database,
+                                "dst_table":table.name,
+                            }
+                        })
