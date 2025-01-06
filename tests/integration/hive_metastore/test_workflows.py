@@ -99,12 +99,7 @@ def test_table_migration_job_refreshes_migration_status(
 
 
 def test_table_migration_convert_manged_to_external(installation_ctx, make_table_migration_context) -> None:
-    """Convert managed tables to external before migrating.
-
-    Note:
-        This test fails from Databricks runtime 16.0 (https://docs.databricks.com/en/release-notes/runtime/16.0.html),
-        probably due to the JDK update (https://docs.databricks.com/en/release-notes/runtime/16.0.html#breaking-change-jdk-17-is-now-the-default).
-    """
+    """Convert managed tables to external before migrating."""
     tables, dst_schema = make_table_migration_context("managed", installation_ctx)
     ctx = installation_ctx.replace(
         config_transform=lambda wc: dataclasses.replace(

@@ -295,11 +295,7 @@ class TablesMigrator:
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
     def _convert_hms_table_to_external(self, src_table: Table) -> bool:
-        """Converts a Hive metastore table to external using Spark JVM methods.
-
-        TODO:
-            This method fails for Databricks runtime 16.0, probably due to the JDK update (https://docs.databricks.com/en/release-notes/runtime/16.0.html#breaking-change-jdk-17-is-now-the-default).
-        """
+        """Converts a Hive metastore table to external using Spark JVM methods."""
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
         try:
@@ -327,6 +323,8 @@ class TablesMigrator:
                 old_table.schemaPreservesCase(),
                 old_table.ignoredProperties(),
                 old_table.viewOriginalText(),
+                # From DBR 16, there's a new table property: entityStorageLocations (Seq[EntityStorageLocation])
+                *([old_table.entityStorageLocations()] if hasattr(old_table, 'entityStorageLocations') else []),
             )
             self._catalog.alterTable(new_table)
             self._update_table_status(src_table, inventory_table)
