@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
@@ -81,6 +82,32 @@ class AWSCredentialCandidate:
     def role_name(self):
         role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
+
+
+@dataclass()
+class AWSGlue:
+    instance_pofile_arn: str
+    aws_region: str
+    aws_account_id: str
+
+    @classmethod
+    def get_glue_for_workspace(cls, workspace: WorkspaceClient, instance_profile_arn) -> typing.Self | None:
+
+        account_id_match = re.match(r"arn:aws:iam::(\d+):instance-profile/.*", instance_profile_arn)
+        if not account_id_match:
+            logger.error(f"Instance profile ARN is mismatched {instance_profile_arn}")
+            return None
+        aws_account_id = account_id_match.group(1)
+        try:
+            response = workspace.api_client.do("GET", f"/api/2.0/account/workspaces/{workspace.get_workspace_id()}")
+            if isinstance(response, dict):
+                aws_region = response.get("aws_region")
+                if aws_region:
+                    return AWSGlue(instance_profile_arn, aws_region, aws_account_id)
+        except NotFound:
+            # workspace information cannot be found
+            logger.warning("Can't retrieve aws region")
+            return None
 
 
 class AWSResources:
