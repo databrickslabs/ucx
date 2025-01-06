@@ -121,11 +121,11 @@ def test_table_migration_convert_manged_to_external(installation_ctx, make_table
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
-    ctx.deployed_workflows.run_workflow("assessment")
+    ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
     assert ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
 
     # The workflow under test.
-    ctx.deployed_workflows.run_workflow("migrate-tables")
+    ctx.deployed_workflows.run_workflow("migrate-tables", skip_job_wait=True)
     assert ctx.deployed_workflows.validate_step("migrate-tables")
 
     missing_tables = set[str]()
@@ -163,7 +163,7 @@ def test_hiveserde_table_in_place_migration_job(installation_ctx, make_table_mig
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
-    ctx.deployed_workflows.run_workflow("assessment")
+    ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
     assert ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
 
     # The workflow under test.
@@ -191,12 +191,11 @@ def test_hiveserde_table_ctas_migration_job(ws, installation_ctx, make_table_mig
 
     # The assessment workflow is a prerequisite, and now verified by the workflow: it needs to successfully complete
     # before we can test the migration workflow.
-    ctx.deployed_workflows.run_workflow("assessment")
+    ctx.deployed_workflows.run_workflow("assessment", skip_job_wait=True)
     assert ctx.deployed_workflows.validate_step("assessment"), "Workflow failed: assessment"
 
     # The workflow under test.
-    ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
-    # assert the workflow is successful
+    ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas", skip_job_wait=True)
     assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
     # assert the tables are migrated
     missing_tables = set[str]()
