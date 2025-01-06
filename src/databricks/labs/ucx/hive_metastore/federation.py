@@ -5,7 +5,6 @@ from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import ClassVar
 
-
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
@@ -20,10 +19,10 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import AWSGlue
 from databricks.labs.ucx.assessment.secrets import SecretsMixin
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +90,11 @@ class HiveMetastoreFederation(SecretsMixin):
             'Enter the name of the Hive Metastore connection and catalog', default=self._workspace_info.current()
         )
 
-        if self._external_hms and prompts.confirm(
+        if self._glue_metastore and prompts.confirm(
+            'A supported AWS Glue Metastore connection was identified. Use it?'
+        ):
+            connection_info = self._get_or_create_glue_connection(name, self._glue_metastore)
+        elif self._external_hms and prompts.confirm(
             f'A supported external Hive Metastore connection was identified: {self._external_hms.database_type}. '
             f'Use this connection?'
         ):
@@ -143,6 +146,24 @@ class HiveMetastoreFederation(SecretsMixin):
                 ),
             )
         return external_hms
+
+    @cached_property
+    def _glue_metastore(self) -> AWSGlue | None:
+        if not self._ws.config.is_aws:
+            return None
+        if not self._config.spark_conf:
+            logger.info('Spark config not found')
+            return None
+        spark_config = self._config.spark_conf
+        glue_metastore = spark_config.get('spark.databricks.hive.metastore.glueCatalog.enabled')
+        if not glue_metastore or glue_metastore.lower() != 'true':
+            logger.info('Glue Metastore not enabled')
+            return None
+        instance_profile = self._config.instance_profile
+        if not instance_profile:
+            logger.info('Instance Profile not found')
+            return None
+        return AWSGlue.get_glue_for_workspace(self._ws, instance_profile)
 
     @classmethod
     def _split_jdbc_url(cls, jdbc_url: str) -> ExternalHmsInfo:
@@ -205,6 +226,17 @@ class HiveMetastoreFederation(SecretsMixin):
             options["password"] = external_hms.password
         if external_hms.version:
             options["version"] = external_hms.version
+        try:
+            return self._ws.connections.create(
+                name=name,
+                connection_type=ConnectionType.HIVE_METASTORE,  # needs SDK change
+                options=options,
+            )
+        except AlreadyExists:
+            return self._get_existing_connection(name)
+
+    def _get_or_create_glue_connection(self, name: str, aws_glue: AWSGlue) -> ConnectionInfo:
+        options = aws_glue.as_dict()
         try:
             return self._ws.connections.create(
                 name=name,

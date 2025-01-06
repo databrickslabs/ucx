@@ -109,6 +109,13 @@ class AWSGlue:
             logger.warning("Can't retrieve aws region")
             return None
 
+    def as_dict(self):
+        return {
+            "instance_profile_arn": self.instance_pofile_arn,
+            "aws_region": self.aws_region,
+            "aws_account_id": self.aws_account_id,
+        }
+
 
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
