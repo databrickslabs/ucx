@@ -1,3 +1,4 @@
+import pytest
 from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 
@@ -68,9 +69,11 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
     assert dashboards == [Dashboard.from_sdk_lakeview_dashboard(dashboard)]
 
 
-def test_redash_dashboard_ownership_is_me(runtime_ctx, is_in_debug) -> None:
+@pytest.mark.skip(
+    reason="The user cannot be found using the Dashboard creator user ID when running this test from the CI"
+)
+def test_redash_dashboard_ownership_is_me(runtime_ctx) -> None:
     """The Redash owner should be the user that creates the dashboard, i.e. who runs this integration test."""
-    _ = is_in_debug  # The user cannot be found using the Dashboard creator user ID when running this test from the CI
     sdk_redash_dashboard = runtime_ctx.make_dashboard()
     dashboard = Dashboard.from_sdk_redash_dashboard(sdk_redash_dashboard)
 
