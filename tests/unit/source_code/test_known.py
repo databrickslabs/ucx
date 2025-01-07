@@ -73,6 +73,7 @@ def test_error_on_missing_known_json() -> None:
         KnownList._get_known()  # pylint: disable=protected-access
 
 
+@pytest.mark.skip(reason="Interferes with tests reading known list at the same time of rebuilding (writing)")
 def test_rebuild_trivial() -> None:
     # No-op: the known.json file is already up-to-date
     cwd = Path.cwd()
