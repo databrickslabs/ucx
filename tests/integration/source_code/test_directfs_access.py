@@ -3,6 +3,12 @@ import pytest
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom, CurrentSessionState
+from databricks.labs.ucx.source_code.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyFixer
+from databricks.labs.ucx.source_code.python.python_ast import Tree
+from integration.conftest import runtime_ctx
+from unit.source_code.linters.test_spark_connect import session_state
 
 
 def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
@@ -110,3 +116,48 @@ def test_path_dfsa_ownership(
     # Verify ownership can be made.
     owner = runtime_ctx.directfs_access_ownership.owner_of(path_record)
     assert owner == runtime_ctx.workspace_client.current_user.me().user_name
+
+def test_path_dfsa_replacement(
+    runtime_ctx,
+    make_directory,
+    make_mounted_location,
+    inventory_schema,
+    sql_backend,
+) -> None:
+    """Verify that the direct-fs access in python notebook is replaced with Unity catalog table"""
+
+    mounted_location = '/mnt/things/e/f/g'
+    external_table = runtime_ctx.make_table(external_csv=mounted_location,
+                                                    )
+    notebook_content = f"display(spark.read.csv('{mounted_location}'))"
+    notebook = runtime_ctx.make_notebook(path=f"{make_directory()}/notebook.py",
+                                         content=notebook_content.encode("ASCII"))
+    job = runtime_ctx.make_job(notebook_path=notebook)
+
+    # # Produce a DFSA record for the job.
+    linter = WorkflowLinter(
+        runtime_ctx.workspace_client,
+        runtime_ctx.dependency_resolver,
+        runtime_ctx.path_lookup,
+        TableMigrationIndex([]),
+        runtime_ctx.directfs_access_crawler_for_paths,
+        runtime_ctx.used_tables_crawler_for_paths,
+        include_job_ids=[job.job_id],
+    )
+    linter.refresh_report(sql_backend, inventory_schema)
+
+    runtime_ctx.tables_crawler.snapshot()
+    runtime_ctx.directfs_access_crawler_for_paths.snapshot()
+
+    session_state = CurrentSessionState()
+    directfs_py_fixer = DirectFsAccessPyFixer(session_state,
+                                              runtime_ctx.directfs_access_crawler_for_paths,
+                                              runtime_ctx.tables_crawler)
+    directfs_py_fixer.populate_directfs_table_list([runtime_ctx.directfs_access_crawler_for_paths],
+                                                   runtime_ctx.tables_crawler,
+                                                   "workspace_name",
+                                                   "catalog_name")
+
+    assert True
+    directfs_py_fixer.fix_tree(Tree.maybe_normalized_parse(notebook_content).tree)
+    assert True

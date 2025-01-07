@@ -219,7 +219,7 @@ class DirectFsAccessPyFixer(DirectFsAccessPyLinter):
         super().__init__(session_state, prevent_spark_duplicates)
         self.directfs_crawler = directfs_crawler
         self.tables_crawler = tables_crawler
-        self.direct_fs_table_list = [Any, [dict[str,str], Any]]
+        self.direct_fs_table_list:[Any, [dict[str,str], Any]] = []
 
     def fix_tree(self, tree: Tree) -> Tree:
        for directfs_node in self.collect_dfsas_from_tree(tree):
