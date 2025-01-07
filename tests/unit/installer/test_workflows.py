@@ -39,7 +39,7 @@ def side_effect_remove_after_in_tags_settings(**settings) -> CreateResponse:
     return CreateResponse(job_id=1)
 
 
-def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installation):
+def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installation) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.current_user.me.return_value = User(user_name="user", groups=[ComplexValue(display="admins")])
     ws.jobs.create.side_effect = side_effect_remove_after_in_tags_settings

@@ -101,7 +101,7 @@ def not_found(_):
     raise NotFound(msg)
 
 
-def test_create_database(ws, caplog, mock_installation, any_prompt):
+def test_create_database(ws, caplog, mock_installation, any_prompt) -> None:
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
@@ -139,7 +139,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     wheels.upload_to_wsfs.assert_called()
 
 
-def test_install_cluster_override_jobs(ws, mock_installation):
+def test_install_cluster_override_jobs(ws, mock_installation) -> None:
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
@@ -160,7 +160,7 @@ def test_install_cluster_override_jobs(ws, mock_installation):
     wheels.upload_to_dbfs.assert_not_called()
 
 
-def test_writeable_dbfs(ws, tmp_path, mock_installation):
+def test_writeable_dbfs(ws, tmp_path, mock_installation) -> None:
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -512,7 +512,7 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
     )
 
 
-def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_installation):
+def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_installation) -> None:
     webbrowser_open = mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
     prompts = MockPrompts(
@@ -582,7 +582,7 @@ def test_remove_database(ws):
     workflow_installer.create_jobs.assert_not_called()
 
 
-def test_remove_jobs_no_state(ws):
+def test_remove_jobs_no_state(ws) -> None:
     sql_backend = MockBackend()
     ws = create_autospec(WorkspaceClient)
     prompts = MockPrompts(
@@ -615,7 +615,7 @@ def test_remove_jobs_no_state(ws):
     wheels.upload_to_wsfs.assert_not_called()
 
 
-def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs):
+def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs) -> None:
     ws.jobs.delete.side_effect = InvalidParameterValue("job id 123 not found")
 
     sql_backend = MockBackend()
@@ -1110,7 +1110,7 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-def test_triggering_assessment_wf(ws, mocker, mock_installation):
+def test_triggering_assessment_wf(ws, mocker, mock_installation) -> None:
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
@@ -1142,7 +1142,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now.assert_not_called()
 
 
-def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
+def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation) -> None:
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
@@ -1225,7 +1225,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     wheels.upload_to_wsfs.assert_called()
 
 
-def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
+def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt) -> None:
     sql_backend = MockBackend()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
@@ -1283,7 +1283,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     assert 'Corrupt installation state. Skipping job_id=125 as it is not managed by UCX' in caplog.messages
 
 
-def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
+def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt) -> None:
     sql_backend = MockBackend()
     ws.jobs.delete.side_effect = InvalidParameterValue()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
@@ -1498,7 +1498,7 @@ def test_check_inventory_database_exists(ws, mock_installation):
         install.configure()
 
 
-def test_user_not_admin(ws, mock_installation):
+def test_user_not_admin(ws, mock_installation) -> None:
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="group1")])
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkflowsDeployment(
