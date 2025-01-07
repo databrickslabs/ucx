@@ -223,8 +223,17 @@ def ws():
 
 @pytest.fixture
 def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolver:
+
+    def mock_pip_install_always_successful(_) -> tuple[int, str, str]:
+        """Mock an always successful pip install.
+
+        Pip installs require internet access which we want to avoid during unit testing for speed and reliability.
+        While using the simple dependency resolver, we mock any library install as successful.
+        """
+        return 0, "", ""
+
     allow_list = KnownList()
-    library_resolver = PythonLibraryResolver(allow_list)
+    library_resolver = PythonLibraryResolver(allow_list, mock_pip_install_always_successful)
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
