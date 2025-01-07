@@ -34,7 +34,8 @@ from databricks.sdk.service.provisioning import Workspace
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.framework.tasks import Workflow, job_task
 from databricks.labs.ucx.install import AccountInstaller, WorkspaceInstallation, WorkspaceInstaller, extract_major_minor
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
@@ -113,7 +114,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -147,7 +148,7 @@ def test_install_cluster_override_jobs(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        Workflows.all().tasks(),
+        Workflows.all(),
     )
 
     workflows_installation.create_jobs()
@@ -169,7 +170,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        Workflows.all().tasks(),
+        Workflows.all(),
     )
 
     workflows_installation.create_jobs()
@@ -530,7 +531,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="ucx", policy_id='123'),
@@ -601,7 +602,7 @@ def test_remove_jobs_no_state(ws):
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -635,7 +636,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -1131,7 +1132,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        Workflows.all().tasks(),
+        Workflows.all(),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -1163,7 +1164,7 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        Workflows.all().tasks(),
+        Workflows.all(),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -1229,8 +1230,13 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
 
-    def dummy_task(*_):
-        pass
+    class Dummy(Workflow):
+        def __init__(self):
+            super().__init__("assessment")
+
+        @job_task
+        def some(self, ctx: RuntimeContext):
+            """...."""
 
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
@@ -1239,7 +1245,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         ws,
         wheels,
         PRODUCT_INFO,
-        [Task('assessment', 'some', '...', dummy_task)],
+        Workflows([Dummy()]),
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -1279,7 +1285,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
 
 def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
-    ws.jobs.delete.side_effect = InvalidParameterValue(...)
+    ws.jobs.delete.side_effect = InvalidParameterValue()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -1289,7 +1295,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -1502,7 +1508,7 @@ def test_user_not_admin(ws, mock_installation):
         ws,
         wheels,
         PRODUCT_INFO,
-        Workflows.all().tasks(),
+        Workflows.all(),
     )
 
     with pytest.raises(PermissionDenied) as failure:

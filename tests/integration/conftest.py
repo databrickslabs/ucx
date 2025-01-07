@@ -43,7 +43,6 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePe
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -1144,10 +1143,6 @@ class MockInstallationContext(MockRuntimeContext):
         return ProductInfo.for_testing(WorkspaceConfig)
 
     @cached_property
-    def tasks(self) -> list[Task]:
-        return Workflows.all().tasks()
-
-    @cached_property
     def workflows_deployment(self) -> WorkflowsDeployment:
         return WorkflowsDeployment(
             self.config,
@@ -1156,7 +1151,7 @@ class MockInstallationContext(MockRuntimeContext):
             self.workspace_client,
             self.product_info.wheels(self.workspace_client),
             self.product_info,
-            self.tasks,
+            Workflows.all(),
         )
 
     @cached_property

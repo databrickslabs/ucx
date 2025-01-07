@@ -11,7 +11,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -51,6 +51,11 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
+
+# Although we really don't like using TYPE_CHECKING guards, this is the only way to avoid a circular import without
+# significant refactoring.
+if TYPE_CHECKING:
+    from databricks.labs.ucx.runtime import Workflows
 
 logger = logging.getLogger(__name__)
 
@@ -587,7 +592,7 @@ class WorkflowsDeployment(InstallationMixin):
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
-        tasks: list[Task],
+        workflows: Workflows,
     ):
         self._config = config
         self._installation = installation
@@ -595,13 +600,13 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._tasks = tasks
+        self._workflows = workflows
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
     def create_jobs(self) -> None:
         remote_wheels = self._upload_wheel()
-        desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
+        desired_workflows = {t.workflow for t in self._workflows.tasks() if t.cloud_compatible(self._ws.config)}
 
         wheel_runner = ""
         if self._config.override_clusters:
@@ -700,7 +705,7 @@ class WorkflowsDeployment(InstallationMixin):
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self._tasks:
+            for task in self._workflows.tasks():
                 if self._is_testing() and task.is_testing():
                     continue
                 if task.workflow != workflow_name:
@@ -725,7 +730,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _workflow_names(self) -> list[str]:
         names = []
-        for task in self._tasks:
+        for task in self._workflows.tasks():
             if self._is_testing() and task.is_testing():
                 continue
             if task.workflow not in names:
@@ -824,7 +829,7 @@ class WorkflowsDeployment(InstallationMixin):
 
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
-        for task in self._tasks:
+        for task in self._workflows.tasks():
             if task.workflow != workflow_name:
                 continue
             job_clusters.add(task.job_cluster)
