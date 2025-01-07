@@ -253,6 +253,14 @@
     "audioread.rawread": [],
     "audioread.version": []
   },
+  "autocommand": {
+    "autocommand": [],
+    "autocommand.autoasync": [],
+    "autocommand.autocommand": [],
+    "autocommand.automain": [],
+    "autocommand.autoparse": [],
+    "autocommand.errors": []
+  },
   "azure": {
     "azure.digitaltwins": [],
     "azure.digitaltwins.core": []
