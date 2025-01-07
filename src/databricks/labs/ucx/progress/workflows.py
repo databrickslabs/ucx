@@ -1,5 +1,7 @@
 import datetime as dt
 
+from databricks.sdk.service.jobs import CronSchedule, PauseStatus
+
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
 
@@ -22,6 +24,13 @@ class MigrationProgress(Workflow):
 
     def __init__(self) -> None:
         super().__init__('migration-progress-experimental')
+
+    @property
+    def schedule(self) -> CronSchedule:
+        """Schedule the migration progress workflow to run by default daily at 5:00 a.m. (UTC)."""
+        return CronSchedule(
+            quartz_cron_expression="0 5 * * *", timezone_id="Etc/UTC", pause_status=PauseStatus.UNPAUSED
+        )
 
     @job_task(job_cluster="user_isolation")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:

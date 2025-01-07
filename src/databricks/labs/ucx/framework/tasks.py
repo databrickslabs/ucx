@@ -6,6 +6,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
+from databricks.sdk.service.jobs import CronSchedule
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
@@ -70,6 +71,11 @@ class Workflow:
     @property
     def name(self):
         return self._name
+
+    @property
+    def schedule(self) -> CronSchedule | None:
+        """The default (cron) schedule for this workflow, or None if it is not scheduled."""
+        return None
 
     def tasks(self) -> Iterable[Task]:
         # return __task__ from every method in this class that has this attribute
