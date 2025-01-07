@@ -107,7 +107,7 @@ class PriorityQueue:
 
     _REMOVED = "<removed>"  # Mark removed items
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._entries: list[QueueEntry] = []
         self._entry_finder: dict[MigrationNode, QueueEntry] = {}
         self._counter = itertools.count()  # Tiebreaker with equal priorities, then "first in, first out"
@@ -120,7 +120,7 @@ class PriorityQueue:
         if task in self._entry_finder:
             self._remove(task)
         count = next(self._counter)
-        entry = [priority, count, task]
+        entry: QueueEntry = [priority, count, task]
         self._entry_finder[task] = entry
         heapq.heappush(self._entries, entry)
 
@@ -138,6 +138,7 @@ class PriorityQueue:
     def _remove(self, task: MigrationNode) -> None:
         """Remove a task from the queue."""
         entry = self._entry_finder.pop(task)
+        # The entry is also stored in self._entries.
         entry[2] = self._REMOVED
 
 
