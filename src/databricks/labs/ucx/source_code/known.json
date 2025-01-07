@@ -6839,6 +6839,14 @@
   "jaraco.functools": {
     "jaraco.functools": []
   },
+  "jaraco.text": {
+    "jaraco.text": [],
+    "jaraco.text.layouts": [],
+    "jaraco.text.show-newlines": [],
+    "jaraco.text.strip-prefix": [],
+    "jaraco.text.to-dvorak": [],
+    "jaraco.text.to-qwerty": []
+  },
   "jax-jumpy": {
     "jumpy": [],
     "jumpy._base_fns": [],
