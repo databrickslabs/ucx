@@ -8,7 +8,7 @@ from databricks.sdk.config import with_user_agent_extra
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.framework.tasks import Task, Workflow, parse_args
+from databricks.labs.ucx.framework.tasks import Workflow, parse_args
 from databricks.labs.ucx.installer.logs import TaskLogger
 from databricks.labs.ucx.hive_metastore.workflows import (
     ScanTablesInMounts,
@@ -31,11 +31,7 @@ logger = logging.getLogger(__name__)
 
 class Workflows:
     def __init__(self, workflows: list[Workflow]):
-        self._tasks: list[Task] = []
-        self._workflows: dict[str, Workflow] = {}
-        for workflow in workflows:
-            self._workflows[workflow.name] = workflow
-            self._tasks.extend(workflow.tasks())
+        self._workflows: dict[str, Workflow] = {workflow.name: workflow for workflow in workflows}
 
     @classmethod
     def all(cls):
@@ -56,9 +52,6 @@ class Workflows:
                 Failing(),
             ]
         )
-
-    def tasks(self) -> list[Task]:
-        return self._tasks
 
     def workflows(self) -> dict[str, Workflow]:
         return self._workflows
