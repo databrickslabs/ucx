@@ -10,10 +10,6 @@ from databricks.sdk.service.workspace import AclPermission
 
 def test_running_real_migrate_groups_job(
     installation_ctx,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
-    make_secret_scope,
-    make_secret_scope_acl,
 ) -> None:
     """Test the migrate groups workflow.
 
@@ -37,9 +33,8 @@ def test_running_real_migrate_groups_job(
     """
     ws_group, acc_group = installation_ctx.make_ucx_group(wait_for_provisioning=True)
 
-    # TODO: Move `make_cluster_policy` and `make_cluster_policy_permissions` to context like other `make_` methods
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
+    cluster_policy = installation_ctx.make_cluster_policy()
+    installation_ctx.make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group.display_name,
@@ -51,17 +46,10 @@ def test_running_real_migrate_groups_job(
     installation_ctx.make_grant(ws_group.display_name, 'OWN', schema_info=schema)
     installation_ctx.make_grant(ws_group.display_name, 'SELECT', table_info=table)
 
-    # TODO: Move `make_secret_scope` and `make_secret_scope_acl` to context like other `make_` methods
-    secret_scope = make_secret_scope()
-    make_secret_scope_acl(scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE)
-
-    # TODO: Move `include_object_permissions` to context like other `include_` attributes
-    # Limit the considered permissions to the following objects:
-    installation_ctx.__dict__['include_object_permissions'] = [
-        f"cluster-policies:{cluster_policy.policy_id}",
-        f"TABLE:{table.full_name}",
-        f"secrets:{secret_scope}",
-    ]
+    secret_scope = installation_ctx.make_secret_scope()
+    installation_ctx.make_secret_scope_acl(
+        scope=secret_scope, principal=ws_group.display_name, permission=AclPermission.WRITE
+    )
 
     installation_ctx.workspace_installation.run()
     # The crawlers should run as part of the assessment. To minimize the crawling here, we only crawl what is necessary
@@ -135,13 +123,6 @@ def test_running_legacy_validate_groups_permissions_job(
     secret_scope = make_secret_scope()
     make_secret_scope_acl(scope=secret_scope, principal=ws_group_a.display_name, permission=AclPermission.WRITE)
 
-    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
-    installation_ctx.__dict__['include_object_permissions'] = [
-        f"cluster-policies:{cluster_policy.policy_id}",
-        f"queries:{query.id}",
-        f"TABLE:{table.full_name}",
-        f"secrets:{secret_scope}",
-    ]
     installation_ctx.__dict__['config_transform'] = lambda c: replace(c, use_legacy_permission_migration=True)
     installation_ctx.workspace_installation.run()
     installation_ctx.permission_manager.snapshot()
