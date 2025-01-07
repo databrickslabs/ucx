@@ -831,7 +831,8 @@ class WorkflowsDeployment(InstallationMixin):
 
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
-        for task in self._workflows[workflow_name].tasks():
+        workflow = self._workflows[workflow_name]
+        for task in workflow.tasks():
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
         job_tasks.append(self._job_parse_logs_task(job_tasks, workflow_name, remote_wheels))
@@ -847,6 +848,7 @@ class WorkflowsDeployment(InstallationMixin):
             "tags": tags,
             "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
+            "schedule": workflow.schedule,
             "tasks": job_tasks,
         }
 
