@@ -728,10 +728,13 @@ class WorkflowsDeployment(InstallationMixin):
         return dashboard_link
 
     def _workflow_names(self) -> list[str]:
-        # Workflows are excluded if they _is_testing() and all tests are testing.
-        return [workflow_name
-                for workflow_name, tasks in self._workflows.items()
-                if not self._is_testing() or any(not t.is_testing() for t in tasks.tasks())]
+        names = []
+        # Workflows are excluded if _is_testing() and all tasks are testing.
+        for workflow_name, tasks in self._workflows.items():
+            if self._is_testing() and all(t.is_testing() for t in tasks.tasks()):
+                continue
+            names.append(workflow_name)
+        return names
 
     def _job_cluster_spark_conf(self, cluster_key: str):
         conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
