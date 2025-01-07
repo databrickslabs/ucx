@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -77,7 +78,10 @@ class Workflow:
                 continue
             fn = getattr(self, attr)
             if hasattr(fn, "__task__"):
-                yield fn.__task__
+                task_definition = fn.__task__
+                # Substitute placeholder for workflow name (unavailable at time of declaration).
+                with_workflow = dataclasses.replace(task_definition, workflow=self.name)
+                yield with_workflow
 
 
 def job_task(

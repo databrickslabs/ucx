@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import os
 import sys
@@ -36,11 +35,7 @@ class Workflows:
         self._workflows: dict[str, Workflow] = {}
         for workflow in workflows:
             self._workflows[workflow.name] = workflow
-            for task_definition in workflow.tasks():
-                # Add the workflow name to the task definition, because we cannot access
-                # the workflow name from the method decorator
-                with_workflow = dataclasses.replace(task_definition, workflow=workflow.name)
-                self._tasks.append(with_workflow)
+            self._tasks.extend(workflow.tasks())
 
     @classmethod
     def all(cls):
