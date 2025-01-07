@@ -32815,6 +32815,21 @@
     "trl.trainer.sft_trainer": [],
     "trl.trainer.utils": []
   },
+  "typeguard": {
+    "typeguard": [],
+    "typeguard._checkers": [],
+    "typeguard._config": [],
+    "typeguard._decorators": [],
+    "typeguard._exceptions": [],
+    "typeguard._functions": [],
+    "typeguard._importhook": [],
+    "typeguard._memo": [],
+    "typeguard._pytest_plugin": [],
+    "typeguard._suppression": [],
+    "typeguard._transformer": [],
+    "typeguard._union_transformer": [],
+    "typeguard._utils": []
+  },
   "types-python-dateutil": {},
   "types-pyyaml": {},
   "types-requests": {},
