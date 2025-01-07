@@ -606,8 +606,11 @@ class WorkflowsDeployment(InstallationMixin):
 
     def create_jobs(self) -> None:
         remote_wheels = self._upload_wheel()
-        desired_workflows = {workflow for workflow, tasks in self._workflows.items()
-                             if any(task.cloud_compatible(self._ws.config) for task in tasks.tasks())}
+        desired_workflows = {
+            workflow
+            for workflow, tasks in self._workflows.items()
+            if any(task.cloud_compatible(self._ws.config) for task in tasks.tasks())
+        }
 
         wheel_runner = ""
         if self._config.override_clusters:
