@@ -58,7 +58,6 @@ from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
@@ -151,7 +150,6 @@ class WorkspaceInstaller(WorkspaceContext):
         self,
         ws: WorkspaceClient,
         environ: dict[str, str] | None = None,
-        tasks: list[Task] | None = None,
     ):
         super().__init__(ws)
         if not environ:
@@ -162,7 +160,7 @@ class WorkspaceInstaller(WorkspaceContext):
             raise SystemExit(msg)
 
         self._is_account_install = self._force_install == "account"
-        self._tasks = tasks if tasks else Workflows.all().tasks()
+        self._tasks = Workflows.all().tasks()
 
     @cached_property
     def upgrades(self) -> Upgrades:
