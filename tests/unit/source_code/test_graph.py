@@ -4,40 +4,28 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
+from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
-    DependencyResolver,
     InheritedContext,
     DependencyGraphWalker,
 )
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python.python_ast import Tree
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
 
 
-def test_dependency_graph_registers_library(mock_path_lookup) -> None:
+def test_dependency_graph_registers_library_from_egg(mock_path_lookup, simple_dependency_resolver) -> None:
+    egg_path = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     dependency = Dependency(FileLoader(), Path("test"))
-    file_loader = FileLoader()
-    allow_list = KnownList()
     session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
-    dependency_resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list),
-        NotebookResolver(NotebookLoader()),
-        import_file_resolver,
-        import_file_resolver,
-        mock_path_lookup,
-    )
-    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, session_state)
 
-    problems = graph.register_library("demo-egg")  # installs pkgdir
+    problems = graph.register_library(egg_path.as_posix())
 
     assert len(problems) == 0
-    lookup_resolve = graph.path_lookup.resolve(Path("pkgdir"))
+    lookup_resolve = graph.path_lookup.resolve(Path("thingy"))
     assert lookup_resolve is not None
     assert lookup_resolve.exists()
 

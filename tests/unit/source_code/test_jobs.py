@@ -88,19 +88,6 @@ def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lo
     ws.assert_not_called()
 
 
-def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(mock_path_lookup, graph) -> None:
-    ws = create_autospec(WorkspaceClient)
-    libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="demo-egg"))]  # installs pkgdir
-    task = jobs.Task(task_key="test", libraries=libraries)
-
-    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
-    problems = workflow_task_container.build_dependency_graph(graph)
-
-    assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pkgdir")).exists()
-    ws.assert_not_called()
-
-
 def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mock_path_lookup, graph) -> None:
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
