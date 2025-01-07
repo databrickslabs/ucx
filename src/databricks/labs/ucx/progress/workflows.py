@@ -29,7 +29,7 @@ class MigrationProgress(Workflow):
     def schedule(self) -> CronSchedule:
         """Schedule the migration progress workflow to run by default daily at 5:00 a.m. (UTC)."""
         return CronSchedule(
-            quartz_cron_expression="0 5 * * *", timezone_id="Etc/UTC", pause_status=PauseStatus.UNPAUSED
+            quartz_cron_expression="0 0 5 * * *", timezone_id="Etc/UTC", pause_status=PauseStatus.UNPAUSED
         )
 
     @job_task(job_cluster="user_isolation")
