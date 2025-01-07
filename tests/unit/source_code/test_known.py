@@ -77,7 +77,7 @@ def test_error_on_missing_known_json() -> None:
 def test_known_list_rebuild_finds_no_new_distributions(caplog) -> None:
     """Should be a no-op, otherwise know.json should be updated"""
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.source_code.known"):
-        KnownList.rebuild(Path.cwd())
+        KnownList.rebuild(Path.cwd(), dry_run=True)
     assert "No new distributions found." in caplog.messages
 
 

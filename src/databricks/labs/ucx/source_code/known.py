@@ -128,7 +128,7 @@ class KnownList:
         return name
 
     @classmethod
-    def rebuild(cls, root: Path) -> None:
+    def rebuild(cls, root: Path, *, dry_run: bool = False) -> None:
         """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
         try:
@@ -144,6 +144,8 @@ class KnownList:
         updated_distributions = dict(sorted(updated_distributions.items()))
         if known_distributions == updated_distributions:
             logger.info("No new distributions found.")
+        elif dry_run:
+            logger.info("Found new distributions during dry run.")
         else:
             known_json = Path(__file__).parent / "known.json"
             with known_json.open('w') as f:
