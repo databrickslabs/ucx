@@ -6639,6 +6639,11 @@
     "importlib_resources.readers": [],
     "importlib_resources.simple": []
   },
+  "inflect": {
+    "inflect": [],
+    "inflect.compat": [],
+    "inflect.compat.py38": []
+  },
   "iniconfig": {
     "iniconfig": []
   },
