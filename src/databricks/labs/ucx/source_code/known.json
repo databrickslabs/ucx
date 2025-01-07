@@ -6838,6 +6838,9 @@
     "jaraco.classes.meta": [],
     "jaraco.classes.properties": []
   },
+  "jaraco.collections": {
+    "jaraco.collections": []
+  },
   "jaraco.context": {
     "jaraco.context": []
   },
