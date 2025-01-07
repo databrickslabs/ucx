@@ -22,7 +22,7 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
     # The assessment workflow is a prerequisite for migration-progress: it needs to successfully complete before we can
     # test the migration-progress workflow.
     workflow = "assessment"
-    installation_ctx.deployed_workflows.run_workflow(workflow)
+    installation_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     # After the assessment, a user (maybe) installs the progress tracking
@@ -30,7 +30,7 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
 
     # Run the migration-progress workflow until completion.
     workflow = "migration-progress-experimental"
-    installation_ctx.deployed_workflows.run_workflow(workflow)
+    installation_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     # Ensure that the migration-progress workflow populated the `workflow_runs` table.
