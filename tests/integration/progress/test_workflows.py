@@ -1,7 +1,9 @@
 import datetime as dt
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
+from databricks.sdk.service.jobs import PauseStatus
 
 from ..conftest import MockInstallationContext
 
@@ -38,3 +40,15 @@ def test_running_real_migration_progress_job(installation_ctx: MockInstallationC
     # Ensure that the history file has records written to it.
     query = f"SELECT 1 from {installation_ctx.ucx_catalog}.multiworkspace.historical LIMIT 1"
     assert any(installation_ctx.sql_backend.fetch(query)), f"No snapshots captured to the history log: {query}"
+
+
+def test_migration_progress_job_has_schedule(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
+    """Ensure that the migration-progress workflow is installed with a schedule attached."""
+    installation_ctx.workspace_installation.run()
+
+    workflow_id = installation_ctx.install_state.jobs["migration-progress-experimental"]
+    workflow = ws.jobs.get(workflow_id)
+    schedule = workflow.settings.schedule
+    assert schedule.quartz_cron_expression, "No cron expression found for the migration-progress workflow."
+    assert schedule.timezone_id, "No time-zone specified for scheduling the migration-progress workflow."
+    assert schedule.pause_status == PauseStatus.UNPAUSED, "Workflow schedule should not be paused."
