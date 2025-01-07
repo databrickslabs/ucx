@@ -600,13 +600,14 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._workflows = workflows
+        self._workflows = workflows.workflows()
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
     def create_jobs(self) -> None:
         remote_wheels = self._upload_wheel()
-        desired_workflows = {t.workflow for t in self._workflows.tasks() if t.cloud_compatible(self._ws.config)}
+        desired_workflows = {workflow for workflow, tasks in self._workflows.items()
+                             if any(task.cloud_compatible(self._ws.config) for task in tasks.tasks())}
 
         wheel_runner = ""
         if self._config.override_clusters:
@@ -705,10 +706,8 @@ class WorkflowsDeployment(InstallationMixin):
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self._workflows.tasks():
+            for task in self._workflows[workflow_name].tasks():
                 if self._is_testing() and task.is_testing():
-                    continue
-                if task.workflow != workflow_name:
                     continue
                 doc = self._config.replace_inventory_variable(task.doc)
                 markdown.append(f"### `{task.name}`\n\n")
@@ -729,13 +728,10 @@ class WorkflowsDeployment(InstallationMixin):
         return dashboard_link
 
     def _workflow_names(self) -> list[str]:
-        names = []
-        for task in self._workflows.tasks():
-            if self._is_testing() and task.is_testing():
-                continue
-            if task.workflow not in names:
-                names.append(task.workflow)
-        return names
+        # Workflows are excluded if they _is_testing() and all tests are testing.
+        return [workflow_name
+                for workflow_name, tasks in self._workflows.items()
+                if not self._is_testing() or any(not t.is_testing() for t in tasks.tasks())]
 
     def _job_cluster_spark_conf(self, cluster_key: str):
         conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
@@ -829,9 +825,7 @@ class WorkflowsDeployment(InstallationMixin):
 
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
-        for task in self._workflows.tasks():
-            if task.workflow != workflow_name:
-                continue
+        for task in self._workflows[workflow_name].tasks():
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
         job_tasks.append(self._job_parse_logs_task(job_tasks, workflow_name, remote_wheels))

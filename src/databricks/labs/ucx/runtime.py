@@ -60,6 +60,9 @@ class Workflows:
     def tasks(self) -> list[Task]:
         return self._tasks
 
+    def workflows(self) -> dict[str, Workflow]:
+        return self._workflows
+
     def trigger(self, *argv):
         named_parameters = parse_args(*argv)
         config_path = Path(named_parameters["config"])
