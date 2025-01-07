@@ -412,7 +412,7 @@ class WorkflowLinter:
         tasks = []
         items_listed = 0
         for job in self._ws.jobs.list():
-            if self._include_job_ids and job.job_id not in self._include_job_ids:
+            if self._include_job_ids is not None and job.job_id not in self._include_job_ids:
                 logger.info(f"Skipping job_id={job.job_id}")
                 continue
             if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
