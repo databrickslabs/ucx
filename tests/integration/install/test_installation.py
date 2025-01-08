@@ -117,7 +117,7 @@ def test_job_cluster_policy(ws, installation_ctx) -> None:
     assert cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.inventory_database}) ({user_name})"
 
     spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
-    assert policy_definition["spark_version"]["value"] == spark_version
+    assert policy_definition["spark_version"]["values"][0] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
     if ws.config.is_azure:
         assert (
