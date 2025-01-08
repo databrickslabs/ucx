@@ -77,6 +77,12 @@ class PipelinesMigrator:
                 if pipeline.pipeline_id in self._include_pipeline_ids:
                     continue
                 pipelines_in_workspace.remove(pipeline)
+
+        if self._skip_pipeline_ids:
+            for pipeline in pipelines_in_workspace:
+                if pipeline.pipeline_id in self._skip_pipeline_ids:
+                    pipelines_in_workspace.remove(pipeline)
+
         return pipelines_in_workspace
 
     def migrate_pipelines(self) -> None:
