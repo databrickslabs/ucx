@@ -71,7 +71,13 @@ class PipelinesMigrator:
         """
         Returns the list of pipelines in the current workspace
         """
-        return list(self._pipeline_crawler.snapshot())
+        pipelines_in_workspace = list(self._pipeline_crawler.snapshot())
+        if self._include_pipeline_ids:
+            for pipeline in pipelines_in_workspace:
+                if pipeline.pipeline_id in self._include_pipeline_ids:
+                    continue
+                pipelines_in_workspace.remove(pipeline)
+        return pipelines_in_workspace
 
     def migrate_pipelines(self) -> None:
         """
@@ -90,10 +96,7 @@ class PipelinesMigrator:
 
         tasks = []
         for pipeline in pipelines_to_migrate:
-            if self._include_pipeline_ids is not None and pipeline.pipeline_id in self._include_pipeline_ids:
-                tasks.append(partial(self._migrate_pipeline, pipeline))
-            else:
-                tasks.append(partial(self._migrate_pipeline, pipeline))
+            tasks.append(partial(self._migrate_pipeline, pipeline))
         if not tasks:
             return []
         Threads.strict("migrate pipelines", tasks)
