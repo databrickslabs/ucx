@@ -26,7 +26,7 @@ from astroid import (  # type: ignore
     parse,
     Uninferable,
 )
-from astroid.exceptions import AstroidSyntaxError
+from astroid.exceptions import AstroidSyntaxError  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Failure,
