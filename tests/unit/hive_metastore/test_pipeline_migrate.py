@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize(
-    "pipeline_spec,include_flag,expected,api_calls",
+    "pipeline_spec, include_flag, expected, api_calls",
     [
         # empty spec
         (
