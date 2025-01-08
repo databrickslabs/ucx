@@ -90,9 +90,8 @@ class PipelinesMigrator:
 
         tasks = []
         for pipeline in pipelines_to_migrate:
-            if len(self._include_pipeline_ids) > 0:
-                if pipeline.pipeline_id in self._include_pipeline_ids:
-                    tasks.append(partial(self._migrate_pipeline, pipeline))
+            if self._include_pipeline_ids is not None and pipeline.pipeline_id in self._include_pipeline_ids:
+                tasks.append(partial(self._migrate_pipeline, pipeline))
             else:
                 tasks.append(partial(self._migrate_pipeline, pipeline))
         if not tasks:
