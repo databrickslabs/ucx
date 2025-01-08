@@ -90,20 +90,6 @@ def test_migrate_pipelines(ws, mock_installation, pipeline_spec, include_flag, e
     if api_calls:
         ws.api_client.do.assert_has_calls([api_calls])
 
-    ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
-    ws.jobs.get.side_effect = [
-        BaseJob(
-            job_id=536591785949415,
-            settings=JobSettings(
-                name="single-job",
-                tasks=[Task(pipeline_task=PipelineTask(pipeline_id="empty-spec"), task_key="task_key")],
-            ),
-        ),
-        BaseJob(
-            job_id=536591785949417,
-        ),
-    ]
-
 
 def test_migrate_pipelines_no_pipelines(
     ws,
