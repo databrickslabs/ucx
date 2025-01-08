@@ -903,6 +903,7 @@ class WorkflowsDeployment(InstallationMixin):
                         custom_tags={"ResourceClass": "SingleNode"},
                         num_workers=0,
                         policy_id=self._config.policy_id,
+                        apply_policy_default_values=True,
                     ),
                 )
             )
@@ -915,6 +916,7 @@ class WorkflowsDeployment(InstallationMixin):
                         spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
                         policy_id=self._config.policy_id,
+                        apply_policy_default_values=True,
                     ),
                 )
             )
@@ -930,6 +932,7 @@ class WorkflowsDeployment(InstallationMixin):
                             max_workers=self._config.max_workers,
                             min_workers=self._config.min_workers,
                         ),
+                        apply_policy_default_values=True,
                     ),
                 )
             )
