@@ -100,7 +100,10 @@ class Tree:  # pylint: disable=too-many-public-methods
             None,
             Failure(
                 code="python-parse-error",
-                message=f"Failed to parse code `{source_code}`: {type(e)}: {e}. Report this as an issue on UCX GitHub.",
+                message=(
+                    "Please report the following error as an issue on UCX GitHub. "
+                    f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
+                ),
                 # Lines and columns are both 0-based: the first line is line 0.
                 start_line=0,
                 start_col=0,
