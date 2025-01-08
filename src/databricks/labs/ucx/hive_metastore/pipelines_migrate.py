@@ -32,12 +32,14 @@ class PipelinesMigrator:
         jobs_crawler: JobsCrawler,
         catalog_name: str,
         include_pipeline_ids: list[str] | None = None,
+        skip_pipeline_ids: list[str] | None = None,
     ):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
         self._jobs_crawler = jobs_crawler
         self._catalog_name = catalog_name
-        self._include_pipeline_ids = include_pipeline_ids or []
+        self._include_pipeline_ids = include_pipeline_ids
+        self._skip_pipeline_ids = skip_pipeline_ids
         self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
 
     def _populate_pipeline_job_tasks_mapping(self) -> None:
