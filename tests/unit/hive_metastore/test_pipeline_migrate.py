@@ -13,11 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize(
-    "pipeline_spec,expected,api_calls",
+    "pipeline_spec,include_flag,expected,api_calls",
     [
         # empty spec
         (
             ("empty-spec", "pipe1", 1, "[]", "creator1"),
+            "empty-spec",
             1,
             call(
                 'POST',
@@ -32,10 +33,11 @@ logger = logging.getLogger(__name__)
             ),
         ),
         # migrated dlt spec
-        (("migrated-dlt-spec", "pipe2", 1, "[]", "creator2"), 0, None),
+        (("migrated-dlt-spec", "pipe2", 1, "[]", "creator2"), "migrated-dlt-spec", 0, None),
         # spec with spn
         (
             ("spec-with-spn", "pipe3", 1, "[]", "creator3"),
+            "spec-with-spn",
             1,
             call(
                 'POST',
@@ -50,10 +52,10 @@ logger = logging.getLogger(__name__)
             ),
         ),
         # skip pipeline
-        (("skip-pipeline", "pipe3", 1, "[]", "creator3"), 0, None),
+        (("skip-pipeline", "pipe3", 1, "[]", "creator3"), "some-other-spec", 0, None),
     ],
 )
-def test_migrate_pipelines(ws, mock_installation, pipeline_spec, expected, api_calls):
+def test_migrate_pipelines(ws, mock_installation, pipeline_spec, include_flag, expected, api_calls):
     errors = {}
     rows = {
         "`hive_metastore`.`inventory_database`.`pipelines`": [pipeline_spec],
@@ -65,7 +67,7 @@ def test_migrate_pipelines(ws, mock_installation, pipeline_spec, expected, api_c
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
     jobs_crawler = JobsCrawler(ws, sql_backend, "inventory_database")
     pipelines_migrator = PipelinesMigrator(
-        ws, pipelines_crawler, jobs_crawler, "catalog_name", skip_pipeline_ids=["skip-pipeline"]
+        ws, pipelines_crawler, jobs_crawler, "catalog_name", include_pipeline_ids=[include_flag]
     )
 
     ws.jobs.get.side_effect = [

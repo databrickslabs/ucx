@@ -17,12 +17,12 @@ class PipelinesMigrator:
     """
     PipelinesMigrator is responsible for migrating pipelines from HMS to UC
     It uses the DLT Migration API to migrate the pipelines and also updates the jobs associated with the pipelines if any
-    The class also provides an option to skip the pipelines that are already migrated or the ones that are explicitly skipped
+    The class also provides an option to include only some pipelines that are should be migrated
 
     :param ws: WorkspaceClient
     :param pipelines_crawler: PipelinesCrawler
     :param catalog_name: str
-    :param skip_pipeline_ids: list[str] | None
+    :param include_pipeline_ids: list[str] | None
     """
 
     def __init__(
@@ -31,13 +31,13 @@ class PipelinesMigrator:
         pipelines_crawler: PipelinesCrawler,
         jobs_crawler: JobsCrawler,
         catalog_name: str,
-        skip_pipeline_ids: list[str] | None = None,
+        include_pipeline_ids: list[str] | None = None,
     ):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
         self._jobs_crawler = jobs_crawler
         self._catalog_name = catalog_name
-        self._skip_pipeline_ids = skip_pipeline_ids or []
+        self._include_pipeline_ids = include_pipeline_ids or []
         self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
 
     def _populate_pipeline_job_tasks_mapping(self) -> None:
@@ -88,10 +88,11 @@ class PipelinesMigrator:
 
         tasks = []
         for pipeline in pipelines_to_migrate:
-            if pipeline.pipeline_id in self._skip_pipeline_ids:
-                logger.info(f"Skipping pipeline {pipeline.pipeline_id}")
-                continue
-            tasks.append(partial(self._migrate_pipeline, pipeline))
+            if len(self._include_pipeline_ids) > 0:
+                if pipeline.pipeline_id in self._include_pipeline_ids:
+                    tasks.append(partial(self._migrate_pipeline, pipeline))
+            else:
+                tasks.append(partial(self._migrate_pipeline, pipeline))
         if not tasks:
             return []
         Threads.strict("migrate pipelines", tasks)
