@@ -600,7 +600,7 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._workflows = workflows.workflows()
+        self._workflows = workflows.workflows
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 

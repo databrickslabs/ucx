@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class Workflows:
     def __init__(self, workflows: list[Workflow]):
-        self._workflows: dict[str, Workflow] = {workflow.name: workflow for workflow in workflows}
+        self.workflows: dict[str, Workflow] = {workflow.name: workflow for workflow in workflows}
 
     @classmethod
     def all(cls):
@@ -53,9 +53,6 @@ class Workflows:
             ]
         )
 
-    def workflows(self) -> dict[str, Workflow]:
-        return self._workflows
-
     def trigger(self, *argv):
         named_parameters = parse_args(*argv)
         config_path = Path(named_parameters["config"])
@@ -64,11 +61,11 @@ class Workflows:
         task_name = named_parameters.get("task", "not specified")
         workflow_name = named_parameters.get("workflow", "not specified")
         attempt = named_parameters.get("attempt", "0")
-        if workflow_name not in self._workflows:
-            msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self._workflows.keys())}'
+        if workflow_name not in self.workflows:
+            msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self.workflows.keys())}'
             raise KeyError(msg)
         print(f"UCX v{__version__}")
-        workflow = self._workflows[workflow_name]
+        workflow = self.workflows[workflow_name]
         if task_name == "parse_logs":
             return ctx.task_run_warning_recorder.snapshot()
         # both CLI commands and workflow names appear in telemetry under `cmd`
