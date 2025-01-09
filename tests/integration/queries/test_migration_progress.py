@@ -327,7 +327,7 @@ def query_problems(ws: WorkspaceClient, dashboards: list[Dashboard], dbfs_locati
 def dfsas(make_workspace_file, dbfs_location: str, dashboard_with_dfsa: Dashboard) -> list[DirectFsAccess]:
     workspace_file = make_workspace_file(content=f'df = spark.read.csv("{dbfs_location}")')
     records = [
-        DirectFsAccess(
+        DirectFsAccess(  # TODO: Match with Job
             path=dbfs_location,
             is_read=False,
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
@@ -336,8 +336,8 @@ def dfsas(make_workspace_file, dbfs_location: str, dashboard_with_dfsa: Dashboar
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="3", other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id="3/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id="4", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="4/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
