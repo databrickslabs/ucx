@@ -4,7 +4,7 @@ from typing import BinaryIO
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
 from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -32,14 +32,14 @@ class PipelinesMigrator:
         jobs_crawler: JobsCrawler,
         catalog_name: str,
         include_pipeline_ids: list[str] | None = None,
-        skip_pipeline_ids: list[str] | None = None,
+        exclude_pipeline_ids: list[str] | None = None,
     ):
         self._ws = ws
         self._pipeline_crawler = pipelines_crawler
         self._jobs_crawler = jobs_crawler
         self._catalog_name = catalog_name
         self._include_pipeline_ids = include_pipeline_ids
-        self._skip_pipeline_ids = skip_pipeline_ids
+        self._exclude_pipeline_ids = exclude_pipeline_ids
         self._pipeline_job_tasks_mapping: dict[str, list[dict]] = {}
 
     def _populate_pipeline_job_tasks_mapping(self) -> None:
@@ -52,38 +52,48 @@ class PipelinesMigrator:
             if not job.job_id:
                 continue
 
-            job_details = self._ws.jobs.get(int(job.job_id))
-            if not job_details.settings or not job_details.settings.tasks:
-                continue
-
-            for task in job_details.settings.tasks:
-                if not task.pipeline_task:
+            try:
+                job_details = self._ws.jobs.get(int(job.job_id))
+                if not job_details.settings or not job_details.settings.tasks:
                     continue
-                pipeline_id = task.pipeline_task.pipeline_id
-                job_info = {"job_id": job.job_id, "task_key": task.task_key}
-                if pipeline_id not in self._pipeline_job_tasks_mapping:
-                    self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
-                else:
-                    self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
-                logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
+
+                for task in job_details.settings.tasks:
+                    if not task.pipeline_task:
+                        continue
+                    pipeline_id = task.pipeline_task.pipeline_id
+                    job_info = {"job_id": job.job_id, "task_key": task.task_key}
+                    if pipeline_id not in self._pipeline_job_tasks_mapping:
+                        self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
+                    else:
+                        self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
+                    logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
+            except ResourceDoesNotExist:
+                logger.warning(f"Job {job.job_id} not found")
 
     def _get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         """
-        Returns the list of pipelines in the current workspace
+        Returns the list of pipelines filtered by the include and exclude list
         """
-        pipelines_in_workspace = list(self._pipeline_crawler.snapshot())
-        if self._include_pipeline_ids:
-            for pipeline in pipelines_in_workspace:
-                if pipeline.pipeline_id in self._include_pipeline_ids:
-                    continue
-                pipelines_in_workspace.remove(pipeline)
+        pipelines_to_migrate = self._list_pipelines()
 
-        if self._skip_pipeline_ids:
-            for pipeline in pipelines_in_workspace:
-                if pipeline.pipeline_id in self._skip_pipeline_ids:
-                    pipelines_in_workspace.remove(pipeline)
+        for pipeline in pipelines_to_migrate:
+            if self._exclude_pipeline_ids is not None and pipeline.pipeline_id in self._exclude_pipeline_ids:
+                pipelines_to_migrate.remove(pipeline)
+        return pipelines_to_migrate
 
-        return pipelines_in_workspace
+    def _list_pipelines(self) -> list[PipelineInfo]:
+        """
+        Returns the list of pipelines in the current workspace or list of include_pipeline if any
+        """
+        if self._include_pipeline_ids is None:
+            return self._pipeline_crawler.snapshot()
+
+        filtered_pipelines = []
+        for pipeline in self._pipeline_crawler.snapshot():
+            if pipeline.pipeline_id in self._include_pipeline_ids:
+                filtered_pipelines.append(pipeline)
+
+        return filtered_pipelines
 
     def migrate_pipelines(self) -> None:
         """
