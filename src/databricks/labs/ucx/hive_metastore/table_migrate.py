@@ -294,18 +294,28 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
-    def _convert_hms_table_to_external(self, src_table: Table) -> bool:
-        """Converts a Hive metastore table to external using Spark JVM methods.
+    @staticmethod
+    def _get_entity_storage_locations(table_metadata):
+        """Obtain the entityStorageLocations property for table metadata, if the property is present."""
+        # This is needed because:
+        #  - DBR 16.0 introduced entityStorageLocations as a property on table metadata, and this is required for
+        #    as a constructor parameter for CatalogTable.
+        #  - We need to be compatible with earlier versions of DBR.
+        #  - The normal hasattr() check does not work with Py4J-based objects: it always returns True and non-existent
+        #    methods will be automatically created on the proxy but fail when invoked.
+        # Instead the only approach is to use dir() to check if the method exists _prior_ to trying to access it.
+        # (After trying to access it, dir() will also include it even though it doesn't exist.)
+        return table_metadata.entityStorageLocations() if 'entityStorageLocations' in dir(table_metadata) else None
 
-        TODO:
-            This method fails for Databricks runtime 16.0, probably due to the JDK update (https://docs.databricks.com/en/release-notes/runtime/16.0.html#breaking-change-jdk-17-is-now-the-default).
-        """
+    def _convert_hms_table_to_external(self, src_table: Table) -> bool:
+        """Converts a Hive metastore table to external using Spark JVM methods."""
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
         try:
             database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
+            entity_storage_locations = self._get_entity_storage_locations(old_table)
             new_table = self._catalog_table(
                 old_table.identifier(),
                 self._catalog_type('EXTERNAL'),
@@ -327,13 +337,17 @@ class TablesMigrator:
                 old_table.schemaPreservesCase(),
                 old_table.ignoredProperties(),
                 old_table.viewOriginalText(),
+                # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
+                # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
+                # is present on the source table then the argument is needed.)
+                *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
             self._update_table_status(src_table, inventory_table)
-            logger.info(f"Converted {src_table.name} to External Table type.")
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
             return False
+        logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
