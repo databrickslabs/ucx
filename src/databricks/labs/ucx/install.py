@@ -58,7 +58,6 @@ from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
@@ -151,7 +150,6 @@ class WorkspaceInstaller(WorkspaceContext):
         self,
         ws: WorkspaceClient,
         environ: dict[str, str] | None = None,
-        tasks: list[Task] | None = None,
     ):
         super().__init__(ws)
         if not environ:
@@ -162,7 +160,7 @@ class WorkspaceInstaller(WorkspaceContext):
             raise SystemExit(msg)
 
         self._is_account_install = self._force_install == "account"
-        self._tasks = tasks if tasks else Workflows.all().tasks()
+        self._workflows = Workflows.all()
 
     @cached_property
     def upgrades(self) -> Upgrades:
@@ -199,7 +197,7 @@ class WorkspaceInstaller(WorkspaceContext):
                 self.workspace_client,
                 self.wheels,
                 self.product_info,
-                self._tasks,
+                self._workflows,
             )
             workspace_installation = WorkspaceInstallation(
                 config,
@@ -502,8 +500,16 @@ class WorkspaceInstallation(InstallationMixin):
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
-        tasks = Workflows.all().tasks()
-        workflows_installer = WorkflowsDeployment(config, installation, install_state, ws, wheels, product_info, tasks)
+        workflows = Workflows.all()
+        workflows_installer = WorkflowsDeployment(
+            config,
+            installation,
+            install_state,
+            ws,
+            wheels,
+            product_info,
+            workflows,
+        )
 
         return cls(
             config,

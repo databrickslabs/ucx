@@ -14,6 +14,7 @@ from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.runtime import Workflows
 
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
@@ -31,7 +32,7 @@ def workspace_installation(request, ws, any_prompt) -> WorkspaceInstallation:
         ws,
         wheels,
         PRODUCT_INFO,
-        [],
+        Workflows([]),
     )
     return WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
