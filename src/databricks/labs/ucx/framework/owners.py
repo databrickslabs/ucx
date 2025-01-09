@@ -7,9 +7,9 @@ from typing import Generic, TypeVar, final
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, InternalError
+from databricks.sdk.errors import InternalError, InvalidParameterValue, NotFound, ResourceDoesNotExist
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import User, PermissionLevel
+from databricks.sdk.service.iam import User, ObjectPermissions, PermissionLevel
 from databricks.sdk.service.workspace import ObjectType
 
 logger = logging.getLogger(__name__)
@@ -219,18 +219,32 @@ class WorkspacePathOwnership(Ownership[WorkspacePath]):
 
     @staticmethod
     def _maybe_type_and_id(path: WorkspacePath) -> tuple[str, str] | None:
-        object_info = path._object_info  # pylint: disable=protected-access
+        try:
+            object_info = path._object_info  # pylint: disable=protected-access
+        except (InvalidParameterValue, ResourceDoesNotExist):
+            logger.warning(f"Cannot retrieve status for: {path}")
+            return None
+        if not (object_info.object_id and object_info.object_type):
+            return None
         object_id = str(object_info.object_id)
         match object_info.object_type:
             case ObjectType.NOTEBOOK:
                 return 'notebooks', object_id
             case ObjectType.FILE:
                 return 'files', object_id
+            case ObjectType.DIRECTORY:
+                return 'directories', object_id
+            case _:
+                logger.warning(f"Unsupported object type: {object_info.object_type.value}")
         return None
 
     @staticmethod
-    def _infer_from_first_can_manage(object_permissions):
+    def _infer_from_first_can_manage(object_permissions: ObjectPermissions) -> str | None:
+        if object_permissions.access_control_list is None:
+            return None
         for acl in object_permissions.access_control_list:
+            if acl.all_permissions is None:
+                return None
             for permission in acl.all_permissions:
                 if permission.permission_level != PermissionLevel.CAN_MANAGE:
                     continue
