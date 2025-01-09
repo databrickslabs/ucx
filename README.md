@@ -1116,6 +1116,13 @@ dbutils.notebook.run(a)
 
 [[back to top](#databricks-labs-ucx)]
 
+## `python-parse-error`
+
+This is a generic message indicating that the Python code could not be parsed. The user must manually check the Python
+code.
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `python-udf-in-shared-clusters`
 
 `applyInPandas` requires DBR 14.3 LTS or above on Unity Catalog clusters in Shared access mode. Example:
