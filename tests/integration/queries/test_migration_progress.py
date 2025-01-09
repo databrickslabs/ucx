@@ -745,7 +745,7 @@ def test_migration_progress_query_dashboards_pending_migration(
     query_name = "03_05_dashboards_pending_migration"
     workspace_id = ws.get_workspace_id()
     rows = []
-    for status in statuses_pending_migration:
+    for status in sorted(statuses_pending_migration, key=lambda s: (s.src_schema, s.src_table)):
         table_full_name = ".".join(["hive_metastore", status.src_schema, status.src_table])
         row = Row(
             workspace_id=workspace_id,
