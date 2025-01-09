@@ -11,7 +11,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -51,6 +51,11 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
+
+# Although we really don't like using TYPE_CHECKING guards, this is the only way to avoid a circular import without
+# significant refactoring.
+if TYPE_CHECKING:
+    from databricks.labs.ucx.runtime import Workflows
 
 logger = logging.getLogger(__name__)
 
@@ -317,13 +322,13 @@ class DeployedWorkflows:
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
-        for step, job_id in self._install_state.jobs.items():
+        for workflow_name, job_id in self._install_state.jobs.items():
             job_state = None
             start_time = None
             try:
                 job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
             except InvalidParameterValue as e:
-                logger.warning(f"skipping {step}: {e}")
+                logger.warning(f"skipping {workflow_name}: {e}")
                 continue
             if job_runs:
                 state = job_runs[0].state
@@ -335,7 +340,8 @@ class DeployedWorkflows:
                     start_time = job_runs[0].start_time / 1000
             latest_status.append(
                 {
-                    "step": step,
+                    # "Step" was the historic name that UCX used for the workflows, to "step" through a migration.
+                    "step": workflow_name,
                     "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
                     "started": (
                         "<never run>" if not (job_runs and start_time) else self._readable_timedelta(start_time)
@@ -586,7 +592,7 @@ class WorkflowsDeployment(InstallationMixin):
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
-        tasks: list[Task],
+        workflows: Workflows,
     ):
         self._config = config
         self._installation = installation
@@ -594,13 +600,17 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
-        self._tasks = tasks
+        self._workflows = workflows.workflows
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
     def create_jobs(self) -> None:
         remote_wheels = self._upload_wheel()
-        desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
+        desired_workflows = {
+            workflow
+            for workflow, tasks in self._workflows.items()
+            if any(task.cloud_compatible(self._ws.config) for task in tasks.tasks())
+        }
 
         wheel_runner = ""
         if self._config.override_clusters:
@@ -687,22 +697,20 @@ class WorkflowsDeployment(InstallationMixin):
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
-        for step_name in self._step_list():
-            if step_name not in self._install_state.jobs:
-                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
+        for workflow_name in self._workflow_names():
+            if workflow_name not in self._install_state.jobs:
+                logger.warning(f"Skipping step '{workflow_name}' since it was not deployed.")
                 continue
-            job_id = self._install_state.jobs[step_name]
+            job_id = self._install_state.jobs[workflow_name]
             dashboard_link = ""
-            dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
-            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
+            dashboard_link = self._create_dashboard_links(workflow_name, dashboard_link)
+            job_link = f"[{self._name(workflow_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self._tasks:
+            for task in self._workflows[workflow_name].tasks():
                 if self._is_testing() and task.is_testing():
-                    continue
-                if task.workflow != step_name:
                     continue
                 doc = self._config.replace_inventory_variable(task.doc)
                 markdown.append(f"### `{task.name}`\n\n")
@@ -712,8 +720,8 @@ class WorkflowsDeployment(InstallationMixin):
         intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
         self._installation.upload('README.py', intro.encode('utf8'))
 
-    def _create_dashboard_links(self, step_name, dashboard_link):
-        dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
+    def _create_dashboard_links(self, workflow_name, dashboard_link):
+        dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(workflow_name)]
         for dash in dashboards_per_step:
             if len(dashboard_link) == 0:
                 dashboard_link += "Go to the one of the following dashboards after running the job:\n"
@@ -722,14 +730,14 @@ class WorkflowsDeployment(InstallationMixin):
             dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
         return dashboard_link
 
-    def _step_list(self) -> list[str]:
-        step_list = []
-        for task in self._tasks:
-            if self._is_testing() and task.is_testing():
+    def _workflow_names(self) -> list[str]:
+        names = []
+        # Workflows are excluded if _is_testing() and all tasks are testing.
+        for workflow_name, tasks in self._workflows.items():
+            if self._is_testing() and all(t.is_testing() for t in tasks.tasks()):
                 continue
-            if task.workflow not in step_list:
-                step_list.append(task.workflow)
-        return step_list
+            names.append(workflow_name)
+        return names
 
     def _job_cluster_spark_conf(self, cluster_key: str):
         conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
@@ -747,20 +755,20 @@ class WorkflowsDeployment(InstallationMixin):
 
     # Workflow creation might fail on an InternalError with no message
     @retried(on=[InternalError], timeout=timedelta(minutes=2))
-    def _deploy_workflow(self, step_name: str, settings):
-        if step_name in self._install_state.jobs:
+    def _deploy_workflow(self, workflow_name: str, settings):
+        if workflow_name in self._install_state.jobs:
             try:
-                job_id = int(self._install_state.jobs[step_name])
-                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
+                job_id = int(self._install_state.jobs[workflow_name])
+                logger.info(f"Updating configuration for step={workflow_name} job_id={job_id}")
                 return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             except InvalidParameterValue:
-                del self._install_state.jobs[step_name]
-                logger.warning(f"step={step_name} does not exist anymore for some reason")
-                return self._deploy_workflow(step_name, settings)
-        logger.info(f"Creating new job configuration for step={step_name}")
+                del self._install_state.jobs[workflow_name]
+                logger.warning(f"step={workflow_name} does not exist anymore for some reason")
+                return self._deploy_workflow(workflow_name, settings)
+        logger.info(f"Creating new job configuration for step={workflow_name}")
         new_job = self._ws.jobs.create(**settings)
         assert new_job.job_id is not None
-        self._install_state.jobs[step_name] = str(new_job.job_id)
+        self._install_state.jobs[workflow_name] = str(new_job.job_id)
         return None
 
     @staticmethod
@@ -812,7 +820,7 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
-    def _job_settings(self, step_name: str, remote_wheels: list[str]) -> dict[str, Any]:
+    def _job_settings(self, workflow_name: str, remote_wheels: list[str]) -> dict[str, Any]:
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -823,12 +831,11 @@ class WorkflowsDeployment(InstallationMixin):
 
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
-        for task in self._tasks:
-            if task.workflow != step_name:
-                continue
+        workflow = self._workflows[workflow_name]
+        for task in workflow.tasks():
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
-        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheels))
+        job_tasks.append(self._job_parse_logs_task(job_tasks, workflow_name, remote_wheels))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         tags = {"version": f"v{version}"}
@@ -837,10 +844,11 @@ class WorkflowsDeployment(InstallationMixin):
             date_to_remove = self._get_test_purge_time()
             tags.update({"RemoveAfter": date_to_remove})
         return {
-            "name": self._name(step_name),
+            "name": self._name(workflow_name),
             "tags": tags,
             "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
+            "schedule": workflow.schedule,
             "tasks": job_tasks,
         }
 
@@ -951,8 +959,8 @@ class WorkflowsDeployment(InstallationMixin):
     def _create_debug(self, remote_wheels: list[str]):
         readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
-            f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._install_state.jobs.items()
+            f"[{self._name(workflow_name)}]({self._ws.config.host}#job/{job_id})"
+            for workflow_name, job_id in self._install_state.jobs.items()
         )
         remote_wheels_str = " ".join(remote_wheels)
         content = DEBUG_NOTEBOOK.format(

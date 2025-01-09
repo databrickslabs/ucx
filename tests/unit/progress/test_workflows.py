@@ -8,7 +8,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, MetastoreAssignment
-from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState
+from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState, PauseStatus
 
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
@@ -169,3 +169,9 @@ def test_migration_progress_record_workflow_run(run_workflow, mock_backend) -> N
     ]
     # Finish-time must be indistinguishable from or later than the start time.
     assert all(row["started_at"] <= row["finished_at"] for row in rows)
+
+
+def test_migration_progress_has_schedule() -> None:
+    workflow = MigrationProgress()
+    schedule = workflow.schedule
+    assert schedule is not None and schedule.pause_status == PauseStatus.UNPAUSED
