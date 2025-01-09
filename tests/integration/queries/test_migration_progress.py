@@ -151,7 +151,12 @@ def job_without_failures() -> JobInfo:
 
 @pytest.fixture
 def job_with_failures() -> JobInfo:
-    return JobInfo("3", success=0, failures="")  # Failure come from workflow problems below
+    """A job with failures
+
+    - See workflow_problems
+    - See dfsa
+    """
+    return JobInfo("3", success=0, failures="")
 
 
 @pytest.fixture
@@ -314,7 +319,7 @@ def query_problems(ws: WorkspaceClient, dashboards: list[Dashboard], dbfs_locati
 
 @pytest.fixture
 def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsAccess]:
-    # TODO: Match the DFSAs with a job and dashboard
+    # TODO: Match the DFSAs with a dashboard
     workspace_file = make_workspace_file(content=f'df = spark.read.csv("{dbfs_location}")')
     query = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
@@ -327,8 +332,8 @@ def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsA
             source_id=str(workspace_file),
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="WORKFLOW", object_id="my_workflow_id", other={"name": "my_workflow"}),
-                LineageAtom(object_type="TASK", object_id="my_workflow_id/my_task_id"),
+                LineageAtom(object_type="WORKFLOW", object_id="3", other={"name": "my_workflow"}),
+                LineageAtom(object_type="TASK", object_id="3/my_task_id"),
                 LineageAtom(object_type="NOTEBOOK", object_id="my_notebook_path"),
                 LineageAtom(object_type="FILE", object_id=str(workspace_file)),
             ],
@@ -486,6 +491,7 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     used_tables: list[UsedTable],
     query_problems: list[QueryProblem],
     dashboards: list[Dashboard],
+    dfsas: list[DirectFsAccess],
 ):
     """Populate the UCX catalog with multiworkspace tables.
 
@@ -526,6 +532,20 @@ def catalog_populated(  # pylint: disable=too-many-arguments
         f'hive_metastore.{runtime_ctx.inventory_database}.used_tables_in_queries',
         used_tables,
         UsedTable,
+        mode='overwrite',
+    )
+    # Persists DirectFsAccess to propagate them to Jobs
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.directfs_in_paths',
+        [dfsa for dfsa in dfsas if dfsa.source_type != "QUERY"],
+        DirectFsAccess,
+        mode='overwrite',
+    )
+    # Persists DirectFsAccess to propagate them to Dashboards
+    runtime_ctx.sql_backend.save_table(
+        f'hive_metastore.{runtime_ctx.inventory_database}.directfs_in_queries',
+        [dfsa for dfsa in dfsas if dfsa.source_type == "QUERY"],
+        DirectFsAccess,
         mode='overwrite',
     )
     # Persists QueryProblems to propagate them to Dashboards
