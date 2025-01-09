@@ -93,8 +93,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Skip TACL migration during table migration
     skip_tacl_migration: bool = False
 
-    # Select SQL query statement disposition, default to INLINE
-    query_statement_disposition: Disposition | None = None
+    # Select SQL query statement disposition
+    query_statement_disposition: Disposition = Disposition.INLINE
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
