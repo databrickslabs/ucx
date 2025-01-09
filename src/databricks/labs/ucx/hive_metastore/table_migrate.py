@@ -296,12 +296,7 @@ class TablesMigrator:
 
     @staticmethod
     def _get_entity_storage_locations(table_metadata):
-        """Detect if the current DBR supports/requires entityStorageLocations as a property on table metadata.
-
-        Args:
-            table_metadata: The table metadata (proxy) object that might not have the entityStorageLocations property.
-        Returns: a (JVM) Seq[EntityStorageLocation] if the property is present, or None otherwise.
-        """
+        """Obtain the entityStorageLocations property for table metadata, if the property is present."""
         # This is needed because:
         #  - DBR 16.0 introduced entityStorageLocations as a property on table metadata, and this is required for
         #    as a constructor parameter for CatalogTable.
@@ -349,10 +344,10 @@ class TablesMigrator:
             )
             self._catalog.alterTable(new_table)
             self._update_table_status(src_table, inventory_table)
-            logger.info(f"Converted {src_table.name} to External Table type.")
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
             return False
+        logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
