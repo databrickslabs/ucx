@@ -96,12 +96,18 @@ class Tree:  # pylint: disable=too-many-public-methods
                     end_col=(e.error.end_offset or 2) - 1,
                 ),
             )
+        new_issue_url = (
+            "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
+            "&labels=migrate/code,needs-triage,bug"
+            "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
+            f"%0A%0A%60%60%60+python%0A{source_code}%0A%60%60%60"
+        )
         return MaybeTree(
             None,
             Failure(
                 code="python-parse-error",
                 message=(
-                    "Please report the following error as an issue on UCX GitHub. "
+                    f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
                     f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
                 ),
                 # Lines and columns are both 0-based: the first line is line 0.
