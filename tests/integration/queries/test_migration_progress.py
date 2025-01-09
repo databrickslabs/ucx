@@ -255,19 +255,25 @@ def dbfs_location() -> str:
 
 
 @pytest.fixture
+def dashboard_with_dfsa(make_dashboard, make_query, dbfs_location) -> Dashboard:
+    query_with_dfsa = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
+    return Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa))
+
+
+@pytest.fixture
 def dashboards(
     make_dashboard,
     make_query,
     dashboard_with_hive_tables: Dashboard,
     dashboard_with_uc_tables: Dashboard,
+    dashboard_with_dfsa: Dashboard,
     dbfs_location: str,
 ) -> list[Dashboard]:
     query_with_invalid_sql = make_query(sql_query="SELECT SUM(1")
-    query_with_dfsa = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
         dashboard_with_hive_tables,
         Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_invalid_sql)),
-        Dashboard.from_sdk_redash_dashboard(make_dashboard(query=query_with_dfsa)),
+        dashboard_with_dfsa,
         dashboard_with_uc_tables,
     ]
     return records
@@ -318,10 +324,8 @@ def query_problems(ws: WorkspaceClient, dashboards: list[Dashboard], dbfs_locati
 
 
 @pytest.fixture
-def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsAccess]:
-    # TODO: Match the DFSAs with a dashboard
+def dfsas(make_workspace_file, dbfs_location: str, dashboard_with_dfsa: Dashboard) -> list[DirectFsAccess]:
     workspace_file = make_workspace_file(content=f'df = spark.read.csv("{dbfs_location}")')
-    query = make_query(sql_query=f"SELECT * FROM csv.`{dbfs_location}`")
     records = [
         DirectFsAccess(
             path=dbfs_location,
@@ -346,11 +350,15 @@ def dfsas(make_workspace_file, make_query, dbfs_location: str) -> list[DirectFsA
             # Technically, the mocked code is reading the path, but marking it as write allows us to set the owner to
             # the current user, which we can test below.
             is_write=True,
-            source_id=query.id,
+            source_id=dashboard_with_dfsa.query_ids[0],
             source_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2.0),
             source_lineage=[
-                LineageAtom(object_type="DASHBOARD", object_id="my_dashboard_id", other={"name": "my_dashboard"}),
-                LineageAtom(object_type="QUERY", object_id=f"my_dashboard_id/{query.id}", other={"name": "my_query"}),
+                LineageAtom(object_type="DASHBOARD", object_id=dashboard_with_dfsa.id, other={"name": "my_dashboard"}),
+                LineageAtom(
+                    object_type="QUERY",
+                    object_id=f"{dashboard_with_dfsa.id}/{dashboard_with_dfsa.query_ids[0]}",
+                    other={"name": "my_query"},
+                ),
             ],
             assessment_start_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5.0),
             assessment_end_timestamp=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2.0),
@@ -538,13 +546,6 @@ def catalog_populated(  # pylint: disable=too-many-arguments
     runtime_ctx.sql_backend.save_table(
         f'hive_metastore.{runtime_ctx.inventory_database}.directfs_in_paths',
         [dfsa for dfsa in dfsas if dfsa.source_type != "QUERY"],
-        DirectFsAccess,
-        mode='overwrite',
-    )
-    # Persists DirectFsAccess to propagate them to Dashboards
-    runtime_ctx.sql_backend.save_table(
-        f'hive_metastore.{runtime_ctx.inventory_database}.directfs_in_queries',
-        [dfsa for dfsa in dfsas if dfsa.source_type == "QUERY"],
         DirectFsAccess,
         mode='overwrite',
     )
