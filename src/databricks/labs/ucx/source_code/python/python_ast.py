@@ -26,6 +26,7 @@ from astroid import (  # type: ignore
     parse,
     Uninferable,
 )
+from astroid.exceptions import AstroidSyntaxError  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Failure,
@@ -78,15 +79,37 @@ class Tree:  # pylint: disable=too-many-public-methods
             return MaybeTree(tree, None)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
-            return cls._definitely_failure('system-error', code, e)
+            return cls._definitely_failure(code, e)
 
     @staticmethod
-    def _definitely_failure(message_code: str, source_code: str, e: Exception) -> MaybeTree:
+    def _definitely_failure(source_code: str, e: Exception) -> MaybeTree:
+        if isinstance(e, AstroidSyntaxError) and isinstance(e.error, SyntaxError):
+            return MaybeTree(
+                None,
+                Failure(
+                    code="python-parse-error",
+                    message=f"Failed to parse code due to invalid syntax: {source_code}",
+                    # Lines and columns are both 0-based: the first line is line 0.
+                    start_line=(e.error.lineno or 1) - 1,
+                    start_col=(e.error.offset or 1) - 1,
+                    end_line=(e.error.end_lineno or 2) - 1,
+                    end_col=(e.error.end_offset or 2) - 1,
+                ),
+            )
+        new_issue_url = (
+            "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
+            "&labels=migrate/code,needs-triage,bug"
+            "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
+            f"%0A%0A%60%60%60+python%0A{source_code}%0A%60%60%60"
+        )
         return MaybeTree(
             None,
             Failure(
-                code=message_code,
-                message=f"Failed to parse code `{source_code}`: {type(e)}: {e}. Report this as an issue on UCX GitHub.",
+                code="python-parse-error",
+                message=(
+                    f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
+                    f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
+                ),
                 # Lines and columns are both 0-based: the first line is line 0.
                 start_line=0,
                 start_col=0,

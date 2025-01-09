@@ -1127,7 +1127,11 @@ class MockInstallationContext(MockRuntimeContext):
             renamed_group_prefix=self.renamed_group_prefix,
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
-            include_job_ids=self.created_jobs,
+            # An empty list is not saved in the installation.save below.
+            # With a dummy id, we signal to skip all jobs.
+            # A temporary hack to speed up the WorkflowLinter, proper solution follows from issue:
+            # https://github.com/databrickslabs/blueprint/issues/179
+            include_job_ids=self.created_jobs or [1],
             include_dashboard_ids=self.created_dashboards,
             include_query_ids=self.created_queries,
             include_object_permissions=self.created_object_permissions,

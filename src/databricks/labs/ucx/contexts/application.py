@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.assessment.dashboards import DashboardOwnership
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.hive_metastore.pipelines_migrate import PipelinesMigrator
@@ -265,6 +266,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def udf_ownership(self) -> UdfOwnership:
         return UdfOwnership(self.administrator_locator)
+
+    @cached_property
+    def dashboard_ownership(self) -> DashboardOwnership:
+        return DashboardOwnership(self.administrator_locator, self.workspace_client, self.workspace_path_ownership)
 
     @cached_property
     def tables_crawler(self) -> TablesCrawler:
