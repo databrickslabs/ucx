@@ -4,7 +4,7 @@ from typing import BinaryIO
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, ResourceDoesNotExist
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -52,23 +52,20 @@ class PipelinesMigrator:
             if not job.job_id:
                 continue
 
-            try:
-                job_details = self._ws.jobs.get(int(job.job_id))
-                if not job_details.settings or not job_details.settings.tasks:
-                    continue
+            job_details = self._ws.jobs.get(int(job.job_id))
+            if not job_details.settings or not job_details.settings.tasks:
+                continue
 
-                for task in job_details.settings.tasks:
-                    if not task.pipeline_task:
-                        continue
-                    pipeline_id = task.pipeline_task.pipeline_id
-                    job_info = {"job_id": job.job_id, "task_key": task.task_key}
-                    if pipeline_id not in self._pipeline_job_tasks_mapping:
-                        self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
-                    else:
-                        self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
-                    logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
-            except ResourceDoesNotExist:
-                logger.warning(f"Job {job.job_id} not found")
+            for task in job_details.settings.tasks:
+                if not task.pipeline_task:
+                    continue
+                pipeline_id = task.pipeline_task.pipeline_id
+                job_info = {"job_id": job.job_id, "task_key": task.task_key}
+                if pipeline_id not in self._pipeline_job_tasks_mapping:
+                    self._pipeline_job_tasks_mapping[pipeline_id] = [job_info]
+                else:
+                    self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
+                logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
     def _get_pipelines_to_migrate(self) -> list[PipelineInfo]:
         """
@@ -86,7 +83,7 @@ class PipelinesMigrator:
         Returns the list of pipelines in the current workspace or list of include_pipeline if any
         """
         if self._include_pipeline_ids is None:
-            return self._pipeline_crawler.snapshot()
+            return list(self._pipeline_crawler.snapshot())
 
         filtered_pipelines = []
         for pipeline in self._pipeline_crawler.snapshot():
