@@ -82,6 +82,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
   * [`not-supported`](#not-supported)
   * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+  * [`python-parse-error`](#python-parse-error)
   * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
   * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
   * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
