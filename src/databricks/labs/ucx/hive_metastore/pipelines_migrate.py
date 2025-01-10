@@ -23,6 +23,7 @@ class PipelinesMigrator:
     :param pipelines_crawler: PipelinesCrawler
     :param catalog_name: str
     :param include_pipeline_ids: list[str] | None
+    :param exclude_pipeline_ids: list[str] | None
     """
 
     def __init__(
