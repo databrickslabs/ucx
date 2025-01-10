@@ -77,13 +77,10 @@ class PipelinesMigrator:
         if self._include_pipeline_ids:
             pipeline_ids_to_migrate = self._include_pipeline_ids
         else:
-            for pipeline in list(self._pipeline_crawler.snapshot()):
-                pipeline_ids_to_migrate.append(pipeline.pipeline_id)
+            pipeline_ids_to_migrate = [p.pipeline_id for p in self._pipeline_crawler.snapshot()]
 
         if self._exclude_pipeline_ids is not None:
-            for pipeline_id in pipeline_ids_to_migrate:
-                if pipeline_id in self._exclude_pipeline_ids:
-                    pipeline_ids_to_migrate.remove(pipeline_id)
+            pipeline_ids_to_migrate = list(set(pipeline_ids_to_migrate) - set(self._exclude_pipeline_ids))
         return pipeline_ids_to_migrate
 
     def migrate_pipelines(self) -> None:
@@ -98,7 +95,7 @@ class PipelinesMigrator:
         Create tasks to parallely migrate the pipelines
         """
         # get pipelines to migrate
-        pipelines_to_migrate = self._get_pipelines_to_migrate()
+        pipelines_to_migrate = self._get_pipeline_ids_to_migrate()
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
@@ -131,9 +128,9 @@ class PipelinesMigrator:
         """
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
-        get_pipeline = self._ws.pipelines.get(pipeline_id)
-        if get_pipeline.spec:
-            if get_pipeline.spec.catalog:
+        pipeline_info = self._ws.pipelines.get(pipeline_id)
+        if pipeline_info.spec:
+            if pipeline_info.spec.catalog:
                 # Skip if the pipeline is already migrated to UC
                 logger.info(f"Pipeline {pipeline_id} is already migrated to UC")
                 return []
@@ -143,13 +140,13 @@ class PipelinesMigrator:
             # Rename old pipeline first
             self._ws.pipelines.update(
                 pipeline_id,
-                name=f"{get_pipeline.name} [OLD]",
-                clusters=get_pipeline.spec.clusters if get_pipeline.spec.clusters else None,
-                storage=get_pipeline.spec.storage if get_pipeline.spec.storage else None,
-                continuous=get_pipeline.spec.continuous if get_pipeline.spec.continuous else None,
-                deployment=get_pipeline.spec.deployment if get_pipeline.spec.deployment else None,
-                target=get_pipeline.spec.target if get_pipeline.spec.target else None,
-                libraries=get_pipeline.spec.libraries if get_pipeline.spec.libraries else None,
+                name=f"{pipeline_info.name} [OLD]",
+                clusters=pipeline_info.spec.clusters if pipeline_info.spec.clusters else None,
+                storage=pipeline_info.spec.storage if pipeline_info.spec.storage else None,
+                continuous=pipeline_info.spec.continuous if pipeline_info.spec.continuous else None,
+                deployment=pipeline_info.spec.deployment if pipeline_info.spec.deployment else None,
+                target=pipeline_info.spec.target if pipeline_info.spec.target else None,
+                libraries=pipeline_info.spec.libraries if pipeline_info.spec.libraries else None,
             )
 
         # Clone pipeline
@@ -161,7 +158,7 @@ class PipelinesMigrator:
             'catalog': self._catalog_name,
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
-            'name': f"{get_pipeline.name}",
+            'name': f"{pipeline_info.name}",
         }
         res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline_id}/clone', body=body, headers=headers)
         assert isinstance(res, dict)
