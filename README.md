@@ -2115,7 +2115,7 @@ are eligible to be run as a collection. User can run the below commands as colle
 - `migrate-tables`
 - `migrate-acls`
 - `migrate-dbsql-dashboards`
-- `validate-group-membership`
+- `validate-groups-membership`
 Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
 
 
