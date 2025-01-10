@@ -36,7 +36,7 @@ def test_running_real_assessment_job(
     installation_ctx.workspace_installation.run()
 
     workflow = "assessment"
-    installation_ctx.deployed_workflows.run_workflow(workflow)
+    installation_ctx.deployed_workflows.run_workflow(workflow, skip_job_wait=True)
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
     after = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
