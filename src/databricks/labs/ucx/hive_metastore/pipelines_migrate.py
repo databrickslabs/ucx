@@ -132,14 +132,14 @@ class PipelinesMigrator:
         if pipeline_info.spec:
             if pipeline_info.spec.catalog:
                 # Skip if the pipeline is already migrated to UC
-                logger.info(f"Pipeline {pipeline_id} is already migrated to UC")
+                logger.info(f"Pipeline {pipeline_info.pipeline_id} is already migrated to UC")
                 return []
 
             # Stop HMS pipeline
-            self._ws.pipelines.stop(pipeline_id)
+            self._ws.pipelines.stop(pipeline_info.pipeline_id)
             # Rename old pipeline first
             self._ws.pipelines.update(
-                pipeline_id,
+                pipeline_info.pipeline_id,
                 name=f"{pipeline_info.name} [OLD]",
                 clusters=pipeline_info.spec.clusters if pipeline_info.spec.clusters else None,
                 storage=pipeline_info.spec.storage if pipeline_info.spec.storage else None,
@@ -160,17 +160,17 @@ class PipelinesMigrator:
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
             'name': f"{pipeline_info.name}",
         }
-        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline_id}/clone', body=body, headers=headers)
+        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline_info.pipeline_id}/clone', body=body, headers=headers)
         assert isinstance(res, dict)
         if 'pipeline_id' not in res:
-            logger.warning(f"Failed to clone pipeline {pipeline_id}")
+            logger.warning(f"Failed to clone pipeline {pipeline_info.pipeline_id}")
             return res
 
         # After successful clone, update jobs
         # Currently there is no SDK method available to migrate the DLT pipelines
         # We are directly using the DLT Migration API in the interim, once the SDK method is available, we can replace this
-        if pipeline_id in self._pipeline_job_tasks_mapping:
-            for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline_id]:
+        if pipeline_info.pipeline_id in self._pipeline_job_tasks_mapping:
+            for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline_info.pipeline_id]:
                 self._ws.jobs.update(
                     pipeline_job_task_mapping['job_id'],
                     new_settings=JobSettings(
