@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import builtins
-import sys
-from abc import ABC, abstractmethod
 import logging
+import sys
 import re
+import urllib.parse
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TypeVar, cast
@@ -95,7 +96,7 @@ class Tree:  # pylint: disable=too-many-public-methods
                     end_col=(e.error.end_offset or 2) - 1,
                 ),
             )
-        new_issue_url = (
+        new_issue_url = urllib.parse.quote_plus(
             "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
             "&labels=migrate/code,needs-triage,bug"
             "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
