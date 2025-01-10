@@ -8,7 +8,7 @@ from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -68,30 +68,29 @@ class PipelinesMigrator:
                     self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
                 logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
-    def _get_pipelines_to_migrate(self) -> list[PipelineInfo]:
+    def _get_pipelines_to_migrate(self) -> list[str]:
         """
         Returns the list of pipelines filtered by the include and exclude list
         """
-        pipelines_to_migrate = self._list_pipelines()
+        pipeline_ids_to_migrate = self._list_pipeline_ids()
 
-        for pipeline in pipelines_to_migrate:
-            if self._exclude_pipeline_ids is not None and pipeline.pipeline_id in self._exclude_pipeline_ids:
-                pipelines_to_migrate.remove(pipeline)
-        return pipelines_to_migrate
+        for pipeline_id in pipeline_ids_to_migrate:
+            if self._exclude_pipeline_ids is not None and pipeline_id in self._exclude_pipeline_ids:
+                pipeline_ids_to_migrate.remove(pipeline_id)
+        return pipeline_ids_to_migrate
 
-    def _list_pipelines(self) -> list[PipelineInfo]:
+    def _list_pipeline_ids(self) -> list[str]:
         """
-        Returns the list of pipelines in the current workspace or list of include_pipeline if any
+        Returns the list of pipeline ids in the current workspace
         """
-        if self._include_pipeline_ids is None:
-            return list(self._pipeline_crawler.snapshot())
+        if self._include_pipeline_ids:
+            return self._include_pipeline_ids
 
-        filtered_pipelines = []
-        for pipeline in self._pipeline_crawler.snapshot():
-            if pipeline.pipeline_id in self._include_pipeline_ids:
-                filtered_pipelines.append(pipeline)
+        pipeline_id_list = []
+        for pipeline in list(self._pipeline_crawler.snapshot()):
+            pipeline_id_list.append(pipeline.pipeline_id)
 
-        return filtered_pipelines
+        return pipeline_id_list
 
     def migrate_pipelines(self) -> None:
         """
@@ -109,27 +108,27 @@ class PipelinesMigrator:
         logger.info(f"Found {len(pipelines_to_migrate)} pipelines to migrate")
 
         tasks = []
-        for pipeline in pipelines_to_migrate:
-            tasks.append(partial(self._migrate_pipeline, pipeline))
+        for pipeline_id in pipelines_to_migrate:
+            tasks.append(partial(self._migrate_pipeline, pipeline_id))
         if not tasks:
             return []
         Threads.strict("migrate pipelines", tasks)
         return tasks
 
-    def _migrate_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO | bool:
+    def _migrate_pipeline(self, pipeline_id: str) -> dict | list | BinaryIO | bool:
         """
         Private method to clone the pipeline and handle the exceptions
         """
         try:
-            return self._clone_pipeline(pipeline)
+            return self._clone_pipeline(pipeline_id)
         except DatabricksError as e:
             if "Cloning from Hive Metastore to Unity Catalog is currently not supported" in str(e):
                 logger.error(f"{e}: Please contact Databricks to enable DLT HMS to UC migration API on this workspace")
                 return False
-            logger.error(f"Failed to migrate pipeline {pipeline.pipeline_id}: {e}")
+            logger.error(f"Failed to migrate pipeline {pipeline_id}: {e}")
             return False
 
-    def _clone_pipeline(self, pipeline: PipelineInfo) -> dict | list | BinaryIO:
+    def _clone_pipeline(self, pipeline_id: str) -> dict | list | BinaryIO:
         """
         This method calls the DLT Migration API to clone the pipeline
         Stop and rename the old pipeline before cloning the new pipeline
@@ -138,19 +137,19 @@ class PipelinesMigrator:
         """
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
-        get_pipeline = self._ws.pipelines.get(pipeline.pipeline_id)
+        get_pipeline = self._ws.pipelines.get(pipeline_id)
         if get_pipeline.spec:
             if get_pipeline.spec.catalog:
                 # Skip if the pipeline is already migrated to UC
-                logger.info(f"Pipeline {pipeline.pipeline_id} is already migrated to UC")
+                logger.info(f"Pipeline {pipeline_id} is already migrated to UC")
                 return []
 
             # Stop HMS pipeline
-            self._ws.pipelines.stop(pipeline.pipeline_id)
+            self._ws.pipelines.stop(pipeline_id)
             # Rename old pipeline first
             self._ws.pipelines.update(
-                pipeline.pipeline_id,
-                name=f"{pipeline.pipeline_name} [OLD]",
+                pipeline_id,
+                name=f"{get_pipeline.name} [OLD]",
                 clusters=get_pipeline.spec.clusters if get_pipeline.spec.clusters else None,
                 storage=get_pipeline.spec.storage if get_pipeline.spec.storage else None,
                 continuous=get_pipeline.spec.continuous if get_pipeline.spec.continuous else None,
@@ -168,21 +167,19 @@ class PipelinesMigrator:
             'catalog': self._catalog_name,
             'clone_mode': 'MIGRATE_TO_UC',
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
-            'name': f"{pipeline.pipeline_name}",
+            'name': f"{get_pipeline.name}",
         }
-        res = self._ws.api_client.do(
-            'POST', f'/api/2.0/pipelines/{pipeline.pipeline_id}/clone', body=body, headers=headers
-        )
+        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline_id}/clone', body=body, headers=headers)
         assert isinstance(res, dict)
         if 'pipeline_id' not in res:
-            logger.warning(f"Failed to clone pipeline {pipeline.pipeline_id}")
+            logger.warning(f"Failed to clone pipeline {pipeline_id}")
             return res
 
         # After successful clone, update jobs
         # Currently there is no SDK method available to migrate the DLT pipelines
         # We are directly using the DLT Migration API in the interim, once the SDK method is available, we can replace this
-        if pipeline.pipeline_id in self._pipeline_job_tasks_mapping:
-            for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline.pipeline_id]:
+        if pipeline_id in self._pipeline_job_tasks_mapping:
+            for pipeline_job_task_mapping in self._pipeline_job_tasks_mapping[pipeline_id]:
                 self._ws.jobs.update(
                     pipeline_job_task_mapping['job_id'],
                     new_settings=JobSettings(
