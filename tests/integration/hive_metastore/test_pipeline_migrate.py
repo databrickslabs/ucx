@@ -120,7 +120,7 @@ def test_pipeline_migrate(
         runtime_ctx.pipelines_crawler,
         runtime_ctx.jobs_crawler,
         runtime_ctx.make_catalog().name,
-        skip_pipeline_ids=[created_pipelines[1].pipeline_id],
+        include_pipeline_ids=[created_pipelines[0].pipeline_id, created_pipelines[1].pipeline_id],
     )
     pipelines_migrator.migrate_pipelines()
 
