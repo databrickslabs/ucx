@@ -129,7 +129,7 @@ class PipelinesMigrator:
         # Need to get the pipeline again to get the libraries
         # else updating name fails with libraries not provided error
         pipeline_info = self._ws.pipelines.get(pipeline_id)
-        if pipeline_info.spec:
+        if pipeline_info.spec and pipeline_info.pipeline_id:
             if pipeline_info.spec.catalog:
                 # Skip if the pipeline is already migrated to UC
                 logger.info(f"Pipeline {pipeline_info.pipeline_id} is already migrated to UC")
@@ -160,7 +160,9 @@ class PipelinesMigrator:
             'configuration': {'pipelines.migration.ignoreExplicitPath': 'true'},
             'name': f"{pipeline_info.name}",
         }
-        res = self._ws.api_client.do('POST', f'/api/2.0/pipelines/{pipeline_info.pipeline_id}/clone', body=body, headers=headers)
+        res = self._ws.api_client.do(
+            'POST', f'/api/2.0/pipelines/{pipeline_info.pipeline_id}/clone', body=body, headers=headers
+        )
         assert isinstance(res, dict)
         if 'pipeline_id' not in res:
             logger.warning(f"Failed to clone pipeline {pipeline_info.pipeline_id}")
