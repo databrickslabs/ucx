@@ -1983,8 +1983,8 @@ Workspace Group Name  Members Count  Account Group Name  Members Count  Differen
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership.
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and
-[group migration](#group-migration-workflow) for more details.
+used to debug issues related to group membership. See [group migration workflow](#group-migration-workflow) and
+[group migration design document](docs/local-group-migration.md) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
 
