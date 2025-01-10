@@ -4,7 +4,7 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -290,3 +290,16 @@ dbutils.notebook.run(f"Hey {name2}")
     linter = DbutilsPyLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert not advices
+
+
+def test_tree_maybe_parse_fails_on_jupyter_magic() -> None:
+    source = "%tb"
+    tree = Tree.maybe_parse(source)
+    assert tree.failure == Failure(
+        "python-parse-error",
+        f"Failed to parse code due to invalid syntax: {source}",
+        start_line=0,
+        start_col=0,
+        end_line=0,
+        end_col=1,
+    )

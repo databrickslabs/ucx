@@ -10,8 +10,9 @@ from databricks.sdk.service.iam import ComplexValue, User
 from databricks.sdk.service.jobs import BaseRun, CreateResponse, Run, RunOutput, RunResultState, RunState, RunTask
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.framework.tasks import Workflow, job_task
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows, WorkflowsDeployment
+from databricks.labs.ucx.runtime import Workflows
 
 
 class ResourceDoesNotExistIter:
@@ -38,7 +39,7 @@ def side_effect_remove_after_in_tags_settings(**settings) -> CreateResponse:
     return CreateResponse(job_id=1)
 
 
-def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installation):
+def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installation) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.current_user.me.return_value = User(user_name="user", groups=[ComplexValue(display="admins")])
     ws.jobs.create.side_effect = side_effect_remove_after_in_tags_settings
@@ -47,7 +48,15 @@ def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installati
     install_state = InstallState.from_installation(mock_installation)
     wheels = create_autospec(WheelsV2)
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    tasks = [Task("workflow", "task", "docs", lambda *_: None)]
+
+    class Dummy(Workflow):
+        def __init__(self):
+            super().__init__('dummy')
+
+        @job_task
+        def task(self, ctx):
+            """docs"""
+
     workflows_deployment = WorkflowsDeployment(
         config,
         mock_installation,
@@ -55,7 +64,7 @@ def test_workflows_deployment_creates_jobs_with_remove_after_tag(mock_installati
         ws,
         wheels,
         product_info,
-        tasks=tasks,
+        workflows=Workflows([Dummy()]),
     )
     try:
         workflows_deployment.create_jobs()

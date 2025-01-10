@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import os
 import sys
@@ -9,7 +8,7 @@ from databricks.sdk.config import with_user_agent_extra
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.framework.tasks import Task, Workflow, parse_args
+from databricks.labs.ucx.framework.tasks import Workflow, parse_args
 from databricks.labs.ucx.installer.logs import TaskLogger
 from databricks.labs.ucx.hive_metastore.workflows import (
     ScanTablesInMounts,
@@ -32,15 +31,7 @@ logger = logging.getLogger(__name__)
 
 class Workflows:
     def __init__(self, workflows: list[Workflow]):
-        self._tasks: list[Task] = []
-        self._workflows: dict[str, Workflow] = {}
-        for workflow in workflows:
-            self._workflows[workflow.name] = workflow
-            for task_definition in workflow.tasks():
-                # Add the workflow name to the task definition, because we cannot access
-                # the workflow name from the method decorator
-                with_workflow = dataclasses.replace(task_definition, workflow=workflow.name)
-                self._tasks.append(with_workflow)
+        self.workflows: dict[str, Workflow] = {workflow.name: workflow for workflow in workflows}
 
     @classmethod
     def all(cls):
@@ -62,9 +53,6 @@ class Workflows:
             ]
         )
 
-    def tasks(self) -> list[Task]:
-        return self._tasks
-
     def trigger(self, *argv):
         named_parameters = parse_args(*argv)
         config_path = Path(named_parameters["config"])
@@ -73,11 +61,11 @@ class Workflows:
         task_name = named_parameters.get("task", "not specified")
         workflow_name = named_parameters.get("workflow", "not specified")
         attempt = named_parameters.get("attempt", "0")
-        if workflow_name not in self._workflows:
-            msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self._workflows.keys())}'
+        if workflow_name not in self.workflows:
+            msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self.workflows.keys())}'
             raise KeyError(msg)
         print(f"UCX v{__version__}")
-        workflow = self._workflows[workflow_name]
+        workflow = self.workflows[workflow_name]
         if task_name == "parse_logs":
             return ctx.task_run_warning_recorder.snapshot()
         # both CLI commands and workflow names appear in telemetry under `cmd`

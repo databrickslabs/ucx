@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -5,6 +6,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
+from databricks.sdk.service.jobs import CronSchedule
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
@@ -70,6 +72,11 @@ class Workflow:
     def name(self):
         return self._name
 
+    @property
+    def schedule(self) -> CronSchedule | None:
+        """The default (cron) schedule for this workflow, or None if it is not scheduled."""
+        return None
+
     def tasks(self) -> Iterable[Task]:
         # return __task__ from every method in this class that has this attribute
         for attr in dir(self):
@@ -77,7 +84,10 @@ class Workflow:
                 continue
             fn = getattr(self, attr)
             if hasattr(fn, "__task__"):
-                yield fn.__task__
+                task_definition = fn.__task__
+                # Substitute placeholder for workflow name (unavailable at time of declaration).
+                with_workflow = dataclasses.replace(task_definition, workflow=self.name)
+                yield with_workflow
 
 
 def job_task(
