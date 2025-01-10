@@ -68,7 +68,7 @@ class PipelinesMigrator:
                     self._pipeline_job_tasks_mapping[pipeline_id].append(job_info)
                 logger.info(f"Found job:{job.job_id} task:{task.task_key} associated with pipeline {pipeline_id}")
 
-    def _get_pipelines_to_migrate(self) -> list[str]:
+    def _get_pipeline_ids_to_migrate(self) -> list[str]:
         """
         Returns the list of pipelines filtered by the include and exclude list
         """
