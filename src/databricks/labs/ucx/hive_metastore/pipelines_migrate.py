@@ -72,25 +72,19 @@ class PipelinesMigrator:
         """
         Returns the list of pipelines filtered by the include and exclude list
         """
-        pipeline_ids_to_migrate = self._list_pipeline_ids()
+        pipeline_ids_to_migrate = []
 
-        for pipeline_id in pipeline_ids_to_migrate:
-            if self._exclude_pipeline_ids is not None and pipeline_id in self._exclude_pipeline_ids:
-                pipeline_ids_to_migrate.remove(pipeline_id)
-        return pipeline_ids_to_migrate
-
-    def _list_pipeline_ids(self) -> list[str]:
-        """
-        Returns the list of pipeline ids in the current workspace
-        """
         if self._include_pipeline_ids:
-            return self._include_pipeline_ids
+            pipeline_ids_to_migrate = self._include_pipeline_ids
+        else:
+            for pipeline in list(self._pipeline_crawler.snapshot()):
+                pipeline_ids_to_migrate.append(pipeline.pipeline_id)
 
-        pipeline_id_list = []
-        for pipeline in list(self._pipeline_crawler.snapshot()):
-            pipeline_id_list.append(pipeline.pipeline_id)
-
-        return pipeline_id_list
+        if self._exclude_pipeline_ids is not None:
+            for pipeline_id in pipeline_ids_to_migrate:
+                if pipeline_id in self._exclude_pipeline_ids:
+                    pipeline_ids_to_migrate.remove(pipeline_id)
+        return pipeline_ids_to_migrate
 
     def migrate_pipelines(self) -> None:
         """
