@@ -91,7 +91,7 @@ class AWSGlue:
     aws_account_id: str
 
     @classmethod
-    def get_glue_for_workspace(cls, workspace: WorkspaceClient, instance_profile_arn) -> typing.Self | None:
+    def get_glue_for_workspace(cls, workspace: WorkspaceClient, instance_profile_arn):
 
         account_id_match = re.match(r"arn:aws:iam::(\d+):instance-profile/.*", instance_profile_arn)
         if not account_id_match:
@@ -99,11 +99,11 @@ class AWSGlue:
             return None
         aws_account_id = account_id_match.group(1)
         try:
-            response = workspace.api_client.do("GET", f"/api/2.0/account/workspaces/{workspace.get_workspace_id()}")
-            if isinstance(response, dict):
-                aws_region = response.get("aws_region")
-                if aws_region:
-                    return AWSGlue(instance_profile_arn, aws_region, aws_account_id)
+            metastore = workspace.metastores.current().metastore_id
+            aws_region = workspace.metastores.get(metastore).region
+            if aws_region:
+                return AWSGlue(instance_profile_arn, aws_region, aws_account_id)
+            return None
         except NotFound:
             # workspace information cannot be found
             logger.warning("Can't retrieve aws region")
@@ -124,6 +124,30 @@ class AWSResources:
     S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
+    GLUE_REQUIRED_ACTIONS: typing.ClassVar[set[str]] = {
+        "glue:BatchCreatePartition",
+        "glue:BatchDeletePartition",
+        "glue:BatchGetPartition",
+        "glue:CreateDatabase",
+        "glue:CreateTable",
+        "glue:CreateUserDefinedFunction",
+        "glue:DeleteDatabase",
+        "glue:DeletePartition",
+        "glue:DeleteTable",
+        "glue:DeleteUserDefinedFunction",
+        "glue:GetDatabase",
+        "glue:GetDatabases",
+        "glue:GetPartition",
+        "glue:GetPartitions",
+        "glue:GetTable",
+        "glue:GetTables",
+        "glue:GetUserDefinedFunction",
+        "glue:GetUserDefinedFunctions",
+        "glue:UpdateDatabase",
+        "glue:UpdatePartition",
+        "glue:UpdateTable",
+        "glue:UpdateUserDefinedFunction",
+    }
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
@@ -231,34 +255,50 @@ class AWSResources:
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
-            actions = action.get("Action")
-            if not actions:
-                continue
-            s3_actions = self._s3_actions(actions)
-            if not s3_actions or self.S3_READONLY not in s3_actions:
-                continue
-            privilege = Privilege.WRITE_FILES.value
-            for s3_action_type in self.S3_ACTIONS:
-                if s3_action_type not in s3_actions:
-                    privilege = Privilege.READ_FILES.value
-                    continue
-            for resource in action.get("Resource", []):
-                match = re.match(self.S3_REGEX, resource)
-                if match:
-                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3://{match.group(1)}"))
-                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
+            action_policy_actions = self._s3_policy_actions(action) or self._glue_policy_actions(action)
+            policy_actions.extend(action_policy_actions)
         return policy_actions
 
-    def _s3_actions(self, actions):
-        s3_actions = []
+    def _s3_policy_actions(self, action):
+        s3_policy_actions = []
+        actions = action.get("Action")
+        if not actions:
+            return []
+        if not isinstance(actions, list):
+            if self.S3_READONLY not in actions:
+                return []
+            privilege = Privilege.WRITE_FILES.value
+            for s3_action_type in self.S3_ACTIONS:
+                if s3_action_type not in actions:
+                    privilege = Privilege.READ_FILES.value
+                    break
+        elif actions == self.S3_READONLY:
+            privilege = Privilege.READ_FILES.value
+        else:
+            return []
+
+        for resource in action.get("Resource", []):
+            match = re.match(self.S3_REGEX, resource)
+            if match:
+                s3_policy_actions.append(AWSPolicyAction("s3", privilege, f"s3://{match.group(1)}"))
+                s3_policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
+        return s3_policy_actions
+
+    def _glue_policy_actions(self, action):
+        actions = action.get("Action")
+        if not actions:
+            return []
         if isinstance(actions, list):
-            for single_action in actions:
-                if single_action in self.S3_ACTIONS:
-                    s3_actions.append(single_action)
-                    continue
-        elif actions in self.S3_ACTIONS:
-            s3_actions = [actions]
-        return s3_actions
+            # Check if all the required glue action are present in the role
+            for required_action in self.GLUE_REQUIRED_ACTIONS:
+                if required_action not in actions:
+                    return []
+        elif actions != "glue:*":
+            return []
+
+        if "*" not in action.get("Resource", []):
+            return []
+        return AWSPolicyAction("glue", Privilege.USAGE.value, "*")
 
     def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
         return self._get_json_for_cli(
