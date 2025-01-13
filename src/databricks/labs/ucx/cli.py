@@ -858,7 +858,7 @@ def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     working_directory = Path.cwd()
     if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
         return
-    ctx.local_file_migrator.apply(working_directory)
+    ctx.local_code_migrator.apply(working_directory)
 
 
 @ucx.command
