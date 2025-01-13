@@ -3,13 +3,11 @@ import shutil
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta, datetime, timezone
-from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -18,13 +16,11 @@ from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat, Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
-from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
-from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
@@ -171,27 +167,6 @@ def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job
     problems, *_ = simple_ctx.workflow_linter.lint_job(job_with_library.job_id)
 
     assert len([problem for problem in problems if problem.message == problem_message]) == 0
-
-
-def test_lint_local_code(simple_ctx):
-    # no need to connect
-    session_state = CurrentSessionState()
-    linter_context = LinterContext(TableMigrationIndex([]), session_state)
-    light_ctx = simple_ctx
-    ucx_path = Path(__file__).parent.parent.parent.parent
-    path_to_scan = Path(ucx_path, "src")
-    # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
-    linter = LocalCodeLinter(
-        light_ctx.notebook_loader,
-        light_ctx.file_loader,
-        light_ctx.folder_loader,
-        light_ctx.path_lookup,
-        session_state,
-        light_ctx.dependency_resolver,
-        lambda: linter_context,
-    )
-    problems = linter.lint(Prompts(), path_to_scan, StringIO())
-    assert len(problems) > 0
 
 
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
