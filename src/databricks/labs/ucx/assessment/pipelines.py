@@ -42,9 +42,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
         if self._include_pipeline_ids is not None:
             pipeline_ids = self._include_pipeline_ids
         else:
-            for pipeline in self._ws.pipelines.list_pipelines():
-                if pipeline.pipeline_id is not None:
-                    pipeline_ids.append(pipeline.pipeline_id)
+            pipeline_ids = [p.pipeline_id for p in self._ws.pipelines.list_pipelines() if p.pipeline_id]
 
         for pipeline_id in pipeline_ids:
             try:

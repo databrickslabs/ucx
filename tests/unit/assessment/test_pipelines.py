@@ -92,7 +92,7 @@ def test_pipeline_crawler_creator():
         PipelineStateInfo(pipeline_id="2", creator_user_name=""),
         PipelineStateInfo(pipeline_id="3", creator_user_name="bob"),
     )
-    ws.pipelines.get = create_autospec(GetPipelineResponse)  # pylint: disable=mock-no-usage
+    ws.pipelines.get = create_autospec(GetPipelineResponse)
     ws.pipelines.get.side_effect = [
         GetPipelineResponse(pipeline_id="1", spec=PipelineSpec(id="1"), creator_user_name=None),
         GetPipelineResponse(pipeline_id="2", spec=PipelineSpec(id="2"), creator_user_name=""),
