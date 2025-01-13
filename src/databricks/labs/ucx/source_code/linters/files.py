@@ -236,13 +236,12 @@ class LocalFileMigrator:
                 logger.info(f"Applying fix for {advice}")
                 code = fixer.apply(code)
                 applied = True
-            if not applied:
-                return False
-            # Write the fixed code back to the file
-            with path.open("w") as f:
-                logger.info(f"Overwriting {path}")
-                f.write(code)
-                return True
+        if not applied:
+            return False
+        with path.open("w") as f:
+            logger.info(f"Overwriting {path}")
+            f.write(code)
+        return True
 
 
 class StubContainer(SourceContainer):
