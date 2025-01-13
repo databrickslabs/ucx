@@ -95,13 +95,13 @@ def test_migrator_supported_language_no_fixer() -> None:
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
 
 
-def test_migrator_supported_language_with_fixer(tmpdir) -> None:
+def test_migrator_supported_language_with_fixer(tmp_path) -> None:
     languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
+    languages.linter(Language.PYTHON).lint.return_value = [Mock(code="some-code")]
+    languages.fixer(Language.PYTHON, "some-code").apply.return_value = "Hi there!"
     migrator = LocalFileMigrator(lambda: languages)
-    path = Path(tmpdir, 'any.py')
-    path.write_text("import tempfile", encoding='utf-8')
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
     migrator.apply(path)
     assert path.read_text("utf-8") == "Hi there!"
 
