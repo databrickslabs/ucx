@@ -201,6 +201,11 @@ class LocalFileMigrator:
         self._context_factory = context_factory
 
     def apply(self, path: Path) -> bool:
+        """Apply the local file migrator.
+
+        Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
+        subdirectories are fixed.
+        """
         if path.is_dir():
             fix_indicators = []
             for child_path in path.iterdir():
