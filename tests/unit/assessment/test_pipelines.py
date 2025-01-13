@@ -52,6 +52,14 @@ def test_pipeline_list_with_no_config():
 
     assert len(crawler) == 0
 
+def test_include_pipeline_ids():
+    ws = mock_workspace_client(pipeline_ids=['empty-spec', 'spec-with-spn'])
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx", include_pipeline_ids=['empty-spec'])
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 1
+    assert result_set[0].pipeline_id == 'empty-spec'
+
 
 def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     """Check that crawling doesn't fail if a pipeline is deleted after we list the pipelines but before we assess it."""
