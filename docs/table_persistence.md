@@ -8,7 +8,7 @@ Table utilization per workflow:
 
 | Table                    | Generate Assessment | Update Migration Progress | Migrate Groups | Migrate External Tables | Upgrade Jobs | Migrate tables | Migrate Data Reconciliation |
 |--------------------------|---------------------|---------------------------|----------------|-------------------------|--------------|----------------|-----------------------------|
-| tables                   | RW                  | RW                        |                | RO                      |              | RO             |                             |
+| tables                   | RW                  | RW                        |                | RW                      |              | RW             |                             |
 | grants                   | RW                  | RW                        |                | RW                      |              | RW             |                             |
 | mounts                   | RW                  |                           |                | RO                      | RO           | RO             |                             |
 | permissions              | RW                  |                           | RW             | RO                      |              | RO             |                             |
@@ -30,7 +30,7 @@ Table utilization per workflow:
 | query_problems           | RW                  | RW                        |                |                         |              |                |                             |
 | workflow_problems        | RW                  | RW                        |                |                         |              |                |                             |
 | udfs                     | RW                  | RW                        | RO             |                         |              |                |                             |
-| logs                     | RW                  |                           | RW             | RW                      |              | RW             | RW                          |
+| logs                     | RW                  | RW                        | RW             | RW                      | RW           | RW             | RW                          |
 | recon_results            |                     |                           |                |                         |              |                | RW                          |
 | redash_dashboards        | RW                  |                           |                |                         |              |                | RW                          |
 | lakeview_dashboards      | RW                  |                           |                |                         |              |                | RW                          |

@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import partial, cached_property
 
 from databricks.labs.blueprint.parallel import Threads
@@ -18,8 +19,11 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
-
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher, TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import (
+    TableMigrationStatusRefresher,
+    TableMigrationStatus,
+    TableMigrationIndex,
+)
 from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
@@ -56,14 +60,11 @@ class TablesMigrator:
         self._migrate_grants = migrate_grants
         self._external_locations = external_locations
 
-    def get_remaining_tables(self) -> list[Table]:
-        migration_index = self.index(force_refresh=True)
-        table_rows = []
+    def warn_about_remaining_non_migrated_tables(self, migration_statuses: Iterable[TableMigrationStatus]) -> None:
+        migration_index = TableMigrationIndex(migration_statuses)
         for crawled_table in self._tables_crawler.snapshot():
             if not migration_index.is_migrated(crawled_table.database, crawled_table.name):
-                table_rows.append(crawled_table)
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
-        return table_rows
 
     def index(self, *, force_refresh: bool = False):
         return self._migration_status_refresher.index(force_refresh=force_refresh)
@@ -293,13 +294,28 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
-    def _convert_hms_table_to_external(self, src_table: Table):
+    @staticmethod
+    def _get_entity_storage_locations(table_metadata):
+        """Obtain the entityStorageLocations property for table metadata, if the property is present."""
+        # This is needed because:
+        #  - DBR 16.0 introduced entityStorageLocations as a property on table metadata, and this is required for
+        #    as a constructor parameter for CatalogTable.
+        #  - We need to be compatible with earlier versions of DBR.
+        #  - The normal hasattr() check does not work with Py4J-based objects: it always returns True and non-existent
+        #    methods will be automatically created on the proxy but fail when invoked.
+        # Instead the only approach is to use dir() to check if the method exists _prior_ to trying to access it.
+        # (After trying to access it, dir() will also include it even though it doesn't exist.)
+        return table_metadata.entityStorageLocations() if 'entityStorageLocations' in dir(table_metadata) else None
+
+    def _convert_hms_table_to_external(self, src_table: Table) -> bool:
+        """Converts a Hive metastore table to external using Spark JVM methods."""
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
         try:
             database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
+            entity_storage_locations = self._get_entity_storage_locations(old_table)
             new_table = self._catalog_table(
                 old_table.identifier(),
                 self._catalog_type('EXTERNAL'),
@@ -321,13 +337,17 @@ class TablesMigrator:
                 old_table.schemaPreservesCase(),
                 old_table.ignoredProperties(),
                 old_table.viewOriginalText(),
+                # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
+                # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
+                # is present on the source table then the argument is needed.)
+                *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
             self._update_table_status(src_table, inventory_table)
-            logger.info(f"Converted {src_table.name} to External Table type.")
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
             return False
+        logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):

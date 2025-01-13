@@ -458,6 +458,36 @@ def test_lakeview_dashboard_crawler_skips_not_found_dashboard_ids(caplog, mock_b
     ws.lakeview.list.assert_not_called()
 
 
+def test_lakeview_dashboard_crawler_skips_exclude_dashboard_ids(caplog, mock_backend) -> None:
+    ws = create_autospec(WorkspaceClient)
+    dashboards = [SdkLakeviewDashboard(dashboard_id="did1"), SdkLakeviewDashboard(dashboard_id="did2")]
+    ws.lakeview.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    crawler = LakeviewDashboardCrawler(ws, mock_backend, "test", exclude_dashboard_ids=["did2"])
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
+    ws.lakeview.list.assert_called_once()
+
+
+def test_lakeview_dashboard_crawler_skips_exclude_dashboard_ids_takes_priority_over_include_dashboard_ids(
+    caplog, mock_backend
+) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.lakeview.get.side_effect = lambda dashboard_id: SdkLakeviewDashboard(dashboard_id=dashboard_id)
+    crawler = LakeviewDashboardCrawler(
+        ws, mock_backend, "test", include_dashboard_ids=["did1", "did2"], exclude_dashboard_ids=["did2"]
+    )
+
+    crawler.snapshot()
+
+    rows = mock_backend.rows_written_for("hive_metastore.test.lakeview_dashboards", "overwrite")
+    assert rows == [Row(id="did1", name=None, parent=None, query_ids=[], tags=[], creator_id=None)]
+    ws.lakeview.list.assert_not_called()
+    ws.lakeview.get.assert_has_calls([call("did1"), call("did2")])
+
+
 def test_lakeview_dashboard_crawler_list_queries_includes_query_ids(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     datasets = [
@@ -585,21 +615,6 @@ def test_lakeview_dashboard_crawler_list_queries_handles_not_found(caplog, mock_
     assert len(queries) == 0
     assert "Cannot get Lakeview dashboard: did" in caplog.messages
     ws.lakeview.get.assert_called_once_with("did")
-
-
-def test_dashboard_ownership_owner_of_from_user_display_name() -> None:
-    administrator_locator = create_autospec(AdministratorLocator)
-    ws = create_autospec(WorkspaceClient)
-    ws.users.get.return_value = User(display_name="Cor")
-    workspace_path_ownership = create_autospec(WorkspacePathOwnership)
-    ownership = DashboardOwnership(administrator_locator, ws, workspace_path_ownership)
-
-    owner = ownership.owner_of(Dashboard("id", creator_id="123456789"))
-
-    assert owner == "Cor"
-    administrator_locator.get_workspace_administrator.assert_not_called()
-    ws.users.get.assert_called_with("123456789")
-    workspace_path_ownership.owner_of_path.assert_not_called()
 
 
 def test_dashboard_ownership_owner_of_from_user_email() -> None:

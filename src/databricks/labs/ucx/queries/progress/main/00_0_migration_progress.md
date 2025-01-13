@@ -8,7 +8,7 @@ height: 4
 > the [UCX catalog exists](https://github.com/databrickslabs/ucx?tab=readme-ov-file#create-ucx-catalog-command).
 
 This dashboard displays the migration progress, with data visualized from the `migration-progress-experimental`
-workflow. This workflow is designed to run regularly — either daily or weekly — to provide an up-to-date overview of the
+workflow. This workflow is designed runs daily (by default) to provide an up-to-date overview of the
 migration progress.
 
 In addition to offering real-time insights into migration progress, the dashboard also facilitates planning and task

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import cast
 from unittest import mock
@@ -73,10 +74,11 @@ def test_error_on_missing_known_json() -> None:
         KnownList._get_known()  # pylint: disable=protected-access
 
 
-def test_rebuild_trivial() -> None:
-    # No-op: the known.json file is already up-to-date
-    cwd = Path.cwd()
-    KnownList.rebuild(cwd)
+def test_known_list_rebuild_finds_no_new_distributions(caplog) -> None:
+    """Should be a no-op, otherwise know.json should be updated"""
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.source_code.known"):
+        KnownList.rebuild(Path.cwd(), dry_run=True)
+    assert "No new distributions found." in caplog.messages
 
 
 def test_analyze_dist_info() -> None:

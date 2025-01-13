@@ -23,7 +23,7 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole
+from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSUCRoleCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
@@ -103,7 +103,12 @@ def installation_no_roles():
 @pytest.fixture
 def backend():
     rows = {
-        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
+        "external_locations": [
+            ["s3://BUCKET1/FOLDER1", 1],
+            ["s3://BUCKET2/FOLDER2", 1],
+            ["s3://BUCKET4", 2],
+            ["s3://BUCKETX/FOLDERX", 1],
+        ]
     }
     return MockBackend(rows=rows, fails_on_first={})
 
@@ -201,6 +206,25 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     principal_acl.apply_location_acl.assert_called()
 
 
+def test_uc_roles_create_all_roles(mock_ws, backend, locations):
+    install = MockInstallation({"uc_roles_access.csv": []})
+    mock_ws.storage_credentials.list.return_value = []
+    mock_ws.external_locations.list.return_value = []
+    aws = AWSResources("profile", lambda cmd: (0, '{"Role": {"Arn": "arn:aws:iam::12345:role/role1"}}', ""))
+    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, aws, locations)
+
+    roles = aws_resource_permissions.list_uc_roles(single_role=False)
+    expected_roles = [
+        AWSUCRoleCandidate(role_name='UC_ROLE_BUCKET4', policy_name='UC_POLICY', resource_paths=['s3://BUCKET4']),
+        AWSUCRoleCandidate(role_name='UC_ROLE_BUCKET1', policy_name='UC_POLICY', resource_paths=['s3://BUCKET1']),
+        AWSUCRoleCandidate(role_name='UC_ROLE_BUCKETX', policy_name='UC_POLICY', resource_paths=['s3://BUCKETX']),
+        AWSUCRoleCandidate(role_name='UC_ROLE_BUCKET2', policy_name='UC_POLICY', resource_paths=['s3://BUCKET2']),
+    ]
+    assert len(roles) == len(expected_roles)
+    for role in expected_roles:
+        assert role in roles
+
+
 def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installation, backend, locations):
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     cluster_policy = Policy(
@@ -228,7 +252,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws.put_role_policy.assert_called_with(
         'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
-        {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'},
+        {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKET4', 's3://BUCKETX/FOLDERX'},
         None,
         None,
     )
@@ -416,7 +440,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
         call(
             'UC_ROLE_123123',
             'UC_POLICY',
-            {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'},
+            {'s3://BUCKET2/*', 's3://BUCKET4/*', 's3://BUCKET2', 's3://BUCKET4', 's3://BUCKET1', 's3://BUCKET1/*'},
             None,
             None,
         )
@@ -452,8 +476,6 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
     aws.list_all_uc_roles.return_value = []
     with pytest.raises(PermissionDenied):
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     aws.delete_role.assert_called_once()
 
 

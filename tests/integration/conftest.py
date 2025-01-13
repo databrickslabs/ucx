@@ -43,8 +43,8 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePe
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.catalog_schema import Catalog
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, MountsCrawler, ExternalLocation, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
@@ -471,6 +471,8 @@ class MockRuntimeContext(
         make_lakeview_dashboard_fixture,
         make_cluster_policy_fixture,
         make_cluster_policy_permissions_fixture,
+        make_secret_scope_fixture,
+        make_secret_scope_acl_fixture,
         env_or_skip_fixture,
         ws_fixture,
         make_random_fixture,
@@ -494,9 +496,12 @@ class MockRuntimeContext(
         self._make_lakeview_dashboard = make_lakeview_dashboard_fixture
         self._make_cluster_policy = make_cluster_policy_fixture
         self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
+        self._make_secret_scope = make_secret_scope_fixture
+        self._make_secret_scope_acl = make_secret_scope_acl_fixture
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
+        self._catalogs: list[Catalog] = []
         self._groups: list[Group] = []
         self._udfs: list[FunctionInfo] = []
         self._grants: list[Grant] = []
@@ -504,6 +509,9 @@ class MockRuntimeContext(
         self._queries: list[LegacyQuery] = []
         self._lakeview_query_id: str | None = None
         self._dashboards: list[SdkRedashDashboard | SdkLakeviewDashboard] = []
+        self._cluster_policies: list[CreatePolicyResponse] = []
+        self._secret_scopes: list[str] = []
+
         # TODO: add methods to pre-populate the following:
         self._spn_infos: list[AzureServicePrincipalInfo] = []
 
@@ -571,10 +579,20 @@ class MockRuntimeContext(
         return grant
 
     def make_cluster_policy(self, **kwargs) -> CreatePolicyResponse:
-        return self._make_cluster_policy(**kwargs)
+        cluster_policy = self._make_cluster_policy(**kwargs)
+        self._cluster_policies.append(cluster_policy)
+        return cluster_policy
 
     def make_cluster_policy_permissions(self, **kwargs):
         return self._make_cluster_policy_permissions(**kwargs)
+
+    def make_secret_scope(self, **kwargs):
+        secret_scope = self._make_secret_scope(**kwargs)
+        self._secret_scopes.append(secret_scope)
+        return secret_scope
+
+    def make_secret_scope_acl(self, **kwargs):
+        return self._make_secret_scope_acl(**kwargs)
 
     def make_job(self, **kwargs) -> Job:
         job = self._make_job(**kwargs)
@@ -603,7 +621,9 @@ class MockRuntimeContext(
         return self._make_notebook(**kwargs)
 
     def make_catalog(self, **kwargs):
-        return self._make_catalog(**kwargs)
+        catalog = self._make_catalog(**kwargs)
+        self._catalogs.append(catalog)
+        return catalog
 
     def make_linting_resources(self) -> None:
         """Make resources to lint."""
@@ -632,6 +652,7 @@ class MockRuntimeContext(
             include_job_ids=self.created_jobs,
             include_dashboard_ids=self.created_dashboards,
             include_query_ids=self.created_queries,
+            include_object_permissions=self.created_object_permissions,
         )
 
     @cached_property
@@ -758,6 +779,35 @@ class MockRuntimeContext(
                 raise ValueError(f"Unsupported dashboard: {dashboard}")
         return dashboard_ids
 
+    @property
+    def created_object_permissions(self) -> list[str]:
+        # Initialize include_object_permissions for the created fixtures
+        # Currently only supports the object types for which the fixtures exist
+        created_object_permissions = set()
+
+        # GenericPermissionsSupport
+        for cluster_policy in self._cluster_policies:
+            created_object_permissions.add(f"cluster_policies:{cluster_policy.policy_id}")
+        for job in self._jobs:
+            created_object_permissions.add(f"jobs:{job.job_id}")
+
+        # TableAclSupport
+        for table in self._tables:
+            created_object_permissions.add(f"TABLE:{table.full_name}")
+        for schema in self._schemas:
+            created_object_permissions.add(f"DATABASE:{schema.full_name}")
+        for catalog in self._catalogs:
+            created_object_permissions.add(f"CATALOG:{catalog.name}")
+        for udf in self._udfs:
+            created_object_permissions.add(f"FUNCTION:{udf.name}")
+
+        for secret_scope in self._secret_scopes:
+            created_object_permissions.add(f"secrets:{secret_scope}")
+        for query in self._queries:
+            created_object_permissions.add(f"queries:{query.id}")
+
+        return list(created_object_permissions)
+
     @cached_property
     def azure_service_principal_crawler(self) -> StaticServicePrincipalCrawler:
         return StaticServicePrincipalCrawler(
@@ -810,6 +860,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
     make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
     env_or_skip,
     make_random,
 ) -> MockRuntimeContext:
@@ -826,6 +878,8 @@ def runtime_ctx(  # pylint: disable=too-many-arguments
         make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope,
+        make_secret_scope_acl,
         env_or_skip,
         ws,
         make_random,
@@ -949,7 +1003,7 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
 class MockInstallationContext(MockRuntimeContext):
     __test__ = False
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments, too-many-locals
         self,
         make_catalog_fixture,
         make_schema_fixture,
@@ -967,6 +1021,8 @@ class MockInstallationContext(MockRuntimeContext):
         make_lakeview_dashboard_fixture,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope_fixture,
+        make_secret_scope_acl_fixture,
         ws_fixture,
         watchdog_purge_suffix,
     ):
@@ -983,6 +1039,8 @@ class MockInstallationContext(MockRuntimeContext):
             make_lakeview_dashboard_fixture,
             make_cluster_policy,
             make_cluster_policy_permissions,
+            make_secret_scope_fixture,
+            make_secret_scope_acl_fixture,
             env_or_skip_fixture,
             ws_fixture,
             make_random_fixture,
@@ -1055,10 +1113,6 @@ class MockInstallationContext(MockRuntimeContext):
         return lambda wc: wc
 
     @cached_property
-    def include_object_permissions(self) -> None:
-        return None
-
-    @cached_property
     def config(self) -> WorkspaceConfig:
         workspace_config = self.workspace_installer.configure()
         default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
@@ -1073,10 +1127,14 @@ class MockInstallationContext(MockRuntimeContext):
             renamed_group_prefix=self.renamed_group_prefix,
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
-            include_job_ids=self.created_jobs,
+            # An empty list is not saved in the installation.save below.
+            # With a dummy id, we signal to skip all jobs.
+            # A temporary hack to speed up the WorkflowLinter, proper solution follows from issue:
+            # https://github.com/databrickslabs/blueprint/issues/179
+            include_job_ids=self.created_jobs or [1],
             include_dashboard_ids=self.created_dashboards,
             include_query_ids=self.created_queries,
-            include_object_permissions=self.include_object_permissions,
+            include_object_permissions=self.created_object_permissions,
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             ucx_catalog=self.ucx_catalog,
         )
@@ -1089,10 +1147,6 @@ class MockInstallationContext(MockRuntimeContext):
         return ProductInfo.for_testing(WorkspaceConfig)
 
     @cached_property
-    def tasks(self) -> list[Task]:
-        return Workflows.all().tasks()
-
-    @cached_property
     def workflows_deployment(self) -> WorkflowsDeployment:
         return WorkflowsDeployment(
             self.config,
@@ -1101,7 +1155,7 @@ class MockInstallationContext(MockRuntimeContext):
             self.workspace_client,
             self.product_info.wheels(self.workspace_client),
             self.product_info,
-            self.tasks,
+            Workflows.all(),
         )
 
     @cached_property
@@ -1167,6 +1221,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
     make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
+    make_secret_scope,
+    make_secret_scope_acl,
     watchdog_purge_suffix,
 ) -> Generator[MockInstallationContext, None, None]:
     ctx = MockInstallationContext(
@@ -1186,6 +1242,8 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
         make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
+        make_secret_scope,
+        make_secret_scope_acl,
         ws,
         watchdog_purge_suffix,
     )

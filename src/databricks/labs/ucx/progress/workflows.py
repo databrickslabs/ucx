@@ -1,5 +1,7 @@
 import datetime as dt
 
+from databricks.sdk.service.jobs import CronSchedule, PauseStatus
+
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
 
@@ -22,6 +24,13 @@ class MigrationProgress(Workflow):
 
     def __init__(self) -> None:
         super().__init__('migration-progress-experimental')
+
+    @property
+    def schedule(self) -> CronSchedule:
+        """Schedule the migration progress workflow to run by default daily at 5:00 a.m. (UTC)."""
+        return CronSchedule(
+            quartz_cron_expression="0 0 5 * * ?", timezone_id="Etc/UTC", pause_status=PauseStatus.UNPAUSED
+        )
 
     @job_task(job_cluster="user_isolation")
     def verify_prerequisites(self, ctx: RuntimeContext) -> None:
@@ -141,11 +150,31 @@ class MigrationProgress(Workflow):
         history_log.append_inventory_snapshot(cluster_policies_snapshot)
 
     @job_task(depends_on=[verify_prerequisites])
+    def crawl_redash_dashboards(self, ctx: RuntimeContext):
+        """Scans all Redash dashboards."""
+        ctx.redash_crawler.snapshot(force_refresh=True)
+
+    @job_task(depends_on=[verify_prerequisites])
+    def crawl_lakeview_dashboards(self, ctx: RuntimeContext):
+        """Scans all Lakeview dashboards."""
+        ctx.lakeview_crawler.snapshot(force_refresh=True)
+
+    @job_task(depends_on=[crawl_redash_dashboards, crawl_lakeview_dashboards])
     def assess_dashboards(self, ctx: RuntimeContext):
-        """Scans all dashboards for migration issues in SQL code of embedded widgets.
-        Also stores direct filesystem accesses for display in the migration dashboard."""
-        # TODO: Ensure these are captured in the history log.
+        """Scans all dashboards for migration issues in SQL code of embedded widgets."""
         ctx.query_linter.refresh_report()
+
+    @job_task(depends_on=[assess_dashboards], job_cluster="user_isolation")
+    def update_redash_dashboards_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest Redash dashboards inventory snapshot."""
+        redash_dashboards_snapshot = ctx.redash_crawler.snapshot(force_refresh=False)
+        ctx.dashboards_progress.append_inventory_snapshot(redash_dashboards_snapshot)
+
+    @job_task(depends_on=[assess_dashboards], job_cluster="user_isolation")
+    def update_lakeview_dashboards_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest Lakeview dashboards inventory snapshot."""
+        lakeview_dashboards_snapshot = ctx.lakeview_crawler.snapshot(force_refresh=False)
+        ctx.dashboards_progress.append_inventory_snapshot(lakeview_dashboards_snapshot)
 
     @job_task(depends_on=[verify_prerequisites])
     def assess_workflows(self, ctx: RuntimeContext):

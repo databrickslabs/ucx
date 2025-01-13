@@ -213,8 +213,9 @@ class AWSResourcePermissions:
         missing_paths = set()
         for external_location in external_locations:
             matching_role = False
+            path = PurePath(external_location.location)
             for role in compatible_roles:
-                if external_location.location.startswith(role.resource_path):
+                if PurePath(role.resource_path) in path.parents or path.match(role.resource_path):
                     matching_role = True
                     continue
             if matching_role:
@@ -226,7 +227,7 @@ class AWSResourcePermissions:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
-        external_locations = self._locations.external_locations_with_root()
+        external_locations = list(self._locations.external_locations_with_root())
         logger.info(f"Found {len(external_locations)} external locations")
         compatible_roles = self.load_uc_compatible_roles()
         roles: dict[str, AWSCredentialCandidate] = {}

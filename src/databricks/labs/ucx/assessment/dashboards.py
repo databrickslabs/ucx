@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.lakeview import Dashboard as LsqlLakeviewDashboard, Dataset
@@ -89,6 +90,8 @@ class Query:
 @dataclass
 class Dashboard:
     """UCX representation of a dashboard."""
+
+    __id_attributes__: ClassVar[tuple[str, ...]] = ("id",)
 
     id: str
     """The ID for this dashboard."""
@@ -310,17 +313,21 @@ class LakeviewDashboardCrawler(CrawlerBase[Dashboard]):
         schema: str,
         *,
         include_dashboard_ids: list[str] | None = None,
+        exclude_dashboard_ids: list[str] | None = None,
         include_query_ids: list[str] | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "lakeview_dashboards", Dashboard)
         self._ws = ws
         self._include_dashboard_ids = include_dashboard_ids
+        self._exclude_dashboard_ids = exclude_dashboard_ids
         self._include_query_ids = include_query_ids
 
     def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
         for sdk_dashboard in self._list_dashboards():
             if sdk_dashboard.dashboard_id is None:
+                continue
+            if sdk_dashboard.dashboard_id in (self._exclude_dashboard_ids or []):
                 continue
             dashboard = Dashboard.from_sdk_lakeview_dashboard(sdk_dashboard)
             dashboards.append(dashboard)
@@ -410,7 +417,7 @@ class DashboardOwnership(Ownership[Dashboard]):
     def _get_user_name(self, user_id: str) -> str | None:
         try:
             user = self._ws.users.get(user_id)
-            return user.display_name or user.user_name
+            return user.user_name
         except DatabricksError as e:
             logger.warning(f"Could not retrieve user: {user_id}", exc_info=e)
             return None
