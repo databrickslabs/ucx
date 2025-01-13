@@ -1,4 +1,5 @@
 
+import Admonition from '@theme/Admonition';
 
 # Developer Guide
 
@@ -29,7 +30,7 @@ or specialized functionality unavailable in standard libraries.
 
 ## Adding entries to `known.json` file
 
-When adding a new entry to the [`known.json` file](src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
+When adding a new entry to the [`known.json` file](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
 stores information about known (in)compatibilities with Unity Catalog. The file speeds up static code analysis and prevents false positives.
 
 1. load into virtual environment
@@ -405,6 +406,11 @@ $ python3.10 -m pip install hatch
 $ make dev
 $ make test
 ```
-Note: Before performing a clean installation, deactivate the virtual environment and follow the commands given above.
 
-Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.
+<Admonition type="info" title="Deactivating the Virtual Environment">
+  Before performing a clean installation, deactivate the virtual environment and follow the commands given above.
+</Admonition>
+
+<Admonition type="note" title="Env command">
+  The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.
+</Admonition>
