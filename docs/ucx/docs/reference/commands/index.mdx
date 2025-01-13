@@ -3,17 +3,17 @@ sidebar_position: 1
 ---
 import Admonition from '@theme/Admonition';
 
-# Commands Reference
+# Commands
 
 This section contains the reference documentation for the UCX commands.
 
 ## Code migration commands
 
-See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
+See the [migration process diagram](/docs/process) to understand the role of the code migration commands in the migration process.
 
-After you're done with the [table migration](#Table-Migration), you can proceed to the code migration.
+After you're done with the [table migration](/docs/process#table-migration-process), you can proceed to the code migration.
 
-Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
+Once you're done with the code migration, you can run the [`cluster-remap` command](/docs/reference/commands#cluster-remap) to remap the
 clusters to be UC compatible.
 
 
@@ -43,7 +43,7 @@ With modern IDEs, clicking on the file link opens the file at the problematic li
 databricks labs ucx migrate-local-code
 ```
 
-**(Experimental)** Once [table migration](#Table-Migration) is complete, you can run this command to
+**(Experimental)** Once [table migration](/docs/process#table-migration-process) is complete, you can run this command to
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during
 the automated transformation process.
@@ -56,12 +56,12 @@ the automated transformation process.
 databricks labs ucx migrate-dbsql-dashboards [--dashboard-id <dashboard-id>]
 ```
 
-**(Experimental)** Once [table migration](#Table-Migration) is complete, you can run this command to
+**(Experimental)** Once [table migration](/docs/process#table-migration-process) is complete, you can run this command to
 migrate all Databricks SQL dashboards in the workspace. At this moment, this command is highly experimental and discards
 formatting during the automated transformation process.
 
 This command tags dashboards & queries that have been migrated with `migrated by UCX` tag. The original queries are
-also backed up in the ucx installation folder, to allow for easy rollback (see [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)).
+also backed up in the ucx installation folder, to allow for easy rollback (see [`revert-dbsql-dashboards` command](/docs/commands#revert-dbsql-dashboards)).
 
 This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
 
@@ -90,9 +90,9 @@ authenticate your machine with:
 * `databricks auth login --host https://accounts.cloud.databricks.com/` (AWS)
 * `databricks auth login --host https://accounts.azuredatabricks.net/` (Azure)
 
-Ask your Databricks Account admin to run the [`sync-workspace-info` command](#sync-workspace-info-command) to sync the
+Ask your Databricks Account admin to run the [`sync-workspace-info` command](/docs/commands#sync-workspace-info) to sync the
 workspace information with the UCX installations. Once the workspace information is synced, you can run the
-[`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog.
+[`create-table-mapping` command](/docs/commands#create-table-mapping) to align your tables with the Unity Catalog.
 
 
 
@@ -113,11 +113,11 @@ databricks --profile ACCOUNTS labs ucx sync-workspace-info
 > or "https://accounts.azuredatabricks.net").
 
 This command uploads the workspace config to all workspaces in the account where `ucx` is installed. This command is
-necessary to create an immutable default catalog mapping for [table migration](#Table-Migration) process and is the prerequisite
-for [`create-table-mapping` command](#create-table-mapping-command).
+necessary to create an immutable default catalog mapping for [table migration](/docs/process#table-migration-process) process and is the prerequisite
+for [`create-table-mapping` command](/docs/reference/commands#create-table-mapping).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and
-run [`manual-workspace-info` command](#manual-workspace-info-command) to enter Databricks Workspace IDs and Databricks
+run [`manual-workspace-info` command](/docs/reference/commands#manual-workspace-info) to enter Databricks Workspace IDs and Databricks
 Workspace names.
 
 
@@ -139,7 +139,7 @@ Next workspace id (default: stop):
 14:21:20  INFO [d.l.ucx.account] Synchronised workspace id mapping for installations on current workspace
 ```
 
-This command is only supposed to be run if the [`sync-workspace-info` command](#sync-workspace-info-command) cannot be
+This command is only supposed to be run if the [`sync-workspace-info` command](/docs/reference/commands#sync-workspace-info) cannot be
 run. It prompts the user to enter the required information manually and creates the workspace info. This command is
 useful for workspace administrators who are unable to use the `sync-workspace-info` command, because they are not
 Databricks Account Administrators. It can also be used to manually create the workspace info in a new workspace.
@@ -164,7 +164,7 @@ The following scenarios are supported, if a group X:
 
 This command is useful for the setups, that don't have SCIM provisioning in place.
 
-Once you're done with this command, proceed to the [group migration workflow](#group-migration-workflow).
+Once you're done with this command, proceed to the [group migration workflow](/docs/reference/workflows#group-migration-workflow).
 
 
 
@@ -181,8 +181,8 @@ Workspace Group Name  Members Count  Account Group Name  Members Count  Differen
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership.
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and
-[group migration](#group-migration-workflow) for more details.
+used to debug issues related to group membership. See [group migration](docs/reference/local-group-migration.md) and
+[group migration](/docs/reference/workflows#group-migration-workflow) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
 
