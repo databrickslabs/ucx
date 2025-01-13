@@ -1,10 +1,11 @@
+import logging
 from io import StringIO
 from pathlib import Path
 
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, LocalCodeMigrator
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
@@ -26,3 +27,15 @@ def test_local_code_linter_lints_ucx(simple_ctx) -> None:
     )
     problems = linter.lint(Prompts(), path_to_scan, StringIO())
     assert len(problems) > 0, f"Found problems while linting ucx: {problems}"
+
+
+def test_local_code_migrator_fixes_ucx(simple_ctx) -> None:
+    session_state = CurrentSessionState()  # No need to connect
+    linter_context = LinterContext(TableMigrationIndex([]), session_state)
+    ucx_path = Path(__file__).parent.parent.parent.parent.parent
+    path_to_scan = Path(ucx_path, "src")
+    migrator = LocalCodeMigrator(lambda: linter_context)
+
+    has_code_changes = migrator.apply(path_to_scan)
+
+    assert not has_code_changes
