@@ -207,7 +207,7 @@ class LocalFileMigrator:
             return True
         return self._apply_file_fix(path)
 
-    def _apply_file_fix(self, path: Path):
+    def _apply_file_fix(self, path: Path) -> bool:
         """
         The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
         """
