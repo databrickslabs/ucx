@@ -218,12 +218,11 @@ class LocalFileMigrator:
         logger.info(f"Analysing {path}")
         context = self._context_factory()
         linter = context.linter(language)
-        with path.open("r") as f:
-            try:
-                code = f.read()
-            except UnicodeDecodeError as e:
-                logger.warning(f"Could not decode file: {path}", exc_info=e)
-                return False
+        try:
+            code = path.read_text()
+        except UnicodeDecodeError as e:
+            logger.warning(f"Could not decode file: {path}", exc_info=e)
+            return False
         applied = False
         for advice in linter.lint(code):
             logger.info(f"Found: {advice}")
@@ -235,9 +234,8 @@ class LocalFileMigrator:
             applied = True
         if not applied:
             return False
-        with path.open("w") as f:
-            logger.info(f"Overwriting {path}")
-            f.write(code)
+        logger.info(f"Overwriting {path}")
+        path.write_text(code)
         return True
 
 
