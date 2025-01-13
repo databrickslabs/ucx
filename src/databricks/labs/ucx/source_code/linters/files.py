@@ -211,13 +211,9 @@ class LocalFileMigrator:
         """
         The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
         """
-        # Check if the file extension is in the list of supported extensions
-        if path.suffix not in self._extensions:
-            return False
-        # Get the language corresponding to the file extension
-        language = self._extensions[path.suffix]
-        # If the language is not supported, return
+        language = self._extensions.get(path.suffix)
         if not language:
+            logger.warning(f"Skipping file with unsupported extension: {path}")
             return False
         logger.info(f"Analysing {path}")
         # Get the linter for the language
