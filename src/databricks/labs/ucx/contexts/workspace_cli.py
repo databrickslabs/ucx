@@ -23,7 +23,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator, LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.files import LocalCodeMigrator, LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
@@ -222,8 +222,8 @@ class LocalCheckoutContext(WorkspaceContext):
         return LinterContext(index, session_state)
 
     @cached_property
-    def local_file_migrator(self) -> LocalFileMigrator:
-        return LocalFileMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
+    def local_code_migrator(self) -> LocalCodeMigrator:
+        return LocalCodeMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
 
     @cached_property
     def local_code_linter(self) -> LocalCodeLinter:

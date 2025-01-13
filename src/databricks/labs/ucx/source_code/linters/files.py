@@ -193,8 +193,8 @@ class LocalCodeLinter:
         yield from walker
 
 
-class LocalFileMigrator:
-    """The LocalFileMigrator class is responsible for fixing code files based on their language."""
+class LocalCodeMigrator:
+    """Fix local code files based on their language."""
 
     def __init__(self, context_factory: Callable[[], LinterContext]):
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}

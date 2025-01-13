@@ -74,7 +74,7 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
-from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.linters.files import LocalCodeMigrator
 from databricks.labs.ucx.source_code.redash import Redash
 
 
@@ -948,17 +948,17 @@ def test_relay_logs(ws, caplog) -> None:
     assert 'Something is logged' in caplog.messages
 
 
-def test_migrate_local_code(ws):
+def test_migrate_local_code(ws) -> None:
     prompts = MockPrompts({'.*': 'yes'})
-    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
+    with patch.object(LocalCodeMigrator, 'apply') as mock_apply:
         migrate_local_code(ws, prompts)
 
         mock_apply.assert_called_once_with(Path.cwd())
 
 
-def test_migrate_local_code_aborted_via_prompt(ws):
+def test_migrate_local_code_aborted_via_prompt(ws) -> None:
     prompts = MockPrompts({'.*apply UC migration to all files.*': 'no'})
-    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
+    with patch.object(LocalCodeMigrator, 'apply') as mock_apply:
         migrate_local_code(ws, prompts)
 
         mock_apply.assert_not_called()
