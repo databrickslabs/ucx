@@ -36,7 +36,6 @@ class NotebookMigrator:
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
-                # TODO migration data, see https://github.com/databrickslabs/ucx/issues/1327
                 continue
             if not self._languages.is_supported(cell.language.language):
                 continue
@@ -45,7 +44,6 @@ class NotebookMigrator:
                 cell.migrated_code = migrated_code
                 changed = True
         if changed:
-            # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
             notebook.path.replace(notebook.path.with_suffix(".bak"))
             notebook.path.write_text(notebook.to_migrated_code())
         return changed
