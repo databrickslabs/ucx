@@ -42,6 +42,15 @@ def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
     assert not migrator.apply(path)
 
 
+def test_file_migrator_skips_non_existing_file(caplog) -> None:
+    languages = LinterContext(TableMigrationIndex([]))
+    migrator = LocalFileMigrator(lambda: languages)
+    path = Path("non_existing_file.py")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
+        assert not migrator.apply(path)
+    assert f"Skip non-existing file: {path}" in caplog.messages
+
+
 def test_file_migrator_fix_ignores_unsupported_language(tmp_path, caplog) -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
