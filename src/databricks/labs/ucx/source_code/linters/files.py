@@ -205,11 +205,13 @@ class LocalFileMigrator:
             for child_path in path.iterdir():
                 self.apply(child_path)
             return True
-        return self._apply_file_fix(path)
+        return self._fix_file(path)
 
-    def _apply_file_fix(self, path: Path) -> bool:
-        """
-        The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
+    def _fix_file(self, path: Path) -> bool:
+        """Fix a file.
+
+        Apply the code fixers on the read content of the file. If the fixers yield code changes, write them back to the
+        file.
         """
         language = self._extensions.get(path.suffix)
         if not language:
@@ -221,7 +223,15 @@ class LocalFileMigrator:
         except UnicodeDecodeError as e:
             logger.warning(f"Could not decode file: {path}", exc_info=e)
             return False
-        applied = False
+        fixed_code = self._fix_code(code, language)
+        if code == fixed_code:
+            return False
+        logger.info(f"Overwriting: {path}")
+        path.write_text(code)
+        return True
+
+    def _fix_code(self, code: str, language: Language) -> str:
+        """Fix the code given a language."""
         context = self._context_factory()
         linter = context.linter(language)
         for advice in linter.lint(code):
@@ -231,12 +241,7 @@ class LocalFileMigrator:
                 continue
             logger.info(f"Applying fix for {advice}")
             code = fixer.apply(code)
-            applied = True
-        if not applied:
-            return False
-        logger.info(f"Overwriting {path}")
-        path.write_text(code)
-        return True
+        return code
 
 
 class StubContainer(SourceContainer):
