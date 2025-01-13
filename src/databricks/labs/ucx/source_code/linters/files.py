@@ -240,6 +240,9 @@ class LocalFileMigrator:
     def _fix_code(self, code: str, language: Language) -> str:
         """Fix the code given a language."""
         context = self._context_factory()
+        if not context.is_supported(language):
+            logger.warning(f"Skip fixing unsupported language: [{language}] {code}")
+            return code
         linter = context.linter(language)
         for advice in linter.lint(code):
             fixer = context.fixer(language, advice.code)
