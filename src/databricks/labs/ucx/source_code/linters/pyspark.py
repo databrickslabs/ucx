@@ -461,6 +461,14 @@ class _SparkSqlAnalyzer:
 
 
 class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
+    """Linter for SparkSQL used within PySpark.
+
+    Examples
+    1. Find table name reference in SparkSQL:
+       ``` python
+       spark.sql("SELECT * FROM hive_metastore.schema.table").collect()
+       ```
+    """
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
