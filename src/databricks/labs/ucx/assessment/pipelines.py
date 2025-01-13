@@ -48,7 +48,7 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
             try:
                 pipeline_response = self._ws.pipelines.get(pipeline_id)
             except NotFound:
-                logger.warning(f"Pipeline disappeared, cannot assess: (id={pipeline_id})")
+                logger.warning(f"Pipeline not found: {pipeline_id}")
                 continue
 
             creator_name = pipeline_response.creator_user_name or None

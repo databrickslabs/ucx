@@ -82,7 +82,7 @@ def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     assert results == [
         PipelineInfo(pipeline_id="1", pipeline_name="will_remain", creator_name=None, success=1, failures="[]")
     ]
-    assert "Pipeline disappeared, cannot assess: (id=2)" in caplog.messages
+    assert "Pipeline not found: 2" in caplog.messages
 
 
 def test_pipeline_crawler_creator():
