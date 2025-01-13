@@ -29,7 +29,9 @@ class PipelineInfo:
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, include_pipeline_ids: list[str] | None = None):
+    def __init__(
+        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, include_pipeline_ids: list[str] | None = None
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
         self._include_pipeline_ids = include_pipeline_ids
@@ -45,6 +47,8 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                 )
             try:
                 assert pipeline.pipeline_id is not None
+                if self._include_pipeline_ids and pipeline.pipeline_id not in self._include_pipeline_ids:
+                    continue
                 pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
             except NotFound:
                 logger.warning(f"Pipeline disappeared, cannot assess: {pipeline.name} (id={pipeline.pipeline_id})")
