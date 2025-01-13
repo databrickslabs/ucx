@@ -216,10 +216,8 @@ class LocalFileMigrator:
             logger.warning(f"Skipping file with unsupported extension: {path}")
             return False
         logger.info(f"Analysing {path}")
-        # Get the linter for the language
         context = self._context_factory()
         linter = context.linter(language)
-        # Open the file and read the code
         with path.open("r") as f:
             try:
                 code = f.read()
@@ -227,7 +225,6 @@ class LocalFileMigrator:
                 logger.warning(f"Could not decode file: {path}", exc_info=e)
                 return False
             applied = False
-            # Lint the code and apply fixes
             for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
                 fixer = context.fixer(language, advice.code)
