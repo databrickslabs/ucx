@@ -52,6 +52,7 @@ def test_pipeline_list_with_no_config():
 
     assert len(crawler) == 0
 
+
 def test_include_pipeline_ids():
     ws = mock_workspace_client(pipeline_ids=['empty-spec', 'spec-with-spn'])
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx", include_pipeline_ids=['empty-spec'])
