@@ -440,7 +440,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
         call(
             'UC_ROLE_123123',
             'UC_POLICY',
-            {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'},
+            {'s3://BUCKET2/*', 's3://BUCKET4/*', 's3://BUCKET2', 's3://BUCKET4', 's3://BUCKET1', 's3://BUCKET1/*'},
             None,
             None,
         )
@@ -476,7 +476,7 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
     aws.list_all_uc_roles.return_value = []
     with pytest.raises(PermissionDenied):
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-    assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_BUCKET4') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     aws.delete_role.assert_called_once()
 
