@@ -11,9 +11,8 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class NotebookMigrator:
-    def __init__(self, languages: LinterContext):
-        # TODO: move languages to `apply`
-        self._languages = languages
+    def __init__(self, context: LinterContext):
+        self._context = context
 
     def revert(self, path: Path) -> bool:
         backup_path = path.with_suffix(".bak")
@@ -37,9 +36,9 @@ class NotebookMigrator:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
                 continue
-            if not self._languages.is_supported(cell.language.language):
+            if not self._context.is_supported(cell.language.language):
                 continue
-            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
+            migrated_code = self._context.apply_fixes(cell.language.language, cell.original_code)
             if migrated_code != cell.original_code:
                 cell.migrated_code = migrated_code
                 changed = True
