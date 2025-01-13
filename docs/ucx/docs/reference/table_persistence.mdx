@@ -1,4 +1,4 @@
-# UCX objects
+# Inventory
 
 List of all UCX objects and their respective metadata.
 
@@ -35,12 +35,12 @@ Table utilization per workflow:
 | redash_dashboards        | RW                  |                           |                |                         |              |                | RW                          |
 | lakeview_dashboards      | RW                  |                           |                |                         |              |                | RW                          |
 
-**RW** - Read/Write, the job generates or updates the table.<br/>
-**RO** - Read Only
+- **RW** - Read/Write, the job generates or updates the table.<br/>
+- **RO** - Read Only
 
-### Inventory Database
+## Inventory Database
 
-#### _$inventory_.tables
+### `_$inventory_.tables`
 
 Holds Inventory of all tables in all databases and their relevant metadata.
 
@@ -57,7 +57,7 @@ Holds Inventory of all tables in all databases and their relevant metadata.
 
 <br/>
 
-#### _$inventory_.grants
+### `_$inventory_.grants`
 
 Inventory of all Table ACLs for tables indexed in tables table.
 
@@ -74,7 +74,7 @@ Inventory of all Table ACLs for tables indexed in tables table.
 
 <br/>
 
-#### _$inventory_.mounts
+### `_$inventory_.mounts`
 
 List of DBFS mount points.
 
@@ -86,7 +86,7 @@ List of DBFS mount points.
 
 <br/>
 
-#### _$inventory_.permissions
+### `_$inventory_.permissions`
 
 Workspace object level permissions
 
@@ -98,7 +98,7 @@ Workspace object level permissions
 
 <br/>
 
-#### _$inventory_.jobs
+### `_$inventory_.jobs`
 
 Holds a list of all jobs with a notation of potential issues.
 
@@ -110,7 +110,7 @@ Holds a list of all jobs with a notation of potential issues.
 | compatible  | int      | 1 or 0, used for percentage reporting                      |
 | failures    | string   | List of issues identified by the assessment in JSON format |
 
-#### _$inventory_.clusters
+### `_$inventory_.clusters`
 
 Holds a list of all clusters with a notation of potential issues.
 
@@ -122,7 +122,7 @@ Holds a list of all clusters with a notation of potential issues.
 | compatible      | int      | 1 or 0, used for percentage reporting                      |
 | failures        | string   | List of issues identified by the assessment in JSON format |
 
-#### _$inventory_.external_locations
+### `_$inventory_.external_locations`
 
 Holds a list of all external locations that will be required for the migration.
 
@@ -130,7 +130,7 @@ Holds a list of all external locations that will be required for the migration.
 |-------------------|----------|-----------------------|----------|
 | external_location | string   | External Location URL |
 
-#### _$inventory_.workspace_objects
+### `_$inventory_.workspace_objects`
 
 Holds a list of all workspace objects (notebooks, directories, files, repos and libraries) from the workspace.
 This is used by the permission crawler.
@@ -143,7 +143,7 @@ This is used by the permission crawler.
 | language    | string   | language of the object (applicable for notebooks only)    |
 
 
-#### _$inventory_.redash_dashboards and _$inventory_.lakeview_dashboards
+### `_$inventory_.redash_dashboards` and `_$inventory_.lakeview_dashboards`
 
 Holds a list of all Redash or Lakeview dashboards. This is used by the `QueryLinter` and `Redash` migration.
 

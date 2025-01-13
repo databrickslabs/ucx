@@ -43,10 +43,6 @@ html[data-theme='dark'] {
 }
 
 
-html {
-  @apply font-sans;
-}
-
 .header-github-link::before {
   content: '';
   width: 24px;
