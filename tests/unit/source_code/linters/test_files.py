@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
@@ -41,13 +42,15 @@ def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
     assert not migrator.apply(path)
 
 
-def test_file_migrator_fix_ignores_unsupported_language() -> None:
+def test_file_migrator_fix_ignores_unsupported_language(tmp_path, caplog) -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
-    path = Path('unsupported.py')
-    with pytest.raises(ValueError):
+    path = tmp_path / 'unsupported.py'
+    path.touch()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
         assert not migrator.apply(path)
+    assert "Skip fixing unsupported language: R" in caplog.messages
 
 
 def test_file_migrator_fix_reads_supported_extensions(migration_index) -> None:

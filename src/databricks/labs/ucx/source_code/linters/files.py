@@ -219,6 +219,9 @@ class LocalFileMigrator:
         Apply the code fixers on the read content of the file. If the fixers yield code changes, write them back to the
         file.
         """
+        if not path.exists():
+            logger.warning(f"Skip non-existing file: {path}")
+            return False
         language = self._extensions.get(path.suffix)
         if not language:
             logger.warning(f"Skip fixing file with unsupported extension: {path}")
@@ -241,7 +244,7 @@ class LocalFileMigrator:
         """Fix the code given a language."""
         context = self._context_factory()
         if not context.is_supported(language):
-            logger.warning(f"Skip fixing unsupported language: [{language}] {code}")
+            logger.warning(f"Skip fixing unsupported language: {language.value}")
             return code
         linter = context.linter(language)
         for advice in linter.lint(code):
