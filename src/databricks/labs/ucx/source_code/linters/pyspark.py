@@ -386,6 +386,14 @@ class SparkTableNameMatchers:
 
 
 class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
+    """Linter for table name references in PySpark
+
+    Examples:
+    1. Find table name referenceS
+       ``` python
+       spark.read.table("hive_metastore.schema.table")
+       ```
+    """
 
     def __init__(
         self,
