@@ -215,18 +215,19 @@ class LocalFileMigrator:
         """
         language = self._extensions.get(path.suffix)
         if not language:
-            logger.warning(f"Skipping file with unsupported extension: {path}")
+            logger.warning(f"Skip fixing file with unsupported extension: {path}")
             return False
-        logger.info(f"Analysing {path}")
+        logger.info(f"Fixing: {path}")
         try:
             code = path.read_text()
         except UnicodeDecodeError as e:
-            logger.warning(f"Could not decode file: {path}", exc_info=e)
+            logger.warning(f"Cannot decode file: {path}", exc_info=e)
             return False
         fixed_code = self._fix_code(code, language)
         if code == fixed_code:
+            logger.info(f"No fixes found for: {path}")
             return False
-        logger.info(f"Overwriting: {path}")
+        logger.info(f"Fixed: {path}")
         path.write_text(code)
         return True
 
@@ -235,11 +236,10 @@ class LocalFileMigrator:
         context = self._context_factory()
         linter = context.linter(language)
         for advice in linter.lint(code):
-            logger.info(f"Found: {advice}")
             fixer = context.fixer(language, advice.code)
             if not fixer:
                 continue
-            logger.info(f"Applying fix for {advice}")
+            logger.info(f"Applying fix for: {advice}")
             code = fixer.apply(code)
         return code
 
