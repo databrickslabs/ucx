@@ -37,22 +37,29 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
         self._include_pipeline_ids = include_pipeline_ids
 
     def _crawl(self) -> Iterable[PipelineInfo]:
-        all_pipelines = list(self._ws.pipelines.list_pipelines())
-        for pipeline in all_pipelines:
-            creator_name = pipeline.creator_user_name or None
+
+        pipeline_ids = []
+        if self._include_pipeline_ids is not None:
+            pipeline_ids = self._include_pipeline_ids
+        else:
+            for pipeline in self._ws.pipelines.list_pipelines():
+                if pipeline.pipeline_id is not None:
+                    pipeline_ids.append(pipeline.pipeline_id)
+
+        for pipeline_id in pipeline_ids:
+            try:
+                pipeline_response = self._ws.pipelines.get(pipeline_id)
+            except NotFound:
+                logger.warning(f"Pipeline disappeared, cannot assess: (id={pipeline_id})")
+                continue
+
+            creator_name = pipeline_response.creator_user_name or None
             if not creator_name:
                 logger.warning(
-                    f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
+                    f"Pipeline {pipeline_response.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            try:
-                assert pipeline.pipeline_id is not None
-                if self._include_pipeline_ids is not None and pipeline.pipeline_id not in self._include_pipeline_ids:
-                    continue
-                pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
-            except NotFound:
-                logger.warning(f"Pipeline disappeared, cannot assess: {pipeline.name} (id={pipeline.pipeline_id})")
-                continue
+            assert pipeline_response.pipeline_id is not None
             assert pipeline_response.spec is not None
             pipeline_config = pipeline_response.spec.configuration
             failures = []
@@ -63,8 +70,8 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
                 self._pipeline_clusters(clusters, failures)
             failures_as_json = json.dumps(failures)
             yield PipelineInfo(
-                pipeline_id=pipeline.pipeline_id,
-                pipeline_name=pipeline.name,
+                pipeline_id=pipeline_response.pipeline_id,
+                pipeline_name=pipeline_response.name,
                 creator_name=creator_name,
                 success=int(not failures),
                 failures=failures_as_json,

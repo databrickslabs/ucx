@@ -72,7 +72,7 @@ def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     def mock_get(pipeline_id: str) -> GetPipelineResponse:
         if pipeline_id == "2":
             raise ResourceDoesNotExist("Simulated disappearance")
-        return GetPipelineResponse(pipeline_id=pipeline_id, spec=PipelineSpec(id=pipeline_id))
+        return GetPipelineResponse(pipeline_id=pipeline_id, spec=PipelineSpec(id=pipeline_id), name="will_remain")
 
     ws.pipelines.get = mock_get
 
@@ -82,7 +82,7 @@ def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     assert results == [
         PipelineInfo(pipeline_id="1", pipeline_name="will_remain", creator_name=None, success=1, failures="[]")
     ]
-    assert "Pipeline disappeared, cannot assess: will_disappear (id=2)" in caplog.messages
+    assert "Pipeline disappeared, cannot assess: (id=2)" in caplog.messages
 
 
 def test_pipeline_crawler_creator():
@@ -93,6 +93,11 @@ def test_pipeline_crawler_creator():
         PipelineStateInfo(pipeline_id="3", creator_user_name="bob"),
     )
     ws.pipelines.get = create_autospec(GetPipelineResponse)  # pylint: disable=mock-no-usage
+    ws.pipelines.get.side_effect = [
+        GetPipelineResponse(pipeline_id="1", spec=PipelineSpec(id="1"), creator_user_name=None),
+        GetPipelineResponse(pipeline_id="2", spec=PipelineSpec(id="2"), creator_user_name=""),
+        GetPipelineResponse(pipeline_id="3", spec=PipelineSpec(id="3"), creator_user_name="bob"),
+    ]
     result = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
 
     expected_creators = [None, None, "bob"]
