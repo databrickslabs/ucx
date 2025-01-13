@@ -1,5 +1,5 @@
-Group Name Conflict Resolution
-===
+# Group Name Conflict Resolution
+
 
 See [this document](local-group-migration.md) for workspace group migration.
 
@@ -37,7 +37,7 @@ When we run the migration process the regular expression substitution will be ap
 Group Translation Scenarios:
 
 | Scenario       | User Input                                                   | workspace_group_regex | workspace_group_replace | account_group_regex | Example                                          |
-|----------------|--------------------------------------------------------------|-----------------------|-------------------------|---------------------|--------------------------------------------------|
+| -------------- | ------------------------------------------------------------ | --------------------- | ----------------------- | ------------------- | ------------------------------------------------ |
 | Prefix         | prefix: [Prefix]                                             | ^                     | [Prefix]                | [EMPTY]             | data_engineers --> prod_data_engineers           |
 | Suffix         | suffix: [Prefix]                                             | $                     | [Suffix]                | [EMPTY]             | data_engineers --> data_engineers_prod           |
 | Substitution   | Search Regex: [Regex]<br/>Replace Text:[Replacement_Text]    | [WS_Regex]            | [ [Replacement_Text]    | [Empty]             | corp_tech_data_engineers --> prod_data_engineers |

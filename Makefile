@@ -32,3 +32,9 @@ solacc:
 	hatch run python tests/integration/source_code/solacc.py
 
 .PHONY: all clean dev lint fmt test integration coverage known solacc
+
+docs-install:
+	yarn --cwd docs/ucx install
+
+docs-serve:
+	yarn --cwd docs/ucx start
