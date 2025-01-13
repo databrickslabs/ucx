@@ -7,7 +7,7 @@ After you're done with the [table migration](#Table-Migration), you can proceed 
 Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
 clusters to be UC compatible.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `lint-local-code` command
 
@@ -26,7 +26,7 @@ When run from an IDE terminal, this command generates output as follows:
 ![img.png](/img/lint-local-code-output.png)
 With modern IDEs, clicking on the file link opens the file at the problematic line
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `migrate-local-code` command
 
@@ -39,7 +39,7 @@ migrate all python and SQL files in the current working directory. This command 
 at the moment only supports Python and SQL files and discards code comments and formatting during
 the automated transformation process.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `migrate-dbsql-dashboards` command
 
@@ -58,7 +58,7 @@ This command can be run with `--dashboard-id` flag to migrate a specific dashboa
 
 This command is incremental and can be run multiple times to migrate new dashboards.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `revert-dbsql-dashboards` command
 
@@ -71,4 +71,4 @@ databricks labs ucx revert-dbsql-dashboards [--dashboard-id <dashboard-id>]
 
 This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
 
-[[back to top](#databricks-labs-ucx)]
+

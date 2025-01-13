@@ -11,7 +11,7 @@ Ask your Databricks Account admin to run the [`sync-workspace-info` command](#sy
 workspace information with the UCX installations. Once the workspace information is synced, you can run the
 [`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `sync-workspace-info` command
 
@@ -37,7 +37,7 @@ If you cannot get account administrator privileges in reasonable time, you can t
 run [`manual-workspace-info` command](#manual-workspace-info-command) to enter Databricks Workspace IDs and Databricks
 Workspace names.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `manual-workspace-info` command
 
@@ -61,7 +61,7 @@ run. It prompts the user to enter the required information manually and creates 
 useful for workspace administrators who are unable to use the `sync-workspace-info` command, because they are not
 Databricks Account Administrators. It can also be used to manually create the workspace info in a new workspace.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `create-account-groups` command
 
@@ -83,7 +83,7 @@ This command is useful for the setups, that don't have SCIM provisioning in plac
 
 Once you're done with this command, proceed to the [group migration workflow](#group-migration-workflow).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `validate-groups-membership` command
 
@@ -103,7 +103,7 @@ used to debug issues related to group membership. See [group migration](docs/loc
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `validate-table-locations` command
 
@@ -134,7 +134,7 @@ Considerations when resolving tables with overlapping locations are:
     - Tags
   - ACLs
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `cluster-remap` command
 
@@ -159,7 +159,7 @@ to revert the cluster remapping.
 
 You can revert the cluster remapping using the [`revert-cluster-remap` command](#revert-cluster-remap-command).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `revert-cluster-remap` command
 
@@ -176,7 +176,7 @@ its configuration from UC to original one.It will iterate through the list of cl
 cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
 By default, it will revert all the clusters present in the backup folder
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `upload` command
 

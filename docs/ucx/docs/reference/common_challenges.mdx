@@ -1,7 +1,7 @@
 # Common Challenges and the Solutions
 Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions below.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Network Connectivity Issues
 
@@ -69,7 +69,7 @@ ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verif
 [to force requests library to set verify=False](https://github.com/psf/requests/blob/8c211a96cdbe9fe320d63d9e1ae15c5c07e179f8/requests/sessions.py#L718)
 as well as set `SSL_CERT_DIR` env var pointing to the proxy CA cert for the urllib3 library.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Insufficient Privileges
 
@@ -111,7 +111,7 @@ Admin privileges required for commands:
 | [<u>sync-workspace-info</u>](#sync-workspace-info-command)                                       | Account Admin |
 | [<u>manual-workspace-info</u>](#manual-workspace-info-command)                                   | Workspace Admin |
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Version Issues
 
@@ -140,7 +140,7 @@ specific version of UCX, you can do it using the command
 `databricks labs install ucx@\<version\>`, for example,
 `databricks labs install ucx@v0.21.0`.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Authentication Issues
 
@@ -165,7 +165,7 @@ authentication</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.
 [<u>Basic authentication
 (legacy)</u>](https://docs.databricks.com/en/dev-tools/cli/authentication.html#basic-auth).
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Multiple Profiles in Databricks CLI
 
@@ -189,7 +189,7 @@ profile: `databricks labs install ucx -p prod`.
 **Solution:** The installation command `databricks labs install ucx`
 will provide an option to select one account profile.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Workspace has an external Hive Metastore (HMS)
 
@@ -219,7 +219,7 @@ admin settings do not have the configurations already set. For example,
 add *spark.hadoop.javax.jdo.option.ConnectionURL \<connectionstring\>*
 under Data Access Configuration of SQL Warehouse Admin Settings.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ### Verify the Installation
 
@@ -236,4 +236,4 @@ successfully, the installation can be verified with the following steps:
     external HMS, verify from the results that the assessment has
     analyzed the external HMS tables.
 
-[[back to top](#databricks-labs-ucx)]
+

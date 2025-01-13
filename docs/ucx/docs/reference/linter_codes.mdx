@@ -42,7 +42,7 @@ for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
     spark.sql(query).collect()
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `catalog-api-in-shared-clusters`
 
@@ -50,7 +50,7 @@ for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
 mode, so of your code has `spark.catalog.tableExists("table")` or `spark.catalog.listDatabases()`, you need to ensure
 that your cluster is running the correct runtime version and data security mode.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `changed-result-format-in-uc`
 
@@ -64,7 +64,7 @@ for table in spark.catalog.listTables():
 
 you need to make sure that `do_stuff_with_table` can handle the new format.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `direct-filesystem-access-in-sql-query`
 
@@ -77,7 +77,7 @@ df = spark.sql("SELECT * FROM parquet.`/mnt/foo/path/to/parquet.file`")
 
 you need to change it to use UC tables.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `direct-filesystem-access`
 
@@ -96,7 +96,7 @@ display(spark.read.csv('s3://bucket/folder/data.csv'))
 
 You need to change it to use UC tables or UC volumes.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `dependency-not-found`
 
@@ -104,7 +104,7 @@ This message indicates that the linter has found a dependency, like Python sourc
 available in the workspace. The user must ensure that the dependency is available in the workspace. This usually
 means an error in the user code.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `jvm-access-in-shared-clusters`
 
@@ -123,7 +123,7 @@ LOGGER = log4jLogger.LogManager.getLogger(__name__)
 
 you need to change it to use Python equivalents.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `legacy-context-in-shared-clusters`
 
@@ -140,13 +140,13 @@ or this:
 sc.parallelize([1, 2, 3])
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `not-supported`
 
 Installing eggs is no longer supported on Databricks 14.0 or higher.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `notebook-run-cannot-compute-value`
 
@@ -165,14 +165,14 @@ a = "./leaf1.py"
 dbutils.notebook.run(a)
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `python-parse-error`
 
 This is a generic message indicating that the Python code could not be parsed. The user must manually check the Python
 code.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `python-udf-in-shared-clusters`
 
@@ -197,7 +197,7 @@ It is not possible to register Java UDF from Python code on Unity Catalog cluste
 spark.udf.registerJavaFunction("func", "org.example.func", IntegerType())
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `rdd-in-shared-clusters`
 
@@ -207,7 +207,7 @@ RDD APIs are not supported on Unity Catalog clusters in Shared access mode. Use 
 df.rdd.mapPartitions(myUdf)
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `spark-logging-in-shared-clusters`
 
@@ -232,27 +232,27 @@ or
 sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `sql-parse-error`
 
 This is a generic message indicating that the SQL query could not be parsed. The user must manually check the SQL query.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `sys-path-cannot-compute-value`
 
 Path for `sys.path.append` cannot be computed and requires adjusting the path. It is not clear for automated code
 analysis where the path is located.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `table-migrated-to-uc`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `to-json-in-shared-clusters`
 
@@ -263,10 +263,10 @@ above to get a subset of command context information. Example code that triggers
 dbutils.notebook.entry_point.getDbutils().notebook().getContext().toSafeJson()
 ```
 
-[[back to top](#databricks-labs-ucx)]
+
 
 ## `unsupported-magic-line`
 
 This message indicates the code that could not be analysed by UCX. User must check the code manually.
 
-[[back to top](#databricks-labs-ucx)]
+
