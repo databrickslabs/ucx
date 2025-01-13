@@ -202,9 +202,10 @@ class LocalFileMigrator:
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
+            fix_indicators = []
             for child_path in path.iterdir():
-                self.apply(child_path)
-            return True
+                fix_indicators.append(self.apply(child_path))
+            return all(fix_indicators)
         return self._fix_file(path)
 
     def _fix_file(self, path: Path) -> bool:
