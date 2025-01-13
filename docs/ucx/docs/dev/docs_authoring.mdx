@@ -1,0 +1,65 @@
+import Admonition from '@theme/Admonition';
+
+# Authoring Documentation
+
+This document provides guidelines for writing documentation for the UCX project.
+
+
+## Tech Stack
+
+The UCX documentation is built using [Docusaurus](https://docusaurus.io/), a modern static site generator. Docusaurus is a project of Facebook Open Source and is used by many open-source projects to build their documentation websites.
+We also use [MDX](https://mdxjs.com/) to write markdown files that include JSX components. This allows us to write markdown files with embedded React components.
+For styling, we use [Tailwind CSS](https://tailwindcss.com/), a utility-first CSS framework for rapidly building custom designs.
+
+## Writing Documentation
+
+Most of the documentation is written in markdown files with the `.mdx` extension. 
+The markdown files are located in the `docs` directory of the UCX project.
+
+## Prerequisites
+
+Before you start writing documentation, make sure you have the following tools installed on your machine:
+- [Node.js](https://nodejs.org/en/)
+- [Yarn](https://yarnpkg.com/)
+
+On macOS, you can install Node.js and Yarn using [Homebrew](https://brew.sh/):
+
+```bash
+brew install node
+npm install --global yarn
+```
+
+
+## Setup 
+
+To set up the documentation locally, follow these steps:
+
+1. Clone the UCX repository
+2. Navigate to the `docs/ucx` directory:
+
+```bash
+cd docs/ucx
+```
+
+3. Start the development server:
+
+```bash
+yarn start
+```
+
+4. Open your browser and navigate to `http://localhost:3000/` to view the documentation site.
+
+
+## Adding images
+
+To add images to your documentation, place the image files in the `static/img` directory.
+
+To include an image in your markdown file, use the following syntax:
+
+```markdown
+![Alt text](/img/image-name.png)
+```
+
+<Admonition type="tip" title="Tip" emoji="💡">
+Images support zooming features out of the box.
+</Admonition>

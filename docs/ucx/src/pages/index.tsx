@@ -7,7 +7,7 @@ import { JSX } from 'react';
 const Hero = () => {
   return (
     <main className='flex flex-col items-center pt-20 w-full'>
-      <div className="px-4 md:px-10 max-w-screen-lg h-[calc(100vh-60px)] flex flex-col md:flex-row justify-between w-full">
+      <div className="px-4 md:px-10 max-w-screen-xl h-[calc(100vh-140px)] flex flex-col md:flex-row justify-between w-full">
         {/* <!-- Left Column (Text) --> */}
         <div className="md:w-2/3 text-center md:text-left">
           <h1 className="text-5xl font-semibold leading-tight text-balance mb-6"><span className='font-mono'>UCX</span> - Unity Catalog

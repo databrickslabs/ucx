@@ -35,12 +35,15 @@ const config: Config = {
       return {
         name: "docusaurus-plugin-tailwindcss",
         configurePostCss(postcssOptions) {
-          postcssOptions.plugins.push(require('tailwindcss'));
-          postcssOptions.plugins.push(require('autoprefixer'));
+          postcssOptions.plugins = [
+            require('tailwindcss'),
+            require('autoprefixer'),
+          ];
           return postcssOptions;
         },
       }
-    }
+    },
+    'docusaurus-plugin-image-zoom',
   ],
 
   presets: [
@@ -92,6 +95,13 @@ const config: Config = {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
+    zoom: {
+      selector: 'article img',
+      background: {
+        light: 'rgb(255, 255, 255)',
+        dark: '#0f0d29',
+      },
+    }
   } satisfies Preset.ThemeConfig,
 };
 

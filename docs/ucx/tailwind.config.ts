@@ -10,6 +10,11 @@ export default {
   theme: {
     extend: {},
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
+  corePlugins: {
+    preflight: false, // to make headings H1-H6 work correctly
+  }
 } satisfies Config
 
