@@ -46,30 +46,30 @@ class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
 
         for pipeline_id in pipeline_ids:
             try:
-                pipeline_response = self._ws.pipelines.get(pipeline_id)
+                pipeline = self._ws.pipelines.get(pipeline_id)
+                assert pipeline.pipeline_id is not None
+                assert pipeline.spec is not None
             except NotFound:
                 logger.warning(f"Pipeline not found: {pipeline_id}")
                 continue
 
-            creator_name = pipeline_response.creator_user_name or None
+            creator_name = pipeline.creator_user_name or None
             if not creator_name:
                 logger.warning(
-                    f"Pipeline {pipeline_response.name} have Unknown creator, it means that the original creator "
+                    f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            assert pipeline_response.pipeline_id is not None
-            assert pipeline_response.spec is not None
-            pipeline_config = pipeline_response.spec.configuration
+            pipeline_config = pipeline.spec.configuration
             failures = []
             if pipeline_config:
                 failures.extend(self._check_spark_conf(pipeline_config, "pipeline"))
-            clusters = pipeline_response.spec.clusters
+            clusters = pipeline.spec.clusters
             if clusters:
                 self._pipeline_clusters(clusters, failures)
             failures_as_json = json.dumps(failures)
             yield PipelineInfo(
-                pipeline_id=pipeline_response.pipeline_id,
-                pipeline_name=pipeline_response.name,
+                pipeline_id=pipeline.pipeline_id,
+                pipeline_name=pipeline.name,
                 creator_name=creator_name,
                 success=int(not failures),
                 failures=failures_as_json,
