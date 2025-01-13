@@ -87,7 +87,7 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
-    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))\/.*$"
+    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [

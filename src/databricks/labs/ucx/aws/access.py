@@ -213,8 +213,9 @@ class AWSResourcePermissions:
         missing_paths = set()
         for external_location in external_locations:
             matching_role = False
+            path = PurePath(external_location.location)
             for role in compatible_roles:
-                if external_location.location.startswith(role.resource_path):
+                if PurePath(role.resource_path) in path.parents or path.match(role.resource_path):
                     matching_role = True
                     continue
             if matching_role:
