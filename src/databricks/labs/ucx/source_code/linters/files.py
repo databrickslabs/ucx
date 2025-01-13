@@ -216,14 +216,14 @@ class LocalFileMigrator:
             logger.warning(f"Skipping file with unsupported extension: {path}")
             return False
         logger.info(f"Analysing {path}")
-        context = self._context_factory()
-        linter = context.linter(language)
         try:
             code = path.read_text()
         except UnicodeDecodeError as e:
             logger.warning(f"Could not decode file: {path}", exc_info=e)
             return False
         applied = False
+        context = self._context_factory()
+        linter = context.linter(language)
         for advice in linter.lint(code):
             logger.info(f"Found: {advice}")
             fixer = context.fixer(language, advice.code)
