@@ -31,7 +31,7 @@ def test_local_code_linter_lints_ucx(simple_ctx, ucx_source_path) -> None:
         lambda: linter_context,
     )
     problems = linter.lint(Prompts(), ucx_source_path, StringIO())
-    assert len(problems) > 0, f"Found problems while linting ucx: {problems}"
+    assert len(problems) > 0, f"Found no problems while linting ucx"
 
 
 def test_local_code_linter_lints_migrated_hive_metastore_table(simple_ctx, tmp_path) -> None:
