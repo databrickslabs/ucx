@@ -224,15 +224,15 @@ class LocalFileMigrator:
             except UnicodeDecodeError as e:
                 logger.warning(f"Could not decode file: {path}", exc_info=e)
                 return False
-            applied = False
-            for advice in linter.lint(code):
-                logger.info(f"Found: {advice}")
-                fixer = context.fixer(language, advice.code)
-                if not fixer:
-                    continue
-                logger.info(f"Applying fix for {advice}")
-                code = fixer.apply(code)
-                applied = True
+        applied = False
+        for advice in linter.lint(code):
+            logger.info(f"Found: {advice}")
+            fixer = context.fixer(language, advice.code)
+            if not fixer:
+                continue
+            logger.info(f"Applying fix for {advice}")
+            code = fixer.apply(code)
+            applied = True
         if not applied:
             return False
         with path.open("w") as f:
