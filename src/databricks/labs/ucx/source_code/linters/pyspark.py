@@ -264,7 +264,7 @@ class DirectFilesystemAccessMatcher(_TableNameMatcher):
 
 class SparkTableNameMatchers:
 
-    def __init__(self, dfsa_matchers_only: bool):
+    def __init__(self, *, dfsa_matchers_only: bool):
 
         spark_dfsa_matchers: list[_TableNameMatcher] = [
             DirectFilesystemAccessMatcher(
@@ -396,7 +396,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._from_table = from_table
         self._index = index
         self._session_state = session_state
-        self._spark_matchers = SparkTableNameMatchers(False).matchers
+        self._spark_matchers = SparkTableNameMatchers(dfsa_matchers_only=False).matchers
 
     @property
     def name(self) -> str:
