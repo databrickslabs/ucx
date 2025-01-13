@@ -237,7 +237,7 @@ class LocalFileMigrator:
             logger.info(f"No fixes found for: {path}")
             return False
         logger.info(f"Fixed: {path}")
-        path.write_text(code)
+        path.write_text(fixed_code)
         return True
 
     def _fix_code(self, code: str, language: Language) -> str:
