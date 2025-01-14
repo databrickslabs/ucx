@@ -60,6 +60,12 @@ def test_fixer_returns_none_for_unsupported_language(empty_table_migration_index
     assert fixer is None
 
 
+def test_linter_context_apply_fixes_no_operation(empty_table_migration_index: TableMigrationIndex) -> None:
+    context = LinterContext(empty_table_migration_index)
+    fixed_code = context.apply_fixes(Language.PYTHON, "print(1)")
+    assert fixed_code == "print(1)"
+
+
 @pytest.mark.parametrize(
     'code,expected',
     [
