@@ -5,6 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
@@ -81,6 +82,21 @@ def test_local_code_migrator_apply_walks_directory(tmp_path) -> None:
     assert path.read_text("utf-8") == "Hi there!"
 
 
+def test_local_code_migrator_fixes_migrated_hive_metastore_table(tmp_path) -> None:
+    path = tmp_path / "read_table.py"
+    path.write_text("df = spark.read.table('hive_metastore.schema.table')")
+
+    session_state = CurrentSessionState()  # No need to connect
+    index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
+    linter_context = LinterContext(index, session_state)
+    migrator = LocalCodeMigrator(lambda: linter_context)
+
+    has_code_changes = migrator.apply(path)
+
+    assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
+    assert "df = spark.read.table('catalog.schema.table')" in path.read_text()
+
+
 @pytest.fixture()
 def local_code_linter(mock_path_lookup, migration_index):
     notebook_loader = NotebookLoader()
@@ -108,7 +124,7 @@ def local_code_linter(mock_path_lookup, migration_index):
     )
 
 
-def test_local_code_linter_lints_migrated_hive_metastore_table(tmp_path, local_code_linter) -> None:
+def test_local_code_linter_lint_path_detects_migrated_hive_metastore_table(tmp_path, local_code_linter) -> None:
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.old.things')")
 
@@ -128,7 +144,7 @@ def test_local_code_linter_lints_migrated_hive_metastore_table(tmp_path, local_c
     )
 
 
-def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
+def test_local_code_linter_lint_path_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "simulate-sys-path"
     paths: set[Path] = set()
@@ -137,7 +153,7 @@ def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     assert not advices
 
 
-def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
+def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
     paths: set[Path] = set()

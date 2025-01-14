@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, LocalCodeMigrator
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 
@@ -42,19 +42,3 @@ def test_local_code_migrator_fixes_ucx(simple_ctx, ucx_source_path) -> None:
     has_code_changes = migrator.apply(ucx_source_path)
 
     assert not has_code_changes
-
-
-def test_local_code_migrator_fixes_migrated_hive_metastore_table(simple_ctx, tmp_path) -> None:
-    # TODO: Is this a unit or integration test?
-    path = tmp_path / "read_table.py"
-    path.write_text("df = spark.read.table('hive_metastore.schema.table')")
-
-    session_state = CurrentSessionState()  # No need to connect
-    index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
-    linter_context = LinterContext(index, session_state)
-    migrator = LocalCodeMigrator(lambda: linter_context)
-
-    has_code_changes = migrator.apply(path)
-
-    assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
-    assert "catalog" in path.read_text()
