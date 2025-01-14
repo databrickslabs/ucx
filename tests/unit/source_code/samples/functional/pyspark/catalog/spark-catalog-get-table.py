@@ -3,7 +3,7 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrated-to-uc:+1:12:+1:48] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc-python:+1:12:+1:48] Table old.things is migrated to brand.new.stuff in Unity Catalog
     table = spark.catalog.getTable("old.things")
     do_stuff_with(table)
 
