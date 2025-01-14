@@ -28,8 +28,8 @@ from tests.unit import locate_site_packages, _samples_path
 
 
 def test_local_code_migrator_apply_skips_non_existing_file(caplog) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: languages)
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
     path = Path("non_existing_file.py")
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
         assert not migrator.apply(path)
@@ -37,8 +37,8 @@ def test_local_code_migrator_apply_skips_non_existing_file(caplog) -> None:
 
 
 def test_local_code_migrator_apply_ignores_unsupported_extensions(caplog, tmp_path) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: languages)
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
     path = tmp_path / "unsupported.ext"
     path.touch()
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
@@ -47,8 +47,8 @@ def test_local_code_migrator_apply_ignores_unsupported_extensions(caplog, tmp_pa
 
 
 def test_local_code_migrator_apply_ignores_unsupported_language_on_context(tmp_path, caplog) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: languages)
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
     migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
     path = tmp_path / 'unsupported.py'
     path.touch()
