@@ -170,7 +170,11 @@ class Fixer(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def diagnostic_codes(self) -> set[str]:
+        """The diagnostic codes that this fixer fixes."""
+
+    def is_supported(self, diagnostic_code: str) -> bool:
+        return diagnostic_code in self.diagnostic_codes
 
     @abstractmethod
     def apply(self, code: str) -> str: ...
