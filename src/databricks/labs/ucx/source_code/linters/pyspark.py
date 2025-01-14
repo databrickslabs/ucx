@@ -406,9 +406,9 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._spark_matchers = SparkTableNameMatchers(dfsa_matchers_only=False).matchers
 
     @property
-    def name(self) -> str:
-        # this is the same fixer, just in a different language context
-        return 'table-migrated-to-uc-python'
+    def diagnostic_codes(self) -> set[str]:
+        """The diagnostic codes that this fixer fixes."""
+        return {'table-migrated-to-uc-python'}
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -482,9 +482,9 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
         self._sql_fixer = sql_fixer
 
     @property
-    def name(self) -> str:
-        # The name implies that the SQL linter is for detecting migrated tables
-        return 'table-migrated-to-uc-python-sql'
+    def diagnostic_codes(self) -> set[str]:
+        """The diagnostic codes that this fixer fixes."""
+        return {'table-migrated-to-uc-python-sql'}
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for call_node, query in self._visit_call_nodes(tree):

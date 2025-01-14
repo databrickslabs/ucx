@@ -82,13 +82,6 @@ class LinterContext:
 
         python_dfsa_collectors += [DirectFsAccessPyLinter(session_state, prevent_spark_duplicates=False)]
 
-        # See the `fixer` method below on why this is required
-        sql_fixer_names, python_fixer_names = [f.name for f in sql_fixers], [f.name for f in python_fixers]
-        if len(sql_fixer_names) != len(set(sql_fixer_names)):
-            raise NameError(f"SQL fixers should have unique names: {sql_fixer_names}")
-        if len(python_fixer_names) != len(set(python_fixer_names)):
-            raise NameError(f"Python fixers should have unique names: {python_fixer_names}")
-
         self._linters: dict[Language, list[SqlLinter] | list[PythonLinter]] = {
             Language.PYTHON: python_linters,
             Language.SQL: sql_linters,
@@ -130,7 +123,7 @@ class LinterContext:
             Fixer | None : The fixer if a match is found, otherwise None.
         """
         for fixer in self._fixers.get(language, []):
-            if fixer.name == diagnostic_code:
+            if fixer.is_supported(diagnostic_code):
                 return fixer
         return None
 
