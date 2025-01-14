@@ -81,6 +81,7 @@ class AccountAggregate:
                         )
                     ]
                 )
+                # TODO: Use FromTableSqlLinter via LinterContext
                 from_table = FromTableSqlLinter(stub_index, CurrentSessionState(schema=inventory_database))
                 logger.info(f"Querying Schema {inventory_database}")
 
