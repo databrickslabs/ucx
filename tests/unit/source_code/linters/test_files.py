@@ -92,7 +92,7 @@ def test_local_code_migrator_fixes_migrated_hive_metastore_table(tmp_path) -> No
     has_code_changes = migrator.apply(path)
 
     assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
-    assert "df = spark.read.table('catalog.schema.table')" in path.read_text()
+    assert "df = spark.read.table('catalog.schema.table')" == path.read_text()
 
 
 @pytest.fixture()
