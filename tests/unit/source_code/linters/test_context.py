@@ -9,8 +9,8 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 def test_linter_context_has_unique_fixer_names() -> None:
     try:
         LinterContext(TableMigrationIndex([]))
-    except NameError:
-        assert False, "Fixers should have unique names"
+    except NameError as e:
+        assert False, str(e)
     else:
         assert True, "Fixers have unique names"
 
