@@ -423,3 +423,48 @@ class FileLinter:
             self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
         )
         yield from notebook_linter.lint()
+
+    def apply(self) -> bool:
+        """Fix a file.
+
+        Apply the code fixers on the read content of the file. If the fixers yield code changes, write them back to the
+        file.
+        """
+
+        encoding = locale.getpreferredencoding(False)
+        try:
+            # Not using `safe_read_text` here to surface read errors
+            self._content = self._content or read_text(self._path)
+        except FileNotFoundError:
+            failure_message = f"File not found: {self._path}"
+            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
+            return
+        except UnicodeDecodeError:
+            failure_message = f"File without {encoding} encoding is not supported {self._path}"
+            yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
+            return
+        except PermissionError:
+            failure_message = f"Missing read permission for {self._path}"
+            yield Failure("file-permission", failure_message, 0, 0, 1, 1)
+            return
+
+        yield from self._apply_file()
+
+    def _apply_file(self):
+        language = file_language(self._path)
+        if not language:
+            suffix = self._path.suffix.lower()
+            if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
+                yield from []
+            elif suffix in self._NOT_YET_SUPPORTED_SUFFIXES:
+                yield Failure("unsupported-language", f"Language not supported yet for {self._path}", 0, 0, 1, 1)
+            else:
+                yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        else:
+            try:
+                fixed_content = self._ctx.apply_fixes(language, self._content)
+                if self._content == fixed_content:
+                    self._path.write_text(fixed_content)
+            except ValueError as err:
+                failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
+                yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
