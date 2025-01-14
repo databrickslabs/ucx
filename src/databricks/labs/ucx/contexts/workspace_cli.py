@@ -29,6 +29,7 @@ from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
 
+
 # pylint: disable=too-many-public-methods
 
 
@@ -161,6 +162,7 @@ class WorkspaceContext(CliContext):
         return AWSResourcePermissions(
             self.installation,
             self.workspace_client,
+            self.config,
             self.aws_resources,
             self.external_locations,
             self.named_parameters.get("kms_key"),

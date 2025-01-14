@@ -12,6 +12,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class AWSUCRoleCandidate:
     role_name: str
     policy_name: str
     resource_paths: list[str]
+    resource_type: str = "s3"
 
 
 @dataclass
@@ -82,39 +84,6 @@ class AWSCredentialCandidate:
     def role_name(self):
         role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
-
-
-@dataclass()
-class AWSGlue:
-    instance_pofile_arn: str
-    aws_region: str
-    aws_account_id: str
-
-    @classmethod
-    def get_glue_for_workspace(cls, workspace: WorkspaceClient, instance_profile_arn):
-
-        account_id_match = re.match(r"arn:aws:iam::(\d+):instance-profile/.*", instance_profile_arn)
-        if not account_id_match:
-            logger.error(f"Instance profile ARN is mismatched {instance_profile_arn}")
-            return None
-        aws_account_id = account_id_match.group(1)
-        try:
-            metastore = workspace.metastores.current().metastore_id
-            aws_region = workspace.metastores.get(metastore).region
-            if aws_region:
-                return AWSGlue(instance_profile_arn, aws_region, aws_account_id)
-            return None
-        except NotFound:
-            # workspace information cannot be found
-            logger.warning("Can't retrieve aws region")
-            return None
-
-    def as_dict(self):
-        return {
-            "instance_profile_arn": self.instance_pofile_arn,
-            "aws_region": self.aws_region,
-            "aws_account_id": self.aws_account_id,
-        }
 
 
 class AWSResources:
@@ -255,8 +224,8 @@ class AWSResources:
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
-            action_policy_actions = self._s3_policy_actions(action) or self._glue_policy_actions(action)
-            policy_actions.extend(action_policy_actions)
+            policy_actions.extend(self._s3_policy_actions(action))
+            policy_actions.extend(self._glue_policy_actions(action))
         return policy_actions
 
     def _s3_policy_actions(self, action):
@@ -264,7 +233,7 @@ class AWSResources:
         actions = action.get("Action")
         if not actions:
             return []
-        if not isinstance(actions, list):
+        if isinstance(actions, list):
             if self.S3_READONLY not in actions:
                 return []
             privilege = Privilege.WRITE_FILES.value
@@ -298,7 +267,7 @@ class AWSResources:
 
         if "*" not in action.get("Resource", []):
             return []
-        return AWSPolicyAction("glue", Privilege.USAGE.value, "*")
+        return [AWSPolicyAction("glue", Privilege.USAGE.value, "*")]
 
     def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
         return self._get_json_for_cli(
@@ -369,6 +338,32 @@ class AWSResources:
             }
         )
 
+    def _aws_glue_policy(self, resources, account_id, role_name):
+        """
+        Create the UC IAM policy for the given S3 prefixes, account ID, role name, and KMS key.
+        """
+
+        statement = [
+            {
+                "Action": [
+                    "glue:*",
+                ],
+                "Resource": list(resources),
+                "Effect": "Allow",
+            },
+            {
+                "Action": ["sts:AssumeRole"],
+                "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                "Effect": "Allow",
+            },
+        ]
+        return self._get_json_for_cli(
+            {
+                "Version": "2012-10-17",
+                "Statement": statement,
+            }
+        )
+
     def _create_role(self, role_name: str, assume_role_json: str) -> str | None:
         """
         Create an AWS role with the given name and assume role policy document.
@@ -414,7 +409,8 @@ class AWSResources:
         self,
         role_name: str,
         policy_name: str,
-        s3_prefixes: set[str],
+        resource_type: str,
+        resources: set[str],
         account_id: str,
         kms_key: str | None = None,
     ) -> bool:
@@ -423,13 +419,21 @@ class AWSResources:
         Args:
             role_name: the name of the role
             policy_name: the name of the policy
-            s3_prefixes: s3 prefixes to allow access to
+            resource_type: the type of the resource (s3 or glue)
+            resources: s3 prefixes to allow access to
             account_id: AWS account ID
             kms_key: (optional) KMS key to be used
         """
+        if resource_type == "s3":
+            policy_document = self._aws_s3_policy(resources, account_id, role_name, kms_key)
+        elif resource_type == "glue":
+            policy_document = self._aws_glue_policy(resources, account_id, role_name)
+        else:
+            logger.error(f"Resource type {resource_type} not supported")
+            return False
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
-            f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
+            f"--policy-document {policy_document}"
         ):
             return False
         return True
@@ -529,3 +533,68 @@ class AWSResources:
     @staticmethod
     def _get_json_for_cli(input_json: dict) -> str:
         return json.dumps(input_json).replace('\n', '').replace(" ", "")
+
+
+@dataclass()
+class AWSGlue:
+    aws_region: str
+    aws_account_id: str
+
+    @classmethod
+    def get_glue_connection_info(
+        cls,
+        workspace: WorkspaceClient,
+        config: WorkspaceConfig,
+    ):
+        if not config.spark_conf:
+            logger.info('Spark config not found')
+            return None
+        spark_config = config.spark_conf
+        glue_metastore = spark_config.get('spark.databricks.hive.metastore.glueCatalog.enabled')
+        if not glue_metastore or glue_metastore.lower() != 'true':
+            logger.info('Glue Metastore not enabled')
+            return None
+        aws_region = spark_config.get('spark.hadoop.aws.region')
+        instance_profile_arn = config.instance_profile
+        if not instance_profile_arn:
+            logger.info('Instance Profile not found')
+            return None
+
+        account_id_match = re.match(r"arn:aws:iam::(\d+):instance-profile/.*", instance_profile_arn)
+        if not account_id_match:
+            logger.error(f"Instance profile ARN is mismatched {instance_profile_arn}")
+            return None
+        aws_account_id = account_id_match.group(1)
+        if not aws_region:
+            try:
+                metastore = workspace.metastores.current().metastore_id
+                aws_region = workspace.metastores.get(metastore).region
+                if not aws_region:
+                    logger.warning("Can't retrieve glue aws region")
+                    return None
+            except NotFound:
+                # workspace information cannot be found
+                logger.warning("Can't retrieve aws region")
+                return None
+
+        return cls(aws_region, aws_account_id)
+
+    def as_dict(self):
+        return {
+            "aws_region": self.aws_region,
+            "aws_account_id": self.aws_account_id,
+        }
+
+    @staticmethod
+    def is_glue_in_config(
+        config: WorkspaceConfig,
+    ) -> bool:
+        if not config.spark_conf:
+            logger.info('Spark config not found')
+            return False
+        spark_config = config.spark_conf
+        glue_metastore = spark_config.get('spark.databricks.hive.metastore.glueCatalog.enabled')
+        if not glue_metastore or glue_metastore.lower() != 'true':
+            logger.info('Glue Metastore not enabled')
+            return False
+        return True

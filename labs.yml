@@ -222,6 +222,14 @@ commands:
       - name: run-as-collection
         description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
 
+  - name: migrate-glue-credentials
+    description: Migrate credentials for glue service access to UC storage credential
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+      - name: run-as-collection
+        description: (Optional) boolean flag to indicate to run the cmd as a collection. Default is False.
+
   - name: create-account-groups
     is_account_level: true
     description: |
