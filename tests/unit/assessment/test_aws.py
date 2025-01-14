@@ -654,7 +654,7 @@ def test_create_uc_role_policy_no_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234")
+    aws.put_role_policy("test_role", "test_policy", "s3", s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -677,7 +677,7 @@ def test_create_uc_role_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
+    aws.put_role_policy("test_role", "test_policy", "s3", s3_prefixes, "1234", "key_arn")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '

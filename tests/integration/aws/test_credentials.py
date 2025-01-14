@@ -40,6 +40,7 @@ def run_migration(ws, sql_backend, env_or_skip, aws_cli_ctx):
         resource_permissions = AWSResourcePermissions(
             installation,
             ws,
+            aws_cli_ctx.config,
             aws,
             location,
             aws_cli_ctx.principal_acl,

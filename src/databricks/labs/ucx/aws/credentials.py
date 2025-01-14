@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.platform import InvalidParameterValue
+from databricks.sdk.errors.platform import InvalidParameterValue, NotFound
 from databricks.sdk.service.catalog import (
     AwsIamRoleRequest,
     Privilege,
@@ -52,12 +52,44 @@ class CredentialManager:
         logger.info(f"Found {len(iam_roles)} distinct IAM roles already used in UC storage credentials")
         return iam_roles
 
+    def list_glue(self) -> dict[str, str]:
+        # list existed service credentials that are using iam roles, capturing the arns and names
+        credential_response = self._ws.api_client.do('GET', '/api/2.1/unity-catalog/credentials')
+        if not credential_response or not isinstance(credential_response, dict):
+            raise NotFound('could not retrieve credentials for Glue access. ')
+        credential_list = credential_response.get("credentials")
+        if not credential_list or not isinstance(credential_list, list):
+            raise NotFound('could not retrieve credentials for Glue access. ')
+        credentials = {
+            credential.get("name"): credential.get("aws_iam_role").get("role_arn")
+            for credential in credential_list
+            if credential.get("purpose") == "SERVICE"
+        }
+
+        logger.info(f"Found {len(credentials)} distinct IAM roles used in UC service credentials")
+        return credentials
+
     def create(self, name: str, role_arn: str, read_only: bool) -> StorageCredentialInfo:
         return self._ws.storage_credentials.create(
             name,
             aws_iam_role=AwsIamRoleRequest(role_arn),
             comment=f"Created by UCX during migration to UC using AWS IAM Role: {name}",
             read_only=read_only,
+        )
+
+    def create_service_credential(self, name: str, role_arn: str) -> None:
+        self._ws.api_client.do(
+            'POST',
+            '/api/2.1/unity-catalog/credentials',
+            body={
+                "name": name,
+                "aws_iam_role": {
+                    "role_arn": role_arn,
+                },
+                "comment": "Glue service credential created by UCX during migration to UC using AWS IAM Role",
+                "purpose": "SERVICE",
+                "skip_validation": True,
+            },
         )
 
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
@@ -144,6 +176,25 @@ class IamRoleMigration:
 
         return filtered_iam_list
 
+    def _generate_glue_migration_list(
+        self,
+    ) -> list[AWSCredentialCandidate]:
+        """
+        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm.
+        It returns a list of ARNs
+        """
+        # load IAM role list
+        iam_list = self._resource_permissions.get_glue_roles()
+        # list existing storage credentials
+        credential_list = self._storage_credential_manager.list_glue().values()
+        # check if the iam is already used in UC storage credential
+        filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in credential_list]
+
+        # output the action plan for customer to confirm
+        self._print_action_plan(filtered_iam_list)
+
+        return filtered_iam_list
+
     def save(self, migration_results: list[CredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
@@ -186,6 +237,25 @@ class IamRoleMigration:
         else:
             logger.info("No IAM Role migrated to UC Storage credentials")
         return execution_result
+
+    def migrate_glue(self, prompts: Prompts):
+        iam_list = self._generate_glue_migration_list()
+        if len(iam_list) == 0:
+            logger.info("No Glue IAM Role to migrate")
+            return []
+
+        plan_confirmed = prompts.confirm(
+            "Above IAM roles will be migrated to UC service credentials for Glue Access, please review and confirm."
+        )
+        if plan_confirmed is not True:
+            return []
+
+        for iam in iam_list:
+            self._storage_credential_manager.create_service_credential(
+                name=iam.role_name,
+                role_arn=iam.role_arn,
+            )
+        return None
 
 
 class IamRoleCreation:

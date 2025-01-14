@@ -21,6 +21,7 @@ from databricks.labs.ucx.assessment.aws import (
     logger,
     AWSUCRoleCandidate,
     AWSCredentialCandidate,
+    AWSGlue,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -34,6 +35,7 @@ class AWSResourcePermissions:
         self,
         installation: Installation,
         ws: WorkspaceClient,
+        config: WorkspaceConfig,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
         kms_key=None,
@@ -41,6 +43,7 @@ class AWSResourcePermissions:
         self._installation = installation
         self._aws_resources = aws_resources
         self._ws = ws
+        self._config = config
         self._locations = external_locations
         self._aws_account_id = aws_resources.validate_connection().get("Account")
         self._kms_key = kms_key
@@ -79,15 +82,27 @@ class AWSResourcePermissions:
                         self._generate_role_name(single_role, role_name, s3_prefix), policy_name, [s3_prefix]
                     )
                 )
+        if AWSGlue.is_glue_in_config(self._config):
+            roles.append(
+                AWSUCRoleCandidate(
+                    role_name=self._generate_role_name(single_role, role_name, "glue"),
+                    policy_name=policy_name,
+                    resource_paths=["*"],
+                    resource_type="glue",
+                )
+            )
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
         roles_created = []
         for role in roles:
             expanded_paths = set()
-            for path in role.resource_paths:
-                expanded_paths.add(path)
-                expanded_paths.add(f"{path}/*")
+            if role.resource_type == "s3":
+                for path in role.resource_paths:
+                    expanded_paths.add(path)
+                    expanded_paths.add(f"{path}/*")
+            if role.resource_type == "glue":
+                expanded_paths.add("*")
             try:
 
                 role_arn = self._aws_resources.create_uc_role(role.role_name)
@@ -95,6 +110,7 @@ class AWSResourcePermissions:
                     self._aws_resources.put_role_policy(
                         role.role_name,
                         role.policy_name,
+                        role.resource_type,
                         expanded_paths,
                         self._aws_account_id,
                         self._kms_key,
@@ -134,6 +150,15 @@ class AWSResourcePermissions:
             self.save_uc_compatible_roles()
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
         return role_actions
+
+    def get_glue_roles(self) -> list[AWSCredentialCandidate]:
+        roles = self.load_uc_compatible_roles()
+        glue_roles: list[AWSCredentialCandidate] = []
+        for role in roles:
+            if role.resource_type != "glue":
+                continue
+            glue_roles.append(AWSCredentialCandidate(role.role_arn, Privilege.USAGE.value, role.resource_path))
+        return glue_roles
 
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
@@ -317,7 +342,7 @@ class AWSResourcePermissions:
             or not self._aws_resources.create_instance_profile(iam_role_name)
             or not self._aws_resources.add_role_to_instance_profile(iam_role_name, iam_role_name)
             or not self._aws_resources.put_role_policy(
-                iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
+                iam_role_name, iam_policy_name, "s3", s3_paths, self._aws_account_id, self._kms_key
             )
         ):
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)
@@ -343,7 +368,7 @@ class AWSResourcePermissions:
             ):
                 return
             self._aws_resources.put_role_policy(
-                iam_role_name, iam_policy_name, s3_paths, self._aws_account_id, self._kms_key
+                iam_role_name, iam_policy_name, "s3", s3_paths, self._aws_account_id, self._kms_key
             )
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
             config.uber_instance_profile = iam_role_name_in_cluster_policy
