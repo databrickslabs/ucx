@@ -12,55 +12,55 @@ def empty_table_migration_index() -> TableMigrationIndex:
     return index
 
 
-def test_linter_returns_correct_analyser_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_linter_returns_correct_analyser_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     linter = context.linter(Language.PYTHON)
     assert isinstance(linter, Linter)
 
 
-def test_linter_returns_correct_analyser_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_linter_returns_correct_analyser_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
     languages = LinterContext(empty_table_migration_index)
     linter = languages.linter(Language.SQL)
     assert isinstance(linter, Linter)
 
 
-def test_linter_raises_error_for_unsupported_language(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_linter_raises_error_for_unsupported_language(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     with pytest.raises(ValueError):
         context.linter(Language.R)
 
 
-def test_fixer_returns_none_fixer_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_fixer_returns_none_fixer_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixer = context.fixer(Language.PYTHON, "diagnostic_code")
     assert fixer is None
 
 
-def test_fixer_returns_correct_fixer_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_fixer_returns_correct_fixer_for_python(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixer = context.fixer(Language.PYTHON, "table-migrate")
     assert isinstance(fixer, Fixer)
 
 
-def test_fixer_returns_none_fixer_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_fixer_returns_none_fixer_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixer = context.fixer(Language.SQL, "diagnostic_code")
     assert fixer is None
 
 
-def test_fixer_returns_correct_fixer_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_fixer_returns_correct_fixer_for_sql(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixer = context.fixer(Language.SQL, "table-migrate")
     assert isinstance(fixer, Fixer) or fixer is None
 
 
-def test_fixer_returns_none_for_unsupported_language(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_fixer_returns_none_for_unsupported_language(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixer = context.fixer(Language.SCALA, "diagnostic_code")
     assert fixer is None
 
 
-def test_linter_context_apply_fixes_no_operation(empty_table_migration_index: TableMigrationIndex) -> None:
+def test_linter_context_linter_apply_fixes_no_operation(empty_table_migration_index: TableMigrationIndex) -> None:
     context = LinterContext(empty_table_migration_index)
     fixed_code = context.apply_fixes(Language.PYTHON, "print(1)")
     assert fixed_code == "print(1)"
