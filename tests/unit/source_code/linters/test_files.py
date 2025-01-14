@@ -84,15 +84,26 @@ def test_local_code_migrator_fixes_migrated_hive_metastore_table(tmp_path) -> No
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.schema.table')")
 
-    session_state = CurrentSessionState()  # No need to connect
     index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
-    linter_context = LinterContext(index, session_state)
+    linter_context = LinterContext(index, CurrentSessionState())
     migrator = LocalCodeMigrator(lambda: linter_context)
 
     has_code_changes = migrator.apply(path)
 
     assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
     assert "df = spark.read.table('catalog.schema.table')" == path.read_text()
+
+
+def test_local_code_migrator_apply_finds_children_in_context(mock_path_lookup, local_code_linter) -> None:
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
+
+    index = TableMigrationIndex([TableMigrationStatus("old", "thing", "brand", "new", "stuff")])
+    linter_context = LinterContext(index, CurrentSessionState())
+    migrator = LocalCodeMigrator(lambda: linter_context)
+
+    has_code_changes = migrator.apply(path)
+
+    assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
 
 
 @pytest.fixture()
