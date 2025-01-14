@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from unittest.mock import Mock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -8,7 +8,6 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 
@@ -28,21 +27,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_notebook_migrator_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_local_code_migrator_apply_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_file_migrator_skips_non_existing_file(caplog) -> None:
+def test_local_code_migrator_apply_skips_non_existing_file(caplog) -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalCodeMigrator(lambda: languages)
     path = Path("non_existing_file.py")
@@ -51,7 +36,17 @@ def test_file_migrator_skips_non_existing_file(caplog) -> None:
     assert f"Skip non-existing file: {path}" in caplog.messages
 
 
-def test_local_code_migrator_apply_ignores_unsupported_language(tmp_path, caplog) -> None:
+def test_local_code_migrator_apply_ignores_unsupported_extensions(caplog, tmp_path) -> None:
+    languages = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: languages)
+    path = tmp_path / "unsupported.ext"
+    path.touch()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
+        assert not migrator.apply(path)
+    assert f"Skip fixing file with unsupported extension: {path}" in caplog.messages
+
+
+def test_local_code_migrator_apply_ignores_unsupported_language_on_context(tmp_path, caplog) -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalCodeMigrator(lambda: languages)
     migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
@@ -62,52 +57,28 @@ def test_local_code_migrator_apply_ignores_unsupported_language(tmp_path, caplog
     assert "Skip fixing unsupported language: R" in caplog.messages
 
 
-def test_file_migrator_supported_language_no_diagnostics() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = []
-    migrator = LocalCodeMigrator(lambda: languages)
-    path = Path(__file__)
-    migrator.apply(path)
-    languages.fixer.assert_not_called()
-
-
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = mock_path_lookup.resolve(Path("root1.run.py"))
-    assert not migrator.apply(path)
-
-
-def test_migrator_supported_language_no_fixer() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalCodeMigrator(lambda: languages)
-    path = Path(__file__)
-    migrator.apply(path)
-    languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
-
-
-def test_migrator_supported_language_with_fixer(tmp_path) -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code="some-code")]
-    languages.fixer(Language.PYTHON, "some-code").apply.return_value = "Hi there!"
-    migrator = LocalCodeMigrator(lambda: languages)
+def test_linter_context_apply_with_supported_language(tmp_path) -> None:
     path = tmp_path / "any.py"
     path.write_text("import tempfile", encoding="utf-8")
+    context = create_autospec(LinterContext)
+    context.apply_fixes.return_value = "Hi there!"
+    migrator = LocalCodeMigrator(lambda: context)
+
     migrator.apply(path)
+
     assert path.read_text("utf-8") == "Hi there!"
 
 
-def test_migrator_walks_directory() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalCodeMigrator(lambda: languages)
-    path = Path(__file__).parent
-    migrator.apply(path)
-    languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
-    assert languages.fixer.call_count > 1
+def test_local_code_migrator_apply_walks_directory(tmp_path) -> None:
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
+    context = create_autospec(LinterContext)
+    context.apply_fixes.return_value = "Hi there!"
+    migrator = LocalCodeMigrator(lambda: context)
+
+    migrator.apply(path.parent)
+
+    assert path.read_text("utf-8") == "Hi there!"
 
 
 @pytest.fixture()
