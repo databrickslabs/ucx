@@ -13,8 +13,8 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 @pytest.fixture
 def ucx_source_path() -> Path:
     ucx_path = Path(__file__).parent.parent.parent.parent.parent
-    ucx_source_path = Path(ucx_path, "src")
-    return ucx_source_path
+    path = Path(ucx_path, "src")
+    return path
 
 
 def test_local_code_linter_lints_ucx(simple_ctx, ucx_source_path) -> None:
