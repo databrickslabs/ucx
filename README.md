@@ -1196,7 +1196,7 @@ analysis where the path is located.
 
 [[back to top](#databricks-labs-ucx)]
 
-## `table-migrated-to-uc`
+## `table-migrated-to-uc-{sql}`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.

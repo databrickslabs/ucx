@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
@@ -11,7 +12,6 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Deprecation,
     CurrentSessionState,
-    SqlLinter,
     Fixer,
     UsedTable,
     UsedTableNode,
@@ -154,7 +154,7 @@ class SparkCallMatcher(_TableNameMatcher):
             if dst is None:
                 continue
             yield Deprecation.from_node(
-                code='table-migrated-to-uc',
+                code='table-migrated-to-uc-python',
                 message=f"Table {used_table[0]} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
@@ -409,7 +409,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
     @property
     def name(self) -> str:
         # this is the same fixer, just in a different language context
-        return self._from_table.name
+        return 'table-migrated-to-uc-python'
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -478,13 +478,14 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
        ```
     """
 
-    def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
+    def __init__(self, sql_linter: FromTableSqlLinter, sql_fixer: FromTableSqlLinter | None):
         self._sql_linter = sql_linter
         self._sql_fixer = sql_fixer
 
     @property
     def name(self) -> str:
-        return "<none>" if self._sql_fixer is None else self._sql_fixer.name
+        # The name implies that the SQL linter is for detecting migrated tables
+        return 'table-migrated-to-uc-python-sql'
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for call_node, query in self._visit_call_nodes(tree):
@@ -497,7 +498,10 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                     )
                     continue
                 for advice in self._sql_linter.lint(value.as_string()):
-                    yield advice.replace_from_node(call_node)
+                    yield dataclasses.replace(
+                        advice.replace_from_node(call_node),
+                        code=self.name,
+                    )
 
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
