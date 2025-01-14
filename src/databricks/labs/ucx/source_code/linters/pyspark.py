@@ -511,7 +511,7 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                 for advice in self._sql_linter.lint(value.as_string()):
                     yield dataclasses.replace(
                         advice.replace_from_node(call_node),
-                        code=self.diagnostic_code or advice.code,
+                        code=self._fixer_diagnostic_code_mapping.get(advice.code, advice.code),
                     )
 
     def apply(self, code: str) -> str:
