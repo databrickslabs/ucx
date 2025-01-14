@@ -101,7 +101,7 @@ def test_local_code_migrator_apply_finds_children_in_context(mock_path_lookup, l
     linter_context = LinterContext(index, CurrentSessionState())
     migrator = LocalCodeMigrator(lambda: linter_context)
 
-    has_code_changes = migrator.apply(path)
+    has_code_changes = migrator.apply_path(path)
 
     assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
 
