@@ -58,7 +58,7 @@ spark.sql("SELECT * FROM csv.`s3://bucket/path`")
     advices = list(spark_linter.lint(python_code))
     assert [
         Deprecation(
-            code='table-migrated-to-uc-sql',
+            code='table-migrated-to-uc-python-sql',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=1,
             start_col=0,
@@ -88,7 +88,7 @@ for i in range(10):
 """
     assert list(spark_linter.lint(old_code)) == [
         Deprecation(
-            code='table-migrated-to-uc-sql',
+            code='table-migrated-to-uc-python-sql',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
             start_col=13,
