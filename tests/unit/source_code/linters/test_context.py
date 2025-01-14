@@ -6,6 +6,15 @@ from databricks.labs.ucx.source_code.base import Fixer, Linter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 
+def test_linter_context_has_unique_fixer_names() -> None:
+    try:
+        LinterContext(TableMigrationIndex([]))
+    except NameError:
+        assert False, "Fixers should have unique names"
+    else:
+        assert True, "Fixers have unique names"
+
+
 def test_linter_context_linter_returns_correct_analyser_for_python() -> None:
     context = LinterContext(TableMigrationIndex([]))
     linter = context.linter(Language.PYTHON)
