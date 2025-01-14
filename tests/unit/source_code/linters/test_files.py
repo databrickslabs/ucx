@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advice
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
@@ -105,6 +105,26 @@ def local_code_linter(mock_path_lookup, migration_index):
         session_state,
         resolver,
         lambda: LinterContext(migration_index),
+    )
+
+
+def test_local_code_linter_lints_migrated_hive_metastore_table(tmp_path, local_code_linter) -> None:
+    path = tmp_path / "read_table.py"
+    path.write_text("df = spark.read.table('hive_metastore.old.things')")
+
+    advices = list(local_code_linter.lint_path(path))
+
+    assert len(advices) > 0, "Expect at least one advice"
+    assert advices[0] == LocatedAdvice(
+        Deprecation(
+            code="table-migrated-to-uc-python",
+            message="Table hive_metastore.old.things is migrated to brand.new.stuff in Unity Catalog",
+            start_line=0,
+            start_col=5,
+            end_line=0,
+            end_col=50,
+        ),
+        path,
     )
 
 
