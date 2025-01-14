@@ -4,17 +4,12 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
-
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatus
-from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
-
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
+from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import (
     LocalCodeMigrator,
     FileLoader,
@@ -24,7 +19,10 @@ from databricks.labs.ucx.source_code.linters.files import (
     Folder,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+
 from tests.unit import locate_site_packages, _samples_path
 
 
