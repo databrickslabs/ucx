@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
@@ -498,10 +497,8 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                     )
                     continue
                 for advice in self._sql_linter.lint(value.as_string()):
-                    yield dataclasses.replace(
-                        advice.replace_from_node(call_node),
-                        code=self.name,
-                    )
+                    # TODO: Replace the name so that it matches this linter
+                    yield advice.replace_from_node(call_node)
 
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
