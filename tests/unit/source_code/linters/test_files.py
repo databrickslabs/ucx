@@ -130,7 +130,7 @@ def test_local_code_linter_lints_migrated_hive_metastore_table(tmp_path, local_c
 
 def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
+    path = Path(__file__).parent.parent / "samples" / "simulate-sys-path"
     paths: set[Path] = set()
     advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) > 10
