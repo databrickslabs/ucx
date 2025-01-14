@@ -53,7 +53,6 @@ class ViewToMigrate(TableToMigrate):
         return aliases
 
     def sql_migrate_view(self, index: TableMigrationIndex) -> str:
-        # TODO: Use FromTableSqlLinter via LinterContext
         from_table = FromTableSqlLinter(index, CurrentSessionState(self.src.database))
         assert self.src.view_text is not None, 'Expected a view text'
         migrated_select = from_table.apply(self.src.view_text)

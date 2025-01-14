@@ -62,7 +62,6 @@ class Redash:
             return
         # backup the query
         self._installation.save(query, filename=f'backup/queries/{query.id}.json')
-        # TODO: Use FromTableSqlLinter via LinterContext
         from_table = FromTableSqlLinter(self._index, self._get_session_state(query))
         new_query = UpdateQueryRequestQuery(
             query_text=from_table.apply(query.query),
