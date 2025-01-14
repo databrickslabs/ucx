@@ -41,7 +41,7 @@ def test_linter_context_fixer_returns_none_fixer_for_python() -> None:
 
 def test_linter_context_fixer_returns_correct_fixer_for_python() -> None:
     context = LinterContext(TableMigrationIndex([]))
-    fixer = context.fixer(Language.PYTHON, "table-migrate")
+    fixer = context.fixer(Language.PYTHON, "table-migrated-to-uc-python")
     assert isinstance(fixer, Fixer)
 
 
