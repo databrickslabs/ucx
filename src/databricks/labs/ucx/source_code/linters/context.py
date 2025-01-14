@@ -136,6 +136,7 @@ class LinterContext:
         raise ValueError(f"Unsupported language: {language}")
 
     def apply_fixes(self, language: Language, code: str) -> str:
+        """Apply fixes from linters belonging to the language."""
         linter = self.linter(language)
         for advice in linter.lint(code):
             fixer = self.fixer(language, advice.code)

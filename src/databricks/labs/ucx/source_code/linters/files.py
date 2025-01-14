@@ -232,28 +232,14 @@ class LocalCodeMigrator:
         except UnicodeDecodeError as e:
             logger.warning(f"Cannot decode file: {path}", exc_info=e)
             return False
-        fixed_code = self._fix_code(code, language)
+        context = self._context_factory()
+        fixed_code = context.apply_fixes(language, code)
         if code == fixed_code:
             logger.info(f"No fixes found for: {path}")
             return False
         logger.info(f"Fixed: {path}")
         path.write_text(fixed_code)
         return True
-
-    def _fix_code(self, code: str, language: Language) -> str:
-        """Fix the code given a language."""
-        context = self._context_factory()
-        if not context.is_supported(language):
-            logger.warning(f"Skip fixing unsupported language: {language.value}")
-            return code
-        linter = context.linter(language)
-        for advice in linter.lint(code):
-            fixer = context.fixer(language, advice.code)
-            if not fixer:
-                continue
-            logger.info(f"Applying fix for: {advice}")
-            code = fixer.apply(code)
-        return code
 
 
 class StubContainer(SourceContainer):
