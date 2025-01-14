@@ -64,7 +64,7 @@ def test_local_code_linter_lints_migrated_hive_metastore_table(simple_ctx, tmp_p
 
     problems = linter.lint(Prompts(), path, StringIO())
 
-    assert len(problems) > 0, f"Found no problems while linting ucx"
+    assert len(problems) > 0, "Found no problems while linting ucx"
     assert problems[0] == located_advice
 
 
