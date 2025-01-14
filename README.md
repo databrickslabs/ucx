@@ -1196,10 +1196,16 @@ analysis where the path is located.
 
 [[back to top](#databricks-labs-ucx)]
 
-## `table-migrated-to-uc-{sql}`
+## `table-migrated-to-uc-{sql,python,python-sql}`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.
+
+| Postfix    | Explanation                                     |
+|------------|-------------------------------------------------|
+| sql        | Table reference in SparkSQL                     |
+| python     | Table reference in PySpark                      |
+| python-sql | Table reference in SparkSQL called from PySpark |
 
 [[back to top](#databricks-labs-ucx)]
 
