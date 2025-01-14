@@ -233,6 +233,9 @@ class LocalCodeMigrator:
             logger.warning(f"Cannot decode file: {path}", exc_info=e)
             return False
         context = self._context_factory()
+        if not context.is_supported(language):
+            logger.warning(f"Skip fixing unsupported language: {language.value}")
+            return False
         fixed_code = context.apply_fixes(language, code)
         if code == fixed_code:
             logger.info(f"No fixes found for: {path}")
