@@ -45,9 +45,9 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
         self._session_state: CurrentSessionState = session_state
 
     @property
-    def diagnostic_codes(self) -> set[str]:
+    def diagnostic_code(self) -> str | None:
         """The diagnostic codes that this fixer fixes."""
-        return {"table-migrated-to-uc-sql"}
+        return "table-migrated-to-uc-sql"
 
     @property
     def schema(self) -> str:

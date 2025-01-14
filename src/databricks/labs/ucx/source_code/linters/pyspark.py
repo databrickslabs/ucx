@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
@@ -14,6 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     UsedTable,
     UsedTableNode,
+    SqlLinter,
     TableSqlCollector,
     DfsaSqlCollector,
 )
@@ -406,9 +408,9 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._spark_matchers = SparkTableNameMatchers(dfsa_matchers_only=False).matchers
 
     @property
-    def diagnostic_codes(self) -> set[str]:
+    def diagnostic_code(self) -> str | None:
         """The diagnostic codes that this fixer fixes."""
-        return {'table-migrated-to-uc-python'}
+        return "table-migrated-to-uc-python"
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -477,14 +479,24 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
        ```
     """
 
-    def __init__(self, sql_linter: FromTableSqlLinter, sql_fixer: FromTableSqlLinter | None):
+    def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
         self._sql_fixer = sql_fixer
 
+        # This fixer is a wrapper around the SQL fixer for when SQL is used within Python. To uniquely identify this
+        # case, the codes are mapping according to this mapping
+        self._fixer_diagnostic_code_mapping = {
+            "table-migrated-to-uc-sql": "table-migrated-to-uc-python-sql",
+        }
+        if self._sql_fixer and self._sql_fixer.diagnostic_code not in self._fixer_diagnostic_code_mapping:
+            raise ValueError(f"Missing mapping for SQL fixer diagnostic code: {self._sql_fixer}")
+
     @property
-    def diagnostic_codes(self) -> set[str]:
+    def diagnostic_code(self) -> str | None:
         """The diagnostic codes that this fixer fixes."""
-        return {'table-migrated-to-uc-python-sql'}
+        if not (self._sql_fixer and self._sql_fixer.diagnostic_code):
+            return None
+        return self._fixer_diagnostic_code_mapping.get(self._sql_fixer.diagnostic_code)
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for call_node, query in self._visit_call_nodes(tree):
@@ -497,8 +509,10 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                     )
                     continue
                 for advice in self._sql_linter.lint(value.as_string()):
-                    # TODO: Replace the name so that it matches this linter
-                    yield advice.replace_from_node(call_node)
+                    yield dataclasses.replace(
+                        advice.replace_from_node(call_node),
+                        code=self.diagnostic_code or advice.code,
+                    )
 
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
