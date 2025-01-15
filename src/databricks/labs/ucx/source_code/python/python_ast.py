@@ -16,7 +16,6 @@ from astroid import (  # type: ignore
     Call,
     ClassDef,
     Const,
-    Expr,
     Import,
     ImportFrom,
     Instance,
@@ -223,18 +222,18 @@ class Tree:  # pylint: disable=too-many-public-methods
             raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
         self.append_nodes(tree_module.body)
-        self.append_globals(tree_module.globals)
+        self.extend_globals(tree_module.globals)
 
-    def append_globals(self, globs: dict[str, list[Expr]]) -> None:
+    def extend_globals(self, globs: dict[str, list[NodeNG]]) -> None:
+        """Extend globals by extending the global values for each global key.
+
+        Extending globals is a stateful operation for this `Tree` (`self`), similarly to extending a list.
+        """
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Cannot append globals: {type(self.node).__name__}")
+            raise NotImplementedError(f"Cannot extend globals: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
-        for name, values in globs.items():
-            statements: list[Expr] = self_module.globals.get(name, None)
-            if statements is None:
-                self_module.globals[name] = list(values)  # clone the source list to avoid side-effects
-                continue
-            statements.extend(values)
+        for global_key, global_values in globs.items():
+            self_module.globals[global_key] = self_module.globals.get(global_key, []) + global_values
 
     def append_nodes(self, nodes: list[NodeNG]) -> None:
         if not isinstance(self.node, Module):
@@ -702,7 +701,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._make_tree().append_nodes(nodes)
 
     def append_globals(self, globs: dict) -> None:
-        self._make_tree().append_globals(globs)
+        self._make_tree().extend_globals(globs)
 
     def process_child_cell(self, code: str) -> None:
         this_tree = self._make_tree()

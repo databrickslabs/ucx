@@ -75,7 +75,7 @@ class PythonCodeAnalyzer:
             nodes = tree.nodes_between(last_line + 1, node_line - 1)
             context.tree.append_nodes(nodes)
             globs = tree.globals_between(last_line + 1, node_line - 1)
-            context.tree.append_globals(globs)
+            context.tree.extend_globals(globs)
             last_line = node_line
             # process node
             child_context = self._build_inherited_context_from_node(base_node, child_path)
@@ -88,7 +88,7 @@ class PythonCodeAnalyzer:
             nodes = tree.nodes_between(last_line + 1, line_count)
             context.tree.append_nodes(nodes)
             globs = tree.globals_between(last_line + 1, line_count)
-            context.tree.append_globals(globs)
+            context.tree.extend_globals(globs)
         return context
 
     def _parse_and_extract_nodes(self) -> tuple[Tree | None, list[NodeBase], Iterable[DependencyProblem]]:
