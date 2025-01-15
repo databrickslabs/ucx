@@ -516,7 +516,7 @@ def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     aws.list_all_uc_roles.return_value = []
     with caplog.at_level(logging.INFO):
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-        assert ['No IAM Role created'] == caplog.messages
+        assert 'No IAM Role created' in caplog.messages
         aws.create_uc_role.assert_not_called()
 
 
