@@ -662,7 +662,7 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
                     logger.warning(maybe_tree.failure.message)
                     continue
                 assert maybe_tree.tree is not None
-                inherited_tree.append_tree(maybe_tree.tree)
+                inherited_tree.attach_child_tree(maybe_tree.tree)
 
     def _collect_from_source(
         self,

@@ -559,7 +559,7 @@ class InheritedContext:
         if tree is None:
             return InheritedContext(self.tree, found, context.problems)
         new_tree = self.tree or Tree.new_module()
-        new_tree.append_tree(tree)
+        new_tree.attach_child_tree(tree)
         new_problems = itertools.chain(self.problems, context.problems)
         return InheritedContext(new_tree, found, new_problems)
 
