@@ -349,8 +349,8 @@ def test_has_global_fails() -> None:
     assert not Tree.new_module().has_global("xyz")
 
 
-def test_append_globals_fails() -> None:
-    with pytest.raises(NotImplementedError):
+def test_append_globals_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot append globals: .*"):
         Tree(Const("xyz")).append_globals({})
 
 

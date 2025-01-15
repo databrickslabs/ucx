@@ -227,7 +227,7 @@ class Tree:  # pylint: disable=too-many-public-methods
 
     def append_globals(self, globs: dict[str, list[Expr]]) -> None:
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
+            raise NotImplementedError(f"Cannot append globals: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for name, values in globs.items():
             statements: list[Expr] = self_module.globals.get(name, None)
