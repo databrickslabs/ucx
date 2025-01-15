@@ -4,7 +4,7 @@ import pytest
 import astroid  # type: ignore
 from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, Failure
 from databricks.labs.ucx.source_code.python.python_ast import PythonLinter, Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
@@ -409,14 +409,30 @@ def test_const_is_not_from_module() -> None:
     assert not Tree(Const("xyz")).is_from_module("spark")
 
 
-def test_python_linter_lint_lints_tree() -> None:
+class DummyPythonLinter(PythonLinter):
+    """Dummy python linter yielding dummy advices for testing purpose."""
 
-    class DummyPythonLinter(PythonLinter):
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        yield Advice("dummy", "dummy advice", 0, 0, 0, 0)
+        yield Advice("dummy", "dummy advice", 1, 1, 1, 1)
 
-        def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-            yield Advice("dummy", "dummy advice", 0, 0, 0, 0)
-            yield Advice("dummy", "dummy advice", 1, 1, 1, 1)
 
+def test_dummy_python_linter_lint_lints_tree() -> None:
     linter = DummyPythonLinter()
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
+
+
+def test_dummy_python_linter_lint_yields_failure_due_to_parse_error() -> None:
+    linter = DummyPythonLinter()
+    advices = list(linter.lint("print(1"))  # Closing parenthesis is missing on purpose
+    assert advices == [
+        Failure(
+            code="python-parse-error",
+            message="Failed to parse code due to invalid syntax: print(1",
+            start_line=0,
+            start_col=5,
+            end_line=0,
+            end_col=1,
+        )
+    ]
