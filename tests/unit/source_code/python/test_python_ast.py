@@ -1,8 +1,11 @@
+from typing import Iterable
+
 import pytest
 import astroid  # type: ignore
 from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
-from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.python.python_ast import PythonLinter, Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
@@ -404,3 +407,16 @@ def test_renumber_fails() -> None:
 
 def test_const_is_not_from_module() -> None:
     assert not Tree(Const("xyz")).is_from_module("spark")
+
+
+def test_python_linter_lint_lints_tree() -> None:
+
+    class DummyPythonLinter(PythonLinter):
+
+        def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+            yield Advice("dummy", "dummy advice", 0, 0, 0, 0)
+            yield Advice("dummy", "dummy advice", 1, 1, 1, 1)
+
+    linter = DummyPythonLinter()
+    advices = list(linter.lint("print(1)"))
+    assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
