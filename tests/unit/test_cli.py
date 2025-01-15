@@ -8,6 +8,7 @@ from unittest.mock import create_autospec, patch, Mock
 import pytest
 import yaml
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk.service.sql import Disposition
 
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -207,7 +208,7 @@ def test_skip_with_schema(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -222,7 +223,7 @@ def test_skip_with_table(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -237,7 +238,7 @@ def test_skip_with_view(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -264,7 +265,7 @@ def test_unskip_with_schema(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -279,7 +280,7 @@ def test_unskip_with_table(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -294,7 +295,7 @@ def test_unskip_with_view(ws) -> None:
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=None,
+        disposition=Disposition.INLINE,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
