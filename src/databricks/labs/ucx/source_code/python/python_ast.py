@@ -225,6 +225,12 @@ class Tree:  # pylint: disable=too-many-public-methods
         self.extend_globals(tree_module.globals)
 
     def attach_nodes(self, nodes: list[NodeNG]) -> None:
+        """Attach nodes.
+
+        Attaching nodes is a **stateful** operation for both this tree's node, the parent node, and the child nodes.
+        After attaching the nodes, the parent node has the nodes in its body and the child nodes have this tree's node
+        as parent node.
+        """
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Cannot attach nodes to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
