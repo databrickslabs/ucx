@@ -1,5 +1,6 @@
 import pytest
-from astroid import Assign, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+import astroid  # type: ignore
+from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -304,6 +305,20 @@ def test_is_builtin(source, name, is_builtin) -> None:
             assert Tree(call).is_builtin() == is_builtin
             return
     assert False  # could not locate call
+
+
+def test_tree_append_globals_adds_assign_name_to_tree() -> None:
+    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    assert maybe_tree.tree, maybe_tree.failure
+
+    node = astroid.extract_node("b = a + 2")
+    assign_name = next(node.get_children())
+    assert isinstance(assign_name, AssignName)
+
+    maybe_tree.tree.append_globals({"b": [assign_name]})
+
+    assert isinstance(maybe_tree.tree.node, Module)
+    assert maybe_tree.tree.node.globals.get("b") == [assign_name]
 
 
 def test_first_statement_is_none() -> None:
