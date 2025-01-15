@@ -224,6 +224,14 @@ class Tree:  # pylint: disable=too-many-public-methods
         self.append_nodes(tree_module.body)
         self.extend_globals(tree_module.globals)
 
+    def append_nodes(self, nodes: list[NodeNG]) -> None:
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for node in nodes:
+            node.parent = self_module
+            self_module.body.append(node)
+
     def extend_globals(self, globs: dict[str, list[NodeNG]]) -> None:
         """Extend globals by extending the global values for each global key.
 
@@ -234,14 +242,6 @@ class Tree:  # pylint: disable=too-many-public-methods
         self_module: Module = cast(Module, self.node)
         for global_key, global_values in globs.items():
             self_module.globals[global_key] = self_module.globals.get(global_key, []) + global_values
-
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
-        if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
-        self_module: Module = cast(Module, self.node)
-        for node in nodes:
-            node.parent = self_module
-            self_module.body.append(node)
 
     def is_instance_of(self, class_name: str) -> bool:
         for inferred in self.node.inferred():
