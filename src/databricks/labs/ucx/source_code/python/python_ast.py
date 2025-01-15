@@ -211,16 +211,12 @@ class Tree:  # pylint: disable=too-many-public-methods
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
 
-    def append_tree(self, tree: Tree) -> Tree:
-        """returns the appended tree, not the consolidated one!"""
+    def append_tree(self, tree: Tree) -> None:
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
         self.append_nodes(tree_module.body)
         self.append_globals(tree_module.globals)
-        # the following may seem strange but it's actually ok to use the original module as tree root
-        # because each node points to the correct parent (practically, the tree is now only a list of statements)
-        return tree
 
     def append_globals(self, globs: dict[str, list[Expr]]) -> None:
         if not isinstance(self.node, Module):

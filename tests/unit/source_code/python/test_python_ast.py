@@ -148,9 +148,9 @@ def test_appends_statements() -> None:
     maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
     assert maybe_tree_2.tree is not None, maybe_tree_2.failure
     tree_2 = maybe_tree_2.tree
-    tree_3 = tree_1.append_tree(tree_2)
-    nodes = tree_3.locate(Assign, [])
-    tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
+    tree_1.append_tree(tree_2)
+    nodes = tree_2.locate(Assign, [])
+    tree = Tree(nodes[0].value)
     values = list(InferredValue.infer_from_node(tree.node))
     strings = list(value.as_string() for value in values)
     assert strings == ["Hello John!"]
