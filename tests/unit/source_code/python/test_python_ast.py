@@ -148,7 +148,7 @@ def test_appends_statements() -> None:
     maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
     assert maybe_tree_2.tree is not None, maybe_tree_2.failure
     tree_2 = maybe_tree_2.tree
-    tree_1.append_tree(tree_2)
+    tree_1.attach_child_tree(tree_2)
 
     nodes = tree_1.locate(Assign, [])
     tree = Tree(nodes[1].value)  # Starting from tree_1, we want the last assign
@@ -217,11 +217,11 @@ def test_supports_recursive_refs_when_checking_module() -> None:
     maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
     assert maybe_tree_2.tree is not None, maybe_tree_2.failure
     tree_2 = maybe_tree_2.tree
-    main_tree.append_tree(tree_2)
+    main_tree.attach_child_tree(tree_2)
     maybe_tree_3 = Tree.maybe_normalized_parse(source_3)
     assert maybe_tree_3.tree is not None, maybe_tree_3.failure
     tree_3 = maybe_tree_3.tree
-    main_tree.append_tree(tree_3)
+    main_tree.attach_child_tree(tree_3)
     assign = tree_3.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
 
@@ -320,7 +320,7 @@ def test_repr_is_truncated() -> None:
 
 def test_append_tree_fails() -> None:
     with pytest.raises(NotImplementedError):
-        Tree(Const("xyz")).append_tree(Tree(Const("xyz")))
+        Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
 def test_append_node_fails() -> None:

@@ -211,9 +211,16 @@ class Tree:  # pylint: disable=too-many-public-methods
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
 
-    def append_tree(self, tree: Tree) -> None:
+    def attach_child_tree(self, tree: Tree) -> None:
+        """Attach a child tree.
+
+        Attaching a child tree is a **stateful** operation for both the parent and child tree. After attaching a child
+        tree, a tree can be traversed starting from the parent or child tree. From both starting points all nodes in
+        both trees can be reached, though, the order of nodes will be different as that is relative to the starting
+        point.
+        """
         if not isinstance(tree.node, Module):
-            raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
+            raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
         self.append_nodes(tree_module.body)
         self.append_globals(tree_module.globals)
@@ -689,7 +696,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         return maybe_tree
 
     def append_tree(self, tree: Tree) -> None:
-        self._make_tree().append_tree(tree)
+        self._make_tree().attach_child_tree(tree)
 
     def append_nodes(self, nodes: list[NodeNG]) -> None:
         self._make_tree().append_nodes(nodes)
@@ -705,7 +712,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
             logger.warning(maybe_tree.failure.message)
             return
         assert maybe_tree.tree is not None
-        this_tree.append_tree(maybe_tree.tree)
+        this_tree.attach_child_tree(maybe_tree.tree)
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)
