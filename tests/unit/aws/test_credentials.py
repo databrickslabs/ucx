@@ -156,6 +156,28 @@ def test_run_no_credential_to_migrate(caplog, installation, credential_manager):
     assert "No IAM Role to migrate" in caplog.messages
 
 
+def test_create_glue_credentials(installation):
+    prompts = MockPrompts({"Above IAM roles will be migrated*": "Yes"})
+    resource_permissions = create_autospec(AWSResourcePermissions)
+    resource_permissions.get_glue_roles.return_value = [
+        AWSCredentialCandidate(
+            role_arn="arn:aws:iam::123456789012:role/glue-role",
+            privilege=Privilege.USAGE.value,
+            paths={"*"},
+        )
+    ]
+    storage_credentials = create_autospec(CredentialManager)
+    storage_credentials.create_service_credential.return_value = "1234"
+    migration = IamRoleMigration(installation, resource_permissions, storage_credentials)
+    migration.migrate_glue(prompts)
+    storage_credentials.create_service_credential.assert_called_with(
+        name="glue-role", role_arn="arn:aws:iam::123456789012:role/glue-role"
+    )
+    resource_permissions.update_uc_role.assert_called_with(
+        "glue-role", "arn:aws:iam::123456789012:role/glue-role", "1234"
+    )
+
+
 def test_validate_read_only_storage_credentials(credential_manager):
     role_action = AWSRoleAction("arn:aws:iam::123456789012:role/client_id", "s3", "READ_FILES", "s3://prefix")
 

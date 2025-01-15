@@ -91,8 +91,12 @@ class CredentialManager:
                 "skip_validation": True,
             },
         )
-        if response and isinstance(response, dict):
-            return response.get("aws_iam_role").get("external_id")
+        if not response or not isinstance(response, dict):
+            return None
+        iam_role = response.get("aws_iam_role")
+        if not iam_role or not isinstance(iam_role, dict):
+            return None
+        return iam_role.get("external_id")
 
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
         try:

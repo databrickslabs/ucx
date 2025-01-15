@@ -257,14 +257,13 @@ class AWSResources:
         actions = action.get("Action")
         if not actions:
             return []
-        if isinstance(actions, list):
-            if "glue:*" not in actions:
-                # Check if all the required glue action are present in the role
-                for required_action in self.GLUE_REQUIRED_ACTIONS:
-                    if required_action not in actions:
-                        return []
-        elif actions != "glue:*":
-            return []
+        if not isinstance(actions, list):
+            actions = [actions]
+        if "glue:*" not in actions:
+            # Check if all the required glue action are present in the role
+            for required_action in self.GLUE_REQUIRED_ACTIONS:
+                if required_action not in actions:
+                    return []
 
         if "*" not in action.get("Resource", []):
             return []

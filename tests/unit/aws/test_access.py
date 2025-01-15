@@ -68,6 +68,32 @@ def installation_single_role():
 
 
 @pytest.fixture
+def installation_glue():
+    return MockInstallation(
+        {
+            "config.yml": {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'policy_id': 'policy_id',
+                'spark_conf': {'spark.databricks.hive.metastore.glueCatalog.enabled': 'true'},
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            },
+            "uc_roles_access.csv": [
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
+                    "resource_type": "s3",
+                    "privilege": "WRITE_FILES",
+                    "resource_path": "s3://BUCKETX",
+                }
+            ],
+        }
+    )
+
+
+@pytest.fixture
 def installation_multiple_roles():
     return MockInstallation(
         DEFAULT_CONFIG
@@ -467,6 +493,29 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     )
 
 
+def test_create_uc_role_glue(mock_ws, installation_glue, backend, locations):
+    mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    config = installation_glue.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_glue, mock_ws, config, aws, locations)
+    role_creation = IamRoleCreation(installation_glue, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = []
+    role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
+    assert aws.create_uc_role.assert_called
+    assert (
+        call(
+            'UC_ROLE_123123',
+            'UC_POLICY',
+            'glue',
+            {'*'},
+            None,
+            None,
+        )
+        in aws.put_role_policy.call_args_list
+    )
+
+
 def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
@@ -616,6 +665,86 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
                 'privilege': 'WRITE_FILES',
                 'resource_path': 's3://bucketC',
                 'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+        ],
+    )
+
+
+def test_get_uc_compatible_roles_glue(mock_ws, mock_installation, locations):
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket1",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket2",
+            ),
+            AWSPolicyAction(
+                resource_type="s3",
+                privilege="READ_FILES",
+                resource_path="s3://bucket3",
+            ),
+        ],
+        [],
+        [],
+        [
+            AWSPolicyAction(
+                resource_type="glue",
+                privilege="USAGE",
+                resource_path="*",
+            ),
+        ],
+        [],
+        [],
+    ]
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
+        "arn:aws:iam::aws:policy/Policy1",
+        "arn:aws:iam::aws:policy/Policy2",
+    ]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+    config = mock_installation.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        config,
+        aws,
+        locations,
+    )
+    aws_resource_permissions.save_uc_compatible_roles()
+    mock_installation.assert_file_written(
+        'uc_roles_access.csv',
+        [
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket1',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket2',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket3',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'USAGE',
+                'resource_path': '*',
+                'resource_type': 'glue',
                 'role_arn': 'arn:aws:iam::12345:role/uc-role1',
             },
         ],
