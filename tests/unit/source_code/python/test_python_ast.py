@@ -139,28 +139,27 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_appends_statements() -> None:
-    source_1 = "a = 'John'"
-    maybe_tree_1 = Tree.maybe_normalized_parse(source_1)
-    assert maybe_tree_1.tree is not None, maybe_tree_1.failure
-    tree_1 = maybe_tree_1.tree
-    source_2 = 'b = f"Hello {a}!"'
-    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
-    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
-    tree_2 = maybe_tree_2.tree
-    tree_1.attach_child_tree(tree_2)
+def test_tree_attach_child_tree_infers_value() -> None:
+    """Attaching trees allows traversing from both parent and child."""
+    inferred_string = "Hello John!"
+    parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
+    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
+    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
 
-    nodes = tree_1.locate(Assign, [])
-    tree = Tree(nodes[1].value)  # Starting from tree_1, we want the last assign
-    values = list(InferredValue.infer_from_node(tree.node))
-    strings = list(value.as_string() for value in values)
-    assert strings == ["Hello John!"]
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
 
-    nodes = tree_2.locate(Assign, [])
-    tree = Tree(nodes[0].value)  # Starting from tree_2, we want the first assign
-    values = list(InferredValue.infer_from_node(tree.node))
-    strings = list(value.as_string() for value in values)
-    assert strings == ["Hello John!"]
+    parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+
+    nodes = parent_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # Starting from the parent, we are looking for the last assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+    nodes = child_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
 
 
 def test_is_from_module() -> None:
