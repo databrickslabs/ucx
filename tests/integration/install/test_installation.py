@@ -130,24 +130,24 @@ def test_job_cluster_policy(ws, installation_ctx) -> None:
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_job_cluster_on_uc_enabled_workpace(ws, installation_ctx) -> None:
+    # Set the override_cluster to empty so that the installation creates new job clusters
     installation_ctx.workspace_installation.config.override_clusters = ""
 
     installation_ctx.workspace_installation.run()
     job_id = installation_ctx.install_state.jobs["assessment"]
-    if installation_ctx.verify_has_metastore.verify_metastore():
-        job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
-        for cluster in job_clusters:
-            if cluster.job_cluster_key == "main":
-                assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
-            if cluster.job_cluster_key == "tacl":
-                assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
-        job_id = installation_ctx.install_state.jobs["migrate-tables"]
-        job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
-        for cluster in job_clusters:
-            if cluster.job_cluster_key == "main":
-                assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
-            if cluster.job_cluster_key == "user_isolation":
-                assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.USER_ISOLATION
+    job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
+    for cluster in job_clusters:
+        if cluster.job_cluster_key == "main":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
+        if cluster.job_cluster_key == "tacl":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
+    job_id = installation_ctx.install_state.jobs["migrate-tables"]
+    job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
+    for cluster in job_clusters:
+        if cluster.job_cluster_key == "main":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
+        if cluster.job_cluster_key == "user_isolation":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.USER_ISOLATION
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
