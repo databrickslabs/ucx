@@ -221,11 +221,12 @@ class LocalCodeMigrator(LocalCodeLinter):
 
             def _process_dependency(
                 self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-            ) -> None:
+            ) -> Iterable[LocatedAdvice]:
                 ctx = context_factory()
                 # FileLinter will determine which file/notebook linter to use
                 linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
-                linter.apply()
+                for advice in linter.apply():
+                    yield LocatedAdvice(advice, dependency.path)
 
         if linted_paths is None:
             linted_paths = set()

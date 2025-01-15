@@ -19,6 +19,7 @@ from databricks.labs.ucx.source_code.python.python_ast import (
     TablePyCollector,
     DfsaPyCollector,
     PythonSequentialLinter,
+    Tree,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
@@ -104,11 +105,14 @@ class LinterContext:
     def is_supported(self, language: Language) -> bool:
         return language in self._linters and language in self._fixers
 
-    def linter(self, language: Language) -> Linter:
+    def linter(self, language: Language, *, inherited_tree: Tree = None) -> Linter:
         if language not in self._linters:
             raise ValueError(f"Unsupported language: {language}")
         if language is Language.PYTHON:
-            return PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]), [], [])
+            linter = PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]), [], [])
+            if inherited_tree:
+                linter.append_tree(inherited_tree)
+            return linter
         if language is Language.SQL:
             return SqlSequentialLinter(cast(list[SqlLinter], self._linters[language]), [], [])
         raise ValueError(f"Unsupported language: {language}")
@@ -145,9 +149,9 @@ class LinterContext:
             return SqlSequentialLinter([], [], cast(list[TableSqlCollector], self._table_collectors[language]))
         raise ValueError(f"Unsupported language: {language}")
 
-    def apply_fixes(self, language: Language, code: str) -> str:
+    def apply_fixes(self, language: Language, code: str, *, inherited_tree: Tree) -> str:
         """Apply fixes from linters belonging to the language."""
-        linter = self.linter(language)
+        linter = self.linter(language, inherited_tree=inherited_tree)
         for advice in linter.lint(code):
             fixer = self.fixer(language, advice.code)
             if fixer:
