@@ -321,6 +321,19 @@ def test_tree_append_globals_adds_assign_name_to_tree() -> None:
     assert maybe_tree.tree.node.globals.get("b") == [assign_name]
 
 
+def test_tree_attach_child_tree_appends_globals_to_parent_tree() -> None:
+    parent_tree = Tree.maybe_normalized_parse("a = 1")
+    child_tree = Tree.maybe_normalized_parse("b = a + 2")
+
+    assert parent_tree.tree, parent_tree.failure
+    assert child_tree.tree, child_tree.failure
+
+    parent_tree.tree.attach_child_tree(child_tree.tree)
+
+    assert set(parent_tree.tree.node.globals.keys()) == {"a", "b"}
+    assert set(child_tree.tree.node.globals.keys()) == {"b"}
+
+
 def test_first_statement_is_none() -> None:
     node = Const("xyz")
     assert not Tree(node).first_statement()
