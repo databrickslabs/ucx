@@ -63,9 +63,20 @@ class AWSResourcePermissions:
         If single_role is False, create a role and policy for each missing S3 prefix
         """
         roles: list[AWSUCRoleCandidate] = []
+
+        if AWSGlue.is_glue_in_config(self._config):
+            roles.append(
+                AWSUCRoleCandidate(
+                    role_name=self._generate_role_name(single_role, role_name, "glue"),
+                    policy_name=policy_name,
+                    resource_paths=["*"],
+                    resource_type="glue",
+                )
+            )
+
         missing_paths = self._identify_missing_paths()
         if len(missing_paths) == 0:
-            return []
+            return roles
         s3_buckets = set()
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_BUCKET, missing_path)
@@ -82,15 +93,7 @@ class AWSResourcePermissions:
                         self._generate_role_name(single_role, role_name, s3_prefix), policy_name, [s3_prefix]
                     )
                 )
-        if AWSGlue.is_glue_in_config(self._config):
-            roles.append(
-                AWSUCRoleCandidate(
-                    role_name=self._generate_role_name(single_role, role_name, "glue"),
-                    policy_name=policy_name,
-                    resource_paths=["*"],
-                    resource_type="glue",
-                )
-            )
+
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):

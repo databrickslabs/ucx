@@ -77,8 +77,8 @@ class CredentialManager:
             read_only=read_only,
         )
 
-    def create_service_credential(self, name: str, role_arn: str) -> None:
-        self._ws.api_client.do(
+    def create_service_credential(self, name: str, role_arn: str) -> str | None:
+        response = self._ws.api_client.do(
             'POST',
             '/api/2.1/unity-catalog/credentials',
             body={
@@ -91,6 +91,8 @@ class CredentialManager:
                 "skip_validation": True,
             },
         )
+        if response and isinstance(response, dict):
+            return response.get("aws_iam_role").get("external_id")
 
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
         try:
@@ -251,10 +253,11 @@ class IamRoleMigration:
             return []
 
         for iam in iam_list:
-            self._storage_credential_manager.create_service_credential(
+            external_id = self._storage_credential_manager.create_service_credential(
                 name=iam.role_name,
                 role_arn=iam.role_arn,
             )
+            self._resource_permissions.update_uc_role(iam.role_name, iam.role_arn, external_id)
         return None
 
 
