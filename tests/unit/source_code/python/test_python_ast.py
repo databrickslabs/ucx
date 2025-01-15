@@ -307,22 +307,22 @@ def test_is_builtin(source, name, is_builtin) -> None:
     assert False  # could not locate call
 
 
-def test_tree_append_nodes_sets_parent() -> None:
+def test_tree_attach_nodes_sets_parent() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = Tree.maybe_normalized_parse("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
-    maybe_tree.tree.append_nodes([node])
+    maybe_tree.tree.attach_nodes([node])
 
     assert node.parent == maybe_tree.tree.node
 
 
-def test_tree_append_nodes_adds_node_to_body() -> None:
+def test_tree_attach_nodes_adds_node_to_body() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = Tree.maybe_normalized_parse("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
-    maybe_tree.tree.append_nodes([node])
+    maybe_tree.tree.attach_nodes([node])
 
     assert maybe_tree.tree.node.body[-1] == node
 
@@ -368,9 +368,9 @@ def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node()
         Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
-def test_append_node_fails() -> None:
+def test_tree_attach_nodes_raises_not_implemented_error_for_constant_node() -> None:
     with pytest.raises(NotImplementedError):
-        Tree(Const("xyz")).append_nodes([])
+        Tree(Const("xyz")).attach_nodes([])
 
 
 def test_nodes_between_fails() -> None:
