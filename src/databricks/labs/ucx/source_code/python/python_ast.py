@@ -678,6 +678,8 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._linters = linters
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
+
+        # This tree collects all the trees parsed from source code by attaching them as child trees
         self._tree: Tree = Tree.new_module()
 
     def lint(self, code: str) -> Iterable[Advice]:
