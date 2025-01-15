@@ -82,6 +82,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`legacy-context-in-shared-clusters`](#legacy-context-in-shared-clusters)
   * [`not-supported`](#not-supported)
   * [`notebook-run-cannot-compute-value`](#notebook-run-cannot-compute-value)
+  * [`python-parse-error`](#python-parse-error)
   * [`python-udf-in-shared-clusters`](#python-udf-in-shared-clusters)
   * [`rdd-in-shared-clusters`](#rdd-in-shared-clusters)
   * [`spark-logging-in-shared-clusters`](#spark-logging-in-shared-clusters)
@@ -781,7 +782,8 @@ A Databricks admin [assigns account groups to workspaces](https://docs.databrick
 using [identity federation](https://docs.databricks.com/en/admin/users-groups/index.html#enable-identity-federation)
 to manage groups from a single place: your Databricks account. We expect UCX users to create account groups
 centrally while most other Databricks resources that UCX touches are scoped to a single workspace.
-If you do not have account groups matching the workspace in which UCX is installed, please
+For extra confidence, run [`validate-groups-membership` command](#validate-groups-membership-command) before running the
+group migration. If you do not have account groups matching groups in the workspace in which UCX is installed, you can
 run [`create-account-groups` command](#create-account-groups-command) before running the group migration workflow.
 
 The group migration workflow is designed to migrate workspace-local groups to account-level groups. It verifies if
@@ -822,13 +824,11 @@ executed after a successful run of the assessment workflow. The group migration 
    destination groups.
 
 After successfully running the group migration workflow:
-1. Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence the newly created
-   account level groups are considered to be valid.
-2. Run the [`remove-workspace-local-backup-grups`](#validate-groups-membership-command) to remove workspace-level backup
+1. Run the [`remove-workspace-local-backup-grups`](#validate-groups-membership-command) to remove workspace-level backup
    groups, along with their permissions. This should only be executed after confirming that the workspace-local
    migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and
    remove any unnecessary groups and permissions.
-3. Proceed to the [table migration process](#Table-Migration).
+2. Proceed to the [table migration process](#Table-Migration).
 
 For additional information see:
 - The [detailed design](docs/local-group-migration.md) of thie group migration workflow.
@@ -1984,8 +1984,8 @@ Workspace Group Name  Members Count  Account Group Name  Members Count  Differen
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership.
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and
-[group migration](#group-migration-workflow) for more details.
+used to debug issues related to group membership. See [group migration workflow](#group-migration-workflow) and
+[group migration design document](docs/local-group-migration.md) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](#Table-Migration)
 
@@ -2115,7 +2115,7 @@ are eligible to be run as a collection. User can run the below commands as colle
 - `migrate-tables`
 - `migrate-acls`
 - `migrate-dbsql-dashboards`
-- `validate-group-membership`
+- `validate-groups-membership`
 Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
 
 
