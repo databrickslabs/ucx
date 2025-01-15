@@ -29,31 +29,41 @@ class PipelineInfo:
 
 
 class PipelinesCrawler(CrawlerBase[PipelineInfo], CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+    def __init__(
+        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, include_pipeline_ids: list[str] | None = None
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "pipelines", PipelineInfo)
         self._ws = ws
+        self._include_pipeline_ids = include_pipeline_ids
 
     def _crawl(self) -> Iterable[PipelineInfo]:
-        all_pipelines = list(self._ws.pipelines.list_pipelines())
-        for pipeline in all_pipelines:
+
+        pipeline_ids = []
+        if self._include_pipeline_ids is not None:
+            pipeline_ids = self._include_pipeline_ids
+        else:
+            pipeline_ids = [p.pipeline_id for p in self._ws.pipelines.list_pipelines() if p.pipeline_id]
+
+        for pipeline_id in pipeline_ids:
+            try:
+                pipeline = self._ws.pipelines.get(pipeline_id)
+                assert pipeline.pipeline_id is not None
+                assert pipeline.spec is not None
+            except NotFound:
+                logger.warning(f"Pipeline not found: {pipeline_id}")
+                continue
+
             creator_name = pipeline.creator_user_name or None
             if not creator_name:
                 logger.warning(
                     f"Pipeline {pipeline.name} have Unknown creator, it means that the original creator "
                     f"has been deleted and should be re-created"
                 )
-            try:
-                assert pipeline.pipeline_id is not None
-                pipeline_response = self._ws.pipelines.get(pipeline.pipeline_id)
-            except NotFound:
-                logger.warning(f"Pipeline disappeared, cannot assess: {pipeline.name} (id={pipeline.pipeline_id})")
-                continue
-            assert pipeline_response.spec is not None
-            pipeline_config = pipeline_response.spec.configuration
+            pipeline_config = pipeline.spec.configuration
             failures = []
             if pipeline_config:
                 failures.extend(self._check_spark_conf(pipeline_config, "pipeline"))
-            clusters = pipeline_response.spec.clusters
+            clusters = pipeline.spec.clusters
             if clusters:
                 self._pipeline_clusters(clusters, failures)
             failures_as_json = json.dumps(failures)
