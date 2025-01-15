@@ -149,8 +149,15 @@ def test_appends_statements() -> None:
     assert maybe_tree_2.tree is not None, maybe_tree_2.failure
     tree_2 = maybe_tree_2.tree
     tree_1.append_tree(tree_2)
+
+    nodes = tree_1.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # Starting from tree_1, we want the last assign
+    values = list(InferredValue.infer_from_node(tree.node))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["Hello John!"]
+
     nodes = tree_2.locate(Assign, [])
-    tree = Tree(nodes[0].value)
+    tree = Tree(nodes[0].value)  # Starting from tree_2, we want the first assign
     values = list(InferredValue.infer_from_node(tree.node))
     strings = list(value.as_string() for value in values)
     assert strings == ["Hello John!"]
