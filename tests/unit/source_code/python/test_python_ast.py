@@ -317,6 +317,16 @@ def test_tree_append_nodes_sets_parent() -> None:
     assert node.parent == maybe_tree.tree.node
 
 
+def test_tree_append_nodes_adds_node_to_body() -> None:
+    node = astroid.extract_node("b = a + 2")
+    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    assert maybe_tree.tree, maybe_tree.failure
+
+    maybe_tree.tree.append_nodes([node])
+
+    assert maybe_tree.tree.node.body[-1] == node
+
+
 def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
     maybe_tree = Tree.maybe_normalized_parse("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
