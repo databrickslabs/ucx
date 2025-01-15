@@ -442,3 +442,16 @@ def test_python_sequential_linter_lint_lints_tree() -> None:
     linter = PythonSequentialLinter([DummyPythonLinter()], [], [])
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
+
+
+class NodeParentIndicatorLinter(PythonLinter):
+    """Indicate if the Tree node has parent, i.e. is it the top tree or not"""
+
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        yield Advice("top-tree", "yes" if tree.node.parent else "no", 0, 0, 0, 0)
+
+
+def test_python_sequential_linter_lint_has_no_parent_tree() -> None:
+    linter = PythonSequentialLinter([NodeParentIndicatorLinter()], [], [])
+    advices = list(linter.lint("print(1)"))
+    assert advices == [Advice("top-tree", "no", 0, 0, 0, 0)]
