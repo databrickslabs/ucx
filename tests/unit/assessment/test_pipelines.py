@@ -53,6 +53,15 @@ def test_pipeline_list_with_no_config():
     assert len(crawler) == 0
 
 
+def test_include_pipeline_ids():
+    ws = mock_workspace_client(pipeline_ids=['empty-spec', 'spec-with-spn'])
+    crawler = PipelinesCrawler(ws, MockBackend(), "ucx", include_pipeline_ids=['empty-spec'])
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 1
+    assert result_set[0].pipeline_id == 'empty-spec'
+
+
 def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     """Check that crawling doesn't fail if a pipeline is deleted after we list the pipelines but before we assess it."""
     ws.pipelines.list_pipelines.return_value = (
@@ -63,7 +72,7 @@ def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     def mock_get(pipeline_id: str) -> GetPipelineResponse:
         if pipeline_id == "2":
             raise ResourceDoesNotExist("Simulated disappearance")
-        return GetPipelineResponse(pipeline_id=pipeline_id, spec=PipelineSpec(id=pipeline_id))
+        return GetPipelineResponse(pipeline_id=pipeline_id, spec=PipelineSpec(id=pipeline_id), name="will_remain")
 
     ws.pipelines.get = mock_get
 
@@ -73,7 +82,7 @@ def test_pipeline_disappears_during_crawl(ws, mock_backend, caplog) -> None:
     assert results == [
         PipelineInfo(pipeline_id="1", pipeline_name="will_remain", creator_name=None, success=1, failures="[]")
     ]
-    assert "Pipeline disappeared, cannot assess: will_disappear (id=2)" in caplog.messages
+    assert "Pipeline not found: 2" in caplog.messages
 
 
 def test_pipeline_crawler_creator():
@@ -83,7 +92,12 @@ def test_pipeline_crawler_creator():
         PipelineStateInfo(pipeline_id="2", creator_user_name=""),
         PipelineStateInfo(pipeline_id="3", creator_user_name="bob"),
     )
-    ws.pipelines.get = create_autospec(GetPipelineResponse)  # pylint: disable=mock-no-usage
+    ws.pipelines.get = create_autospec(GetPipelineResponse)
+    ws.pipelines.get.side_effect = [
+        GetPipelineResponse(pipeline_id="1", spec=PipelineSpec(id="1"), creator_user_name=None),
+        GetPipelineResponse(pipeline_id="2", spec=PipelineSpec(id="2"), creator_user_name=""),
+        GetPipelineResponse(pipeline_id="3", spec=PipelineSpec(id="3"), creator_user_name="bob"),
+    ]
     result = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
 
     expected_creators = [None, None, "bob"]
