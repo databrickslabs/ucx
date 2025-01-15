@@ -226,7 +226,7 @@ class Tree:  # pylint: disable=too-many-public-methods
 
     def attach_nodes(self, nodes: list[NodeNG]) -> None:
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+            raise NotImplementedError(f"Cannot attach nodes to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for node in nodes:
             node.parent = self_module
@@ -238,7 +238,7 @@ class Tree:  # pylint: disable=too-many-public-methods
         Extending globals is a stateful operation for this `Tree` (`self`), similarly to extending a list.
         """
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Cannot extend globals: {type(self.node).__name__}")
+            raise NotImplementedError(f"Cannot extend globals to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for global_key, global_values in globs.items():
             self_module.globals[global_key] = self_module.globals.get(global_key, []) + global_values
