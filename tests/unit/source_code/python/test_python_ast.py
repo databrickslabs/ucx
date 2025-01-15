@@ -307,7 +307,7 @@ def test_is_builtin(source, name, is_builtin) -> None:
     assert False  # could not locate call
 
 
-def test_tree_append_globals_adds_assign_name_to_tree() -> None:
+def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
     maybe_tree = Tree.maybe_normalized_parse("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
@@ -315,7 +315,7 @@ def test_tree_append_globals_adds_assign_name_to_tree() -> None:
     assign_name = next(node.get_children())
     assert isinstance(assign_name, AssignName)
 
-    maybe_tree.tree.append_globals({"b": [assign_name]})
+    maybe_tree.tree.extend_globals({"b": [assign_name]})
 
     assert isinstance(maybe_tree.tree.node, Module)
     assert maybe_tree.tree.node.globals.get("b") == [assign_name]
@@ -362,9 +362,9 @@ def test_has_global_fails() -> None:
     assert not Tree.new_module().has_global("xyz")
 
 
-def test_append_globals_raises_not_implemented_error_for_constant_node() -> None:
-    with pytest.raises(NotImplementedError, match="Cannot append globals: .*"):
-        Tree(Const("xyz")).append_globals({})
+def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot extend globals: .*"):
+        Tree(Const("xyz")).extend_globals({})
 
 
 def test_globals_between_fails() -> None:
