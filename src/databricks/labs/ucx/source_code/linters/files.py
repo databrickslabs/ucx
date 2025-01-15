@@ -193,60 +193,58 @@ class LocalCodeLinter:
         yield from walker
 
 
-class LocalFileMigrator:
-    """The LocalFileMigrator class is responsible for fixing code files based on their language."""
+class LocalCodeMigrator(LocalCodeLinter):
+    """Fix local code files based on their language."""
 
-    def __init__(self, context_factory: Callable[[], LinterContext]):
-        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._context_factory = context_factory
+    def apply_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
+        is_dir = path.is_dir()
+        loader: DependencyLoader
+        if is_a_notebook(path):
+            loader = self._notebook_loader
+        elif path.is_dir():
+            loader = self._folder_loader
+        else:
+            loader = self._file_loader
+        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
+        root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
+        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
+        container = root_dependency.load(path_lookup)
+        assert container is not None  # because we just created it
+        problems = container.build_dependency_graph(graph)
+        for problem in problems:
+            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
+            yield problem.as_advisory().for_path(problem_path)
+        context_factory = self._context_factory
+        session_state = self._session_state
+
+        class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+
+            def _process_dependency(
+                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+            ) -> Iterable[LocatedAdvice]:
+                ctx = context_factory()
+                # FileLinter will determine which file/notebook linter to use
+                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
+                for advice in linter.apply():
+                    yield LocatedAdvice(advice, dependency.path)
+
+        if linted_paths is None:
+            linted_paths = set()
+        walker = LintingWalker(graph, linted_paths, self._path_lookup)
+        yield from walker
 
     def apply(self, path: Path) -> bool:
-        if path.is_dir():
-            for child_path in path.iterdir():
-                self.apply(child_path)
-            return True
-        return self._apply_file_fix(path)
+        """Apply the local file migrator.
 
-    def _apply_file_fix(self, path: Path):
+        Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
+        subdirectories are fixed.
         """
-        The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
-        """
-        # Check if the file extension is in the list of supported extensions
-        if path.suffix not in self._extensions:
-            return False
-        # Get the language corresponding to the file extension
-        language = self._extensions[path.suffix]
-        # If the language is not supported, return
-        if not language:
-            return False
-        logger.info(f"Analysing {path}")
-        # Get the linter for the language
-        context = self._context_factory()
-        linter = context.linter(language)
-        # Open the file and read the code
-        with path.open("r") as f:
-            try:
-                code = f.read()
-            except UnicodeDecodeError as e:
-                logger.warning(f"Could not decode file {path}: {e}")
-                return False
-            applied = False
-            # Lint the code and apply fixes
-            for advice in linter.lint(code):
-                logger.info(f"Found: {advice}")
-                fixer = context.fixer(language, advice.code)
-                if not fixer:
-                    continue
-                logger.info(f"Applying fix for {advice}")
-                code = fixer.apply(code)
-                applied = True
-            if not applied:
-                return False
-            # Write the fixed code back to the file
-            with path.open("w") as f:
-                logger.info(f"Overwriting {path}")
-                f.write(code)
-                return True
+        if path.is_dir():
+            fix_indicators = []
+            for child_path in path.iterdir():
+                fix_indicators.append(self.apply(child_path))
+            return all(fix_indicators)
+        return self._fix_file(path)
 
 
 class StubContainer(SourceContainer):

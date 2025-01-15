@@ -84,7 +84,7 @@ def test_lints_queries(migration_index, mock_backend) -> None:
             query_id="qid",
             query_parent="qparent",
             query_name="qname",
-            code="table-migrated-to-uc",
+            code="table-migrated-to-uc-sql",
             message="Table old.things is migrated to brand.new.stuff in Unity Catalog",
         )
     ]

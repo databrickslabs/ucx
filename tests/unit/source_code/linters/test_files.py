@@ -1,21 +1,17 @@
+import logging
 from pathlib import Path
-from unittest.mock import Mock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advice
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
-
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
+from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import (
-    LocalFileMigrator,
+    LocalCodeMigrator,
     FileLoader,
     LocalCodeLinter,
     FolderLoader,
@@ -23,90 +19,83 @@ from databricks.labs.ucx.source_code.linters.files import (
     Folder,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_notebook_migrator_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_file_migrator_fix_ignores_unsupported_language() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalFileMigrator(lambda: languages)
-    migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
-    path = Path('unsupported.py')
-    with pytest.raises(ValueError):
+def test_local_code_migrator_apply_skips_non_existing_file(caplog) -> None:
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
+    path = Path("non_existing_file.py")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
         assert not migrator.apply(path)
+    assert f"Skip non-existing file: {path}" in caplog.messages
 
 
-def test_file_migrator_fix_reads_supported_extensions(migration_index) -> None:
-    languages = LinterContext(migration_index)
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
-    assert not migrator.apply(path)
+def test_local_code_migrator_apply_ignores_unsupported_extensions(caplog, tmp_path) -> None:
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
+    path = tmp_path / "unsupported.ext"
+    path.touch()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
+        assert not migrator.apply(path)
+    assert f"Skip fixing file with unsupported extension: {path}" in caplog.messages
 
 
-def test_file_migrator_supported_language_no_diagnostics() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = []
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
+def test_local_code_migrator_apply_ignores_unsupported_language_on_context(tmp_path, caplog) -> None:
+    context = LinterContext(TableMigrationIndex([]))
+    migrator = LocalCodeMigrator(lambda: context)
+    migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
+    path = tmp_path / 'unsupported.py'
+    path.touch()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
+        assert not migrator.apply(path)
+    assert "Skip fixing unsupported language: R" in caplog.messages
+
+
+def test_linter_context_apply_with_supported_language(tmp_path) -> None:
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
+    context = create_autospec(LinterContext)
+    context.apply_fixes.return_value = "Hi there!"
+    migrator = LocalCodeMigrator(lambda: context)
+
     migrator.apply(path)
-    languages.fixer.assert_not_called()
 
-
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = mock_path_lookup.resolve(Path("root1.run.py"))
-    assert not migrator.apply(path)
-
-
-def test_migrator_supported_language_no_fixer() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
-    migrator.apply(path)
-    languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
-
-
-def test_migrator_supported_language_with_fixer(tmpdir) -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(tmpdir, 'any.py')
-    path.write_text("import tempfile", encoding='utf-8')
-    migrator.apply(path)
     assert path.read_text("utf-8") == "Hi there!"
 
 
-def test_migrator_walks_directory() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__).parent
-    migrator.apply(path)
-    languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
-    assert languages.fixer.call_count > 1
+def test_local_code_migrator_apply_walks_directory(tmp_path) -> None:
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
+    context = create_autospec(LinterContext)
+    context.apply_fixes.return_value = "Hi there!"
+    migrator = LocalCodeMigrator(lambda: context)
+
+    migrator.apply(path.parent)
+
+    assert path.read_text("utf-8") == "Hi there!"
+
+
+def test_local_code_migrator_fixes_migrated_hive_metastore_table(tmp_path) -> None:
+    path = tmp_path / "read_table.py"
+    path.write_text("df = spark.read.table('hive_metastore.schema.table')")
+
+    index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
+    linter_context = LinterContext(index, CurrentSessionState())
+    migrator = LocalCodeMigrator(lambda: linter_context)
+
+    has_code_changes = migrator.apply(path)
+
+    assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
+    assert "df = spark.read.table('catalog.schema.table')" == path.read_text()
 
 
 @pytest.fixture()
-def local_code_linter(mock_path_lookup, migration_index):
+def local_code_linter(mock_path_lookup, migration_index) -> LocalCodeMigrator:
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
@@ -121,7 +110,7 @@ def local_code_linter(mock_path_lookup, migration_index):
         import_file_resolver,
         mock_path_lookup,
     )
-    return LocalCodeLinter(
+    return LocalCodeMigrator(
         notebook_loader,
         file_loader,
         folder_loader,
@@ -132,16 +121,36 @@ def local_code_linter(mock_path_lookup, migration_index):
     )
 
 
-def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
+def test_local_code_linter_lint_path_detects_migrated_hive_metastore_table(tmp_path, local_code_linter) -> None:
+    path = tmp_path / "read_table.py"
+    path.write_text("df = spark.read.table('hive_metastore.old.things')")
+
+    advices = list(local_code_linter.lint_path(path))
+
+    assert len(advices) > 0, "Expect at least one advice"
+    assert advices[0] == LocatedAdvice(
+        Deprecation(
+            code="table-migrated-to-uc-python",
+            message="Table hive_metastore.old.things is migrated to brand.new.stuff in Unity Catalog",
+            start_line=0,
+            start_col=5,
+            end_line=0,
+            end_col=50,
+        ),
+        path,
+    )
+
+
+def test_local_code_linter_lint_path_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
+    path = Path(__file__).parent.parent / "samples" / "simulate-sys-path"
     paths: set[Path] = set()
     advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) > 10
     assert not advices
 
 
-def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
+def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
     paths: set[Path] = set()
@@ -160,6 +169,14 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -
             path=path / "child.py",
         )
     ]
+
+
+def test_local_code_linter_apply_path_finds_children_in_context(mock_path_lookup, local_code_linter) -> None:
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
+
+    failures = list(local_code_linter.apply_path(path))
+
+    assert not failures
 
 
 def test_triple_dot_import() -> None:
