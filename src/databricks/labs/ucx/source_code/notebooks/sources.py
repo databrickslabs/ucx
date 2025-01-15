@@ -424,7 +424,7 @@ class FileLinter:
         )
         yield from notebook_linter.lint()
 
-    def apply(self) -> bool:
+    def apply(self) -> Iterable[Advice]:
         """Fix a file.
 
         Apply the code fixers on the read content of the file. If the fixers yield code changes, write them back to the
@@ -450,7 +450,7 @@ class FileLinter:
 
         yield from self._apply_file()
 
-    def _apply_file(self):
+    def _apply_file(self) -> Iterable[Advice]:
         language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
@@ -462,7 +462,7 @@ class FileLinter:
                 yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
         else:
             try:
-                fixed_content = self._ctx.apply_fixes(language, self._content)
+                fixed_content = self._ctx.apply_fixes(language, self._content, inherited_tree=self._inherited_tree)
                 if self._content == fixed_content:
                     self._path.write_text(fixed_content)
             except ValueError as err:
