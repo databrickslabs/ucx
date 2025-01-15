@@ -369,8 +369,13 @@ def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node()
 
 
 def test_tree_attach_nodes_raises_not_implemented_error_for_constant_node() -> None:
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedError, match="Cannot attach nodes to: .*"):
         Tree(Const("xyz")).attach_nodes([])
+
+
+def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot extend globals to: .*"):
+        Tree(Const("xyz")).extend_globals({})
 
 
 def test_nodes_between_fails() -> None:
@@ -380,11 +385,6 @@ def test_nodes_between_fails() -> None:
 
 def test_has_global_fails() -> None:
     assert not Tree.new_module().has_global("xyz")
-
-
-def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:
-    with pytest.raises(NotImplementedError, match="Cannot extend globals: .*"):
-        Tree(Const("xyz")).extend_globals({})
 
 
 def test_globals_between_fails() -> None:
