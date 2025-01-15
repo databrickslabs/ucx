@@ -221,10 +221,10 @@ class Tree:  # pylint: disable=too-many-public-methods
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
-        self.append_nodes(tree_module.body)
+        self.attach_nodes(tree_module.body)
         self.extend_globals(tree_module.globals)
 
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
+    def attach_nodes(self, nodes: list[NodeNG]) -> None:
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
@@ -698,7 +698,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._make_tree().attach_child_tree(tree)
 
     def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().append_nodes(nodes)
+        self._make_tree().attach_nodes(nodes)
 
     def append_globals(self, globs: dict) -> None:
         self._make_tree().extend_globals(globs)
