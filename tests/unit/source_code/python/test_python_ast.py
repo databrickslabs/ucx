@@ -315,8 +315,8 @@ def test_repr_is_truncated() -> None:
     assert len(repr(Tree(Const("xyz")))) <= (32 + len("...") + len("<Tree: >"))
 
 
-def test_append_tree_fails() -> None:
-    with pytest.raises(NotImplementedError):
+def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot attach child tree: .*"):
         Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
