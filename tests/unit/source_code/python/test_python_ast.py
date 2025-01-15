@@ -200,28 +200,26 @@ def test_is_instance_of(source, name, class_name) -> None:
     assert Tree(var[0]).is_instance_of(class_name)
 
 
-def test_supports_recursive_refs_when_checking_module() -> None:
-    source_1 = """
-    df = spark.read.csv("hi")
-    """
-    source_2 = """
-    df = df.withColumn(stuff)
-    """
-    source_3 = """
-    df = df.withColumn(stuff2)
-    """
-    maybe_tree = Tree.maybe_normalized_parse(source_1)
-    assert maybe_tree.tree is not None, maybe_tree.failure
-    main_tree = maybe_tree.tree
-    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
-    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
-    tree_2 = maybe_tree_2.tree
-    main_tree.attach_child_tree(tree_2)
-    maybe_tree_3 = Tree.maybe_normalized_parse(source_3)
-    assert maybe_tree_3.tree is not None, maybe_tree_3.failure
-    tree_3 = maybe_tree_3.tree
-    main_tree.attach_child_tree(tree_3)
-    assign = tree_3.locate(Assign, [])[0]
+def test_tree_attach_child_tree_propagates_module_reference() -> None:
+    """The spark module should propagate from the parent tree."""
+    source = """
+df = spark.read.csv("hi")
+df = df.withColumn(stuff)
+df = df.withColumn(stuff2)
+""".lstrip()  # Remove first new line character
+    sources = source.split("\n")
+    first_line_maybe_tree = Tree.maybe_normalized_parse(sources[0])
+    second_line_maybe_tree = Tree.maybe_normalized_parse(sources[1])
+    third_line_maybe_tree = Tree.maybe_normalized_parse(sources[2])
+
+    assert first_line_maybe_tree.tree, first_line_maybe_tree.failure
+    assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
+    assert third_line_maybe_tree.tree, third_line_maybe_tree.failure
+
+    first_line_maybe_tree.tree.attach_child_tree(second_line_maybe_tree.tree)
+    first_line_maybe_tree.tree.attach_child_tree(third_line_maybe_tree.tree)
+
+    assign = third_line_maybe_tree.tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
 
 
