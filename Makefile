@@ -38,3 +38,6 @@ docs-install:
 
 docs-serve:
 	yarn --cwd docs/ucx start
+
+docs-build:
+	yarn --cwd docs/ucx build
