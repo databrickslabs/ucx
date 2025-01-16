@@ -45,7 +45,8 @@ class AWSExternalLocationsMigration:
         for external_location in existing_external_locations:
             if external_location.url is not None:
                 existing_paths.append(external_location.url)
-        compatible_roles = self._aws_resource_permissions.load_uc_compatible_roles()
+        compatible_roles = [role for role in self._aws_resource_permissions.load_uc_compatible_roles()
+                            if role.resource_type == "s3"]
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
         for path, role_arn in missing_paths:
             if role_arn not in credential_dict:

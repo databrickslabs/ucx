@@ -246,10 +246,7 @@ class HiveMetastoreFederation(SecretsMixin):
         if not current_user.user_name:
             raise NotFound('Current user not found')
         # Get the external locations. If not using external HMS, include the root DBFS location.
-        if self._external_hms is not None:
-            external_locations = self._external_locations.external_locations_with_root()
-        else:
-            external_locations = self._external_locations.snapshot()
+        external_locations = self._external_locations.external_locations_with_root()
 
         for external_location_info in external_locations:
             location = ExternalLocations.clean_location(external_location_info.location)

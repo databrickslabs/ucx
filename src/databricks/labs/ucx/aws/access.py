@@ -257,7 +257,7 @@ class AWSResourcePermissions:
         """
         external_locations = list(self._locations.external_locations_with_root())
         logger.info(f"Found {len(external_locations)} external locations")
-        compatible_roles = self.load_uc_compatible_roles()
+        compatible_roles = [role for role in self.load_uc_compatible_roles() if role.resource_type == "s3"]
         roles: dict[str, AWSCredentialCandidate] = {}
         for external_location in external_locations:
             path = PurePath(external_location.location)
