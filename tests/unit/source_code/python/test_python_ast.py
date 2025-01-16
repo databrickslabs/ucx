@@ -441,44 +441,45 @@ def test_python_sequential_linter_lint_lints_tree() -> None:
     assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
 
 
-class NodeGlobalsLinter(PythonLinter):
+class BodyNodesGlobalsLinter(PythonLinter):
     """Get the node globals"""
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-        globs = ""
+        globs = set()
         if isinstance(tree.node, Module):
-            globs = ",".join(tree.node.globals.keys())
-        yield Advice("globals", globs, 0, 0, 0, 0)
+            for node in tree.node.body:
+                globs |= set(node.parent.globals.keys())
+        yield Advice("globals", ",".join(globs), 0, 0, 0, 0)
 
 
 def test_python_sequential_linter_lint_has_no_globals() -> None:
-    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("globals", "", 0, 0, 0, 0)]
 
 
 def test_python_sequential_linter_lint_has_one_global() -> None:
-    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
     advices = list(linter.lint("a = 1"))
     assert advices == [Advice("globals", "a", 0, 0, 0, 0)]
 
 
 def test_python_sequential_linter_lint_has_two_globals() -> None:
-    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
     advices = list(linter.lint("a = 1;b = 2"))
     assert advices == [Advice("globals", "a,b", 0, 0, 0, 0)]
 
 
 def test_python_sequential_linter_lint_is_stateless() -> None:
     """Globals from previous lint calls should not be part of later calls"""
-    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
     list(linter.lint("a = 1"))
     advices = list(linter.lint("b = 2"))
     assert advices == [Advice("globals", "b", 0, 0, 0, 0)]
 
 
 def test_python_sequential_linter_extend_globals() -> None:
-    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
 
     node = astroid.extract_node("b = a + 2")
     assign_name = next(node.get_children())
