@@ -439,3 +439,19 @@ def test_python_sequential_linter_lint_lints_tree() -> None:
     linter = PythonSequentialLinter([DummyPythonLinter()], [], [])
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
+
+
+class NodeGlobalsLinter(PythonLinter):
+    """Get the node globals"""
+
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        globs = ""
+        if isinstance(tree.node, Module):
+            globs = ",".join(tree.node.globals.keys())
+        yield Advice("globals", globs, 0, 0, 0, 0)
+
+
+def test_python_sequential_linter_lint_has_no_globals() -> None:
+    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    advices = list(linter.lint("print(1)"))
+    assert advices == [Advice("globals", "", 0, 0, 0, 0)]
