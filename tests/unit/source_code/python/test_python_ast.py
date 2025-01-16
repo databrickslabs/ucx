@@ -467,3 +467,11 @@ def test_python_sequential_linter_lint_has_two_globals() -> None:
     linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
     advices = list(linter.lint("a = 1;b = 2"))
     assert advices == [Advice("globals", "a,b", 0, 0, 0, 0)]
+
+
+def test_python_sequential_linter_lint_is_stateless() -> None:
+    """Globals from previous lint calls should not be part of later calls"""
+    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    list(linter.lint("a = 1"))
+    advices = list(linter.lint("b = 2"))
+    assert advices == [Advice("globals", "b", 0, 0, 0, 0)]
