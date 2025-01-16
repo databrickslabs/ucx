@@ -433,3 +433,9 @@ def test_dummy_python_linter_lint_yields_failure_due_to_parse_error() -> None:
             end_col=1,
         )
     ]
+
+
+def test_python_sequential_linter_lint_lints_tree() -> None:
+    linter = PythonSequentialLinter([DummyPythonLinter()], [], [])
+    advices = list(linter.lint("print(1)"))
+    assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
