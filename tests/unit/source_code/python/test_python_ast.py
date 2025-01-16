@@ -1,11 +1,12 @@
+import logging
 from collections.abc import Iterable
 
 import pytest
 import astroid  # type: ignore
-from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Advice, Failure
-from databricks.labs.ucx.source_code.python.python_ast import PythonLinter, PythonSequentialLinter, Tree, TreeHelper
+from databricks.labs.ucx.source_code.base import Advice, DirectFsAccess, DirectFsAccessNode, Failure
+from databricks.labs.ucx.source_code.python.python_ast import DfsaPyCollector, PythonLinter, PythonSequentialLinter, Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
@@ -488,3 +489,32 @@ def test_python_sequential_linter_extend_globals() -> None:
 
     advices = list(linter.lint("a = 1"))
     assert advices == [Advice("globals", "a,b", 0, 0, 0, 0)]
+
+
+class DummyDfsaPyCollector(DfsaPyCollector):
+    """Dummy direct filesystem access collector yielding dummy advices for testing purpose."""
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
+        dfsa = DirectFsAccess(path="test.py")
+        node = NodeNG(0, 0, None, end_lineno=0, end_col_offset=0)
+        yield DirectFsAccessNode(dfsa, node)
+
+
+def test_dummy_dfsa_python_collector_collect_dfsas() -> None:
+    linter = DummyDfsaPyCollector()
+    dfsas = list(linter.collect_dfsas("print(1)"))
+    assert dfsas == [DirectFsAccess(path="test.py")]
+
+
+def test_dummy_dfsa_python_collector_collect_dfsas_warns_failure_due_to_parse_error(caplog) -> None:
+    linter = DummyDfsaPyCollector()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.python.python_ast"):
+        dfsas = list(linter.collect_dfsas("print(1"))  # Closing parenthesis is missing on purpose
+    assert not dfsas
+    assert "Failed to parse code due to invalid syntax: print(1" in caplog.messages
+
+
+def test_python_sequential_linter_collect_dfsas() -> None:
+    linter = PythonSequentialLinter([], [DummyDfsaPyCollector()], [])
+    dfsas = list(linter.collect_dfsas("print(1)"))
+    assert dfsas == [DirectFsAccess(path="test.py")]
