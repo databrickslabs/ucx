@@ -493,18 +493,6 @@ def test_python_sequential_linter_lint_is_stateless() -> None:
     assert advices == [Advice("globals", "b", 0, 0, 0, 0)]
 
 
-def test_python_sequential_linter_extend_globals() -> None:
-    linter = PythonSequentialLinter([BodyNodesGlobalsLinter()], [], [])
-
-    node = astroid.extract_node("b = a + 2")
-    assign_name = next(node.get_children())
-    assert isinstance(assign_name, AssignName)
-    linter.append_globals({"b": [assign_name]})
-
-    advices = list(linter.lint("a = 1"))
-    assert advices == [Advice("globals", "a,b", 0, 0, 0, 0)]
-
-
 class DummyDfsaPyCollector(DfsaPyCollector):
     """Dummy direct filesystem access collector yielding dummy advices for testing purpose."""
 

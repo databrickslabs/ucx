@@ -679,9 +679,6 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
 
-        # This tree collects all the trees parsed from source code by attaching them as child trees
-        self._tree: Tree = Tree.new_module()
-
     def lint(self, code: str) -> Iterable[Advice]:
         maybe_tree = self._parse_and_append(code)
         if maybe_tree.failure:
@@ -699,17 +696,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         if maybe_tree.failure:
             return maybe_tree
         assert maybe_tree.tree is not None
-        self.append_tree(maybe_tree.tree)
         return maybe_tree
-
-    def append_tree(self, tree: Tree) -> None:
-        self._tree.attach_child_tree(tree)
-
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._tree.attach_nodes(nodes)
-
-    def append_globals(self, globs: dict) -> None:
-        self._tree.extend_globals(globs)
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)

@@ -149,7 +149,6 @@ class NotebookLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         notebook: Notebook,
-        inherited_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -158,8 +157,6 @@ class NotebookLinter:
         # reuse Python linter across related files and notebook cells
         # this is required in order to accumulate statements for improved inference
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
-        if inherited_tree is not None:
-            self._python_linter.append_tree(inherited_tree)
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
@@ -214,17 +211,11 @@ class NotebookLinter:
         base_nodes.extend(self._list_run_magic_lines(tree))
         base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
         if len(base_nodes) == 0:
-            self._python_linter.append_tree(tree)
             return
-        # append globals
-        globs = cast(Module, tree.node).globals
-        self._python_linter.append_globals(globs)
         # need to execute things in intertwined sequence so concat and sort them
         nodes = list(cast(Module, tree.node).body)
         base_nodes = sorted(base_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         yield from self._load_children_with_base_nodes(nodes, base_nodes)
-        # append remaining nodes
-        self._python_linter.append_nodes(nodes)
 
     @staticmethod
     def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
@@ -244,7 +235,6 @@ class NotebookLinter:
     def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Iterable[Advice]:
         while len(nodes) > 0:
             node = nodes.pop(0)
-            self._python_linter.append_nodes([node])
             if node.lineno < base_node.node.lineno:
                 continue
             yield from self._load_children_from_base_node(base_node)
@@ -417,8 +407,6 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
-                if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
-                    linter.append_tree(self._inherited_tree)
                 yield from linter.lint(self._content)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
@@ -431,11 +419,5 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(
-            self._ctx,
-            self._path_lookup,
-            self._session_state,
-            notebook,
-            self._inherited_tree,
-        )
+        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook)
         yield from notebook_linter.lint()
