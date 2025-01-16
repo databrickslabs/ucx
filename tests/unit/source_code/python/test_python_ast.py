@@ -5,8 +5,8 @@ import pytest
 import astroid  # type: ignore
 from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Advice, DirectFsAccess, DirectFsAccessNode, Failure
-from databricks.labs.ucx.source_code.python.python_ast import DfsaPyCollector, PythonLinter, PythonSequentialLinter, Tree, TreeHelper
+from databricks.labs.ucx.source_code.base import Advice, DirectFsAccess, DirectFsAccessNode, Failure, UsedTable, UsedTableNode
+from databricks.labs.ucx.source_code.python.python_ast import DfsaPyCollector, PythonLinter, PythonSequentialLinter, TablePyCollector, Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
@@ -518,3 +518,32 @@ def test_python_sequential_linter_collect_dfsas() -> None:
     linter = PythonSequentialLinter([], [DummyDfsaPyCollector()], [])
     dfsas = list(linter.collect_dfsas("print(1)"))
     assert dfsas == [DirectFsAccess(path="test.py")]
+
+
+class DummyTablePyCollector(TablePyCollector):
+    """Dummy table collector yielding dummy used tables for testing purpose."""
+
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
+        dfsa = UsedTable(schema_name="test", table_name="test")
+        node = NodeNG(0, 0, None, end_lineno=0, end_col_offset=0)
+        yield UsedTableNode(dfsa, node)
+
+
+def test_dummy_table_python_collector_collect_tables() -> None:
+    linter = DummyTablePyCollector()
+    used_tables = list(linter.collect_tables("print(1)"))
+    assert used_tables == [UsedTable(schema_name="test", table_name="test")]
+
+
+def test_dummy_table_python_collector_collect_tables_warns_failure_due_to_parse_error(caplog) -> None:
+    linter = DummyTablePyCollector()
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.python.python_ast"):
+        used_tables = list(linter.collect_tables("print(1"))  # Closing parenthesis is missing on purpose
+    assert not used_tables
+    assert "Failed to parse code due to invalid syntax: print(1" in caplog.messages
+
+
+def test_python_sequential_linter_collect_tables() -> None:
+    linter = PythonSequentialLinter([], [], [DummyTablePyCollector()])
+    used_tables = list(linter.collect_tables("print(1)"))
+    assert used_tables == [UsedTable(schema_name="test", table_name="test")]
