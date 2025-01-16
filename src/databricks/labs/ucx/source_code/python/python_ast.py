@@ -678,7 +678,9 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._linters = linters
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
-        self._tree: Tree | None = None
+
+        # This tree collects all the trees parsed from source code by attaching them as child trees
+        self._tree: Tree = Tree.new_module()
 
     def lint(self, code: str) -> Iterable[Advice]:
         maybe_tree = self._parse_and_append(code)
@@ -701,23 +703,22 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         return maybe_tree
 
     def append_tree(self, tree: Tree) -> None:
-        self._make_tree().attach_child_tree(tree)
+        self._tree.attach_child_tree(tree)
 
     def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().attach_nodes(nodes)
+        self._tree.attach_nodes(nodes)
 
     def append_globals(self, globs: dict) -> None:
-        self._make_tree().extend_globals(globs)
+        self._tree.extend_globals(globs)
 
     def process_child_cell(self, code: str) -> None:
-        this_tree = self._make_tree()
         maybe_tree = Tree.maybe_normalized_parse(code)
         if maybe_tree.failure:
             # TODO: bubble up this error
             logger.warning(maybe_tree.failure.message)
             return
         assert maybe_tree.tree is not None
-        this_tree.attach_child_tree(maybe_tree.tree)
+        self._tree.attach_child_tree(maybe_tree.tree)
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)
@@ -744,8 +745,3 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
             yield from collector.collect_tables_from_tree(tree)
-
-    def _make_tree(self) -> Tree:
-        if self._tree is None:
-            self._tree = Tree.new_module()
-        return self._tree
