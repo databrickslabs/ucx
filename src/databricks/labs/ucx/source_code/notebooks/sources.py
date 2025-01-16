@@ -180,21 +180,29 @@ class NotebookLinter:
                 )
         return
 
-    def _load_tree_from_notebook(self, notebook: Notebook, register_trees: bool) -> Failure | None:
+    def _load_tree_from_notebook(
+        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None = None
+    ) -> Failure | None:
         for cell in notebook.cells:
             failure = None
             if isinstance(cell, RunCell):
-                failure = self._load_tree_from_run_cell(cell)
+                failure = self._load_tree_from_run_cell(cell, parent_tree=parent_tree)
             elif isinstance(cell, PythonCell):
-                failure = self._load_tree_from_python_cell(cell, register_trees)
+                failure = self._load_tree_from_python_cell(cell, register_trees, parent_tree=parent_tree)
+                parent_tree = self._python_trees.get(cell)
             if failure:
                 return failure
         return None
 
-    def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Failure | None:
+    def _load_tree_from_python_cell(
+        self, python_cell: PythonCell, register_trees: bool, parent_tree: Tree | None = None
+    ) -> Failure | None:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
             return maybe_tree.failure
+        assert maybe_tree.tree is not None
+        if parent_tree:
+            parent_tree.attach_child_tree(maybe_tree.tree)
         if register_trees:
             # A cell with only comments will not produce a tree
             self._python_trees[python_cell] = maybe_tree.tree or Tree.new_module()
@@ -272,13 +280,13 @@ class NotebookLinter:
         change.apply_to(self._path_lookup)
         return None
 
-    def _load_tree_from_run_cell(self, run_cell: RunCell) -> Failure | None:
+    def _load_tree_from_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
         path = run_cell.maybe_notebook_path()
         if path is None:
             return None  # malformed run cell already reported
         notebook = self._load_source_from_path(path)
         if notebook is not None:
-            return self._load_tree_from_notebook(notebook, False)
+            return self._load_tree_from_notebook(notebook, False, parent_tree=parent_tree)
         return None
 
     def _load_source_from_path(self, path: Path | None) -> Notebook | None:
