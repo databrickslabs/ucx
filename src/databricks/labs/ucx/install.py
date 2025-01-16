@@ -257,6 +257,7 @@ class WorkspaceInstaller(WorkspaceContext):
         recon_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
         )
+
         return WorkspaceConfig(
             inventory_database=inventory_database,
             ucx_catalog=ucx_catalog,
