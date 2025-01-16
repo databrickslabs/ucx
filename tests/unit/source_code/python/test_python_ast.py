@@ -418,3 +418,18 @@ def test_dummy_python_linter_lint_lints_tree() -> None:
     linter = DummyPythonLinter()
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("dummy", "dummy advice", 0, 0, 0, 0), Advice("dummy", "dummy advice", 1, 1, 1, 1)]
+
+
+def test_dummy_python_linter_lint_yields_failure_due_to_parse_error() -> None:
+    linter = DummyPythonLinter()
+    advices = list(linter.lint("print(1"))  # Closing parenthesis is missing on purpose
+    assert advices == [
+        Failure(
+            code="python-parse-error",
+            message="Failed to parse code due to invalid syntax: print(1",
+            start_line=0,
+            start_col=5,
+            end_line=0,
+            end_col=1,
+        )
+    ]
