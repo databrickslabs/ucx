@@ -13,6 +13,7 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk.service import compute
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
@@ -20,7 +21,6 @@ from databricks.sdk.errors import (
     NotFound,
 )
 from databricks.sdk.retries import retried
-from databricks.sdk.service import compute
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -117,7 +117,7 @@ def test_job_cluster_policy(ws, installation_ctx) -> None:
     assert cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.inventory_database}) ({user_name})"
 
     spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
-    assert policy_definition["spark_version"]["value"] == spark_version
+    assert policy_definition["spark_version"]["values"][0] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=32)
     if ws.config.is_azure:
         assert (
@@ -126,6 +126,28 @@ def test_job_cluster_policy(ws, installation_ctx) -> None:
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
+
+
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
+def test_job_cluster_on_uc_enabled_workpace(ws, installation_ctx) -> None:
+    # Set the override_cluster to empty so that the installation creates new job clusters
+    installation_ctx.workspace_installation.config.override_clusters = ""
+
+    installation_ctx.workspace_installation.run()
+    job_id = installation_ctx.install_state.jobs["assessment"]
+    job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
+    for cluster in job_clusters:
+        if cluster.job_cluster_key == "main":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
+        if cluster.job_cluster_key == "tacl":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
+    job_id = installation_ctx.install_state.jobs["migrate-tables"]
+    job_clusters = installation_ctx.workspace_client.jobs.get(job_id).settings.job_clusters
+    for cluster in job_clusters:
+        if cluster.job_cluster_key == "main":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.LEGACY_SINGLE_USER_STANDARD
+        if cluster.job_cluster_key == "user_isolation":
+            assert cluster.new_cluster.data_security_mode == compute.DataSecurityMode.USER_ISOLATION
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

@@ -109,7 +109,7 @@ class ClusterPolicyInstaller:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
         node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=32, min_cores=4)
         policy_definition = {
-            "spark_version": self._policy_config(latest_lts_dbr),
+            "spark_version": {"type": "allowlist", "values": [latest_lts_dbr], "defaultValue": latest_lts_dbr},
             "node_type_id": self._policy_config(node_type_id),
         }
         for key, value in conf.items():

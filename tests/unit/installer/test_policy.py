@@ -62,7 +62,7 @@ def test_cluster_policy_definition_azure_hms():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
@@ -103,7 +103,7 @@ def test_cluster_policy_definition_aws_glue():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
         "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
@@ -128,7 +128,7 @@ def test_cluster_policy_definition_gcp():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
@@ -230,7 +230,7 @@ def test_cluster_policy_definition_azure_hms_warehouse():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
@@ -282,7 +282,7 @@ def test_cluster_policy_definition_aws_glue_warehouse():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
         "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
@@ -338,7 +338,7 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"type": "fixed", "value": "url"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"type": "fixed", "value": "user1"},
@@ -379,7 +379,7 @@ def test_cluster_policy_definition_empty_config():
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
         "aws_attributes.zone_id": {"type": "fixed", "value": "auto"},
@@ -409,7 +409,7 @@ def test_cluster_policy_instance_pool():
     assert instance_pool_id == "instance_pool_1"
 
     policy_expected = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "instance_pool_id": {"type": "fixed", "value": "instance_pool_1"},
     }
     # test the instance pool is added to the cluster policy
@@ -422,7 +422,7 @@ def test_cluster_policy_instance_pool():
     # test the instance pool is not found
     ws.instance_pools.get.side_effect = NotFound()
     policy_expected = {
-        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "spark_version": {"type": "allowlist", "values": ["14.2.x-scala2.12"], "defaultValue": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
         "aws_attributes.zone_id": {"type": "fixed", "value": "auto"},
