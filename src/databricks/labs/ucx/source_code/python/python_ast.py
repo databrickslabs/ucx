@@ -711,15 +711,6 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
     def append_globals(self, globs: dict) -> None:
         self._tree.extend_globals(globs)
 
-    def process_child_cell(self, code: str) -> None:
-        maybe_tree = Tree.maybe_normalized_parse(code)
-        if maybe_tree.failure:
-            # TODO: bubble up this error
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        self._tree.attach_child_tree(maybe_tree.tree)
-
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)
         if maybe_tree.failure:
