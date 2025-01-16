@@ -16,10 +16,10 @@ UCX has the following installation requirements:
 - Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
 - Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
-- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](docs/external_hms_glue.md).
-- A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
+- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](/docs/reference/external_hms_glue).
+- A PRO or Serverless SQL Warehouse to render the [report](/docs/reference/assessment) for the [assessment workflow](/docs/reference/workflows#assessment-workflow).
 
-Once you [install UCX](#install-ucx), you can proceed to the [assessment workflow](#assessment-workflow) to ensure
+Once you [install UCX](#install-ucx), you can proceed to the [assessment workflow](/docs/reference/workflows#assessment-workflow) to ensure
 the compatibility of your workspace with Unity Catalog.
 
 
@@ -55,16 +55,16 @@ databricks labs install ucx
 
 You'll be prompted to select a [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) created by `databricks auth login` command.
 
-Once you install, proceed to the [assessment workflow](#assessment-workflow) to ensure the compatibility of your workspace with UCX.
+Once you install, proceed to the [assessment workflow](/docs/reference/workflows#assessment-workflow) to ensure the compatibility of your workspace with UCX.
 
 The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace.
 It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing
 a PRO or SERVERLESS SQL warehouse, specifying a log level and number of threads, and setting up an external Hive Metastore if necessary.
-Upon the first installation, you're prompted for a workspace local [group migration strategy](docs/group_name_conflict.md).
+Upon the first installation, you're prompted for a workspace local [group migration strategy](/docs/reference/group_name_conflict).
 Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration,
 which is saved to the workspace and can be opened in a web browser.
 
-The [`WorkspaceInstallation`](src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles
+The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles
 the configuration and exception management during the installation process. The installation process creates dashboards, databases, and jobs.
 It also includes the creation of a database with given configuration and the deployment of workflows with specific settings. The installation
 process can handle exceptions and infer errors from job runs and task runs. The workspace installation uploads wheels, creates cluster policies,
@@ -76,7 +76,7 @@ For large organization with many workspaces, grouping workspaces into collection
 User should be an account admin to be able to join a collection.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace.
-These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#advanced-force-install-over-existing-ucx) for more details.
+These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#force-install-over-existing-ucx) for more details.
 
 You can also install a specific version by specifying it like `@v0.13.2` - `databricks labs install ucx@v0.13.2`.
 
@@ -90,15 +90,15 @@ The following resources are installed by UCX:
 
 | Installed UCX resources                           | Description                                                                                      |
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| [Inventory database](./docs/table_persistence.md) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
-| [Workflows](#workflows)                           | Workflows to execute UCX                                                                         |
-| [Dashboards](#dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
+| [Inventory database](/docs/reference/table_persistence) | A Hive metastore database/schema in which UCX persist inventory required for the upgrade process |
+| [Workflows](/docs/reference/workflows)                           | Workflows to execute UCX                                                                         |
+| [Dashboards](/docs/reference/dashboards)                         | Dashboards to visualize UCX outcomes                                                             |
 | [Installation folder](#installation-folder)       | A workspace folder containing UCX files in `/Applications/ucx/`.                                 |
 
 ## Installation folder
 
 UCX is in installed in the workspace folder `/Applications/ucx/`. This folder contains UCX's code resources, like the
-[source code](./src) from this GitHub repository and the [dashboard](#dashboards). Generally, these resources are not
+[source code](https://github.com/databrickslabs/ucx/tree/main/src) from this GitHub repository and the [dashboard](/docs/reference/dashboards). Generally, these resources are not
 *directly* used by UCX users. Resources that can be of importance to users are detailed in the subsections below.
 
 ### Readme notebook
@@ -122,7 +122,7 @@ Every installation creates a `DEBUG` notebook, that initializes UCX as a library
 
 ![debug](/img/debug-logs.png)
 
-The [workflow](#workflows) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed
+The [workflow](/docs/reference/workflows) runs store debug logs in the `logs` folder of the installation folder. The logs are flushed
 every minute in a separate file. Debug logs for [the command-line interface](#authenticate-databricks-cli) are shown
 by adding the `--debug` flag:
 
@@ -185,7 +185,7 @@ This installation mode will automatically select the following options:
 
 Some enterprise block the public PYPI index and host a company controlled PYPI mirror. To install UCX while using a
 company hosted PYPI mirror for finding its dependencies, add all UCX dependencies to the company hosted PYPI mirror (see
-"dependencies" in [`pyproject.toml`](./pyproject.toml)) and set the environment variable `PIP_INDEX_URL` to the company
+"dependencies" in [`pyproject.toml`](https://github.com/databrickslabs/ucx/blob/main/pyproject.toml) and set the environment variable `PIP_INDEX_URL` to the company
 hosted PYPI mirror URL while installing UCX:
 
 ```commandline

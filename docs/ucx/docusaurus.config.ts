@@ -14,6 +14,7 @@ const config: Config = {
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/ucx/',
+  trailingSlash: true,
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -21,9 +22,9 @@ const config: Config = {
   projectName: 'ucx', // Usually your repo name.
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
-  onDuplicateRoutes: 'warn',
-  onBrokenAnchors: 'warn',
+  onBrokenMarkdownLinks: 'throw',
+  onDuplicateRoutes: 'throw',
+  onBrokenAnchors: 'throw',
 
   i18n: {
     defaultLocale: 'en',

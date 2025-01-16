@@ -5,11 +5,11 @@ sidebar_position: 2
 # Process
 
 On a high level, the steps in migration process are:
-1. [assessment](#assessment-workflow)
-2. [group migration](#group-migration-workflow)
-3. [table migration](#table-migration-process)
-4. [data reconciliation](#post-migration-data-reconciliation-workflow)
-5. [code migration](#code-migration-commands)
+1. [assessment](/docs/reference/workflows#assessment-workflow)
+2. [group migration](/docs/reference/workflows#group-migration-workflow)
+3. [table migration](/docs/process/#table-migration-process)
+4. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
+5. [code migration](/docs/reference/commands#code-migration-commands)
 
 The migration process can be schematic visualized as:
 
@@ -47,27 +47,27 @@ flowchart TD
 
 ## Table migration process
 
-> You are required to complete the [assessment workflow](#assessment-workflow) before starting the table migration workflow.
+> You are required to complete the [assessment workflow](/docs/reference/workflows#assessment-workflow) before starting the table migration workflow.
 
 This section explains how to migrate Hive metastore data objects to Unity Catalog. The table migration process consists
-of more steps than only a [workflow](#table-migration-workflow), these steps are:
+of more steps than only a [workflow](/docs/reference/workflows#table-migration-workflows), these steps are:
 
 1. [Table mapping](#table-mapping) : Create a file that maps Hive metastore data objects to Unity Catalog locations.
 2. [Data access](#data-access) : Setup identities to access table data.
 3. [New Unity Catalog resources](#new-unity-catalog-resources) : Create **new** Unity Catalog resources that do not
    require touching existing Hive metastore resources.
-4. [Migrate Hive metastore data objects](#migrate-hive-metastore-data-objects) : Migrate Hive metastore data objects to UC.
+4. [Migrate Hive metastore data objects](/docs/process/#migrate-hive-metastore-data-objects) : Migrate Hive metastore data objects to UC.
 
 ### Table mapping
 
 This section details how to create the table mapping file. This file points existing Hive metastore tables and views to
-Unity Catalog locations. When [migrating the tables and views](#migrate-hive-metastore-data-objects), the file is read
+Unity Catalog locations. When [migrating the tables and views](/docs/process/#migrate-hive-metastore-data-objects), the file is read
 to decide where to migrate the tables and views to.
 
 #### Step 1 : Create the mapping file
 
-Create the mapping file in the [UCX installation folder](#installation-resources) by running the
-[`create-table-mapping` command](#create-table-mapping-command). By default, the file contains all the Hive metastore
+Create the mapping file in the [UCX installation folder](/docs/installation#installation-resources) by running the
+[`create-table-mapping` command](/docs/reference/commands#create-table-mapping). By default, the file contains all the Hive metastore
 tables and views mapped to a single UC catalog, while maintaining the original schema and table names.
 
 #### Step 2: Update the mapping file
@@ -106,25 +106,25 @@ understand the motivation for this step, read how Databricks accesses cloud loca
 #### Step 1 : Map cloud principals to cloud storage locations
 
 Map the cloud principals to cloud storage by running the
-[`principal-prefix-access` command](#principal-prefix-access-command).
+[`principal-prefix-access` command](/docs/reference/commands#principal-prefix-access).
 
 #### Step 2 : Create or modify cloud principals and credentials
 
 Manually create the cloud principals to access data from Unity Catalog:
 
 - AWS:
-  - [`create-missing-principals` command](#create-missing-principals-command-aws-only) creates new AWS roles for Unity
+  - [`create-missing-principals` command](/docs/reference/commands/#create-missing-principals) creates new AWS roles for Unity
     Catalog to access data.
   - Or, [Manually create storage credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
 - Azure:
   - [Manually create storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
-Then, run the [`migrate-credentials` command](#migrate-credentials-command) to migrate the cloud principal
+Then, run the [`migrate-credentials` command](/docs/reference/commands#migrate-credentials) to migrate the cloud principal
 credentials to Unity Catalog.
 
 #### Step 3: Create the "uber" Principal
 
-Create the "uber" principal by running the [`create-uber-principal` command](#create-uber-principal-command).
+Create the "uber" principal by running the [`create-uber-principal` command](/docs/reference/commands#create-uber-principal).
 The table migration requires a cloud principal with access to table data stored in cloud storage. These tables are known
 as external tables. UCX name this cloud principal the "uber" principal as it has access to **all** in-scope cloud
 storage. This principal is only required for the table migration process and not for ongoing UC usage. Once the upgrade
@@ -137,13 +137,13 @@ created without touching the existing Hive metastore objecs.
 
 #### Step 0: Attach a metastore
 
-If skipping the [group migration](#group-migration-workflow), then a metastore should be attached to the workspace by
-following [these instructions](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) or running the [`assign-metastore` command](#assign-metastore-command).
+If skipping the [group migration](/docs/reference/workflows#group-migration-workflow), then a metastore should be attached to the workspace by
+following [these instructions](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html) or running the [`assign-metastore` command](/docs/reference/commands#assign-metastore).
 
 #### Step 1: Create external Locations
 
-Create UC external locations by running the [`migration-locations` command](#migrate-locations-command). The command
-creates a location for each location found during the [assessment](#assessment-workflow). It uses the credentials
+Create UC external locations by running the [`migration-locations` command](/docs/reference/commands#migrate-locations). The command
+creates a location for each location found during the [assessment](/docs/reference/workflows#assessment-workflow). It uses the credentials
 created in the previous steps.
 
 Alternatively, manually create the external locations
@@ -155,14 +155,14 @@ Alternatively, manually create the external locations
 Create Uniyt Catalog [catalogs](https://learn.microsoft.com/en-us/azure/databricks/catalogs/) and
 [schemas](https://learn.microsoft.com/en-us/azure/databricks/schemas/) to organize the destination tables and views in
 by running the
-[`create-catalogs-schemas` command](#create-catalogs-schemas-command). The command creates the UC catalogs and
+[`create-catalogs-schemas` command](/docs/reference/commands#create-catalogs-schemas). The command creates the UC catalogs and
 schemas based on the [table mapping file](#table-mapping). Additionally, it migrates Hive metastore database
 permissions if present.
 
 This step requires considering how to [physically separate data in storage](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#data-is-physically-separated-in-storage)
 within UC. As [Databricks recommends storing managed data at the catalog level](https://docs.databricks.com/en/data-governance/unity-catalog/best-practices.html#configure-a-unity-catalog-metastore),
 we advise to prepare the external locations for the to-be created catalogs before running the `create-catalogs-schemas`
-command. Either, reuse [previously created external locations](#step-23-create-external-locations) or create additional
+command. Either, reuse [previously created external locations](/docs/process/#step-1-create-external-locations) or create additional
 external locations outside of UCX if data separation restrictions requires that. Note that external locations can be
 reused when using subpaths, for example, a folder in a cloud storage
 (`abfss://container@storage.dfs.core.windows.net/folder`) can reuse the external location of the cloud storage
@@ -210,7 +210,7 @@ flowchart LR
     migrate-tables -- 3rd --> mt_ctas_wf
 ```
 
-The [table migration workflows](#table-migration-workflow) can be triggered using the [`migrate-tables` command](#migrate-tables-command) or by
+The [table migration workflows](/docs/reference/workflows#table-migration-workflows) can be triggered using the [`migrate-tables` command](/docs/reference/commands#migrate-tables) or by
 starting the workflows from the workspace UI manually. The table migration workflows are designed to minimize data
 copying and to maintain metadata while allowing users to choose preferred strategies where possible. Chose the
 strategies for migrating tables using the table below:
@@ -255,7 +255,7 @@ The following sections detail how to repair/amend the UC metastore after the upg
 databricks labs ucx skip --schema X [--table Y] [--view Zj]
 ```
 
-The [`skip` command](#skip-command) marks a schema, table or view as to-be skipped during the migration processes.
+The [`skip` command](/docs/reference/commands/#skip) marks a schema, table or view as to-be skipped during the migration processes.
 
 ####  Move data objects
 
@@ -263,7 +263,7 @@ The [`skip` command](#skip-command) marks a schema, table or view as to-be skipp
 databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
 
-The [`move` command](#move-command) moves the object from the source to the target location. The `upgraded_from`
+The [`move` command](/docs/reference/commands#move) moves the object from the source to the target location. The `upgraded_from`
 property are updated to reflect the new location on the source object. Use this command if the data object is migrated
 to the wrong destination.
 
@@ -273,7 +273,7 @@ to the wrong destination.
 databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
 
-This [`alias` command](#alias-command) creates an alias for the object in the target location by creating a view reading
+This [`alias` command](/docs/reference/commands#alias) creates an alias for the object in the target location by creating a view reading
 from the table that needs aliasing. It will create a mirror view to view that is marked as alias.
 Use this command if Hive metastore tables point to the same location as UC does not support UC does not support tables
 with overlapping data locations.
@@ -284,7 +284,7 @@ with overlapping data locations.
 databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]
 ```
 
-The [`revert-migrated-tables` command](#revert-migrated-tables-command) drops the Unity Catalog table or view and reset
+The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-tables) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
 
