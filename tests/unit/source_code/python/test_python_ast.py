@@ -449,7 +449,7 @@ class BodyNodesGlobalsLinter(PythonLinter):
         if isinstance(tree.node, Module):
             for node in tree.node.body:
                 globs |= set(node.parent.globals.keys())
-        yield Advice("globals", ",".join(globs), 0, 0, 0, 0)
+        yield Advice("globals", ",".join(sorted(globs)), 0, 0, 0, 0)
 
 
 def test_python_sequential_linter_lint_has_no_globals() -> None:
