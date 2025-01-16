@@ -5,8 +5,22 @@ import pytest
 import astroid  # type: ignore
 from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Advice, DirectFsAccess, DirectFsAccessNode, Failure, UsedTable, UsedTableNode
-from databricks.labs.ucx.source_code.python.python_ast import DfsaPyCollector, PythonLinter, PythonSequentialLinter, TablePyCollector, Tree, TreeHelper
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    DirectFsAccess,
+    DirectFsAccessNode,
+    Failure,
+    UsedTable,
+    UsedTableNode,
+)
+from databricks.labs.ucx.source_code.python.python_ast import (
+    DfsaPyCollector,
+    PythonLinter,
+    PythonSequentialLinter,
+    TablePyCollector,
+    Tree,
+    TreeHelper,
+)
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
