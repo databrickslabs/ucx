@@ -18,7 +18,6 @@ from databricks.labs.ucx.source_code.base import (
     safe_read_text,
     read_text,
     Advice,
-    Advisory,
     CurrentSessionState,
     Failure,
     Linter,
@@ -36,7 +35,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, PythonSequentialLinter
+from databricks.labs.ucx.source_code.python.python_ast import NodeBase, PythonSequentialLinter, Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -160,12 +159,9 @@ class NotebookLinter:
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
-        has_failure = False
-        for advice in self._load_tree_from_notebook(self._notebook, True):
-            if isinstance(advice, Failure):  # happens when a cell is unparseable
-                has_failure = True
-            yield advice
-        if has_failure:
+        failure = self._load_tree_from_notebook(self._notebook, True)
+        if failure:
+            yield failure
             return
         for cell in self._notebook.cells:
             if not self._context.is_supported(cell.language.language):
@@ -182,40 +178,42 @@ class NotebookLinter:
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
+        return
 
-    def _load_tree_from_notebook(self, notebook: Notebook, register_trees: bool) -> Iterable[Advice]:
+    def _load_tree_from_notebook(self, notebook: Notebook, register_trees: bool) -> Failure | None:
         for cell in notebook.cells:
+            failure = None
             if isinstance(cell, RunCell):
-                yield from self._load_tree_from_run_cell(cell)
-                continue
-            if isinstance(cell, PythonCell):
-                yield from self._load_tree_from_python_cell(cell, register_trees)
-                continue
+                failure = self._load_tree_from_run_cell(cell)
+            elif isinstance(cell, PythonCell):
+                failure = self._load_tree_from_python_cell(cell, register_trees)
+            if failure:
+                return failure
+        return None
 
-    def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
+    def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Failure | None:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
-            yield maybe_tree.failure
-        tree = maybe_tree.tree
-        # a cell with only comments will not produce a tree
+            return maybe_tree.failure
         if register_trees:
-            self._python_trees[python_cell] = tree or Tree.new_module()
-        if not tree:
-            return
-        yield from self._load_children_from_tree(tree)
+            # A cell with only comments will not produce a tree
+            self._python_trees[python_cell] = maybe_tree.tree or Tree.new_module()
+        if maybe_tree.tree:
+            return self._load_children_from_tree(maybe_tree.tree)
+        return None
 
-    def _load_children_from_tree(self, tree: Tree) -> Iterable[Advice]:
+    def _load_children_from_tree(self, tree: Tree) -> Failure | None:
         assert isinstance(tree.node, Module)
         # look for child notebooks (and sys.path changes that might affect their loading)
         base_nodes: list[NodeBase] = []
         base_nodes.extend(self._list_run_magic_lines(tree))
         base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
         if len(base_nodes) == 0:
-            return
+            return None
         # need to execute things in intertwined sequence so concat and sort them
         nodes = list(cast(Module, tree.node).body)
         base_nodes = sorted(base_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
-        yield from self._load_children_with_base_nodes(nodes, base_nodes)
+        return self._load_children_with_base_nodes(nodes, base_nodes)
 
     @staticmethod
     def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
@@ -228,52 +226,60 @@ class NotebookLinter:
             if isinstance(command.as_magic(), RunCommand):
                 yield command
 
-    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]) -> Iterable[Advice]:
+    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]) -> Failure | None:
         for base_node in base_nodes:
-            yield from self._load_children_with_base_node(nodes, base_node)
+            failure = self._load_children_with_base_node(nodes, base_node)
+            if failure:
+                return failure
+        return None
 
-    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Iterable[Advice]:
+    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Failure | None:
         while len(nodes) > 0:
             node = nodes.pop(0)
             if node.lineno < base_node.node.lineno:
                 continue
-            yield from self._load_children_from_base_node(base_node)
+            failure = self._load_children_from_base_node(base_node)
+            if failure:
+                return failure
+        return None
 
-    def _load_children_from_base_node(self, base_node: NodeBase) -> Iterable[Advice]:
+    def _load_children_from_base_node(self, base_node: NodeBase) -> Failure | None:
         if isinstance(base_node, SysPathChange):
-            yield from self._mutate_path_lookup(base_node)
-            return
+            failure = self._mutate_path_lookup(base_node)
+            if failure:
+                return failure
         if isinstance(base_node, MagicLine):
             magic = base_node.as_magic()
             assert isinstance(magic, RunCommand)
             notebook = self._load_source_from_path(magic.notebook_path)
             if notebook is None:
-                yield Advisory.from_node(
+                failure = Failure.from_node(
                     code='dependency-not-found',
                     message=f"Can't locate dependency: {magic.notebook_path}",
                     node=base_node.node,
                 )
-                return
-            yield from self._load_tree_from_notebook(notebook, False)
-            return
+                return failure
+            return self._load_tree_from_notebook(notebook, False)
+        return None
 
-    def _mutate_path_lookup(self, change: SysPathChange) -> Iterable[Advice]:
+    def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
         if isinstance(change, UnresolvedPath):
-            yield Advisory.from_node(
+            return Failure.from_node(
                 code='sys-path-cannot-compute-value',
                 message=f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
                 node=change.node,
             )
-            return
         change.apply_to(self._path_lookup)
+        return None
 
-    def _load_tree_from_run_cell(self, run_cell: RunCell) -> Iterable[Advice]:
+    def _load_tree_from_run_cell(self, run_cell: RunCell) -> Failure | None:
         path = run_cell.maybe_notebook_path()
         if path is None:
-            return  # malformed run cell already reported
+            return None  # malformed run cell already reported
         notebook = self._load_source_from_path(path)
         if notebook is not None:
-            yield from self._load_tree_from_notebook(notebook, False)
+            return self._load_tree_from_notebook(notebook, False)
+        return None
 
     def _load_source_from_path(self, path: Path | None) -> Notebook | None:
         if path is None:
