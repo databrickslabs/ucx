@@ -455,3 +455,9 @@ def test_python_sequential_linter_lint_has_no_globals() -> None:
     linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
     advices = list(linter.lint("print(1)"))
     assert advices == [Advice("globals", "", 0, 0, 0, 0)]
+
+
+def test_python_sequential_linter_lint_has_one_global() -> None:
+    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+    advices = list(linter.lint("a = 1"))
+    assert advices == [Advice("globals", "a", 0, 0, 0, 0)]
