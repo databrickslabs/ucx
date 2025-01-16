@@ -146,22 +146,15 @@ class AWSResourcePermissions:
             return None
         return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAME)
 
-    def load_uc_compatible_roles(self):
+    def load_uc_compatible_roles(self, *, resource_type=None) -> list[AWSRoleAction]:
         try:
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
         except ResourceDoesNotExist:
             self.save_uc_compatible_roles()
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
+        if resource_type:
+            role_actions = [role for role in role_actions if role.resource_type == resource_type]
         return role_actions
-
-    def get_glue_roles(self) -> list[AWSCredentialCandidate]:
-        roles = self.load_uc_compatible_roles()
-        glue_roles: list[AWSCredentialCandidate] = []
-        for role in roles:
-            if role.resource_type != "glue":
-                continue
-            glue_roles.append(AWSCredentialCandidate(role.role_arn, Privilege.USAGE.value, role.resource_path))
-        return glue_roles
 
     def save_instance_profile_permissions(self) -> str | None:
         instance_profile_access = list(self._get_instance_profiles_access())
@@ -257,7 +250,7 @@ class AWSResourcePermissions:
         """
         external_locations = list(self._locations.external_locations_with_root())
         logger.info(f"Found {len(external_locations)} external locations")
-        compatible_roles = [role for role in self.load_uc_compatible_roles() if role.resource_type == "s3"]
+        compatible_roles = self.load_uc_compatible_roles(resource_type="s3")
         roles: dict[str, AWSCredentialCandidate] = {}
         for external_location in external_locations:
             path = PurePath(external_location.location)
@@ -266,7 +259,7 @@ class AWSResourcePermissions:
                     continue
                 if role.role_arn not in roles:
                     roles[role.role_arn] = AWSCredentialCandidate(
-                        role_arn=role.role_arn, privilege=role.privilege, paths=set([external_location.location])
+                        role_arn=role.role_arn, privilege=role.privilege, paths={external_location.location}
                     )
                     continue
                 roles[role.role_arn].paths.add(external_location.location)

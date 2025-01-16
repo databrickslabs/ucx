@@ -190,16 +190,24 @@ class IamRoleMigration:
         It returns a list of ARNs
         """
         # load IAM role list
-        iam_list = self._resource_permissions.get_glue_roles()
+        iam_list = self._resource_permissions.load_uc_compatible_roles(resource_type="glue")
         # list existing storage credentials
         credential_list = self._storage_credential_manager.list_glue().values()
         # check if the iam is already used in UC storage credential
         filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in credential_list]
-
+        credential_candidates = []
+        for iam in filtered_iam_list:
+            credential_candidates.append(
+                AWSCredentialCandidate(
+                    role_arn=iam.role_arn,
+                    privilege=Privilege.USAGE.value,
+                    paths={"*"},
+                )
+            )
         # output the action plan for customer to confirm
-        self._print_action_plan(filtered_iam_list)
+        self._print_action_plan(credential_candidates)
 
-        return filtered_iam_list
+        return credential_candidates
 
     def save(self, migration_results: list[CredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)

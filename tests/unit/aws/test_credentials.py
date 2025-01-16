@@ -159,7 +159,7 @@ def test_run_no_credential_to_migrate(caplog, installation, credential_manager):
 def test_create_glue_credentials(installation):
     prompts = MockPrompts({"Above IAM roles will be migrated*": "Yes"})
     resource_permissions = create_autospec(AWSResourcePermissions)
-    resource_permissions.get_glue_roles.return_value = [
+    resource_permissions.load_uc_compatible_roles.return_value = [
         AWSCredentialCandidate(
             role_arn="arn:aws:iam::123456789012:role/glue-role",
             privilege=Privilege.USAGE.value,
