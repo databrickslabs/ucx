@@ -475,3 +475,15 @@ def test_python_sequential_linter_lint_is_stateless() -> None:
     list(linter.lint("a = 1"))
     advices = list(linter.lint("b = 2"))
     assert advices == [Advice("globals", "b", 0, 0, 0, 0)]
+
+
+def test_python_sequential_linter_extend_globals() -> None:
+    linter = PythonSequentialLinter([NodeGlobalsLinter()], [], [])
+
+    node = astroid.extract_node("b = a + 2")
+    assign_name = next(node.get_children())
+    assert isinstance(assign_name, AssignName)
+    linter.append_globals({"b": [assign_name]})
+
+    advices = list(linter.lint("a = 1"))
+    assert advices == [Advice("globals", "a,b", 0, 0, 0, 0)]
