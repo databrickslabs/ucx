@@ -6,7 +6,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
 
@@ -144,3 +144,35 @@ def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_
     advices = list(linter.lint())
 
     assert not advices, "Expected no advices"
+
+
+def test_notebook_linter_lints_migrated_table(migration_index, mock_path_lookup) -> None:
+    """Regression test with the tests below."""
+    source = """
+# Databricks notebook source
+
+table_name = "old.things"  # Migrated table according to the migration index
+
+# COMMAND ----------
+
+spark.table(table_name)
+""".lstrip()
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        source,
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert advices
+    assert advices[0] == Deprecation(
+        code='table-migrated-to-uc',
+        message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+        start_line=6,
+        start_col=0,
+        end_line=6,
+        end_col=23,
+    )
