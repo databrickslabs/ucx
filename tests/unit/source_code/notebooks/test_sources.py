@@ -178,10 +178,34 @@ spark.table(table_name)
     )
 
 
+def test_notebook_linter_lints_not_migrated_table(migration_index, mock_path_lookup) -> None:
+    """Regression test with the tests above and below."""
+    source = """
+# Databricks notebook source
+
+table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
+
+# COMMAND ----------
+
+spark.table(table_name)
+""".lstrip()
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        source,
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert not [advice for advice in advices if advice.code == "table-migrated-to-uc"]
+
+
 def test_notebook_linter_lints_migrated_table_with_rename(migration_index, mock_path_lookup) -> None:
     """The spark.table should read the table defined above the call not below.
 
-    This is a regression test with the test above and below.
+    This is a regression test with the tests above and below.
     """
     source = """
 # Databricks notebook source
