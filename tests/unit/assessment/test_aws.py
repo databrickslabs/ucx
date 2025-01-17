@@ -907,10 +907,10 @@ def test_aws_glue_config_region_exception(ws, caplog):
             },
         }
     )
-    ws.metastores.get.side_effect = NotFound("can't find region")
+    ws.metastores.get.side_effect = NotFound("Can't retrieve aws region")
     aws_glue = AWSGlue.get_glue_connection_info(ws, installation.load(WorkspaceConfig))
     assert not aws_glue
-    assert "can't find region" in caplog.messages[0]
+    assert "Can't retrieve aws region" in caplog.messages[0]
 
 
 @pytest.mark.parametrize('glue', [True, False])
