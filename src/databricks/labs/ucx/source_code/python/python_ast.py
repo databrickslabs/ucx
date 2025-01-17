@@ -668,7 +668,8 @@ class DfsaPyCollector(DfsaCollector, ABC):
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
 
 
-class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
+class PythonSequentialLinter(PythonLinter, DfsaPyCollector, TablePyCollector):
+    """A linter for sequencing python linters and collectors."""
 
     def __init__(
         self,
@@ -680,46 +681,13 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = self._parse_and_append(code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
-            return
-        assert maybe_tree.tree is not None
-        yield from self.lint_tree(maybe_tree.tree)
-
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint_tree(tree)
 
-    def _parse_and_append(self, code: str) -> MaybeTree:
-        maybe_tree = Tree.maybe_normalized_parse(code)
-        if maybe_tree.failure:
-            return maybe_tree
-        assert maybe_tree.tree is not None
-        return maybe_tree
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
-            yield dfsa_node.dfsa
-
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas_from_tree(tree)
-
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
-            yield table_node.table
 
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
