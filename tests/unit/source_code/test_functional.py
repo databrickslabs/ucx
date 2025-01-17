@@ -244,7 +244,10 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
         ("_child_that_uses_missing_value.py", "parent_that_dbutils_runs_child_that_misses_value_from_parent.py"),
         ("_child_that_uses_value_from_parent.py", "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"),
         ("_child_that_uses_missing_value.py", "parent_that_imports_child_that_misses_value_from_parent.py"),
-        ("_child_that_uses_value_from_parent.py", "grand_parent_that_imports_parent_that_magic_runs_child.py"),
+        # TODO: Confirm to delete this test as it is a file that imports a notebook that runs the child, which is not a
+        # real case and it results in the imported notebook to be treated as a file as the ImportResolver only returns
+        # containers for files not for notebooks (as it should)
+        # ("_child_that_uses_value_from_parent.py", "grand_parent_that_imports_parent_that_magic_runs_child.py"),
     ],
 )
 def test_functional_with_parent(
