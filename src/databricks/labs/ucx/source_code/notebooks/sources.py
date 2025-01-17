@@ -183,9 +183,7 @@ class NotebookLinter:
                 )
         return
 
-    def _parse_trees(
-        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None
-    ) -> Failure | None:
+    def _parse_trees(self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None) -> Failure | None:
         for cell in notebook.cells:
             failure = None
             if isinstance(cell, RunCell):
