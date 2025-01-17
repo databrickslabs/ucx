@@ -20,7 +20,6 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     CurrentSessionState,
     Failure,
-    Linter,
 )
 
 from databricks.labs.ucx.source_code.graph import (
@@ -35,7 +34,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import NodeBase, PythonSequentialLinter, Tree
+from databricks.labs.ucx.source_code.python.python_ast import NodeBase, PythonLinter, Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -156,9 +155,6 @@ class NotebookLinter:
         self._notebook: Notebook = notebook
         self._inherited_tree = inherited_tree
 
-        # reuse Python linter across related files and notebook cells
-        # this is required in order to accumulate statements for improved inference
-        self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
@@ -167,13 +163,15 @@ class NotebookLinter:
             yield failure
             return
         for cell in self._notebook.cells:
-            if not self._context.is_supported(cell.language.language):
+            try:
+                linter = self._context.linter(cell.language.language)
+            except ValueError:  # Language is not supported (yet)
                 continue
             if isinstance(cell, PythonCell):
+                linter = cast(PythonLinter, linter)
                 tree = self._python_trees[cell]
-                advices = self._python_linter.lint_tree(tree)
+                advices = linter.lint_tree(tree)
             else:
-                linter = self._linter(cell.language.language)
                 advices = linter.lint(cell.original_code)
             for advice in advices:
                 yield dataclasses.replace(
@@ -310,11 +308,6 @@ class NotebookLinter:
         if not source:
             return None
         return Notebook.parse(path, source, language)
-
-    def _linter(self, language: Language) -> Linter:
-        if language is Language.PYTHON:
-            return self._python_linter
-        return self._context.linter(language)
 
     @staticmethod
     def name() -> str:
