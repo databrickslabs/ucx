@@ -184,7 +184,7 @@ class NotebookLinter:
         return
 
     def _load_tree_from_notebook(
-        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None = None
+        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None
     ) -> Failure | None:
         for cell in notebook.cells:
             failure = None
@@ -198,7 +198,7 @@ class NotebookLinter:
         return None
 
     def _load_tree_from_python_cell(
-        self, python_cell: PythonCell, register_trees: bool, parent_tree: Tree | None = None
+        self, python_cell: PythonCell, register_trees: bool, *, parent_tree: Tree | None
     ) -> Failure | None:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
@@ -224,7 +224,7 @@ class NotebookLinter:
         # need to execute things in intertwined sequence so concat and sort them
         nodes = list(cast(Module, tree.node).body)
         base_nodes = sorted(base_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
-        return self._load_children_with_base_nodes(nodes, base_nodes)
+        return self._load_children_with_base_nodes(nodes, base_nodes, parent_tree=tree)
 
     @staticmethod
     def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
@@ -237,24 +237,28 @@ class NotebookLinter:
             if isinstance(command.as_magic(), RunCommand):
                 yield command
 
-    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]) -> Failure | None:
+    def _load_children_with_base_nodes(
+        self, nodes: list[NodeNG], base_nodes: list[NodeBase], *, parent_tree: Tree | None
+    ) -> Failure | None:
         for base_node in base_nodes:
-            failure = self._load_children_with_base_node(nodes, base_node)
+            failure = self._load_children_with_base_node(nodes, base_node, parent_tree=parent_tree)
             if failure:
                 return failure
         return None
 
-    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Failure | None:
+    def _load_children_with_base_node(
+        self, nodes: list[NodeNG], base_node: NodeBase, *, parent_tree: Tree | None
+    ) -> Failure | None:
         while len(nodes) > 0:
             node = nodes.pop(0)
             if node.lineno < base_node.node.lineno:
                 continue
-            failure = self._load_children_from_base_node(base_node)
+            failure = self._load_children_from_base_node(base_node, parent_tree=parent_tree)
             if failure:
                 return failure
         return None
 
-    def _load_children_from_base_node(self, base_node: NodeBase) -> Failure | None:
+    def _load_children_from_base_node(self, base_node: NodeBase, *, parent_tree: Tree | None) -> Failure | None:
         if isinstance(base_node, SysPathChange):
             failure = self._mutate_path_lookup(base_node)
             if failure:
@@ -270,7 +274,7 @@ class NotebookLinter:
                     node=base_node.node,
                 )
                 return failure
-            return self._load_tree_from_notebook(notebook, False)
+            return self._load_tree_from_notebook(notebook, False, parent_tree=parent_tree)
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
