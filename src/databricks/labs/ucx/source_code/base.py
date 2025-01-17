@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, TextIO, Type, TypeVar
+from typing import Any, BinaryIO, TextIO, TypeVar
 
 from astroid import NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql
@@ -69,7 +69,7 @@ class Advice:
         return LocatedAdvice(self, path)
 
     @classmethod
-    def from_node(cls: Type[T], *, code: str, message: str, node: NodeNG) -> T:
+    def from_node(cls: type[T], *, code: str, message: str, node: NodeNG) -> T:
         # Astroid lines are 1-based.
         return cls(
             code=code,
