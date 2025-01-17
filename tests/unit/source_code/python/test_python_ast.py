@@ -1,5 +1,6 @@
 import pytest
-from astroid import Assign, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+import astroid  # type: ignore
+from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
@@ -139,21 +140,27 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_appends_statements() -> None:
-    source_1 = "a = 'John'"
-    maybe_tree_1 = Tree.maybe_normalized_parse(source_1)
-    assert maybe_tree_1.tree is not None, maybe_tree_1.failure
-    tree_1 = maybe_tree_1.tree
-    source_2 = 'b = f"Hello {a}!"'
-    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
-    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
-    tree_2 = maybe_tree_2.tree
-    tree_3 = tree_1.append_tree(tree_2)
-    nodes = tree_3.locate(Assign, [])
-    tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
-    values = list(InferredValue.infer_from_node(tree.node))
-    strings = list(value.as_string() for value in values)
-    assert strings == ["Hello John!"]
+def test_tree_attach_child_tree_infers_value() -> None:
+    """Attaching trees allows traversing from both parent and child."""
+    inferred_string = "Hello John!"
+    parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
+    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
+    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+
+    parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+
+    nodes = parent_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # Starting from the parent, we are looking for the last assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+    nodes = child_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
 
 
 def test_is_from_module() -> None:
@@ -194,28 +201,23 @@ def test_is_instance_of(source, name, class_name) -> None:
     assert Tree(var[0]).is_instance_of(class_name)
 
 
-def test_supports_recursive_refs_when_checking_module() -> None:
-    source_1 = """
-    df = spark.read.csv("hi")
-    """
-    source_2 = """
-    df = df.withColumn(stuff)
-    """
-    source_3 = """
-    df = df.withColumn(stuff2)
-    """
-    maybe_tree = Tree.maybe_normalized_parse(source_1)
-    assert maybe_tree.tree is not None, maybe_tree.failure
-    main_tree = maybe_tree.tree
-    maybe_tree_2 = Tree.maybe_normalized_parse(source_2)
-    assert maybe_tree_2.tree is not None, maybe_tree_2.failure
-    tree_2 = maybe_tree_2.tree
-    main_tree.append_tree(tree_2)
-    maybe_tree_3 = Tree.maybe_normalized_parse(source_3)
-    assert maybe_tree_3.tree is not None, maybe_tree_3.failure
-    tree_3 = maybe_tree_3.tree
-    main_tree.append_tree(tree_3)
-    assign = tree_3.locate(Assign, [])[0]
+def test_tree_attach_child_tree_propagates_module_reference() -> None:
+    """The spark module should propagate from the parent tree."""
+    source_1 = "df = spark.read.csv('hi')"
+    source_2 = "df = df.withColumn(stuff)"
+    source_3 = "df = df.withColumn(stuff2)"
+    first_line_maybe_tree = Tree.maybe_normalized_parse(source_1)
+    second_line_maybe_tree = Tree.maybe_normalized_parse(source_2)
+    third_line_maybe_tree = Tree.maybe_normalized_parse(source_3)
+
+    assert first_line_maybe_tree.tree, first_line_maybe_tree.failure
+    assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
+    assert third_line_maybe_tree.tree, third_line_maybe_tree.failure
+
+    first_line_maybe_tree.tree.attach_child_tree(second_line_maybe_tree.tree)
+    first_line_maybe_tree.tree.attach_child_tree(third_line_maybe_tree.tree)
+
+    assign = third_line_maybe_tree.tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
 
 
@@ -302,6 +304,53 @@ def test_is_builtin(source, name, is_builtin) -> None:
     assert False  # could not locate call
 
 
+def test_tree_attach_nodes_sets_parent() -> None:
+    node = astroid.extract_node("b = a + 2")
+    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    assert maybe_tree.tree, maybe_tree.failure
+
+    maybe_tree.tree.attach_nodes([node])
+
+    assert node.parent == maybe_tree.tree.node
+
+
+def test_tree_attach_nodes_adds_node_to_body() -> None:
+    node = astroid.extract_node("b = a + 2")
+    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    assert maybe_tree.tree, maybe_tree.failure
+
+    maybe_tree.tree.attach_nodes([node])
+
+    assert maybe_tree.tree.node.body[-1] == node
+
+
+def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
+    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    assert maybe_tree.tree, maybe_tree.failure
+
+    node = astroid.extract_node("b = a + 2")
+    assign_name = next(node.get_children())
+    assert isinstance(assign_name, AssignName)
+
+    maybe_tree.tree.extend_globals({"b": [assign_name]})
+
+    assert isinstance(maybe_tree.tree.node, Module)
+    assert maybe_tree.tree.node.globals.get("b") == [assign_name]
+
+
+def test_tree_attach_child_tree_appends_globals_to_parent_tree() -> None:
+    parent_tree = Tree.maybe_normalized_parse("a = 1")
+    child_tree = Tree.maybe_normalized_parse("b = a + 2")
+
+    assert parent_tree.tree, parent_tree.failure
+    assert child_tree.tree, child_tree.failure
+
+    parent_tree.tree.attach_child_tree(child_tree.tree)
+
+    assert set(parent_tree.tree.node.globals.keys()) == {"a", "b"}
+    assert set(child_tree.tree.node.globals.keys()) == {"b"}
+
+
 def test_first_statement_is_none() -> None:
     node = Const("xyz")
     assert not Tree(node).first_statement()
@@ -311,14 +360,19 @@ def test_repr_is_truncated() -> None:
     assert len(repr(Tree(Const("xyz")))) <= (32 + len("...") + len("<Tree: >"))
 
 
-def test_append_tree_fails() -> None:
-    with pytest.raises(NotImplementedError):
-        Tree(Const("xyz")).append_tree(Tree(Const("xyz")))
+def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot attach child tree: .*"):
+        Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
-def test_append_node_fails() -> None:
-    with pytest.raises(NotImplementedError):
-        Tree(Const("xyz")).append_nodes([])
+def test_tree_attach_nodes_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot attach nodes to: .*"):
+        Tree(Const("xyz")).attach_nodes([])
+
+
+def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:
+    with pytest.raises(NotImplementedError, match="Cannot extend globals to: .*"):
+        Tree(Const("xyz")).extend_globals({})
 
 
 def test_nodes_between_fails() -> None:
@@ -328,11 +382,6 @@ def test_nodes_between_fails() -> None:
 
 def test_has_global_fails() -> None:
     assert not Tree.new_module().has_global("xyz")
-
-
-def test_append_globals_fails() -> None:
-    with pytest.raises(NotImplementedError):
-        Tree(Const("xyz")).append_globals({})
 
 
 def test_globals_between_fails() -> None:
