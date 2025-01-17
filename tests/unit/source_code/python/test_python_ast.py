@@ -203,14 +203,12 @@ def test_is_instance_of(source, name, class_name) -> None:
 
 def test_tree_attach_child_tree_propagates_module_reference() -> None:
     """The spark module should propagate from the parent tree."""
-    sources = (
-        "df = spark.read.csv('hi')",
-        "df = df.withColumn(stuff)",
-        "df = df.withColumn(stuff2)",
-    )
-    first_line_maybe_tree = Tree.maybe_normalized_parse(sources[0])
-    second_line_maybe_tree = Tree.maybe_normalized_parse(sources[1])
-    third_line_maybe_tree = Tree.maybe_normalized_parse(sources[2])
+    source_1 = "df = spark.read.csv('hi')"
+    source_2 = "df = df.withColumn(stuff)"
+    source_3 = "df = df.withColumn(stuff2)"
+    first_line_maybe_tree = Tree.maybe_normalized_parse(source_1)
+    second_line_maybe_tree = Tree.maybe_normalized_parse(source_2)
+    third_line_maybe_tree = Tree.maybe_normalized_parse(source_3)
 
     assert first_line_maybe_tree.tree, first_line_maybe_tree.failure
     assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
