@@ -213,30 +213,31 @@ class Tree:  # pylint: disable=too-many-public-methods
     def attach_child_tree(self, tree: Tree) -> None:
         """Attach a child tree.
 
-        Attaching a child tree is a **stateful** operation for both the parent and child tree. After attaching a child
-        tree, a tree can be traversed starting from the parent or child tree. From both starting points all nodes in
-        both trees can be reached, though, the order of nodes will be different as that is relative to the starting
-        point.
+        1. Make parent tree of the nodes in the child tree
+        2. Extend parents globals with child globals
+
+        Attaching a child tree is a **stateful** operation for the child tree. After attaching a child
+        tree, the tree can be traversed starting from the child tree as a child knows its parent. However, the tree can
+        not be traversed from the parent tree as that node object does not contain a list with children trees.
         """
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
-        self.attach_nodes(tree_module.body)
+        self.attach_child_nodes(tree_module.body)
         self.extend_globals(tree_module.globals)
 
-    def attach_nodes(self, nodes: list[NodeNG]) -> None:
-        """Attach nodes.
+    def attach_child_nodes(self, nodes: list[NodeNG]) -> None:
+        """Attach child nodes.
 
-        Attaching nodes is a **stateful** operation for both this tree's node, the parent node, and the child nodes.
-        After attaching the nodes, the parent node has the nodes in its body and the child nodes have this tree's node
-        as parent node.
+        Attaching a child tree is a **stateful** operation for the child tree. After attaching a child
+        tree, the tree can be traversed starting from the child tree as a child knows its parent. However, the tree can
+        not be traversed from the parent tree as that node object does not contain a list with children trees.
         """
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Cannot attach nodes to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for node in nodes:
             node.parent = self_module
-            self_module.body.append(node)
 
     def extend_globals(self, globs: dict[str, list[NodeNG]]) -> None:
         """Extend globals by extending the global values for each global key.

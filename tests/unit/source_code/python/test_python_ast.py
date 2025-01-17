@@ -158,8 +158,7 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_tree_attach_child_tree_infers_value() -> None:
-    """Attaching trees allows traversing from both parent and child."""
+def test_tree_attach_child_tree_allows_to_infer_value() -> None:
     inferred_string = "Hello John!"
     parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
     parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
@@ -169,11 +168,6 @@ def test_tree_attach_child_tree_infers_value() -> None:
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
 
     parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
-
-    nodes = parent_maybe_tree.tree.locate(Assign, [])
-    tree = Tree(nodes[1].value)  # Starting from the parent, we are looking for the last assign
-    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
-    assert strings == [inferred_string]
 
     nodes = child_maybe_tree.tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
@@ -322,24 +316,14 @@ def test_is_builtin(source, name, is_builtin) -> None:
     assert False  # could not locate call
 
 
-def test_tree_attach_nodes_sets_parent() -> None:
+def test_tree_attach_child_nodes_sets_parent() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = Tree.maybe_normalized_parse("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
-    maybe_tree.tree.attach_nodes([node])
+    maybe_tree.tree.attach_child_nodes([node])
 
     assert node.parent == maybe_tree.tree.node
-
-
-def test_tree_attach_nodes_adds_node_to_body() -> None:
-    node = astroid.extract_node("b = a + 2")
-    maybe_tree = Tree.maybe_normalized_parse("a = 1")
-    assert maybe_tree.tree, maybe_tree.failure
-
-    maybe_tree.tree.attach_nodes([node])
-
-    assert maybe_tree.tree.node.body[-1] == node
 
 
 def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
@@ -383,9 +367,9 @@ def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node()
         Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
-def test_tree_attach_nodes_raises_not_implemented_error_for_constant_node() -> None:
+def test_tree_attach_child_nodes_raises_not_implemented_error_for_constant_node() -> None:
     with pytest.raises(NotImplementedError, match="Cannot attach nodes to: .*"):
-        Tree(Const("xyz")).attach_nodes([])
+        Tree(Const("xyz")).attach_child_nodes([])
 
 
 def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:
