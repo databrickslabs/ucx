@@ -4,10 +4,11 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
 
 
 @pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
@@ -113,3 +114,33 @@ def test_file_linter_lints_file_with_missing_read_permission(migration_index, mo
     assert len(advices) == 1
     assert advices[0].code == "file-permission"
     assert advices[0].message == f"Missing read permission for {path}"
+
+
+def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_path_lookup) -> None:
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        "# Databricks notebook source\nprint(1)",
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert not advices, "Expected no advices"
+
+
+def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_index, mock_path_lookup) -> None:
+    """Verify the NotebookLinter can resolve %run"""
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context" / "grand_parent.py"
+    notebook = Notebook.parse(path, path.read_text(), Language.PYTHON)
+    linter = NotebookLinter(
+        LinterContext(migration_index),
+        mock_path_lookup.change_directory(path.parent),
+        CurrentSessionState(),
+        notebook,
+    )
+
+    advices = list(linter.lint())
+
+    assert not advices, "Expected no advices"
