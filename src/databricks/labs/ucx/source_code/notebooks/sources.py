@@ -436,5 +436,7 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree)
+        notebook_linter = NotebookLinter(
+            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
+        )
         yield from notebook_linter.lint()
