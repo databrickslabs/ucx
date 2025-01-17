@@ -6,7 +6,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation, Failure
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
 
@@ -128,6 +128,29 @@ def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_
     advices = list(linter.lint())
 
     assert not advices, "Expected no advices"
+
+
+def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mock_path_lookup) -> None:
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        "# Databricks notebook source\nprint(1",  # Missing parenthesis is on purpose
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert advices == [
+        Failure(
+            code='python-parse-error',
+            message='Failed to parse code due to invalid syntax: print(1',
+            start_line=0,
+            start_col=5,
+            end_line=0,
+            end_col=1
+        )
+    ]
 
 
 def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_index, mock_path_lookup) -> None:
