@@ -393,7 +393,9 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 
 def test_compare_remote_local_install_versions(ws, installation_ctx):
-    installation_ctx.workspace_installation.run()
+    installation_finished = installation_ctx.workspace_installation.run()
+    assert installation_finished
+
     with pytest.raises(
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
