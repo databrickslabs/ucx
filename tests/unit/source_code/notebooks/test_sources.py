@@ -176,3 +176,42 @@ spark.table(table_name)
         end_line=6,
         end_col=23,
     )
+
+
+def test_notebook_linter_lints_migrated_table_with_rename(migration_index, mock_path_lookup) -> None:
+    """The spark.table should read the table defined above the call not below.
+
+    This is a regression test with the test above and below.
+    """
+    source = """
+# Databricks notebook source
+
+table_name = "old.things"  # Migrated table according to the migration index
+
+# COMMAND ----------
+
+spark.table(table_name)
+
+# COMMAND ----------
+
+table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
+""".lstrip()
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        source,
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert advices
+    assert advices[0] == Deprecation(
+        code='table-migrated-to-uc',
+        message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+        start_line=6,
+        start_col=0,
+        end_line=6,
+        end_col=23,
+    )
