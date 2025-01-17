@@ -148,18 +148,21 @@ class NotebookLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         notebook: Notebook,
+        inherited_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._notebook: Notebook = notebook
+        self._inherited_tree = inherited_tree
+
         # reuse Python linter across related files and notebook cells
         # this is required in order to accumulate statements for improved inference
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
-        failure = self._load_tree_from_notebook(self._notebook, True)
+        failure = self._load_tree_from_notebook(self._notebook, True, parent_tree=self._inherited_tree)
         if failure:
             yield failure
             return
@@ -433,5 +436,5 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook)
+        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree)
         yield from notebook_linter.lint()
