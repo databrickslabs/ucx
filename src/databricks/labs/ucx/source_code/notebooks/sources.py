@@ -162,7 +162,7 @@ class NotebookLinter:
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
-        failure = self._load_tree_from_notebook(self._notebook, True, parent_tree=self._inherited_tree)
+        failure = self._parse_trees(self._notebook, True, parent_tree=self._inherited_tree)
         if failure:
             yield failure
             return
@@ -183,7 +183,7 @@ class NotebookLinter:
                 )
         return
 
-    def _load_tree_from_notebook(
+    def _parse_trees(
         self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None
     ) -> Failure | None:
         for cell in notebook.cells:
@@ -274,7 +274,7 @@ class NotebookLinter:
                     node=base_node.node,
                 )
                 return failure
-            return self._load_tree_from_notebook(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees(notebook, False, parent_tree=parent_tree)
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
@@ -293,7 +293,7 @@ class NotebookLinter:
             return None  # malformed run cell already reported
         notebook = self._load_source_from_path(path)
         if notebook is not None:
-            return self._load_tree_from_notebook(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees(notebook, False, parent_tree=parent_tree)
         return None
 
     def _load_source_from_path(self, path: Path | None) -> Notebook | None:
