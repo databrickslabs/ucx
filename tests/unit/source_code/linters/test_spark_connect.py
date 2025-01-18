@@ -236,7 +236,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
             end_line=6,
             end_col=24,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.maybe_parse(code).walk()]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.maybe_normalized_parse(code).walk()]))
 
 
 def test_logging_serverless(session_state) -> None:
@@ -248,7 +248,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
     """
 
-    maybe_tree = Tree.maybe_parse(code)
+    maybe_tree = Tree.maybe_normalized_parse(code)
     assert maybe_tree.tree is not None
     tree = maybe_tree.tree
     assert [

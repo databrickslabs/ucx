@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_extracts_root() -> None:
-    maybe_tree = Tree.maybe_parse("o.m1().m2().m3()")
+    maybe_tree = Tree.maybe_normalized_parse("o.m1().m2().m3()")
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     stmt = tree.first_statement()
@@ -17,13 +17,13 @@ def test_extracts_root() -> None:
 
 
 def test_no_first_statement() -> None:
-    maybe_tree = Tree.maybe_parse("")
+    maybe_tree = Tree.maybe_normalized_parse("")
     assert maybe_tree.tree is not None
     assert maybe_tree.tree.first_statement() is None
 
 
 def test_extract_call_by_name() -> None:
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
+    tree = Tree.maybe_normalized_parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -34,7 +34,7 @@ def test_extract_call_by_name() -> None:
 
 
 def test_extract_call_by_name_none() -> None:
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
+    tree = Tree.maybe_normalized_parse("o.m1().m2().m3()")
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -60,7 +60,7 @@ def test_extract_call_by_name_none() -> None:
     ],
 )
 def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
-    tree = Tree.maybe_parse(code)
+    tree = Tree.maybe_normalized_parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -85,7 +85,7 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
     ],
 )
 def test_args_count(code, expected) -> None:
-    tree = Tree.maybe_parse(code)
+    tree = Tree.maybe_normalized_parse(code)
     stmt = tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
@@ -96,37 +96,11 @@ def test_args_count(code, expected) -> None:
 def test_tree_walks_nodes_once() -> None:
     nodes = set()
     count = 0
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
+    tree = Tree.maybe_normalized_parse("o.m1().m2().m3()")
     for node in tree.walk():
         nodes.add(node)
         count += 1
     assert len(nodes) == count
-
-
-def test_parses_incorrectly_indented_code() -> None:
-    source = """# DBTITLE 1,Get Sales Data for Analysis
- sales = (
-   spark
-      .table('retail_sales')
-      .join( # limit data to CY 2021 and 2022
-        spark.table('date').select('dateKey','date','year').filter('year between 2021 and 2022'),
-        on='dateKey'
-        )
-      .join( # get product fields needed for analysis
-        spark.table('product').select('productKey','brandValue','packSizeValueUS'),
-        on='productKey'
-        )
-      .join( # get brand fields needed for analysis
-        spark.table('brand_name_mapping').select('brandValue','brandName'),
-        on='brandValue'
-        )
-  )
-"""
-    # ensure it would fail if not normalized
-    maybe_tree = Tree.maybe_parse(source)
-    assert maybe_tree.failure is not None
-    maybe_tree = Tree.maybe_normalized_parse(source)
-    assert maybe_tree.failure is None
 
 
 def test_ignores_magic_marker_in_multiline_comment() -> None:

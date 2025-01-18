@@ -576,7 +576,7 @@ def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function
 
 
 def test_get_full_function_name_for_member_function() -> None:
-    tree = Tree.maybe_parse("value.attr()")
+    tree = Tree.maybe_normalized_parse("value.attr()")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -585,7 +585,7 @@ def test_get_full_function_name_for_member_function() -> None:
 
 
 def test_get_full_function_name_for_member_member_function() -> None:
-    tree = Tree.maybe_parse("value1.value2.attr()")
+    tree = Tree.maybe_normalized_parse("value1.value2.attr()")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -594,7 +594,7 @@ def test_get_full_function_name_for_member_member_function() -> None:
 
 
 def test_get_full_function_name_for_chained_function() -> None:
-    tree = Tree.maybe_parse("value.attr1().attr2()")
+    tree = Tree.maybe_normalized_parse("value.attr1().attr2()")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -603,7 +603,7 @@ def test_get_full_function_name_for_chained_function() -> None:
 
 
 def test_get_full_function_name_for_global_function() -> None:
-    tree = Tree.maybe_parse("name()")
+    tree = Tree.maybe_normalized_parse("name()")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -612,7 +612,7 @@ def test_get_full_function_name_for_global_function() -> None:
 
 
 def test_get_full_function_name_for_non_method() -> None:
-    tree = Tree.maybe_parse("not_a_function")
+    tree = Tree.maybe_normalized_parse("not_a_function")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -622,7 +622,7 @@ def test_get_full_function_name_for_non_method() -> None:
 def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.maybe_parse("call('some.things')")
+    tree = Tree.maybe_normalized_parse("call('some.things')")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)
@@ -636,7 +636,7 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None
 def test_apply_table_name_matcher_with_existing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.maybe_parse("call('old.things')")
+    tree = Tree.maybe_normalized_parse("call('old.things')")
     assert tree.tree is not None
     node = tree.tree.first_statement()
     assert isinstance(node, Expr)

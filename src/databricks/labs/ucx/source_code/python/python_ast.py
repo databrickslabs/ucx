@@ -68,10 +68,10 @@ class MaybeTree:
         return self.tree.first_statement()
 
 
-class Tree:  # pylint: disable=too-many-public-methods
+class Tree:
 
     @classmethod
-    def maybe_parse(cls, code: str) -> MaybeTree:
+    def _maybe_parse(cls, code: str) -> MaybeTree:
         try:
             root = parse(code)
             tree = Tree(root)
@@ -120,7 +120,7 @@ class Tree:  # pylint: disable=too-many-public-methods
     @classmethod
     def maybe_normalized_parse(cls, code: str) -> MaybeTree:
         code = cls.normalize(code)
-        return cls.maybe_parse(code)
+        return cls._maybe_parse(code)
 
     @classmethod
     def normalize(cls, code: str) -> str:

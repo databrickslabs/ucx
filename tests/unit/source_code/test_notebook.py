@@ -262,7 +262,7 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_parse(source)
+    tree = Tree.maybe_normalized_parse(source)
     assert tree.tree is not None
     nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
     assert len(nodes) == 2
@@ -275,7 +275,7 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_parse(source)
+    tree = Tree.maybe_normalized_parse(source)
     assert tree.tree is not None
     nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
     assert len(nodes) == 0
@@ -290,16 +290,3 @@ dbutils.notebook.run(f"Hey {name2}")
     linter = DbutilsPyLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert not advices
-
-
-def test_tree_maybe_parse_fails_on_jupyter_magic() -> None:
-    source = "%tb"
-    tree = Tree.maybe_parse(source)
-    assert tree.failure == Failure(
-        "python-parse-error",
-        f"Failed to parse code due to invalid syntax: {source}",
-        start_line=0,
-        start_col=0,
-        end_line=0,
-        end_col=1,
-    )

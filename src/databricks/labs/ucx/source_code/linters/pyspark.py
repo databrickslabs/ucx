@@ -412,7 +412,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
     def apply(self, code: str) -> str:
-        maybe_tree = Tree.maybe_parse(code)
+        maybe_tree = Tree.maybe_normalized_parse(code)
         if not maybe_tree.tree:
             assert maybe_tree.failure is not None
             logger.warning(maybe_tree.failure.message)
