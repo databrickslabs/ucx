@@ -119,11 +119,11 @@ class Tree:
 
     @classmethod
     def maybe_normalized_parse(cls, code: str) -> MaybeTree:
-        code = cls.normalize(code)
+        code = cls._normalize(code)
         return cls._maybe_parse(code)
 
     @classmethod
-    def normalize(cls, code: str) -> str:
+    def _normalize(cls, code: str) -> str:
         code = cls._normalize_indents(code)
         code = cls._convert_magic_lines_to_magic_commands(code)
         return code
