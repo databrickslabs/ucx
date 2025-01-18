@@ -71,6 +71,11 @@ class MaybeTree:
 class Tree:
 
     @classmethod
+    def maybe_normalized_parse(cls, code: str) -> MaybeTree:
+        code = cls._normalize(code)
+        return cls._maybe_parse(code)
+
+    @classmethod
     def _maybe_parse(cls, code: str) -> MaybeTree:
         try:
             root = parse(code)
@@ -116,11 +121,6 @@ class Tree:
                 end_col=1,
             ),
         )
-
-    @classmethod
-    def maybe_normalized_parse(cls, code: str) -> MaybeTree:
-        code = cls._normalize(code)
-        return cls._maybe_parse(code)
 
     @classmethod
     def _normalize(cls, code: str) -> str:
