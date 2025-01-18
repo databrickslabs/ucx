@@ -83,22 +83,20 @@ class Tree:
             return MaybeTree(tree, None)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
-            return cls._definitely_failure(code, e)
+            failure = cls._failure_from_exception(code, e)
+            return MaybeTree(None, failure)
 
     @staticmethod
-    def _definitely_failure(source_code: str, e: Exception) -> MaybeTree:
+    def _failure_from_exception(source_code: str, e: Exception) -> Failure:
         if isinstance(e, AstroidSyntaxError) and isinstance(e.error, SyntaxError):
-            return MaybeTree(
-                None,
-                Failure(
-                    code="python-parse-error",
-                    message=f"Failed to parse code due to invalid syntax: {source_code}",
-                    # Lines and columns are both 0-based: the first line is line 0.
-                    start_line=(e.error.lineno or 1) - 1,
-                    start_col=(e.error.offset or 1) - 1,
-                    end_line=(e.error.end_lineno or 2) - 1,
-                    end_col=(e.error.end_offset or 2) - 1,
-                ),
+            return Failure(
+                code="python-parse-error",
+                message=f"Failed to parse code due to invalid syntax: {source_code}",
+                # Lines and columns are both 0-based: the first line is line 0.
+                start_line=(e.error.lineno or 1) - 1,
+                start_col=(e.error.offset or 1) - 1,
+                end_line=(e.error.end_lineno or 2) - 1,
+                end_col=(e.error.end_offset or 2) - 1,
             )
         new_issue_url = (
             "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
@@ -106,20 +104,17 @@ class Tree:
             "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
             f"%0A%0A%60%60%60+python%0A{source_code}%0A%60%60%60"
         )
-        return MaybeTree(
-            None,
-            Failure(
-                code="python-parse-error",
-                message=(
-                    f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
-                    f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
-                ),
-                # Lines and columns are both 0-based: the first line is line 0.
-                start_line=0,
-                start_col=0,
-                end_line=1,
-                end_col=1,
+        return Failure(
+            code="python-parse-error",
+            message=(
+                f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
+                f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
             ),
+            # Lines and columns are both 0-based: the first line is line 0.
+            start_line=0,
+            start_col=0,
+            end_line=1,
+            end_col=1,
         )
 
     @classmethod
