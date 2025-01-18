@@ -205,9 +205,7 @@ class NotebookLinter:
         if register_trees:
             # A cell with only comments will not produce a tree
             self._python_trees[python_cell] = maybe_tree.tree or Tree.new_module()
-        if maybe_tree.tree:
-            return self._load_children_from_tree(maybe_tree.tree)
-        return None
+        return self._load_children_from_tree(maybe_tree.tree)
 
     def _load_children_from_tree(self, tree: Tree) -> Failure | None:
         assert isinstance(tree.node, Module)
