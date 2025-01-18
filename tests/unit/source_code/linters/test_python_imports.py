@@ -37,29 +37,17 @@ def test_linter_returns_empty_list_of_imports() -> None:
     assert not ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
 
 
-def test_linter_returns_import() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('import x')
-    assert maybe_tree.tree is not None
-    import_nodes = ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
-    assert ["x"] == [node.name for node in import_nodes]
-
-
-def test_linter_returns_import_from() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('from x import z')
-    assert maybe_tree.tree is not None
-    import_nodes = ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
-    assert ["x"] == [node.name for node in import_nodes]
-
-
-def test_linter_returns_import_module() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('importlib.import_module("x")')
-    assert maybe_tree.tree is not None
-    import_nodes = ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
-    assert ["x"] == [node.name for node in import_nodes]
-
-
-def test_linter_returns__import__() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('importlib.__import__("x")')
+@pytest.mark.parametrize(
+    "import_statement",
+    [
+        "import x",
+        "from x import z",
+        "importlib.import_module('x')",
+        "importlib.__import__('x')",
+    ]
+)
+def test_import_source_extract_from_tree(import_statement: str) -> None:
+    maybe_tree = MaybeTree.maybe_normalized_parse(import_statement)
     assert maybe_tree.tree is not None
     import_nodes = ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
     assert ["x"] == [node.name for node in import_nodes]
