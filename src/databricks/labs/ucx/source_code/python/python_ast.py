@@ -61,11 +61,11 @@ class MaybeTree:
         try:
             root = parse(code)
             tree = Tree(root)
-            return MaybeTree(tree, None)
+            return cls(tree, None)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
             failure = cls._failure_from_exception(code, e)
-            return MaybeTree(None, failure)
+            return cls(None, failure)
 
     @staticmethod
     def _failure_from_exception(source_code: str, e: Exception) -> Failure:
@@ -162,7 +162,7 @@ class Tree:
     @classmethod
     def new_module(cls) -> Tree:
         node = Module("root")
-        return Tree(node)
+        return cls(node)
 
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
@@ -181,11 +181,10 @@ class Tree:
     def walk(self) -> Iterable[NodeNG]:
         yield from self._walk(self._node)
 
-    @classmethod
-    def _walk(cls, node: NodeNG) -> Iterable[NodeNG]:
+    def _walk(self, node: NodeNG) -> Iterable[NodeNG]:
         yield node
         for child in node.get_children():
-            yield from cls._walk(child)
+            yield from self._walk(child)
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
