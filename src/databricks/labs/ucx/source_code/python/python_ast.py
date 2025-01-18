@@ -128,8 +128,8 @@ class Tree:
         code = cls._convert_magic_lines_to_magic_commands(code)
         return code
 
-    @classmethod
-    def _normalize_indents(cls, python_code: str) -> str:
+    @staticmethod
+    def _normalize_indents(python_code: str) -> str:
         lines = python_code.split("\n")
         for line in lines:
             # skip leading ws and comments
@@ -147,8 +147,8 @@ class Tree:
             return "\n".join(lines)
         return python_code
 
-    @classmethod
-    def _convert_magic_lines_to_magic_commands(cls, python_code: str) -> str:
+    @staticmethod
+    def _convert_magic_lines_to_magic_commands(python_code: str) -> str:
         lines = python_code.split("\n")
         magic_markers = {"%", "!"}
         in_multi_line_comment = False
