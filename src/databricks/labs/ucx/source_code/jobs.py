@@ -51,7 +51,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.python.python_ast import Tree, PythonSequentialLinter
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, PythonSequentialLinter
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -657,7 +657,7 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
-                maybe_tree = Tree.maybe_normalized_parse(cell.original_code)
+                maybe_tree = MaybeTree.maybe_normalized_parse(cell.original_code)
                 if maybe_tree.failure:
                     logger.warning(maybe_tree.failure.message)
                     continue

@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyRes
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
-from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -262,9 +262,9 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_normalized_parse(source)
-    assert tree.tree is not None
-    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
+    maybe_tree = MaybeTree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     assert len(nodes) == 2
 
 
@@ -275,9 +275,9 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_normalized_parse(source)
-    assert tree.tree is not None
-    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
+    maybe_tree = MaybeTree.maybe_normalized_parse(source)
+    assert maybe_tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     assert len(nodes) == 0
 
 

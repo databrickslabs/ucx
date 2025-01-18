@@ -51,25 +51,6 @@ class MaybeTree:
     tree: Tree | None
     failure: Failure | None
 
-    def walk(self) -> Iterable[NodeNG]:
-        # mainly a helper method for unit testing
-        if self.tree is None:  # no cov
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return []
-        return self.tree.walk()
-
-    def first_statement(self) -> NodeNG | None:
-        # mainly a helper method for unit testing
-        if self.tree is None:  # no cov
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return None
-        return self.tree.first_statement()
-
-
-class Tree:
-
     @classmethod
     def maybe_normalized_parse(cls, code: str) -> MaybeTree:
         code = cls._normalize(code)
@@ -158,6 +139,25 @@ class Tree:
             if len(matches) & 1:
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
+
+    def walk(self) -> Iterable[NodeNG]:
+        # mainly a helper method for unit testing
+        if self.tree is None:  # no cov
+            assert self.failure is not None
+            logger.warning(self.failure.message)
+            return []
+        return self.tree.walk()
+
+    def first_statement(self) -> NodeNG | None:
+        # mainly a helper method for unit testing
+        if self.tree is None:  # no cov
+            assert self.failure is not None
+            logger.warning(self.failure.message)
+            return None
+        return self.tree.first_statement()
+
+
+class Tree:
 
     @classmethod
     def new_module(cls) -> Tree:
@@ -621,7 +621,7 @@ class NodeBase(ABC):
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = Tree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(code)
         if maybe_tree.failure:
             yield maybe_tree.failure
             return
@@ -635,7 +635,7 @@ class PythonLinter(Linter):
 class TablePyCollector(TableCollector, ABC):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return
@@ -650,7 +650,7 @@ class TablePyCollector(TableCollector, ABC):
 class DfsaPyCollector(DfsaCollector, ABC):
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return
@@ -688,7 +688,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
             yield from linter.lint_tree(tree)
 
     def _parse_and_append(self, code: str) -> MaybeTree:
-        maybe_tree = Tree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(code)
         if maybe_tree.failure:
             return maybe_tree
         assert maybe_tree.tree is not None
@@ -706,7 +706,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def process_child_cell(self, code: str) -> None:
         this_tree = self._make_tree()
-        maybe_tree = Tree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(code)
         if maybe_tree.failure:
             # TODO: bubble up this error
             logger.warning(maybe_tree.failure.message)

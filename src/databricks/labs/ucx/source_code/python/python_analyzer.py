@@ -21,7 +21,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, NodeBase
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class PythonCodeAnalyzer:
 
     def _parse_and_extract_nodes(self) -> tuple[Tree | None, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
-        maybe_tree = Tree.maybe_normalized_parse(self._python_code)
+        maybe_tree = MaybeTree.maybe_normalized_parse(self._python_code)
         if maybe_tree.failure:
             return None, [], [DependencyProblem(maybe_tree.failure.code, maybe_tree.failure.message)]
         assert maybe_tree.tree is not None
