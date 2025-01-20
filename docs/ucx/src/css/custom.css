@@ -43,6 +43,11 @@ html[data-theme='dark'] {
 }
 
 
+button {
+  @apply font-sans;
+}
+
+
 .header-github-link::before {
   content: '';
   width: 24px;
