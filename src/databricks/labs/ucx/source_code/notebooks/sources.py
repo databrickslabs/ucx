@@ -225,8 +225,8 @@ class NotebookLinter:
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
             self._session_state, tree
         )
-        # Sys path changes require to load children in order of reading
         failures = []
+        # Sys path changes require to load children in order of reading
         for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             failures.extend(self._process_code_node(base_node, parent_tree=tree))
         return failures
@@ -241,7 +241,7 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _process_code_node(self, node: SysPathChange | RunCommand, *, parent_tree: Tree | None) -> list[Failure]:
+    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree | None) -> list[Failure]:
         """Process a code node.
 
         1. `SysPathChange` mutate the path lookup.
