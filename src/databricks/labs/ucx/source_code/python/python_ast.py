@@ -163,6 +163,7 @@ class MaybeTree:
 
 
 class Tree:
+    """The UCX Python abstract syntax tree object"""
 
     @classmethod
     def new_module(cls) -> Tree:
