@@ -22,9 +22,10 @@ def test_no_first_statement() -> None:
     assert maybe_tree.tree.first_statement() is None
 
 
-def test_extract_call_by_name() -> None:
+def test_tree_helper_extract_call_by_name() -> None:
     maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
-    stmt = maybe_tree.first_statement()
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.extract_call_by_name(stmt.value, "m2")
@@ -33,9 +34,10 @@ def test_extract_call_by_name() -> None:
     assert act.func.attrname == "m2"
 
 
-def test_extract_call_by_name_none() -> None:
+def test_tree_helper_extract_call_by_name_none() -> None:
     maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
-    stmt = maybe_tree.first_statement()
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.extract_call_by_name(stmt.value, "m5000")
@@ -59,9 +61,10 @@ def test_extract_call_by_name_none() -> None:
         ("o.m1(4, 3, 2)", 1, "second", 3),
     ],
 )
-def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
+def test_tree_helper_gets_arg(code, arg_index, arg_name, expected) -> None:
     maybe_tree = MaybeTree.from_source_code(code)
-    stmt = maybe_tree.first_statement()
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.get_arg(stmt.value, arg_index, arg_name)
@@ -84,9 +87,10 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
         ("o.m1(3, *b, **c, second=3)", 4),
     ],
 )
-def test_args_count(code, expected) -> None:
+def test_tree_helper_args_count(code, expected) -> None:
     maybe_tree = MaybeTree.from_source_code(code)
-    stmt = maybe_tree.first_statement()
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.args_count(stmt.value)
