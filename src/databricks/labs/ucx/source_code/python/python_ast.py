@@ -96,11 +96,11 @@ class Tree:  # pylint: disable=too-many-public-methods
                     end_col=(e.error.end_offset or 2) - 1,
                 ),
             )
-        new_issue_url = urllib.parse.quote_plus(
+        new_issue_url = (
             "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
             "&labels=migrate/code,needs-triage,bug"
             "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
-            f"%0A%0A%60%60%60+python%0A{source_code}%0A%60%60%60"
+            f"%0A%0A%60%60%60+python%0A{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
         )
         return MaybeTree(
             None,
