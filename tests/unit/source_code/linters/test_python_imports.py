@@ -44,7 +44,7 @@ def test_linter_returns_empty_list_of_imports() -> None:
         "from x import z",
         "importlib.import_module('x')",
         "importlib.__import__('x')",
-    ]
+    ],
 )
 def test_import_source_extract_from_tree(import_statement: str) -> None:
     maybe_tree = MaybeTree.from_source_code(import_statement)
