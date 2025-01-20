@@ -155,10 +155,10 @@ class NotebookLinter:
         self._inherited_tree = inherited_tree
 
         # Python trees are constructed during notebook parsing and cached for later usage
-        self._python_tree_cache: dict[PythonCell, Tree] = {}
+        self._python_tree_cache: dict[tuple[Path, PythonCell], Tree] = {}  # Path in key is the notebook's path
 
     def lint(self) -> Iterable[Advice]:
-        failure = self._parse_trees_from_notebook(self._notebook, True, parent_tree=self._inherited_tree)
+        failure = self._parse_trees_from_notebook(self._notebook, parent_tree=self._inherited_tree)
         if failure:
             yield failure
             return
@@ -169,7 +169,7 @@ class NotebookLinter:
                 continue
             if isinstance(cell, PythonCell):
                 linter = cast(PythonLinter, linter)
-                tree = self._python_tree_cache[cell]
+                tree = self._python_tree_cache[(self._notebook.path, cell)]
                 advices = linter.lint_tree(tree)
             else:
                 advices = linter.lint(cell.original_code)
@@ -181,16 +181,14 @@ class NotebookLinter:
                 )
         return
 
-    def _parse_trees_from_notebook(
-        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None
-    ) -> Failure | None:
+    def _parse_trees_from_notebook(self, notebook: Notebook, *, parent_tree: Tree | None) -> Failure | None:
         for cell in notebook.cells:
             failure = None
             if isinstance(cell, RunCell):
                 failure = self._parse_trees_from_run_cell(cell, parent_tree=parent_tree)
             elif isinstance(cell, PythonCell):
-                failure = self._parse_trees_from_python_cell(cell, register_trees, parent_tree=parent_tree)
-                parent_tree = self._python_tree_cache.get(cell)
+                failure = self._parse_trees_from_python_cell(cell, notebook.path, parent_tree=parent_tree)
+                parent_tree = self._python_tree_cache.get((notebook.path, cell))
             if failure:
                 return failure
         return None
@@ -201,11 +199,11 @@ class NotebookLinter:
             return None  # malformed run cell already reported
         notebook = self._parse_notebook_from_path(path)
         if notebook is not None:
-            return self._parse_trees_from_notebook(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees_from_notebook(notebook, parent_tree=parent_tree)
         return None
 
     def _parse_trees_from_python_cell(
-        self, python_cell: PythonCell, register_trees: bool, *, parent_tree: Tree | None
+        self, python_cell: PythonCell, notebook_path: Path, *, parent_tree: Tree | None
     ) -> Failure | None:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
@@ -213,9 +211,7 @@ class NotebookLinter:
         assert maybe_tree.tree is not None
         if parent_tree:
             parent_tree.attach_child_tree(maybe_tree.tree)
-        if register_trees:
-            # A cell with only comments will not produce a tree
-            self._python_tree_cache[python_cell] = maybe_tree.tree or Tree.new_module()
+        self._python_tree_cache[(notebook_path, python_cell)] = maybe_tree.tree or Tree.new_module()
         return self._parse_child_trees_from_tree(maybe_tree.tree)
 
     def _parse_child_trees_from_tree(self, tree: Tree) -> Failure | None:
@@ -256,7 +252,7 @@ class NotebookLinter:
                     node=base_node.node,
                 )
                 return failure
-            return self._parse_trees_from_notebook(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees_from_notebook(notebook, parent_tree=parent_tree)
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
