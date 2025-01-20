@@ -285,10 +285,6 @@ class NotebookLinter:
             return None
         return Notebook.parse(path, source, language)
 
-    @staticmethod
-    def name() -> str:
-        return "notebook-linter"
-
 
 class FileLinter:
     _NOT_YET_SUPPORTED_SUFFIXES = {
