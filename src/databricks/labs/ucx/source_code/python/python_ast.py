@@ -16,7 +16,6 @@ from astroid import (  # type: ignore
     Call,
     ClassDef,
     Const,
-    Expr,
     Import,
     ImportFrom,
     Instance,
@@ -211,35 +210,44 @@ class Tree:  # pylint: disable=too-many-public-methods
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
 
-    def append_tree(self, tree: Tree) -> Tree:
-        """returns the appended tree, not the consolidated one!"""
+    def attach_child_tree(self, tree: Tree) -> None:
+        """Attach a child tree.
+
+        Attaching a child tree is a **stateful** operation for both the parent and child tree. After attaching a child
+        tree, a tree can be traversed starting from the parent or child tree. From both starting points all nodes in
+        both trees can be reached, though, the order of nodes will be different as that is relative to the starting
+        point.
+        """
         if not isinstance(tree.node, Module):
-            raise NotImplementedError(f"Can't append tree from {type(tree.node).__name__}")
+            raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
-        self.append_nodes(tree_module.body)
-        self.append_globals(tree_module.globals)
-        # the following may seem strange but it's actually ok to use the original module as tree root
-        # because each node points to the correct parent (practically, the tree is now only a list of statements)
-        return tree
+        self.attach_nodes(tree_module.body)
+        self.extend_globals(tree_module.globals)
 
-    def append_globals(self, globs: dict[str, list[Expr]]) -> None:
-        if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append globals to {type(self.node).__name__}")
-        self_module: Module = cast(Module, self.node)
-        for name, values in globs.items():
-            statements: list[Expr] = self_module.globals.get(name, None)
-            if statements is None:
-                self_module.globals[name] = list(values)  # clone the source list to avoid side-effects
-                continue
-            statements.extend(values)
+    def attach_nodes(self, nodes: list[NodeNG]) -> None:
+        """Attach nodes.
 
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
+        Attaching nodes is a **stateful** operation for both this tree's node, the parent node, and the child nodes.
+        After attaching the nodes, the parent node has the nodes in its body and the child nodes have this tree's node
+        as parent node.
+        """
         if not isinstance(self.node, Module):
-            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+            raise NotImplementedError(f"Cannot attach nodes to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for node in nodes:
             node.parent = self_module
             self_module.body.append(node)
+
+    def extend_globals(self, globs: dict[str, list[NodeNG]]) -> None:
+        """Extend globals by extending the global values for each global key.
+
+        Extending globals is a stateful operation for this `Tree` (`self`), similarly to extending a list.
+        """
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Cannot extend globals to: {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for global_key, global_values in globs.items():
+            self_module.globals[global_key] = self_module.globals.get(global_key, []) + global_values
 
     def is_instance_of(self, class_name: str) -> bool:
         for inferred in self.node.inferred():
@@ -693,13 +701,13 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         return maybe_tree
 
     def append_tree(self, tree: Tree) -> None:
-        self._make_tree().append_tree(tree)
+        self._make_tree().attach_child_tree(tree)
 
     def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().append_nodes(nodes)
+        self._make_tree().attach_nodes(nodes)
 
     def append_globals(self, globs: dict) -> None:
-        self._make_tree().append_globals(globs)
+        self._make_tree().extend_globals(globs)
 
     def process_child_cell(self, code: str) -> None:
         this_tree = self._make_tree()
@@ -709,7 +717,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
             logger.warning(maybe_tree.failure.message)
             return
         assert maybe_tree.tree is not None
-        this_tree.append_tree(maybe_tree.tree)
+        this_tree.attach_child_tree(maybe_tree.tree)
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)

@@ -307,28 +307,6 @@ class NotebookLinter:
             return self._python_linter
         return self._context.linter(language)
 
-    def _load_source_from_run_cell(self, run_cell: RunCell) -> None:
-        path = run_cell.maybe_notebook_path()
-        if path is None:
-            return  # malformed run cell already reported
-        resolved = self._path_lookup.resolve(path)
-        if resolved is None:
-            return  # already reported during dependency building
-        language = file_language(resolved)
-        if language is not Language.PYTHON:
-            return
-        source = safe_read_text(resolved)
-        if not source:
-            return
-        notebook = Notebook.parse(path, source, language)
-        for cell in notebook.cells:
-            if isinstance(cell, RunCell):
-                self._load_source_from_run_cell(cell)
-                continue
-            if not isinstance(cell, PythonCell):
-                continue
-            self._python_linter.process_child_cell(cell.original_code)
-
     @staticmethod
     def name() -> str:
         return "notebook-linter"
