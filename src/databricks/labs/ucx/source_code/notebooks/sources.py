@@ -10,7 +10,6 @@ from typing import cast
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     file_language,
     is_a_notebook,
@@ -126,20 +125,6 @@ class NotebookLinter:
     to the code cells according to the language of the cell.
     """
 
-    @classmethod
-    def from_source(
-        cls,
-        index: TableMigrationIndex,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        source: str,
-        default_language: Language,
-    ) -> NotebookLinter:
-        ctx = LinterContext(index)
-        notebook = Notebook.parse(Path(""), source, default_language)
-        assert notebook is not None
-        return cls(ctx, path_lookup, session_state, notebook)
-
     def __init__(
         self,
         context: LinterContext,
@@ -251,7 +236,7 @@ class NotebookLinter:
             failure = self._mutate_path_lookup(node)
             if failure:
                 return [failure]
-        elif isinstance(node, MagicLine):
+        if isinstance(node, MagicLine):
             magic = node.as_magic()
             assert isinstance(magic, RunCommand)
             notebook = self._resolve_and_parse_notebook_path(magic.notebook_path)
