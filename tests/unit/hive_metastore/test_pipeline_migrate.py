@@ -102,12 +102,14 @@ def test_migrate_pipelines_no_pipelines(ws) -> None:
 
 
 def test_migrate_pipelines_skips_not_found_job(caplog, ws) -> None:
-    rows = {
-        "`hive_metastore`.`inventory_database`.`jobs`": [
-            ("536591785949415", 1, [], "single-job", "anonymous@databricks.com")
-        ],
-    }
-    sql_backend = MockBackend(rows=rows)
+    job_columns = MockBackend.rows("job_id", "success", "failures", "job_name", "creator")
+    sql_backend = MockBackend(
+        rows={
+            "`hive_metastore`.`inventory_database`.`jobs`": job_columns[
+                ("536591785949415", 1, [], "single-job", "anonymous@databricks.com")
+            ]
+        }
+    )
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
     jobs_crawler = JobsCrawler(ws, sql_backend, "inventory_database")
     pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, jobs_crawler, "catalog_name")
