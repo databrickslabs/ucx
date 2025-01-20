@@ -34,7 +34,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import NodeBase, PythonLinter, Tree
+from databricks.labs.ucx.source_code.python.python_ast import PythonLinter, Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -208,31 +208,29 @@ class NotebookLinter:
         return self._load_children_from_tree(maybe_tree.tree)
 
     def _load_children_from_tree(self, tree: Tree) -> Failure | None:
-        assert isinstance(tree.node, Module)
-        # look for child notebooks (and sys.path changes that might affect their loading)
-        base_nodes: list[NodeBase] = []
-        base_nodes.extend(self._list_run_magic_lines(tree))
-        base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
-        if len(base_nodes) == 0:
+        """Load children from tree by looking for child notebooks and path changes that might affect their loading."""
+        code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
+            self._session_state, tree
+        )
+        if len(code_path_nodes) == 0:
             return None
-        # need to execute things in intertwined sequence so concat and sort them
         nodes = list(cast(Module, tree.node).body)
-        base_nodes = sorted(base_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
+        # Sys path changes require to load children in order of reading
+        base_nodes = sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return self._load_children_with_base_nodes(nodes, base_nodes, parent_tree=tree)
 
     @staticmethod
-    def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
-
-        def _ignore_problem(_code: str, _message: str, _node: NodeNG) -> None:
-            return None
-
-        commands, _ = MagicLine.extract_from_tree(tree, _ignore_problem)
-        for command in commands:
-            if isinstance(command.as_magic(), RunCommand):
-                yield command
+    def _list_magic_lines_with_run_command(tree: Tree) -> list[MagicLine]:
+        """List the magic lines with a run command"""
+        run_commands = []
+        magic_lines, _ = MagicLine.extract_from_tree(tree, lambda code, message, node: None)
+        for magic_line in magic_lines:
+            if isinstance(magic_line.as_magic(), RunCommand):
+                run_commands.append(magic_line)
+        return run_commands
 
     def _load_children_with_base_nodes(
-        self, nodes: list[NodeNG], base_nodes: list[NodeBase], *, parent_tree: Tree | None
+        self, nodes: list[NodeNG], base_nodes: list[SysPathChange | MagicLine], *, parent_tree: Tree | None
     ) -> Failure | None:
         for base_node in base_nodes:
             failure = self._load_children_with_base_node(nodes, base_node, parent_tree=parent_tree)
@@ -241,7 +239,7 @@ class NotebookLinter:
         return None
 
     def _load_children_with_base_node(
-        self, nodes: list[NodeNG], base_node: NodeBase, *, parent_tree: Tree | None
+        self, nodes: list[NodeNG], base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None
     ) -> Failure | None:
         while len(nodes) > 0:
             node = nodes.pop(0)
@@ -252,7 +250,9 @@ class NotebookLinter:
                 return failure
         return None
 
-    def _load_children_from_base_node(self, base_node: NodeBase, *, parent_tree: Tree | None) -> Failure | None:
+    def _load_children_from_base_node(
+        self, base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None
+    ) -> Failure | None:
         if isinstance(base_node, SysPathChange):
             failure = self._mutate_path_lookup(base_node)
             if failure:
