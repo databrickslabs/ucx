@@ -236,20 +236,20 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _process_code_node(self, base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None) -> Failure | None:
-        if isinstance(base_node, SysPathChange):
-            failure = self._mutate_path_lookup(base_node)
+    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree | None) -> Failure | None:
+        if isinstance(node, SysPathChange):
+            failure = self._mutate_path_lookup(node)
             if failure:
                 return failure
-        if isinstance(base_node, MagicLine):
-            magic = base_node.as_magic()
+        if isinstance(node, MagicLine):
+            magic = node.as_magic()
             assert isinstance(magic, RunCommand)
             notebook = self._resolve_and_parse_path(magic.notebook_path)
             if notebook is None:
                 failure = Failure.from_node(
                     code='dependency-not-found',
                     message=f"Can't locate dependency: {magic.notebook_path}",
-                    node=base_node.node,
+                    node=node.node,
                 )
                 return failure
             return self._parse_notebook(notebook, parent_tree=parent_tree)
