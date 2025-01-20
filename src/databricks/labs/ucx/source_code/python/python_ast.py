@@ -48,6 +48,23 @@ T = TypeVar("T", bound=NodeNG)
 
 @dataclass(frozen=True)
 class MaybeTree:
+    """A :class:`Tree` or a :class:`Failure`.
+
+    The `MaybeTree` is designed to either contain a `Tree` OR a `Failure`,
+    never both or neither. Typically, a `Tree` is constructed using the
+    `MaybeTree` class method(s) that yields a `Failure` if the `Tree` could
+    NOT be constructed, otherwise it yields the `Tree`, resulting in code that
+    looks like:
+
+    ``` python
+    maybe_tree = Tree.from_<class method>(<arguments>)
+    if maybe_tree.failure:
+        # Handle failure and return early
+    assert maybe_tree.tree, "Tree should be not-None when Failure is None."
+    # Use tree
+    ```
+    """
+
     tree: Tree | None
     failure: Failure | None
 
