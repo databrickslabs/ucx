@@ -6,9 +6,11 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation, Failure
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 @pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
@@ -116,8 +118,26 @@ def test_file_linter_lints_file_with_missing_read_permission(migration_index, mo
     assert advices[0].message == f"Missing read permission for {path}"
 
 
+class _NotebookLinter(NotebookLinter):
+    """A helper class to construct the notebook linter from source code for testing simplification."""
+
+    @classmethod
+    def from_source_code(
+        cls,
+        index: TableMigrationIndex,
+        path_lookup: PathLookup,
+        session_state: CurrentSessionState,
+        source: str,
+        default_language: Language,
+    ) -> NotebookLinter:
+        ctx = LinterContext(index)
+        notebook = Notebook.parse(Path(""), source, default_language)
+        assert notebook is not None
+        return cls(ctx, path_lookup, session_state, notebook)
+
+
 def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_path_lookup) -> None:
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -131,7 +151,7 @@ def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_
 
 
 def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mock_path_lookup) -> None:
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -163,7 +183,7 @@ print(1
 
 print(2
 """.lstrip()  # Missing parentheses is on purpose
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -220,7 +240,7 @@ table_name = "old.things"  # Migrated table according to the migration index
 
 spark.table(table_name)
 """.lstrip()
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -252,7 +272,7 @@ table_name = "not_migrated.table"  # NOT a migrated table according to the migra
 
 spark.table(table_name)
 """.lstrip()
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -283,7 +303,7 @@ spark.table(table_name)
 
 table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
 """.lstrip()
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
@@ -322,7 +342,7 @@ spark.table(table_name)
 
 table_name = "old.things"  # Migrated table according to the migration index
 """.lstrip()
-    linter = NotebookLinter.from_source(
+    linter = _NotebookLinter.from_source_code(
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
