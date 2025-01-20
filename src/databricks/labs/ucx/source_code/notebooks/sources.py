@@ -214,7 +214,7 @@ class NotebookLinter:
         assert maybe_tree.tree is not None
         if parent_tree:
             parent_tree.attach_child_tree(maybe_tree.tree)
-        self._python_tree_cache[(notebook_path, python_cell)] = maybe_tree.tree or Tree.new_module()
+        self._python_tree_cache[(notebook_path, python_cell)] = maybe_tree.tree
         return self._parse_tree(maybe_tree.tree)
 
     def _parse_tree(self, tree: Tree) -> Failure | None:
