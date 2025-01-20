@@ -161,14 +161,6 @@ class MaybeTree:
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
 
-    def walk(self) -> Iterable[NodeNG]:
-        # mainly a helper method for unit testing
-        if self.tree is None:  # no cov
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return []
-        return self.tree.walk()
-
     def first_statement(self) -> NodeNG | None:
         # mainly a helper method for unit testing
         if self.tree is None:  # no cov

@@ -209,6 +209,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
     """
 
     maybe_tree = MaybeTree.from_source_code(code)
+    assert maybe_tree.tree
     assert [
         Failure(
             code='spark-logging-in-shared-clusters',
@@ -237,7 +238,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
             end_line=6,
             end_col=24,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in maybe_tree.walk()]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in maybe_tree.tree.walk()]))
 
 
 def test_logging_serverless(session_state) -> None:

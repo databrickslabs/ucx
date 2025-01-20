@@ -93,16 +93,6 @@ def test_args_count(code, expected) -> None:
     assert act == expected
 
 
-def test_maybe_tree_walks_nodes_once() -> None:
-    nodes = set()
-    count = 0
-    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
-    for node in maybe_tree.walk():
-        nodes.add(node)
-        count += 1
-    assert len(nodes) == count
-
-
 def test_maybe_tree_parses_string_formatting() -> None:
     source = '''
 message_unformatted = """
@@ -117,6 +107,17 @@ message_unformatted = """
 def test_tree_maybe_parses_magic_command(magic_command: str) -> None:
     maybe_tree = MaybeTree.from_source_code(magic_command)
     assert maybe_tree.failure is None
+
+
+def test_tree_walks_nodes_once() -> None:
+    nodes = set()
+    count = 0
+    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
+    assert maybe_tree.tree
+    for node in maybe_tree.tree.walk():
+        nodes.add(node)
+        count += 1
+    assert len(nodes) == count
 
 
 def test_tree_attach_child_tree_infers_value() -> None:
