@@ -116,4 +116,4 @@ def test_migrate_pipelines_skips_not_found_job(caplog, ws) -> None:
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.pipelines_migrate"):
         pipelines_migrator.migrate_pipelines()
-    assert "Skipping non-existing job: 1"
+    assert "Skipping non-existing job: 536591785949415" in caplog.messages
