@@ -91,12 +91,8 @@ def test_migrate_pipelines(ws, mock_installation, pipeline_spec, include_flag, e
         ws.api_client.do.assert_has_calls([api_calls])
 
 
-def test_migrate_pipelines_no_pipelines(
-    ws,
-):
-    errors = {}
-    rows = {}
-    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+def test_migrate_pipelines_no_pipelines(ws) -> None:
+    sql_backend = MockBackend()
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
     jobs_crawler = JobsCrawler(ws, sql_backend, "inventory_database")
     pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, jobs_crawler, "catalog_name")
