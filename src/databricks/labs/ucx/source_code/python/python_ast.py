@@ -66,7 +66,10 @@ class MaybeTree:
     """
 
     tree: Tree | None
+    """The UCX Python abstract syntax tree object"""
+
     failure: Failure | None
+    """The failure during constructing the tree"""
 
     @classmethod
     def from_source_code(cls, code: str) -> MaybeTree:
