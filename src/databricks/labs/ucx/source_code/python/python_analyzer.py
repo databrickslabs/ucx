@@ -93,7 +93,7 @@ class PythonCodeAnalyzer:
 
     def _parse_and_extract_nodes(self) -> tuple[Tree | None, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
-        maybe_tree = MaybeTree.maybe_normalized_parse(self._python_code)
+        maybe_tree = MaybeTree.from_source_code(self._python_code)
         if maybe_tree.failure:
             return None, [], [DependencyProblem(maybe_tree.failure.code, maybe_tree.failure.message)]
         assert maybe_tree.tree is not None

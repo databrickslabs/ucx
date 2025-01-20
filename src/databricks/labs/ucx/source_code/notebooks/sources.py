@@ -196,7 +196,7 @@ class NotebookLinter:
                 continue
 
     def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
-        maybe_tree = MaybeTree.maybe_normalized_parse(python_cell.original_code)
+        maybe_tree = MaybeTree.from_source_code(python_cell.original_code)
         if maybe_tree.failure:
             yield maybe_tree.failure
         tree = maybe_tree.tree

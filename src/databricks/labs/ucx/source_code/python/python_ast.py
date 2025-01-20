@@ -52,7 +52,8 @@ class MaybeTree:
     failure: Failure | None
 
     @classmethod
-    def maybe_normalized_parse(cls, code: str) -> MaybeTree:
+    def from_source_code(cls, code: str) -> MaybeTree:
+        """Normalize and parse the source code to get a `Tree` or parse `Failure`."""
         code = cls._normalize(code)
         return cls._maybe_parse(code)
 
@@ -620,7 +621,7 @@ class NodeBase(ABC):
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = MaybeTree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if maybe_tree.failure:
             yield maybe_tree.failure
             return
@@ -634,7 +635,7 @@ class PythonLinter(Linter):
 class TablePyCollector(TableCollector, ABC):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = MaybeTree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.from_source_code(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return
@@ -649,7 +650,7 @@ class TablePyCollector(TableCollector, ABC):
 class DfsaPyCollector(DfsaCollector, ABC):
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = MaybeTree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.from_source_code(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return
@@ -687,7 +688,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
             yield from linter.lint_tree(tree)
 
     def _parse_and_append(self, code: str) -> MaybeTree:
-        maybe_tree = MaybeTree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if maybe_tree.failure:
             return maybe_tree
         assert maybe_tree.tree is not None
@@ -705,7 +706,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def process_child_cell(self, code: str) -> None:
         this_tree = self._make_tree()
-        maybe_tree = MaybeTree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if maybe_tree.failure:
             # TODO: bubble up this error
             logger.warning(maybe_tree.failure.message)

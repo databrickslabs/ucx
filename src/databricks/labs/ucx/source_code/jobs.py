@@ -657,7 +657,7 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
             if cell.language is CellLanguage.PYTHON:
                 if inherited_tree is None:
                     inherited_tree = Tree.new_module()
-                maybe_tree = MaybeTree.maybe_normalized_parse(cell.original_code)
+                maybe_tree = MaybeTree.from_source_code(cell.original_code)
                 if maybe_tree.failure:
                     logger.warning(maybe_tree.failure.message)
                     continue

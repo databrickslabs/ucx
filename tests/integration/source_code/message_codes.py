@@ -11,7 +11,7 @@ def main():
     product_info = ProductInfo.from_class(Advice)
     source_code = product_info.version_file().parent
     for file in source_code.glob("**/*.py"):
-        maybe_tree = MaybeTree.maybe_normalized_parse(file.read_text())
+        maybe_tree = MaybeTree.from_source_code(file.read_text())
         if not maybe_tree.tree:
             continue
         tree = maybe_tree.tree

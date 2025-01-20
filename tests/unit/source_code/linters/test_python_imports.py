@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('')
+    maybe_tree = MaybeTree.from_source_code('')
     assert maybe_tree.tree is not None
     assert not DbutilsPyLinter.list_dbutils_notebook_run_calls(maybe_tree.tree)
 
@@ -25,14 +25,14 @@ dbutils.notebook.run("stuff")
 for i in z:
     ww =   dbutils.notebook.run("toto")
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     assert {"toto", "stuff"} == {str(call.node.args[0].value) for call in calls}
 
 
 def test_linter_returns_empty_list_of_imports() -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse('')
+    maybe_tree = MaybeTree.from_source_code('')
     assert maybe_tree.tree is not None
     assert not ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
 
@@ -47,7 +47,7 @@ def test_linter_returns_empty_list_of_imports() -> None:
     ]
 )
 def test_import_source_extract_from_tree(import_statement: str) -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse(import_statement)
+    maybe_tree = MaybeTree.from_source_code(import_statement)
     assert maybe_tree.tree is not None
     import_nodes = ImportSource.extract_from_tree(maybe_tree.tree, DependencyProblem.from_node)[0]
     assert ["x"] == [node.name for node in import_nodes]
@@ -59,7 +59,7 @@ import sys
 sys.path.append("absolute_path_1")
 sys.path.append("absolute_path_2")
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
@@ -71,7 +71,7 @@ import sys as stuff
 stuff.path.append("absolute_path_1")
 stuff.path.append("absolute_path_2")
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
@@ -82,7 +82,7 @@ def test_linter_returns_appended_absolute_paths_with_sys_path_alias() -> None:
 from sys import path as stuff
 stuff.append("absolute_path")
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "absolute_path" in [p.path for p in appended]
@@ -94,7 +94,7 @@ import sys
 import os
 sys.path.append(os.path.abspath("relative_path"))
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "relative_path" in [p.path for p in appended]
@@ -106,7 +106,7 @@ import sys
 import os as stuff
 sys.path.append(stuff.path.abspath("relative_path"))
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "relative_path" in [p.path for p in appended]
@@ -118,7 +118,7 @@ import sys
 from os import path as stuff
 sys.path.append(stuff.abspath("relative_path"))
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "relative_path" in [p.path for p in appended]
@@ -130,7 +130,7 @@ import sys
 from os.path import abspath
 sys.path.append(abspath("relative_path"))
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "relative_path" in [p.path for p in appended]
@@ -142,7 +142,7 @@ import sys
 from os.path import abspath as stuff
 sys.path.append(stuff("relative_path"))
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert "relative_path" in [p.path for p in appended]
@@ -154,7 +154,7 @@ import sys
 path = "absolute_path_1"
 sys.path.append(path)
 """
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     appended = SysPathChange.extract_from_tree(CurrentSessionState(), maybe_tree.tree)
     assert ["absolute_path_1"] == [p.path for p in appended]
@@ -196,7 +196,7 @@ dbutils.notebook.run(name)
     ],
 )
 def test_infers_dbutils_notebook_run_dynamic_value(code, expected) -> None:
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     all_paths: list[str] = []

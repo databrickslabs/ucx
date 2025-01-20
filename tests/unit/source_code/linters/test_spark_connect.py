@@ -208,7 +208,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 
     """
 
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert [
         Failure(
             code='spark-logging-in-shared-clusters',
@@ -249,7 +249,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
     """
 
-    maybe_tree = MaybeTree.maybe_normalized_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     tree = maybe_tree.tree
     assert [
