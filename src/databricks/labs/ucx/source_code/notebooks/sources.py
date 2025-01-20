@@ -192,6 +192,15 @@ class NotebookLinter:
                 return failure
         return None
 
+    def _load_tree_from_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
+        path = run_cell.maybe_notebook_path()
+        if path is None:
+            return None  # malformed run cell already reported
+        notebook = self._load_source_from_path(path)
+        if notebook is not None:
+            return self._parse_trees(notebook, False, parent_tree=parent_tree)
+        return None
+
     def _load_tree_from_python_cell(
         self, python_cell: PythonCell, register_trees: bool, *, parent_tree: Tree | None
     ) -> Failure | None:
@@ -257,15 +266,6 @@ class NotebookLinter:
                 node=change.node,
             )
         change.apply_to(self._path_lookup)
-        return None
-
-    def _load_tree_from_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
-        path = run_cell.maybe_notebook_path()
-        if path is None:
-            return None  # malformed run cell already reported
-        notebook = self._load_source_from_path(path)
-        if notebook is not None:
-            return self._parse_trees(notebook, False, parent_tree=parent_tree)
         return None
 
     def _load_source_from_path(self, path: Path | None) -> Notebook | None:
