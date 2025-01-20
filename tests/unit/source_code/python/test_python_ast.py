@@ -103,15 +103,14 @@ def test_maybe_tree_walks_nodes_once() -> None:
     assert len(nodes) == count
 
 
-def test_ignores_magic_marker_in_multiline_comment() -> None:
-    source = """message_unformatted = u\"""
-%s is only supported in Python %s and above.\"""
-name="name"
-version="version"
-formatted=message_unformatted % (name, version)
-"""
-    MaybeTree.from_source_code(source)
-    assert True
+def test_maybe_tree_parses_string_formatting() -> None:
+    source = '''
+message_unformatted = """
+%s is only supported in Python %s and above.
+""" % ("name", "version")
+'''
+    maybe_tree = MaybeTree.from_source_code(source)
+    assert maybe_tree.failure is None
 
 
 @pytest.mark.parametrize("magic_command", ["%tb", "%matplotlib inline"])
