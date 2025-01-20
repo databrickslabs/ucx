@@ -157,7 +157,7 @@ class NotebookLinter:
         self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
 
     def lint(self) -> Iterable[Advice]:
-        failure = self._parse_trees(self._notebook, True, parent_tree=self._inherited_tree)
+        failure = self._parse_trees_from_notebook(self._notebook, True, parent_tree=self._inherited_tree)
         if failure:
             yield failure
             return
@@ -180,28 +180,30 @@ class NotebookLinter:
                 )
         return
 
-    def _parse_trees(self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None) -> Failure | None:
+    def _parse_trees_from_notebook(
+        self, notebook: Notebook, register_trees: bool, *, parent_tree: Tree | None
+    ) -> Failure | None:
         for cell in notebook.cells:
             failure = None
             if isinstance(cell, RunCell):
-                failure = self._load_tree_from_run_cell(cell, parent_tree=parent_tree)
+                failure = self._parse_trees_from_run_cell(cell, parent_tree=parent_tree)
             elif isinstance(cell, PythonCell):
-                failure = self._load_tree_from_python_cell(cell, register_trees, parent_tree=parent_tree)
+                failure = self._parse_trees_from_python_cell(cell, register_trees, parent_tree=parent_tree)
                 parent_tree = self._python_trees.get(cell)
             if failure:
                 return failure
         return None
 
-    def _load_tree_from_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
+    def _parse_trees_from_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
         path = run_cell.maybe_notebook_path()
         if path is None:
             return None  # malformed run cell already reported
-        notebook = self._load_source_from_path(path)
+        notebook = self._parse_notebook_from_path(path)
         if notebook is not None:
-            return self._parse_trees(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees_from_notebook(notebook, False, parent_tree=parent_tree)
         return None
 
-    def _load_tree_from_python_cell(
+    def _parse_trees_from_python_cell(
         self, python_cell: PythonCell, register_trees: bool, *, parent_tree: Tree | None
     ) -> Failure | None:
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
@@ -213,16 +215,16 @@ class NotebookLinter:
         if register_trees:
             # A cell with only comments will not produce a tree
             self._python_trees[python_cell] = maybe_tree.tree or Tree.new_module()
-        return self._load_children_from_tree(maybe_tree.tree)
+        return self._parse_child_trees_from_tree(maybe_tree.tree)
 
-    def _load_children_from_tree(self, tree: Tree) -> Failure | None:
-        """Load children from tree by looking for child notebooks and path changes that might affect their loading."""
+    def _parse_child_trees_from_tree(self, tree: Tree) -> Failure | None:
+        """Parse child trees by looking for referred notebooks and path changes that might affect loading notebooks."""
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
             self._session_state, tree
         )
         # Sys path changes require to load children in order of reading
         for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            failure = self._load_children_from_base_node(base_node, parent_tree=tree)
+            failure = self._process_code_node(base_node, parent_tree=tree)
             if failure:
                 return failure
         return None
@@ -237,9 +239,7 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _load_children_from_base_node(
-        self, base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None
-    ) -> Failure | None:
+    def _process_code_node(self, base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None) -> Failure | None:
         if isinstance(base_node, SysPathChange):
             failure = self._mutate_path_lookup(base_node)
             if failure:
@@ -247,7 +247,7 @@ class NotebookLinter:
         if isinstance(base_node, MagicLine):
             magic = base_node.as_magic()
             assert isinstance(magic, RunCommand)
-            notebook = self._load_source_from_path(magic.notebook_path)
+            notebook = self._parse_notebook_from_path(magic.notebook_path)
             if notebook is None:
                 failure = Failure.from_node(
                     code='dependency-not-found',
@@ -255,7 +255,7 @@ class NotebookLinter:
                     node=base_node.node,
                 )
                 return failure
-            return self._parse_trees(notebook, False, parent_tree=parent_tree)
+            return self._parse_trees_from_notebook(notebook, False, parent_tree=parent_tree)
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
@@ -268,7 +268,7 @@ class NotebookLinter:
         change.apply_to(self._path_lookup)
         return None
 
-    def _load_source_from_path(self, path: Path | None) -> Notebook | None:
+    def _parse_notebook_from_path(self, path: Path | None) -> Notebook | None:
         if path is None:
             return None  # already reported during dependency building
         resolved = self._path_lookup.resolve(path)
