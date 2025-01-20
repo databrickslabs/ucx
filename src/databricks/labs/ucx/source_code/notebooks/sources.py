@@ -182,6 +182,7 @@ class NotebookLinter:
         return
 
     def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree | None) -> Failure | None:
+        """Parse a notebook by parsing its cells."""
         for cell in notebook.cells:
             failure = None
             if isinstance(cell, RunCell):
@@ -194,10 +195,11 @@ class NotebookLinter:
         return None
 
     def _resolve_and_parse_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
+        """Resolve the path in the run cell and parse the notebook it refers."""
         path = run_cell.maybe_notebook_path()
         if path is None:
             return None  # malformed run cell already reported
-        notebook = self._resolve_and_parse_path(path)
+        notebook = self._resolve_and_parse_notebook_path(path)
         if notebook is not None:
             return self._parse_notebook(notebook, parent_tree=parent_tree)
         return None
@@ -205,6 +207,7 @@ class NotebookLinter:
     def _parse_python_cell(
         self, python_cell: PythonCell, notebook_path: Path, *, parent_tree: Tree | None
     ) -> Failure | None:
+        """Parse the Python cell."""
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
             return maybe_tree.failure
@@ -236,7 +239,12 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree | None) -> Failure | None:
+    def _process_code_node(self, node: SysPathChange | RunCommand, *, parent_tree: Tree | None) -> Failure | None:
+        """Process a code node.
+
+        1. `SysPathChange` mutate the path lookup.
+        2. `MagicLine` containing a `RunCommand` run other notebooks that should be parsed.
+        """
         if isinstance(node, SysPathChange):
             failure = self._mutate_path_lookup(node)
             if failure:
@@ -244,7 +252,7 @@ class NotebookLinter:
         if isinstance(node, MagicLine):
             magic = node.as_magic()
             assert isinstance(magic, RunCommand)
-            notebook = self._resolve_and_parse_path(magic.notebook_path)
+            notebook = self._resolve_and_parse_notebook_path(magic.notebook_path)
             if notebook is None:
                 failure = Failure.from_node(
                     code='dependency-not-found',
@@ -256,6 +264,7 @@ class NotebookLinter:
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
+        """Mutate the path lookup."""
         if isinstance(change, UnresolvedPath):
             return Failure.from_node(
                 code='sys-path-cannot-compute-value',
@@ -265,7 +274,8 @@ class NotebookLinter:
         change.apply_to(self._path_lookup)
         return None
 
-    def _resolve_and_parse_path(self, path: Path | None) -> Notebook | None:
+    def _resolve_and_parse_notebook_path(self, path: Path | None) -> Notebook | None:
+        """Resolve and parse notebook path."""
         if path is None:
             return None  # already reported during dependency building
         resolved = self._path_lookup.resolve(path)
