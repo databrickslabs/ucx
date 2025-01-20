@@ -7,7 +7,6 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from astroid import Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
@@ -212,12 +211,12 @@ class NotebookLinter:
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
             self._session_state, tree
         )
-        if len(code_path_nodes) == 0:
-            return None
-        nodes = list(cast(Module, tree.node).body)
         # Sys path changes require to load children in order of reading
-        base_nodes = sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
-        return self._load_children_with_base_nodes(nodes, base_nodes, parent_tree=tree)
+        for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
+            failure = self._load_children_from_base_node(base_node, parent_tree=tree)
+            if failure:
+                return failure
+        return None
 
     @staticmethod
     def _list_magic_lines_with_run_command(tree: Tree) -> list[MagicLine]:
@@ -228,27 +227,6 @@ class NotebookLinter:
             if isinstance(magic_line.as_magic(), RunCommand):
                 run_commands.append(magic_line)
         return run_commands
-
-    def _load_children_with_base_nodes(
-        self, nodes: list[NodeNG], base_nodes: list[SysPathChange | MagicLine], *, parent_tree: Tree | None
-    ) -> Failure | None:
-        for base_node in base_nodes:
-            failure = self._load_children_with_base_node(nodes, base_node, parent_tree=parent_tree)
-            if failure:
-                return failure
-        return None
-
-    def _load_children_with_base_node(
-        self, nodes: list[NodeNG], base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None
-    ) -> Failure | None:
-        while len(nodes) > 0:
-            node = nodes.pop(0)
-            if node.lineno < base_node.node.lineno:
-                continue
-            failure = self._load_children_from_base_node(base_node, parent_tree=parent_tree)
-            if failure:
-                return failure
-        return None
 
     def _load_children_from_base_node(
         self, base_node: SysPathChange | MagicLine, *, parent_tree: Tree | None
