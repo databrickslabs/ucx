@@ -153,6 +153,46 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
     ]
 
 
+def test_notebook_linter_lints_source_yielding_parse_failures(migration_index, mock_path_lookup) -> None:
+    source = """
+# Databricks notebook source
+
+print(1
+
+# COMMAND ----------
+
+print(2
+""".lstrip()  # Missing parentheses is on purpose
+    linter = NotebookLinter.from_source(
+        migration_index,
+        mock_path_lookup,
+        CurrentSessionState(),
+        source,
+        Language.PYTHON,
+    )
+
+    advices = list(linter.lint())
+
+    assert advices == [
+        Failure(
+            code='python-parse-error',
+            message='Failed to parse code due to invalid syntax: print(1',
+            start_line=2,
+            start_col=5,
+            end_line=2,
+            end_col=1,
+        ),
+        Failure(
+            code='python-parse-error',
+            message='Failed to parse code due to invalid syntax: print(2',
+            start_line=6,
+            start_col=5,
+            end_line=6,
+            end_col=1,
+        ),
+    ]
+
+
 def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_index, mock_path_lookup) -> None:
     """Verify the NotebookLinter can resolve %run"""
     path = Path(__file__).parent.parent / "samples" / "parent-child-context" / "grand_parent.py"

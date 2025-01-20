@@ -158,9 +158,9 @@ class NotebookLinter:
         self._python_tree_cache: dict[tuple[Path, PythonCell], Tree] = {}  # Path in key is the notebook's path
 
     def lint(self) -> Iterable[Advice]:
-        failure = self._parse_notebook(self._notebook, parent_tree=self._inherited_tree)
-        if failure:
-            yield failure
+        failures = self._parse_notebook(self._notebook, parent_tree=self._inherited_tree)
+        if failures:
+            yield from failures
             return
         for cell in self._notebook.cells:
             try:
@@ -181,53 +181,55 @@ class NotebookLinter:
                 )
         return
 
-    def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree | None) -> Failure | None:
+    def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree | None) -> list[Failure]:
         """Parse a notebook by parsing its cells."""
+        failures = []
         for cell in notebook.cells:
-            failure = None
             if isinstance(cell, RunCell):
-                failure = self._resolve_and_parse_run_cell(cell, parent_tree=parent_tree)
+                failures.extend(self._resolve_and_parse_run_cell(cell, parent_tree=parent_tree))
             elif isinstance(cell, PythonCell):
-                failure = self._parse_python_cell(cell, notebook.path, parent_tree=parent_tree)
+                failures.extend(self._parse_python_cell(cell, notebook.path, parent_tree=parent_tree))
                 parent_tree = self._python_tree_cache.get((notebook.path, cell))
-            if failure:
-                return failure
-        return None
+        return failures
 
-    def _resolve_and_parse_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> Failure | None:
+    def _resolve_and_parse_run_cell(self, run_cell: RunCell, *, parent_tree: Tree | None = None) -> list[Failure]:
         """Resolve the path in the run cell and parse the notebook it refers."""
         path = run_cell.maybe_notebook_path()
         if path is None:
-            return None  # malformed run cell already reported
+            return []  # malformed run cell already reported
         notebook = self._resolve_and_parse_notebook_path(path)
-        if notebook is not None:
-            return self._parse_notebook(notebook, parent_tree=parent_tree)
-        return None
+        if not notebook:
+            return []
+        return self._parse_notebook(notebook, parent_tree=parent_tree)
 
     def _parse_python_cell(
         self, python_cell: PythonCell, notebook_path: Path, *, parent_tree: Tree | None
-    ) -> Failure | None:
+    ) -> list[Failure]:
         """Parse the Python cell."""
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
-            return maybe_tree.failure
+            failure = dataclasses.replace(
+                maybe_tree.failure,
+                start_line=maybe_tree.failure.start_line + python_cell.original_offset,
+                end_line=maybe_tree.failure.end_line + python_cell.original_offset,
+            )
+            return [failure]
         assert maybe_tree.tree is not None
         if parent_tree:
             parent_tree.attach_child_tree(maybe_tree.tree)
         self._python_tree_cache[(notebook_path, python_cell)] = maybe_tree.tree
         return self._parse_tree(maybe_tree.tree)
 
-    def _parse_tree(self, tree: Tree) -> Failure | None:
+    def _parse_tree(self, tree: Tree) -> list[Failure]:
         """Parse tree by looking for referred notebooks and path changes that might affect loading notebooks."""
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
             self._session_state, tree
         )
         # Sys path changes require to load children in order of reading
+        failures = []
         for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            failure = self._process_code_node(base_node, parent_tree=tree)
-            if failure:
-                return failure
-        return None
+            failures.extend(self._process_code_node(base_node, parent_tree=tree))
+        return failures
 
     @staticmethod
     def _list_magic_lines_with_run_command(tree: Tree) -> list[MagicLine]:
@@ -239,7 +241,7 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _process_code_node(self, node: SysPathChange | RunCommand, *, parent_tree: Tree | None) -> Failure | None:
+    def _process_code_node(self, node: SysPathChange | RunCommand, *, parent_tree: Tree | None) -> list[Failure]:
         """Process a code node.
 
         1. `SysPathChange` mutate the path lookup.
@@ -248,8 +250,8 @@ class NotebookLinter:
         if isinstance(node, SysPathChange):
             failure = self._mutate_path_lookup(node)
             if failure:
-                return failure
-        if isinstance(node, MagicLine):
+                return [failure]
+        elif isinstance(node, MagicLine):
             magic = node.as_magic()
             assert isinstance(magic, RunCommand)
             notebook = self._resolve_and_parse_notebook_path(magic.notebook_path)
@@ -259,9 +261,9 @@ class NotebookLinter:
                     message=f"Can't locate dependency: {magic.notebook_path}",
                     node=node.node,
                 )
-                return failure
+                return [failure]
             return self._parse_notebook(notebook, parent_tree=parent_tree)
-        return None
+        return []
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
         """Mutate the path lookup."""
