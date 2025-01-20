@@ -154,7 +154,8 @@ class NotebookLinter:
         self._notebook: Notebook = notebook
         self._inherited_tree = inherited_tree
 
-        self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
+        # Python trees are constructed during notebook parsing and cached for later usage
+        self._python_tree_cache: dict[PythonCell, Tree] = {}
 
     def lint(self) -> Iterable[Advice]:
         failure = self._parse_trees_from_notebook(self._notebook, True, parent_tree=self._inherited_tree)
@@ -168,7 +169,7 @@ class NotebookLinter:
                 continue
             if isinstance(cell, PythonCell):
                 linter = cast(PythonLinter, linter)
-                tree = self._python_trees[cell]
+                tree = self._python_tree_cache[cell]
                 advices = linter.lint_tree(tree)
             else:
                 advices = linter.lint(cell.original_code)
@@ -189,7 +190,7 @@ class NotebookLinter:
                 failure = self._parse_trees_from_run_cell(cell, parent_tree=parent_tree)
             elif isinstance(cell, PythonCell):
                 failure = self._parse_trees_from_python_cell(cell, register_trees, parent_tree=parent_tree)
-                parent_tree = self._python_trees.get(cell)
+                parent_tree = self._python_tree_cache.get(cell)
             if failure:
                 return failure
         return None
@@ -214,7 +215,7 @@ class NotebookLinter:
             parent_tree.attach_child_tree(maybe_tree.tree)
         if register_trees:
             # A cell with only comments will not produce a tree
-            self._python_trees[python_cell] = maybe_tree.tree or Tree.new_module()
+            self._python_tree_cache[python_cell] = maybe_tree.tree or Tree.new_module()
         return self._parse_child_trees_from_tree(maybe_tree.tree)
 
     def _parse_child_trees_from_tree(self, tree: Tree) -> Failure | None:
