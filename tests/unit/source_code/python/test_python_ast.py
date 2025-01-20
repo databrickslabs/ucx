@@ -114,6 +114,13 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
+@pytest.mark.parametrize("magic_command", ["%tb", "%matplotlib inline"])
+def test_tree_maybe_parses_magic_command(magic_command: str) -> None:
+    source = "%tb"
+    maybe_tree = MaybeTree.from_source_code(source)
+    assert maybe_tree.failure is None
+
+
 def test_tree_attach_child_tree_infers_value() -> None:
     """Attaching trees allows traversing from both parent and child."""
     inferred_string = "Hello John!"
