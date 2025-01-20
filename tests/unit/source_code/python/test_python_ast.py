@@ -115,8 +115,7 @@ message_unformatted = """
 
 @pytest.mark.parametrize("magic_command", ["%tb", "%matplotlib inline"])
 def test_tree_maybe_parses_magic_command(magic_command: str) -> None:
-    source = "%tb"
-    maybe_tree = MaybeTree.from_source_code(source)
+    maybe_tree = MaybeTree.from_source_code(magic_command)
     assert maybe_tree.failure is None
 
 
