@@ -145,9 +145,9 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
         Failure(
             code='python-parse-error',
             message='Failed to parse code due to invalid syntax: print(1',
-            start_line=0,
+            start_line=1,
             start_col=5,
-            end_line=0,
+            end_line=1,
             end_col=1,
         )
     ]
