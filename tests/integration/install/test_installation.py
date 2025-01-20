@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import logging
+import time
 from datetime import timedelta
 from typing import NoReturn
 
@@ -19,6 +20,7 @@ from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
+    ResourceDoesNotExist,
 )
 from databricks.sdk.retries import retried
 
@@ -393,8 +395,18 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 
 def test_compare_remote_local_install_versions(ws, installation_ctx):
-    installation_finished = installation_ctx.workspace_installation.run()
-    assert installation_finished
+    installation_ctx.workspace_installation.run()
+
+    # max time to wait for the installation to finish
+    timeout_duration = 5
+
+    for _ in range(timeout_duration):
+        try:
+            installation_ctx.installation.load(WorkspaceConfig)
+            break
+        except ResourceDoesNotExist:
+            logger.info("Waiting for the installation to finish...")
+            time.sleep(1)
 
     with pytest.raises(
         RuntimeWarning,
