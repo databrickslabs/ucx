@@ -20,6 +20,7 @@ from astroid import (  # type: ignore
     Import,
     ImportFrom,
     Instance,
+    JoinedStr,
     Module,
     Name,
     NodeNG,
@@ -551,6 +552,11 @@ class MatchingVisitor(TreeVisitor):
 
     def visit_importfrom(self, node: ImportFrom) -> None:
         if self._node_type is not ImportFrom:
+            return
+        self._matched_nodes.append(node)
+
+    def visit_joinedstr(self, node: JoinedStr) -> None:
+        if self._node_type is not JoinedStr:
             return
         self._matched_nodes.append(node)
 

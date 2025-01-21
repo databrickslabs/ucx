@@ -3,7 +3,7 @@ from collections.abc import Iterable
 
 import pytest
 import astroid  # type: ignore
-from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name, NodeNG  # type: ignore
+from astroid import Assign, AssignName, Attribute, Call, Const, Expr, JoinedStr, Module, Name, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -192,6 +192,29 @@ def test_tree_attach_parent_with_child_tree_infers_value() -> None:
     nodes = child_b_maybe_tree.tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
     strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
+def test_tree_attach_child_tree_with_notebook_using_variable_from_other_notebook() -> None:
+    """Simulating a notebook where it uses a variable from another notebook."""
+    inferred_string = "catalog.schema.table"
+    child_source = "table_name = 'schema.table'"
+    parent_cell_1_source = "%run ./child"
+    parent_cell_2_source = "spark.table(f'catalog.{table_name}')"
+    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+    parent_cell_1_maybe_tree = Tree.maybe_normalized_parse(parent_cell_1_source)
+    parent_cell_2_maybe_tree = Tree.maybe_normalized_parse(parent_cell_2_source)
+
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+    assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
+    assert parent_cell_2_maybe_tree.tree is not None, parent_cell_2_maybe_tree.failure
+
+    parent_cell_1_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+    # Subsequent notebook cell is child of previous cell
+    parent_cell_1_maybe_tree.tree.attach_child_tree(parent_cell_2_maybe_tree.tree)
+
+    nodes = parent_cell_2_maybe_tree.tree.locate(JoinedStr, [])
+    strings = [value.as_string() for value in InferredValue.infer_from_node(nodes[0])]
     assert strings == [inferred_string]
 
 
