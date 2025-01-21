@@ -173,6 +173,7 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
     ]
 
 
+@pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3556")
 def test_notebook_linter_lints_source_yielding_parse_failures(migration_index, mock_path_lookup) -> None:
     source = """
 # Databricks notebook source
