@@ -239,7 +239,7 @@ def test_tree_extend_globals_with_notebook_using_variable_from_other_notebook() 
     assert strings == [inferred_string]
 
 
-def test_tree_attach_child_tree_with_notebook_using_variable_from_parent_notebook() -> None:
+def test_tree_extend_globals_with_notebook_using_variable_from_parent_notebook() -> None:
     """Simulating a notebook where it uses a variable from its parent notebook."""
     inferred_string = "catalog.schema.table"
     child_source = "spark.table(f'catalog.{table_name}')"
@@ -253,9 +253,8 @@ def test_tree_attach_child_tree_with_notebook_using_variable_from_parent_noteboo
     assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
     assert parent_cell_2_maybe_tree.tree is not None, parent_cell_2_maybe_tree.failure
 
-    # Subsequent notebook cell is child of previous cell
-    parent_cell_1_maybe_tree.tree.attach_child_tree(parent_cell_2_maybe_tree.tree)
-    parent_cell_2_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+    parent_cell_2_maybe_tree.tree.extend_globals(parent_cell_1_maybe_tree.tree.node.globals)
+    child_maybe_tree.tree.extend_globals(parent_cell_2_maybe_tree.tree.node.globals)
 
     nodes = child_maybe_tree.tree.locate(JoinedStr, [])
     strings = [value.as_string() for value in InferredValue.infer_from_node(nodes[0])]
