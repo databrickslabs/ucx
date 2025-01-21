@@ -299,7 +299,7 @@ def test_is_instance_of(source, name, class_name) -> None:
     assert Tree(var[0]).is_instance_of(class_name)
 
 
-def test_tree_attach_child_tree_propagates_module_reference() -> None:
+def test_tree_extend_globals_propagates_module_reference() -> None:
     """The spark module should propagate from the parent tree."""
     source_1 = "df = spark.read.csv('hi')"
     source_2 = "df = df.withColumn(stuff)"
@@ -312,8 +312,8 @@ def test_tree_attach_child_tree_propagates_module_reference() -> None:
     assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
     assert third_line_maybe_tree.tree, third_line_maybe_tree.failure
 
-    first_line_maybe_tree.tree.attach_child_tree(second_line_maybe_tree.tree)
-    first_line_maybe_tree.tree.attach_child_tree(third_line_maybe_tree.tree)
+    second_line_maybe_tree.tree.extend_globals(first_line_maybe_tree.tree.node.globals)
+    third_line_maybe_tree.tree.extend_globals(second_line_maybe_tree.tree.node.globals)
 
     assign = third_line_maybe_tree.tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
