@@ -195,8 +195,9 @@ def test_tree_extend_globals_infers_value_from_grand_parent() -> None:
     assert strings == [inferred_string]
 
 
-def test_tree_attach_parent_with_child_tree_infers_value() -> None:
-    inferred_string = "Hello John!"
+def test_tree_extend_globals_for_parent_with_children_cannot_infer_value() -> None:
+    """A tree cannot infer the value from its parent's child (aka sibling tree)."""
+    inferred_string = ""  # Nothing inferred
     parent_source, child_a_source, child_b_source = "name = 'John'", "greeting = 'Hello'", 'say = f"{greeting} {name}!"'
     parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
     child_a_maybe_tree = Tree.maybe_normalized_parse(child_a_source)
@@ -206,8 +207,8 @@ def test_tree_attach_parent_with_child_tree_infers_value() -> None:
     assert child_a_maybe_tree.tree is not None, child_a_maybe_tree.failure
     assert child_b_maybe_tree.tree is not None, child_b_maybe_tree.failure
 
-    parent_maybe_tree.tree.attach_child_tree(child_a_maybe_tree.tree)
-    parent_maybe_tree.tree.attach_child_tree(child_b_maybe_tree.tree)
+    child_a_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+    child_b_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
 
     nodes = child_b_maybe_tree.tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
