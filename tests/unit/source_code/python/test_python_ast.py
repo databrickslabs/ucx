@@ -158,7 +158,7 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_tree_attach_child_tree_infers_value() -> None:
+def test_tree_child_tree_infers_value() -> None:
     inferred_string = "Hello John!"
     parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
     parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
@@ -167,7 +167,7 @@ def test_tree_attach_child_tree_infers_value() -> None:
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
 
-    parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+    child_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
 
     nodes = child_maybe_tree.tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
