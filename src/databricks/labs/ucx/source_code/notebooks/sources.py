@@ -131,19 +131,19 @@ class NotebookLinter:
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         notebook: Notebook,
-        inherited_tree: Tree | None = None,
+        parent_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._notebook: Notebook = notebook
-        self._inherited_tree = inherited_tree
+        self._parent_tree = parent_tree
 
         # Python trees are constructed during notebook parsing and cached for later usage
         self._python_tree_cache: dict[tuple[Path, PythonCell], Tree] = {}  # Path in key is the notebook's path
 
     def lint(self) -> Iterable[Advice]:
-        failures = self._parse_notebook(self._notebook, parent_tree=self._inherited_tree)
+        failures = self._parse_notebook(self._notebook, parent_tree=self._parent_tree)
         if failures:
             yield from failures
             return
