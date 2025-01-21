@@ -4,11 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch: # Enables manual triggering of the workflow
 
 jobs:
   build:
     name: Build Docusaurus
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/ucx
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,6 +21,7 @@ jobs:
         with:
           node-version: 20
           cache: yarn
+          cache-dependency-path: docs/ucx/yarn.lock # need to put the lockfile path explicitly
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -26,12 +31,15 @@ jobs:
       - name: Upload Build Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build
+          path: docs/ucx/build
 
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-
+    runs-on:
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
+    
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write # to deploy to Pages
@@ -42,7 +50,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    runs-on: ubuntu-latest
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

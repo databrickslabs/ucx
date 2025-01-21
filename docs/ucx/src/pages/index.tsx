@@ -6,7 +6,7 @@ import { JSX } from 'react';
 
 const Hero = () => {
   return (
-    <main className='flex flex-col items-center pt-20 w-full'>
+    <div className='flex flex-col items-center h-screen pt-20 w-full'>
       <div className="px-4 md:px-10 max-w-screen-xl h-[calc(100vh-140px)] flex flex-col md:flex-row justify-between w-full">
         {/* <!-- Left Column (Text) --> */}
         <div className="md:w-2/3 text-center md:text-left">
@@ -27,7 +27,7 @@ const Hero = () => {
           <img src="img/logo.svg" alt="UCX Logo" className="w-full rounded-lg hidden md:block" />
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
