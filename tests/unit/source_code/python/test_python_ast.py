@@ -238,6 +238,29 @@ def test_tree_attach_child_tree_with_notebook_using_variable_from_other_notebook
     assert strings == [inferred_string]
 
 
+def test_tree_attach_child_tree_with_notebook_using_variable_from_parent_notebook() -> None:
+    """Simulating a notebook where it uses a variable from its parent notebook."""
+    inferred_string = "catalog.schema.table"
+    child_source = "spark.table(f'catalog.{table_name}')"
+    parent_cell_1_source = "table_name = 'schema.table'"
+    parent_cell_2_source = "%run ./child"
+    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+    parent_cell_1_maybe_tree = Tree.maybe_normalized_parse(parent_cell_1_source)
+    parent_cell_2_maybe_tree = Tree.maybe_normalized_parse(parent_cell_2_source)
+
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+    assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
+    assert parent_cell_2_maybe_tree.tree is not None, parent_cell_2_maybe_tree.failure
+
+    # Subsequent notebook cell is child of previous cell
+    parent_cell_1_maybe_tree.tree.attach_child_tree(parent_cell_2_maybe_tree.tree)
+    parent_cell_2_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
+
+    nodes = child_maybe_tree.tree.locate(JoinedStr, [])
+    strings = [value.as_string() for value in InferredValue.infer_from_node(nodes[0])]
+    assert strings == [inferred_string]
+
+
 def test_is_from_module() -> None:
     source = """
 df = spark.read.csv("hi")
