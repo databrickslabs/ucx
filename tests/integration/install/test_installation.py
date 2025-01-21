@@ -392,12 +392,17 @@ def test_check_inventory_database_exists(ws, installation_ctx):
         installation_ctx.workspace_installer.configure()
 
 
-def test_compare_remote_local_install_versions(ws, installation_ctx):
+def test_compare_remote_local_install_versions(installation_ctx) -> None:
     installation_ctx.workspace_installation.run()
-    with pytest.raises(
-        RuntimeWarning,
-        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
-    ):
+
+    @retried(on=[NotFound], timeout=timedelta(minutes=2))
+    def wait_for_installation_to_finish():
+        installation_ctx.installation.load(WorkspaceConfig)
+
+    wait_for_installation_to_finish()
+
+    error_message = "UCX workspace remote and local install versions are same and no override is requested. Exiting..."
+    with pytest.raises(RuntimeWarning, match=error_message):
         installation_ctx.workspace_installer.configure()
 
     installation_ctx.replace(
