@@ -2,7 +2,7 @@ import logging
 from collections.abc import Iterable
 from pathlib import PurePath, Path
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSResourceType
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
@@ -45,7 +45,7 @@ class AWSExternalLocationsMigration:
         for external_location in existing_external_locations:
             if external_location.url is not None:
                 existing_paths.append(external_location.url)
-        compatible_roles = self._aws_resource_permissions.load_uc_compatible_roles(resource_type="s3")
+        compatible_roles = self._aws_resource_permissions.load_uc_compatible_roles(resource_type=AWSResourceType.S3)
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
         for path, role_arn in missing_paths:
             if role_arn not in credential_dict:

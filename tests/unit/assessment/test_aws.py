@@ -2,7 +2,7 @@ import logging
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
-from databricks.sdk.service.catalog import MetastoreInfo
+from databricks.sdk.service.catalog import MetastoreInfo, Privilege
 from databricks.sdk.errors.platform import NotFound
 
 from databricks.labs.ucx.assessment.aws import (
@@ -11,6 +11,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSResources,
     AWSRole,
     AWSGlue,
+    AWSResourceType,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import run_command
@@ -193,72 +194,74 @@ def test_get_role_policy():
     role_policy = aws.get_role_policy("fake_role", policy_name="fake_policy")
     assert role_policy == [
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket1",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket1",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket2",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket2",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket3",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket3",
         ),
-        AWSPolicyAction(resource_type='s3', privilege='READ_FILES', resource_path='s3://bucket4'),
-        AWSPolicyAction(resource_type='s3', privilege='READ_FILES', resource_path='s3a://bucket4'),
+        AWSPolicyAction(resource_type=AWSResourceType.S3, privilege=Privilege.READ_FILES, resource_path='s3://bucket4'),
+        AWSPolicyAction(
+            resource_type=AWSResourceType.S3, privilege=Privilege.READ_FILES, resource_path='s3a://bucket4'
+        ),
     ]
 
     role_policy = aws.get_role_policy("fake_role", attached_policy_arn="arn:aws:iam::12345:policy/policy")
     assert role_policy == [
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketA",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketA",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketB",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketB",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketC",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketC",
         ),
-        AWSPolicyAction(resource_type='glue', privilege='USAGE', resource_path='*'),
+        AWSPolicyAction(resource_type=AWSResourceType.GLUE, privilege=Privilege.USAGE, resource_path='*'),
     ]
 
 
@@ -679,7 +682,7 @@ def test_create_uc_role_policy_no_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", "s3", s3_prefixes, "1234")
+    aws.put_role_policy("test_role", "test_policy", AWSResourceType.S3, s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -702,7 +705,7 @@ def test_create_uc_role_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", "s3", s3_prefixes, "1234", "key_arn")
+    aws.put_role_policy("test_role", "test_policy", AWSResourceType.S3, s3_prefixes, "1234", "key_arn")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '

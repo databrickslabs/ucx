@@ -14,7 +14,7 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSCredentialCandidate
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSCredentialCandidate, AWSResourceType
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from tests.unit import DEFAULT_CONFIG
@@ -82,7 +82,7 @@ def instance_profile_migration(installation, credential_manager):
             roles.append(
                 AWSCredentialCandidate(
                     role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
-                    privilege=Privilege.WRITE_FILES.value,
+                    privilege=Privilege.WRITE_FILES,
                     paths={f"s3://example-bucket-{i}/*"},
                 )
             )
@@ -179,7 +179,9 @@ def test_create_glue_credentials(installation):
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
-    role_action = AWSRoleAction("arn:aws:iam::123456789012:role/client_id", "s3", "READ_FILES", "s3://prefix")
+    role_action = AWSRoleAction(
+        "arn:aws:iam::123456789012:role/client_id", AWSResourceType.S3, Privilege.READ_FILES, "s3://prefix"
+    )
 
     # validate read-only storage credential
     validation = credential_manager.validate(role_action)
@@ -189,7 +191,9 @@ def test_validate_read_only_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    role_action = AWSRoleAction("arn:aws:iam::123456789012:role/overlap", "s3", "READ_FILES", "s3://prefix")
+    role_action = AWSRoleAction(
+        "arn:aws:iam::123456789012:role/overlap", AWSResourceType.S3, Privilege.READ_FILES, "s3://prefix"
+    )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
@@ -201,14 +205,18 @@ def test_validate_storage_credentials_overlap_location(credential_manager):
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
-    permission_mapping = AWSRoleAction("arn:aws:iam::123456789012:role/none", "s3", "READ_FILES", "s3://prefix")
+    permission_mapping = AWSRoleAction(
+        "arn:aws:iam::123456789012:role/none", AWSResourceType.S3, Privilege.READ_FILES, "s3://prefix"
+    )
 
     validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["Validation returned no results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
-    permission_mapping = AWSRoleAction("arn:aws:iam::123456789012:role/fail", "s3", "READ_FILES", "s3://prefix")
+    permission_mapping = AWSRoleAction(
+        "arn:aws:iam::123456789012:role/fail", AWSResourceType.S3, Privilege.READ_FILES, "s3://prefix"
+    )
 
     validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["LIST validation failed with message: fail"]

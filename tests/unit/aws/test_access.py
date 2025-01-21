@@ -14,6 +14,7 @@ from databricks.sdk.service.catalog import (
     ExternalLocationInfo,
     StorageCredentialInfo,
     MetastoreAssignment,
+    Privilege,
 )
 from databricks.sdk.service.compute import InstanceProfile, Policy
 from databricks.sdk.service.sql import (
@@ -23,7 +24,13 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSUCRoleCandidate
+from databricks.labs.ucx.assessment.aws import (
+    AWSPolicyAction,
+    AWSResources,
+    AWSRole,
+    AWSUCRoleCandidate,
+    AWSResourceType,
+)
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
@@ -59,7 +66,7 @@ def installation_single_role():
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKETX",
                 }
             ]
@@ -85,7 +92,7 @@ def installation_glue():
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKETX",
                 }
             ],
@@ -102,19 +109,19 @@ def installation_multiple_roles():
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKET1",
                 },
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKET2",
                 },
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-rolex",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKETX",
                 },
             ]
@@ -285,7 +292,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws.put_role_policy.assert_called_with(
         'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
-        's3',
+        AWSResourceType.S3,
         {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKET4', 's3://BUCKETX/FOLDERX'},
         None,
         None,
@@ -484,7 +491,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
         call(
             'UC_ROLE_123123',
             'UC_POLICY',
-            's3',
+            AWSResourceType.S3,
             {'s3://BUCKET2/*', 's3://BUCKET4/*', 's3://BUCKET2', 's3://BUCKET4', 's3://BUCKET1', 's3://BUCKET1/*'},
             None,
             None,
@@ -507,7 +514,7 @@ def test_create_uc_role_glue(mock_ws, installation_glue, backend, locations):
         call(
             'UC_ROLE_123123',
             'UC_POLICY',
-            'glue',
+            AWSResourceType.GLUE,
             {'*'},
             None,
             None,
@@ -527,11 +534,11 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     assert (
-        call('UC_ROLE_BUCKET1', 'UC_POLICY', 's3', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        call('UC_ROLE_BUCKET1', 'UC_POLICY', AWSResourceType.S3, {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
         in aws.put_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE_BUCKET2', 'UC_POLICY', 's3', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        call('UC_ROLE_BUCKET2', 'UC_POLICY', AWSResourceType.S3, {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 
@@ -574,18 +581,18 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -593,18 +600,18 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -676,18 +683,18 @@ def test_get_uc_compatible_roles_glue(mock_ws, mock_installation, locations):
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -695,8 +702,8 @@ def test_get_uc_compatible_roles_glue(mock_ws, mock_installation, locations):
         [],
         [
             AWSPolicyAction(
-                resource_type="glue",
-                privilege="USAGE",
+                resource_type=AWSResourceType.GLUE,
+                privilege=Privilege.USAGE,
                 resource_path="*",
             ),
         ],
@@ -790,18 +797,18 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, locations
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -809,18 +816,18 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, locations
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -890,18 +897,18 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -909,18 +916,18 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -1100,8 +1107,8 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             )
         ]

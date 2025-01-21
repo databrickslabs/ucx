@@ -12,7 +12,12 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate, AWSCredentialCandidate
+from databricks.labs.ucx.assessment.aws import (
+    AWSRoleAction,
+    AWSUCRoleCandidate,
+    AWSCredentialCandidate,
+    AWSResourceType,
+)
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -103,7 +108,7 @@ class CredentialManager:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=role_action.role_name,
                 url=role_action.resource_path,
-                read_only=role_action.privilege == Privilege.READ_FILES.value,
+                read_only=role_action.privilege == Privilege.READ_FILES,
             )
         except InvalidParameterValue:
             logger.warning(
@@ -115,7 +120,7 @@ class CredentialManager:
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
-                role_action.privilege == Privilege.READ_FILES.value,
+                role_action.privilege == Privilege.READ_FILES,
                 [
                     "The validation is skipped because an existing external location overlaps "
                     "with the location used for validation."
@@ -127,7 +132,7 @@ class CredentialManager:
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
-                role_action.privilege == Privilege.READ_FILES.value,
+                role_action.privilege == Privilege.READ_FILES,
                 ["Validation returned no results."],
             )
 
@@ -141,7 +146,7 @@ class CredentialManager:
             role_action.role_name,
             role_action.role_arn,
             role_action.resource_path,
-            role_action.privilege == Privilege.READ_FILES.value,
+            role_action.privilege == Privilege.READ_FILES,
             None if not failures else failures,
         )
 
@@ -190,7 +195,7 @@ class IamRoleMigration:
         It returns a list of ARNs
         """
         # load IAM role list
-        iam_list = self._resource_permissions.load_uc_compatible_roles(resource_type="glue")
+        iam_list = self._resource_permissions.load_uc_compatible_roles(resource_type=AWSResourceType.GLUE)
         # list existing storage credentials
         credential_list = self._storage_credential_manager.list_glue().values()
         # check if the iam is already used in UC storage credential
@@ -200,7 +205,7 @@ class IamRoleMigration:
             credential_candidates.append(
                 AWSCredentialCandidate(
                     role_arn=iam.role_arn,
-                    privilege=Privilege.USAGE.value,
+                    privilege=Privilege.USAGE,
                     paths={"*"},
                 )
             )
@@ -222,7 +227,7 @@ class IamRoleMigration:
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
         )
-        if plan_confirmed is not True:
+        if not plan_confirmed:
             return []
 
         execution_result = []
@@ -230,7 +235,7 @@ class IamRoleMigration:
             storage_credential = self._storage_credential_manager.create(
                 name=iam.role_name,
                 role_arn=iam.role_arn,
-                read_only=iam.privilege == Privilege.READ_FILES.value,
+                read_only=iam.privilege == Privilege.READ_FILES,
             )
             if storage_credential.aws_iam_role is None:
                 logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
@@ -239,7 +244,7 @@ class IamRoleMigration:
                 iam.role_name, iam.role_arn, storage_credential.aws_iam_role.external_id
             )
             for path in iam.paths:
-                role_action = AWSRoleAction(iam.role_arn, "s3", path, iam.privilege)
+                role_action = AWSRoleAction(iam.role_arn, AWSResourceType.S3, iam.privilege, path)
                 execution_result.append(self._storage_credential_manager.validate(role_action))
 
         if execution_result:
