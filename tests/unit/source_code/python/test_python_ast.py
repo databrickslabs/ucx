@@ -158,7 +158,7 @@ formatted=message_unformatted % (name, version)
     assert True
 
 
-def test_tree_child_tree_infers_value() -> None:
+def test_tree_extend_globals_child_tree_infers_value() -> None:
     inferred_string = "Hello John!"
     parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
     parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
@@ -175,7 +175,7 @@ def test_tree_child_tree_infers_value() -> None:
     assert strings == [inferred_string]
 
 
-def test_tree_infers_value_from_grand_parent() -> None:
+def test_tree_extend_globals_infers_value_from_grand_parent() -> None:
     inferred_string = "Hello John!"
     grand_parent_source, parent_source, child_source = "name = 'John'", "greeting = 'Hello'", 'say = f"Hello {name}!"'
     grand_parent_maybe_tree = Tree.maybe_normalized_parse(grand_parent_source)
