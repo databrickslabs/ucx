@@ -4,6 +4,7 @@ import pytest
 
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.service.jobs import BaseJob, JobSettings, Task, PipelineTask
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -91,14 +92,30 @@ def test_migrate_pipelines(ws, mock_installation, pipeline_spec, include_flag, e
         ws.api_client.do.assert_has_calls([api_calls])
 
 
-def test_migrate_pipelines_no_pipelines(
-    ws,
-):
-    errors = {}
-    rows = {}
-    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+def test_migrate_pipelines_no_pipelines(ws) -> None:
+    sql_backend = MockBackend()
     pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
     jobs_crawler = JobsCrawler(ws, sql_backend, "inventory_database")
     pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, jobs_crawler, "catalog_name")
     ws.jobs.list.return_value = [BaseJob(job_id=536591785949415), BaseJob(), BaseJob(job_id=536591785949417)]
     pipelines_migrator.migrate_pipelines()
+
+
+def test_migrate_pipelines_skips_not_found_job(caplog, ws) -> None:
+    job_columns = MockBackend.rows("job_id", "success", "failures", "job_name", "creator")
+    sql_backend = MockBackend(
+        rows={
+            "`hive_metastore`.`inventory_database`.`jobs`": job_columns[
+                ("536591785949415", 1, [], "single-job", "anonymous@databricks.com")
+            ]
+        }
+    )
+    pipelines_crawler = PipelinesCrawler(ws, sql_backend, "inventory_database")
+    jobs_crawler = JobsCrawler(ws, sql_backend, "inventory_database")
+    pipelines_migrator = PipelinesMigrator(ws, pipelines_crawler, jobs_crawler, "catalog_name")
+
+    ws.jobs.get.side_effect = NotFound
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.pipelines_migrate"):
+        pipelines_migrator.migrate_pipelines()
+    assert "Skipping non-existing job: 536591785949415" in caplog.messages

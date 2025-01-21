@@ -11,7 +11,13 @@ _TEST_TENANT_ID = "directory_12345"
 
 
 def test_pipeline_migrate(
-    ws, make_pipeline, make_random, watchdog_purge_suffix, make_directory, runtime_ctx, make_mounted_location
+    ws,
+    make_pipeline,
+    make_random,
+    watchdog_purge_suffix,
+    make_directory,
+    runtime_ctx,
+    make_mounted_location,
 ) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
 
