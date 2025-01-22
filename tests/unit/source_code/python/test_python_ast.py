@@ -216,6 +216,33 @@ def test_tree_extend_globals_for_parent_with_children_cannot_infer_value() -> No
     assert strings == [inferred_string]
 
 
+def test_tree_extend_globals_for_unresolvable_parent_cannot_infer_value() -> None:
+    """A tree cannot infer the value from a parent that has an unresolvable node.
+
+    This test shows a learning when working with Astroid. The unresolvable variable is irrelevant for the variable we
+    are trying to resolve, still, the unresolvable variable makes that we cannot resolve to searched value.
+    """
+    inferred_string = ""  # Nothing inferred
+    grand_parent_source = "name = 'John'"
+    parent_source = "print(unknown)\ngreeting = 'Hello'"  # Unresolvable variable `unknown`
+    child_source = "say = f'{greeting} {name}!'"
+    grand_parent_maybe_tree = Tree.maybe_normalized_parse(grand_parent_source)
+    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
+    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+
+    assert grand_parent_maybe_tree.tree is not None, grand_parent_maybe_tree.failure
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+
+    parent_maybe_tree.tree.extend_globals(grand_parent_maybe_tree.tree.node.globals)
+    child_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+
+    nodes = child_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
 def test_tree_extend_globals_with_notebook_using_variable_from_other_notebook() -> None:
     """Simulating a notebook where it uses a variable from another notebook."""
     inferred_string = "catalog.schema.table"
