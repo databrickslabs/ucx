@@ -269,7 +269,7 @@ def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_
 %unsupported stuff '"%#@!
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     commands, _ = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
     dependency = Dependency(FileLoader(), Path(""))

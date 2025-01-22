@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 def test_infers_empty_list() -> None:
     maybe_tree = MaybeTree.from_source_code("a=[]")
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -17,7 +17,7 @@ def test_infers_empty_list() -> None:
 
 def test_infers_empty_tuple() -> None:
     maybe_tree = MaybeTree.from_source_code("a=tuple()")
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -27,7 +27,7 @@ def test_infers_empty_tuple() -> None:
 
 def test_infers_empty_set() -> None:
     maybe_tree = MaybeTree.from_source_code("a={}")
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)
@@ -41,7 +41,7 @@ value = "abc"
 fstring = f"Hello {value}!"
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
@@ -57,7 +57,7 @@ value = { "abc": 123 }
 fstring = f"Hello {value['abc']}!"
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
@@ -73,7 +73,7 @@ value = "abc"
 fstring = "Hello {0}!".format(value)
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of fstring = ...
@@ -92,7 +92,7 @@ for value1 in values_1:
         fstring = f"Hello {value1}, {value2}!"
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of fstring = ...
@@ -110,7 +110,7 @@ name = "my-widget"
 value = dbutils.widgets.get(name)
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
@@ -127,7 +127,7 @@ for name in ["my-widget-1", "my-widget-2"]:
     value = dbutils.widgets.get(name)
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # value of value = ...
@@ -144,7 +144,7 @@ name = "my-widget"
 value = dbutils.widgets.get(name)
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
@@ -158,7 +158,7 @@ def test_survives_absence_of_externally_defined_values() -> None:
     value = dbutils.widgets.get(name)
     """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
@@ -175,7 +175,7 @@ name = "my-widget"
 value = values[name]
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of value = ...

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import builtins
-import sys
-from abc import ABC, abstractmethod
 import logging
 import re
+import sys
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
@@ -68,7 +68,7 @@ class MaybeTree:
     tree: Tree | None
     """The UCX Python abstract syntax tree object"""
 
-    failure: Failure | None
+    failures: list[Failure] = field(default_factory=list)
     """The failure during constructing the tree"""
 
     @classmethod
@@ -82,11 +82,11 @@ class MaybeTree:
         try:
             root = parse(code)
             tree = Tree(root)
-            return cls(tree, None)
+            return cls(tree)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
             failure = cls._failure_from_exception(code, e)
-            return cls(None, failure)
+            return cls(None, [failure])
 
     @staticmethod
     def _failure_from_exception(source_code: str, e: Exception) -> Failure:
@@ -627,8 +627,8 @@ class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
         maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
+        if maybe_tree.failures:
+            yield from maybe_tree.failures
             return
         assert maybe_tree.tree is not None
         yield from self.lint_tree(maybe_tree.tree)
@@ -641,8 +641,9 @@ class TablePyCollector(TableCollector, ABC):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         maybe_tree = MaybeTree.from_source_code(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure)
             return
         assert maybe_tree.tree is not None
         for table_node in self.collect_tables_from_tree(maybe_tree.tree):
@@ -656,8 +657,9 @@ class DfsaPyCollector(DfsaCollector, ABC):
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = MaybeTree.from_source_code(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return
         assert maybe_tree.tree is not None
         for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
@@ -682,8 +684,8 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def lint(self, code: str) -> Iterable[Advice]:
         maybe_tree = self._parse_and_append(code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
+        if maybe_tree.failures:
+            yield from maybe_tree.failures
             return
         assert maybe_tree.tree is not None
         yield from self.lint_tree(maybe_tree.tree)
@@ -694,7 +696,7 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def _parse_and_append(self, code: str) -> MaybeTree:
         maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
+        if maybe_tree.failures:
             return maybe_tree
         assert maybe_tree.tree is not None
         self.append_tree(maybe_tree.tree)
@@ -712,17 +714,19 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
     def process_child_cell(self, code: str) -> None:
         this_tree = self._make_tree()
         maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
+        if maybe_tree.failures:
             # TODO: bubble up this error
-            logger.warning(maybe_tree.failure.message)
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return
         assert maybe_tree.tree is not None
         this_tree.attach_child_tree(maybe_tree.tree)
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
         maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return
         assert maybe_tree.tree is not None
         for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
@@ -734,8 +738,9 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
         maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return
         assert maybe_tree.tree is not None
         for table_node in self.collect_tables_from_tree(maybe_tree.tree):

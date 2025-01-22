@@ -94,8 +94,9 @@ class PythonCodeAnalyzer:
     def _parse_and_extract_nodes(self) -> tuple[Tree | None, list[NodeBase], Iterable[DependencyProblem]]:
         problems: list[DependencyProblem] = []
         maybe_tree = MaybeTree.from_source_code(self._python_code)
-        if maybe_tree.failure:
-            return None, [], [DependencyProblem(maybe_tree.failure.code, maybe_tree.failure.message)]
+        if maybe_tree.failures:
+            problems = [DependencyProblem(failure.code, failure.message) for failure in maybe_tree.failures]
+            return None, [], problems
         assert maybe_tree.tree is not None
         tree = maybe_tree.tree
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)

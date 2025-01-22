@@ -654,15 +654,17 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
         for cell in notebook.cells:
             for item in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
                 yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
-            if cell.language is CellLanguage.PYTHON:
-                if inherited_tree is None:
-                    inherited_tree = Tree.new_module()
-                maybe_tree = MaybeTree.from_source_code(cell.original_code)
-                if maybe_tree.failure:
-                    logger.warning(maybe_tree.failure.message)
-                    continue
-                assert maybe_tree.tree is not None
-                inherited_tree.attach_child_tree(maybe_tree.tree)
+            if cell.language != CellLanguage.PYTHON:
+                continue
+            if inherited_tree is None:
+                inherited_tree = Tree.new_module()
+            maybe_tree = MaybeTree.from_source_code(cell.original_code)
+            if maybe_tree.failures:
+                for failure in maybe_tree.failures:
+                    logger.warning(failure.message)
+                continue
+            assert maybe_tree.tree is not None
+            inherited_tree.attach_child_tree(maybe_tree.tree)
 
     def _collect_from_source(
         self,

@@ -197,8 +197,8 @@ class NotebookLinter:
 
     def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
         maybe_tree = MaybeTree.from_source_code(python_cell.original_code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
+        if maybe_tree.failures:
+            yield from maybe_tree.failures
         tree = maybe_tree.tree
         # a cell with only comments will not produce a tree
         if register_trees:

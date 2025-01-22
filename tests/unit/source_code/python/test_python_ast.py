@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 def test_extracts_root() -> None:
     maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     stmt = tree.first_statement()
     root = Tree(stmt).root
@@ -104,13 +104,13 @@ message_unformatted = """
 """ % ("name", "version")
 '''
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.failure is None
+    assert maybe_tree.tree, maybe_tree.failures
 
 
 @pytest.mark.parametrize("magic_command", ["%tb", "%matplotlib inline"])
 def test_tree_maybe_parses_magic_command(magic_command: str) -> None:
     maybe_tree = MaybeTree.from_source_code(magic_command)
-    assert maybe_tree.failure is None
+    assert maybe_tree.tree, maybe_tree.failures
 
 
 def test_tree_walks_nodes_once() -> None:
@@ -131,8 +131,8 @@ def test_tree_attach_child_tree_infers_value() -> None:
     parent_maybe_tree = MaybeTree.from_source_code(parent_source)
     child_maybe_tree = MaybeTree.from_source_code(child_source)
 
-    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
-    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+    assert parent_maybe_tree.tree, parent_maybe_tree.failures
+    assert child_maybe_tree.tree, child_maybe_tree.failures
 
     parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
 
@@ -153,7 +153,7 @@ df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     save_call = tree.locate(
         Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)]
@@ -167,7 +167,7 @@ from importlib import import_module
 module = import_module("xyz")
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     import_calls = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
     assert import_calls
@@ -176,7 +176,7 @@ module = import_module("xyz")
 @pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
 def test_is_instance_of(source, name, class_name) -> None:
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     assert isinstance(tree.node, Module)
     module = tree.node
@@ -194,9 +194,9 @@ def test_tree_attach_child_tree_propagates_module_reference() -> None:
     second_line_maybe_tree = MaybeTree.from_source_code(source_2)
     third_line_maybe_tree = MaybeTree.from_source_code(source_3)
 
-    assert first_line_maybe_tree.tree, first_line_maybe_tree.failure
-    assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
-    assert third_line_maybe_tree.tree, third_line_maybe_tree.failure
+    assert first_line_maybe_tree.tree, first_line_maybe_tree.failures
+    assert second_line_maybe_tree.tree, second_line_maybe_tree.failures
+    assert third_line_maybe_tree.tree, third_line_maybe_tree.failures
 
     first_line_maybe_tree.tree.attach_child_tree(second_line_maybe_tree.tree)
     first_line_maybe_tree.tree.attach_child_tree(third_line_maybe_tree.tree)
@@ -210,7 +210,7 @@ def test_renumbers_positively() -> None:
 df.write.format("delta").saveAsTable("old.things")
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     assert len(nodes) == 2
@@ -228,7 +228,7 @@ def test_renumbers_negatively() -> None:
 df.write.format("delta").saveAsTable("old.things")
 """
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     assert len(nodes) == 2
@@ -252,7 +252,7 @@ df.write.format("delta").saveAsTable("old.things")
 )
 def test_counts_lines(source: str, line_count: int) -> None:
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     assert tree.line_count() == line_count
 
@@ -274,7 +274,7 @@ x = stuff()""",
 )
 def test_is_builtin(source, name, is_builtin) -> None:
     maybe_tree = MaybeTree.from_source_code(source)
-    assert maybe_tree.tree is not None, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
     for node in nodes:
@@ -291,7 +291,7 @@ def test_is_builtin(source, name, is_builtin) -> None:
 def test_tree_attach_nodes_sets_parent() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = MaybeTree.from_source_code("a = 1")
-    assert maybe_tree.tree, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
 
     maybe_tree.tree.attach_nodes([node])
 
@@ -301,7 +301,7 @@ def test_tree_attach_nodes_sets_parent() -> None:
 def test_tree_attach_nodes_adds_node_to_body() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = MaybeTree.from_source_code("a = 1")
-    assert maybe_tree.tree, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
 
     maybe_tree.tree.attach_nodes([node])
 
@@ -310,7 +310,7 @@ def test_tree_attach_nodes_adds_node_to_body() -> None:
 
 def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
     maybe_tree = MaybeTree.from_source_code("a = 1")
-    assert maybe_tree.tree, maybe_tree.failure
+    assert maybe_tree.tree, maybe_tree.failures
 
     node = astroid.extract_node("b = a + 2")
     assign_name = next(node.get_children())
@@ -326,8 +326,8 @@ def test_tree_attach_child_tree_appends_globals_to_parent_tree() -> None:
     parent_maybe_tree = MaybeTree.from_source_code("a = 1")
     child_maybe_tree = MaybeTree.from_source_code("b = a + 2")
 
-    assert parent_maybe_tree.tree, parent_maybe_tree.failure
-    assert child_maybe_tree.tree, child_maybe_tree.failure
+    assert parent_maybe_tree.tree, parent_maybe_tree.failures
+    assert child_maybe_tree.tree, child_maybe_tree.failures
 
     parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
 

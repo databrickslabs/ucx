@@ -414,19 +414,19 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
 
     def apply(self, code: str) -> str:
         maybe_tree = MaybeTree.from_source_code(code)
-        if not maybe_tree.tree:
-            assert maybe_tree.failure is not None
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return code
-        tree = maybe_tree.tree
+        assert maybe_tree.tree is not None
         # we won't be doing it like this in production, but for the sake of the example
-        for node in tree.walk():
+        for node in maybe_tree.tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return tree.node.as_string()
+        return maybe_tree.tree.node.as_string()
 
     def _find_matcher(self, node: NodeNG) -> _TableNameMatcher | None:
         if not isinstance(node, Call):
@@ -488,8 +488,9 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
         if not self._sql_fixer:
             return code
         maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
+        if maybe_tree.failures:
+            for failure in maybe_tree.failures:
+                logger.warning(failure.message)
             return code
         assert maybe_tree.tree is not None
         tree = maybe_tree.tree
