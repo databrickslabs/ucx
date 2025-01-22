@@ -177,14 +177,12 @@ class NotebookLinter:
             if isinstance(cell, RunCell):
                 maybe_tree = self._resolve_and_parse_run_cell(cell, parent_tree=parent_tree)
             elif isinstance(cell, PythonCell):
-                maybe_tree = self._parse_python_cell(cell)
+                maybe_tree = self._parse_python_cell(cell, parent_tree=parent_tree)
             if maybe_tree.failure:
                 return maybe_tree
             if maybe_tree.tree:
-                # The subsequent cell gets the globals from the previous cell
-                maybe_tree.tree.extend_globals(parent_tree.node.globals)
                 self._python_tree_cache[(notebook.path, cell)] = maybe_tree.tree
-                parent_tree = maybe_tree.tree
+                parent_tree = maybe_tree.tree  # The subsequent cell gets the globals from the previous cell
         return maybe_tree
 
     def _resolve_and_parse_run_cell(self, run_cell: RunCell, *, parent_tree: Tree) -> MaybeTree:
@@ -201,7 +199,7 @@ class NotebookLinter:
             parent_tree.extend_globals(maybe_tree.tree.node.globals)
         return maybe_tree
 
-    def _parse_python_cell(self, python_cell: PythonCell) -> MaybeTree:
+    def _parse_python_cell(self, python_cell: PythonCell, *, parent_tree: Tree) -> MaybeTree:
         """Parse the Python cell."""
         maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
         if maybe_tree.failure:
@@ -212,6 +210,7 @@ class NotebookLinter:
             )
             return MaybeTree(None, failure)
         assert maybe_tree.tree is not None
+        maybe_tree.tree.extend_globals(parent_tree.node.globals)
         maybe_child_tree = self._parse_tree(maybe_tree.tree)
         if maybe_child_tree.failure:
             return maybe_child_tree
