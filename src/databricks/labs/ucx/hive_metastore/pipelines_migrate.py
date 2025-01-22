@@ -4,7 +4,7 @@ from typing import BinaryIO
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service.jobs import PipelineTask, Task, JobSettings
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -53,7 +53,11 @@ class PipelinesMigrator:
             if not job.job_id:
                 continue
 
-            job_details = self._ws.jobs.get(int(job.job_id))
+            try:
+                job_details = self._ws.jobs.get(int(job.job_id))
+            except NotFound:
+                logger.warning(f"Skipping non-existing job: {job.job_id}")
+                continue
             if not job_details.settings or not job_details.settings.tasks:
                 continue
 
