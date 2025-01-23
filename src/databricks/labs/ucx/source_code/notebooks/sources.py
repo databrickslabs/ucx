@@ -451,6 +451,7 @@ class FileLinter:
         yield from self._apply_file()
 
     def _apply_file(self) -> Iterable[Advice]:
+        assert self._content is not None, "Content should be read from path before calling this method"
         language = file_language(self._path)
         if not language:
             suffix = self._path.suffix.lower()
