@@ -463,7 +463,7 @@ class FileLinter:
                 yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
         else:
             try:
-                fixed_content = self._ctx.apply_fixes(language, self._content, inherited_tree=self._inherited_tree)
+                fixed_content = self._ctx.apply_fixes(language, self._content)
                 if self._content == fixed_content:
                     self._path.write_text(fixed_content)
             except ValueError as err:

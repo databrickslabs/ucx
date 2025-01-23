@@ -19,7 +19,6 @@ from databricks.labs.ucx.source_code.python.python_ast import (
     TablePyCollector,
     DfsaPyCollector,
     PythonSequentialLinter,
-    Tree,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
@@ -147,7 +146,7 @@ class LinterContext:
             return SqlSequentialLinter([], [], cast(list[TableSqlCollector], self._table_collectors[language]))
         raise ValueError(f"Unsupported language: {language}")
 
-    def apply_fixes(self, language: Language, code: str, *, inherited_tree: Tree) -> str:
+    def apply_fixes(self, language: Language, code: str) -> str:
         """Apply fixes from linters belonging to the language."""
         linter = self.linter(language)
         for advice in linter.lint(code):
