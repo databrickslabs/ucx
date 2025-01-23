@@ -169,6 +169,11 @@ class NotebookLinter:
     def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree) -> MaybeTree:
         """Parse a notebook by parsing its cells.
 
+        The notebook linter is designed to parse a valid tree for its notebook **only**. Possible child notebooks
+        referenced by run cells are brought into the scope of this notebook, however, their trees are not valid complete
+        for linting. The child notebooks are linted with another call to the notebook linter that includes the
+        context(s) from which these notebooks are ran.
+
         Returns :
             MaybeTree : The tree or failure belonging to the **last** cell.
         """
